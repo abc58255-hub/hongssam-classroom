@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjN2MzYWVkIi8+PHRleHQgeD0iOTAiIHk9IjExNSIgZm9udC1zaXplPSIxMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfj6s8L3RleHQ+PC9zdmc+">
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjN2MzYWVkIi8+PHRleHQgeD0iOTAiIHk9IjExNSIgZm9udC1zaXplPSIxMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfj6s8L3RleHQ+PC9zdmc+">
+  <meta name="theme-color" content="#7c3aed">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>우리 반 교실</title>
+  <style>
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+    html, body { font-family: 'Pretendard', sans-serif; background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%); margin: 0; padding: 0; color: #334155; min-height: 100vh; overflow-x: hidden; }
+    .app-wrapper { display: flex; justify-content: center; padding: 20px; min-height: 90vh; position: relative; z-index: 10; }
+    #sakura-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; overflow: hidden; }
+    .sakura { position: absolute; background-color: #ffd1dc; border-radius: 100% 0 100% 0; box-shadow: -2px -2px 4px rgba(255,182,193,0.4); animation: fall linear infinite, sway ease-in-out infinite alternate; opacity: 0.8; }
+    @keyframes fall { 0%{top:-10%;opacity:0} 10%{opacity:0.8} 90%{opacity:0.8} 100%{top:110%;opacity:0} }
+    @keyframes sway { 0%{transform:translateX(0px) rotate(0deg)} 100%{transform:translateX(30px) rotate(45deg)} }
+
+    .card { background: rgba(255,255,255,0.9); backdrop-filter: blur(10px); width: 100%; max-width: 450px; border-radius: 24px; box-shadow: 0 12px 36px rgba(0,0,0,0.06); overflow: hidden; box-sizing: border-box; margin-top: 10px; position:relative;}
+    .banner-img { height: 150px; background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%); position: relative; }
+    .banner-overlay { position: absolute; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:space-between; padding:0 25px; box-sizing:border-box; }
+    .banner-title { color:white; font-size:24px; font-weight:800; text-shadow:0 2px 4px rgba(0,0,0,0.1); }
+    .refresh-btn { background:rgba(255,255,255,0.25); color:white; border:1px solid rgba(255,255,255,0.5); padding:8px 14px; border-radius:12px; cursor:pointer; font-weight:800; font-size:13px; backdrop-filter:blur(5px); transition:0.2s; }
+    .refresh-btn:hover { background:rgba(255,255,255,0.4); }
+    .card-content { padding: 30px 25px; }
+    .field { margin-bottom: 24px; }
+    label { display:block; margin-bottom:8px; font-weight:700; font-size:14px; color:#475569; }
+    input, select, textarea { width:100%; padding:16px; border:2px solid transparent; border-radius:16px; box-sizing:border-box; font-size:15px; background:#f1f5f9; color:#1e293b; font-family:inherit; transition:all 0.3s ease; }
+    input:focus, select:focus, textarea:focus { outline:none; background:white; border-color:#d8b4e2; box-shadow:0 0 0 4px rgba(161,140,209,0.15); }
+    button.primary-btn { width:100%; padding:18px; background:linear-gradient(to right,#a18cd1,#fbc2eb); color:white; border:none; border-radius:16px; font-size:16px; font-weight:800; cursor:pointer; box-shadow:0 6px 15px rgba(161,140,209,0.4); transition:transform 0.2s,box-shadow 0.2s; }
+    button.primary-btn:active { transform:translateY(2px); box-shadow:0 2px 5px rgba(161,140,209,0.4); }
+    button.primary-btn:disabled { background:#cbd5e1; box-shadow:none; transform:none; cursor:not-allowed; }
+    .status-msg { text-align:center; margin-top:15px; font-weight:700; color:#ef4444; font-size:14px; }
+    .logout-btn { width:100%; background:transparent; color:#94a3b8; border:none; padding:10px; font-size:13px; font-weight:700; cursor:pointer; margin-bottom:15px; }
+    .tab-container { display:flex; background:#f1f5f9; padding:6px; border-radius:18px; margin-bottom:25px; }
+    .tab-btn { flex:1; padding:10px 0; text-align:center; font-weight:800; font-size:12px; color:#64748b; cursor:pointer; border-radius:14px; border:none; background:transparent; transition:0.3s; position:relative; }
+    .tab-btn.active { background:white; color:#a18cd1; box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+    .tab-content { display:none; animation:fadeIn 0.4s ease; }
+    .tab-content.active { display:block; }
+    @keyframes fadeIn { from{opacity:0;transform:translateY(5px)} to{opacity:1;transform:translateY(0)} }
+    .record-card { background:white; border:1px solid #f1f5f9; padding:20px; border-radius:16px; margin-bottom:15px; box-shadow:0 4px 15px rgba(0,0,0,0.03); position:relative; overflow:hidden; }
+    .record-card::before { content:''; position:absolute; top:0; left:0; width:6px; height:100%; background:linear-gradient(to bottom,#a18cd1,#fbc2eb); }
+    .record-title { font-weight:800; color:#1e293b; font-size:16px; margin-bottom:6px; }
+    .record-date { font-size:12px; color:#94a3b8; font-weight:600; margin-bottom:15px; }
+    .record-content { background:#f8fafc; padding:15px; border-radius:12px; font-size:14px; color:#475569; line-height:1.6; }
+    .record-label { font-size:12px; color:#a18cd1; font-weight:800; margin-bottom:4px; display:block; }
+    .survey-badge { position:absolute; top:-4px; right:-4px; background:#ef4444; color:white; font-size:9px; font-weight:bold; padding:2px 5px; border-radius:10px; animation:badgePulse 2s ease-in-out infinite; }
+    @keyframes badgePulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.2)} }
+    .survey-container { background:#fff; border-radius:20px; padding:25px; box-shadow:0 10px 30px rgba(161,140,209,0.1); margin-top:10px; border:2px solid #fbc2eb; position:relative; }
+    .sv-step-text { text-align:center; color:#a18cd1; font-weight:800; font-size:14px; margin-bottom:15px; }
+    .sv-q-title { font-size:18px; font-weight:800; color:#1e293b; margin-bottom:20px; text-align:center; line-height:1.4; }
+    .stu-chip-grid { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+    .stu-chip { background:#f1f5f9; border:1px solid #cbd5e1; color:#475569; padding:10px 14px; border-radius:20px; font-size:14px; font-weight:bold; cursor:pointer; transition:0.2s; }
+    .stu-chip.selected { background:#a18cd1; color:white; border-color:#a18cd1; box-shadow:0 4px 10px rgba(161,140,209,0.4); transform:scale(1.05); }
+    .score-grid { display:flex; justify-content:space-between; margin-bottom:20px; }
+    .score-btn { flex:1; margin:0 4px; padding:15px 0; background:#f1f5f9; border:2px solid transparent; border-radius:12px; font-size:20px; text-align:center; cursor:pointer; transition:0.2s; display:flex; flex-direction:column; align-items:center; }
+    .score-btn span { font-size:12px; font-weight:bold; margin-top:5px; color:#94a3b8; }
+    .score-btn.selected { background:white; border-color:#a18cd1; box-shadow:0 4px 10px rgba(161,140,209,0.2); }
+    .score-btn.selected span { color:#a18cd1; }
+    .dynamic-reason-box { background:#f8fafc; padding:15px; border-radius:12px; margin-bottom:15px; border-left:4px solid #a18cd1; }
+    .nav-btn-wrap { display:flex; gap:10px; margin-top:30px; }
+
+    /* ✅ 학급 알림 스타일 */
+    .notice-section { margin-bottom: 20px; }
+    .notice-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; cursor:pointer; }
+    .notice-header-left { display:flex; align-items:center; gap:8px; font-weight:800; font-size:15px; color:#1e293b; }
+    .notice-toggle-btn { font-size:12px; color:#94a3b8; font-weight:600; }
+    .notice-item { border-radius:14px; padding:14px 16px; margin-bottom:8px; border-left:4px solid #a18cd1; background:white; box-shadow:0 2px 8px rgba(0,0,0,0.04); }
+    .notice-item.important { border-left-color:#ef4444; background:#fff5f5; }
+    .notice-item-top { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; margin-bottom:4px; }
+    .notice-item-title { font-weight:800; font-size:14px; color:#1e293b; }
+    .notice-type-badge { font-size:11px; padding:2px 8px; border-radius:8px; font-weight:700; flex-shrink:0; }
+    .notice-item-content { font-size:13px; color:#475569; line-height:1.6; margin-top:6px; }
+    .notice-item-date { font-size:11px; color:#94a3b8; margin-top:4px; }
+    .notice-empty { text-align:center; color:#94a3b8; font-size:13px; padding:16px; background:#f8fafc; border-radius:12px; }
+
+    #dashboardScreen, #successMsg, #surveyScreen, #surveyEndMsg { display: none; }
+  </style>
+</head>
+<body>
+<div id="sakura-container"></div>
+<div class="app-wrapper">
+
+  <!-- 로그인 -->
+  <div class="card" id="loginScreen">
+    <div class="banner-img"><div class="banner-overlay" style="justify-content:center;"><div class="banner-title" id="loginBanner">🏫 우리 반 교실</div></div></div>
+    <div class="card-content">
+      <div class="field"><label>학번</label><input type="number" id="loginId" placeholder="예: 1305"></div>
+      <div class="field"><label>이름</label><input type="text" id="loginName" placeholder="홍길동"></div>
+      <div class="field"><label>비밀번호</label><input type="password" id="loginPw" onkeypress="if(event.keyCode==13) doLogin()"></div>
+      <button id="loginBtn" class="primary-btn" onclick="doLogin()">입장하기 ✨</button>
+      <div class="status-msg" id="loginStatus"></div>
+      <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
+        🏫 우리 반 교실<br><span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span style="color:#c4b5fd; font-size:10px;">v1.2</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 대시보드 -->
+  <div class="card" id="dashboardScreen">
+    <div class="banner-img" style="height:120px;"><div class="banner-overlay"><div class="banner-title" id="welcomeMsg" style="font-size:18px;">환영합니다!</div><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div>
+    <div class="card-content" style="padding-top:15px;">
+      <button class="logout-btn" onclick="clearLoginInfo()">로그아웃하기</button>
+
+      <!-- ✅ 학급 알림 섹션 -->
+      <div class="notice-section" id="noticeSection" style="display:none;">
+        <div class="notice-header" onclick="toggleNotices()">
+          <div class="notice-header-left">
+            <span>📢</span>
+            <span>학급 알림</span>
+            <span id="noticeBadge" style="background:#ef4444; color:white; font-size:10px; font-weight:800; padding:2px 7px; border-radius:10px; display:none;"></span>
+          </div>
+          <span class="notice-toggle-btn" id="noticeToggleIcon">▲ 접기</span>
+        </div>
+        <div id="noticeList"></div>
+      </div>
+
+      <div class="tab-container">
+        <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">📝 활동 남기기</button>
+        <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">📂 내 기록장</button>
+        <button class="tab-btn" id="btnTab3" onclick="switchTab(3)">💌 이달의 설문 <span id="svBadge" class="survey-badge" style="display:none;">N</span></button>
+        <button class="tab-btn" id="btnTab4" onclick="switchTab(4)" style="color:#ef4444;">🚨 신고</button>
+      </div>
+
+      <div id="tab1" class="tab-content active">
+        <div class="field">
+          <label>활동 선택</label>
+          <select id="actSelect" onchange="updateGuide()"><option value="">로딩 중...</option></select>
+        </div>
+        <div id="actGuideArea" style="display:none; margin-top:0;">
+          <div id="actGuide" style="font-size:13px; color:#475569; background:#f8fafc; padding:12px; border-radius:12px; line-height:1.5; margin-bottom:12px;"></div>
+        </div>
+        <div class="field"><label>역할 / 한 일</label><textarea id="actRole" rows="3" placeholder="이 활동에서 내가 맡은 역할이나 실천한 내용을 적어주세요."></textarea></div>
+        <div class="field"><label>배우고 느낀 점</label><textarea id="actReflect" rows="4" placeholder="활동을 통해 새롭게 알게 된 점이나 느낀 점을 적어주세요."></textarea></div>
+        <div class="field"><label>📸 사진 첨부 (선택)</label><input type="file" id="fileInput" accept="image/jpeg, image/png"></div>
+        <button id="submitBtn" class="primary-btn" onclick="upload()">제출하기</button>
+        <div class="status-msg" id="submitStatus"></div>
+      </div>
+
+      <div id="tab2" class="tab-content">
+        <h3 style="font-size:16px; color:#a18cd1; margin-top:0; font-weight:800;">나의 빛나는 기록 ✨</h3>
+        <div id="myRecordsList"></div>
+      </div>
+
+      <div id="tab3" class="tab-content">
+        <div id="svWaitArea" style="text-align:center; padding:30px 0;">
+          <div style="font-size:50px; margin-bottom:15px;">💌</div>
+          <h3 id="svWaitTitle" style="color:#1e293b; margin-top:0;">진행 중인 설문이 없습니다.</h3>
+          <p id="svWaitDesc" style="color:#64748b; font-size:14px; line-height:1.5; margin-bottom:25px;">선생님이 새로운 설문을 시작하면 여기에 표시됩니다.</p>
+          <button id="svStartBtn" class="primary-btn" style="display:none;" onclick="startSurvey()">설문 시작하기 ▶</button>
+        </div>
+      </div>
+
+      <!-- 탭4: 신고하기 -->
+      <div id="tab4" class="tab-content">
+        <!-- 신고 완료 화면 (제출 후 표시) -->
+        <div id="reportDoneArea" style="display:none; text-align:center; padding:40px 20px;">
+          <div style="font-size:60px; margin-bottom:16px;">✅</div>
+          <div style="font-size:17px; font-weight:800; color:#1e293b; margin-bottom:10px;">접수 완료</div>
+          <div style="font-size:14px; color:#64748b; line-height:1.7;">선생님께 전달되었어요.<br>확인 후 도움을 드릴 거예요.</div>
+        </div>
+        <!-- 신고 입력 폼 -->
+        <div id="reportFormArea">
+          <div style="background:#fef2f2; border:1.5px solid #fca5a5; border-radius:16px; padding:18px; margin-bottom:20px;">
+            <div style="font-size:15px; font-weight:800; color:#dc2626; margin-bottom:6px;">🚨 선생님께 신고하기</div>
+            <div style="font-size:13px; color:#7f1d1d; line-height:1.6;">선생님만 확인할 수 있어요. 실명으로 접수되며 신중하게 작성해주세요.</div>
+          </div>
+          <div class="field">
+            <label>신고 유형</label>
+            <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;">
+              <label style="flex:1; min-width:120px;"><input type="radio" name="reportCat" value="학교폭력·괴롭힘" style="margin-right:6px; accent-color:#ef4444;">🚨 학교폭력·괴롭힘</label>
+              <label style="flex:1; min-width:120px;"><input type="radio" name="reportCat" value="분실·도난" style="margin-right:6px; accent-color:#f59e0b;">🔍 분실·도난</label>
+              <label style="flex:1; min-width:120px;"><input type="radio" name="reportCat" value="건의사항" style="margin-right:6px; accent-color:#10b981;">💡 건의사항</label>
+              <label style="flex:1; min-width:120px;"><input type="radio" name="reportCat" value="기타" style="margin-right:6px; accent-color:#6b7280;">📝 기타</label>
+            </div>
+          </div>
+          <div class="field">
+            <label>내용 <span style="color:#ef4444;">*</span></label>
+            <textarea id="reportContent" rows="5" placeholder="구체적으로 적을수록 선생님이 도움을 드리기 쉬워요." style="width:100%; padding:14px; border:2px solid #fca5a5; border-radius:14px; font-size:14px; background:#fff5f5; color:#1e293b; font-family:inherit; box-sizing:border-box; resize:vertical;"></textarea>
+          </div>
+          <button id="reportBtn" class="primary-btn" style="background:linear-gradient(to right,#ef4444,#f97316);" onclick="submitReport()">신고 접수하기 📨</button>
+          <div class="status-msg" id="reportStatus"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 설문 화면 -->
+  <div class="card" id="surveyScreen" style="background:transparent; box-shadow:none; backdrop-filter:none;">
+    <div class="survey-container">
+      <div class="sv-step-text" id="svStepIndicator">Step 1 / 5</div>
+      <div class="sv-q-title" id="svQTitle">질문 제목</div>
+      <div id="svQContent"></div>
+      <div class="nav-btn-wrap">
+        <button id="svPrevBtn" style="flex:1; padding:15px; border-radius:12px; border:none; background:#e2e8f0; color:#475569; font-weight:bold; cursor:pointer;" onclick="navSurvey(-1)">이전</button>
+        <button id="svNextBtn" style="flex:2; padding:15px; border-radius:12px; border:none; background:linear-gradient(to right,#a18cd1,#fbc2eb); color:white; font-weight:bold; cursor:pointer; box-shadow:0 4px 10px rgba(161,140,209,0.3);" onclick="navSurvey(1)">다음 단계로 ▶</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="successMsg">
+    <div class="banner-img" style="height:160px; background:linear-gradient(135deg,#84fab0 0%,#8fd3f4 100%);"><div class="banner-overlay" style="justify-content:center;"><div class="banner-title" style="font-size:28px; text-align:center;">완료! 🎉</div></div></div>
+    <div class="card-content" style="text-align:center; padding-top:40px;"><button class="primary-btn" style="background:linear-gradient(to right,#84fab0,#8fd3f4);" onclick="backToDashboard()">메인 화면으로</button></div>
+  </div>
+
+  <div class="card" id="surveyEndMsg">
+    <div class="banner-img" style="height:160px; background:linear-gradient(135deg,#fbc2eb 0%,#a18cd1 100%);"><div class="banner-overlay" style="justify-content:center;"><div class="banner-title" style="font-size:24px; text-align:center;">설문 제출 완료! 💌<br><span style="font-size:14px; font-weight:normal;">솔직한 답변 고마워요.</span></div></div></div>
+    <div class="card-content" style="text-align:center; padding-top:40px;"><button class="primary-btn" onclick="backToDashboard()">메인 화면으로 돌아가기</button></div>
+  </div>
+
+</div>
+
+<script>
+  var currentUser = { id: "", name: "" };
+  var gActivities = [], gRoster = [], activeSurvey = null;
+  var svQuestions = [], svAnswers = [], currentQIdx = 0;
+  var noticesOpen = true;
+
+  function createSakura() {
+    var container = document.getElementById('sakura-container');
+    for (var i = 0; i < 20; i++) {
+      var s = document.createElement('div'); s.className = 'sakura';
+      var size = Math.random() * 15 + 10; s.style.width = size + 'px'; s.style.height = size + 'px';
+      s.style.left = Math.random() * 100 + 'vw';
+      s.style.animationDuration = (Math.random() * 5 + 5) + 's, ' + (Math.random() * 3 + 2) + 's';
+      s.style.animationDelay = Math.random() * 5 + 's';
+      container.appendChild(s);
+    }
+  }
+
+  window.onload = function() {
+    createSakura();
+    var sId = localStorage.getItem("hr_student_id"), sName = localStorage.getItem("hr_student_name");
+    if (sId) document.getElementById('loginId').value = sId;
+    if (sName) document.getElementById('loginName').value = sName;
+    if (sId && sName) document.getElementById('loginPw').focus();
+  };
+
+  function switchTab(t) {
+    for (var i = 1; i <= 4; i++) {
+      var btn = document.getElementById('btnTab' + i);
+      var tab = document.getElementById('tab' + i);
+      if (btn) btn.classList.remove('active');
+      if (tab) tab.classList.remove('active');
+    }
+    document.getElementById('btnTab' + t).classList.add('active');
+    document.getElementById('tab' + t).classList.add('active');
+    if (t === 4) initReportTab();
+  }
+
+  function initReportTab() {
+    // 이미 이번 세션에 신고한 경우 완료 화면만 표시
+    if (sessionStorage.getItem('reportSubmitted_' + currentUser.id)) {
+      document.getElementById('reportFormArea').style.display = 'none';
+      document.getElementById('reportDoneArea').style.display = 'block';
+    }
+  }
+
+  function submitReport() {
+    var cat = '';
+    document.querySelectorAll('input[name="reportCat"]').forEach(function(r) { if (r.checked) cat = r.value; });
+    if (!cat) return (document.getElementById('reportStatus').innerText = '신고 유형을 선택해주세요.');
+    var content = document.getElementById('reportContent').value.trim();
+    if (!content) return (document.getElementById('reportStatus').innerText = '내용을 입력해주세요.');
+    var btn = document.getElementById('reportBtn');
+    btn.disabled = true; btn.innerText = '접수 중...';
+    document.getElementById('reportStatus').innerText = '';
+    google.script.run
+      .withFailureHandler(function(err) {
+        btn.disabled = false; btn.innerText = '신고 접수하기 📨';
+        document.getElementById('reportStatus').innerText = '오류: ' + err.message;
+      })
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          // ✅ 폼 숨기고 완료 화면 표시 + 세션에 기록 (재접속까지 유지)
+          document.getElementById('reportFormArea').style.display = 'none';
+          document.getElementById('reportDoneArea').style.display = 'block';
+          sessionStorage.setItem('reportSubmitted_' + currentUser.id, '1');
+        } else {
+          btn.disabled = false; btn.innerText = '신고 접수하기 📨';
+          document.getElementById('reportStatus').innerText = '오류: ' + (res.message || '');
+          document.getElementById('reportStatus').style.color = '#ef4444';
+        }
+      })
+      .submitReport({ studentId: currentUser.id, studentName: currentUser.name, category: cat, content: content });
+  }
+
+  function clearLoginInfo() { localStorage.removeItem("hr_student_id"); localStorage.removeItem("hr_student_name"); location.reload(); }
+
+  function doLogin() {
+    var id = document.getElementById('loginId').value.trim(), name = document.getElementById('loginName').value.trim(), pw = document.getElementById('loginPw').value.trim();
+    if (!id || !name || !pw) return;
+    document.getElementById('loginBtn').disabled = true; document.getElementById('loginStatus').innerText = "확인 중입니다...";
+    google.script.run.withSuccessHandler(function(res) {
+      if (res.success) {
+        currentUser.id = id; currentUser.name = name;
+        localStorage.setItem("hr_student_id", id); localStorage.setItem("hr_student_name", name);
+        document.getElementById('welcomeMsg').innerText = name + ' 학생, 반가워요! 👋';
+        document.getElementById('loginBanner').innerText = '🏫 ' + res.homeroom;
+        document.getElementById('loginScreen').style.display = 'none';
+        document.getElementById('dashboardScreen').style.display = 'block';
+        refreshData();
+      } else { document.getElementById('loginStatus').innerText = res.message; document.getElementById('loginBtn').disabled = false; }
+    }).verifyHomeroomLogin(id, name, pw);
+  }
+
+  // ✅ 학급 알림 렌더링
+  function renderNotices(notices) {
+    var section = document.getElementById('noticeSection');
+    var listDiv = document.getElementById('noticeList');
+    var badge = document.getElementById('noticeBadge');
+
+    if (!notices || notices.length === 0) {
+      section.style.display = 'none';
+      return;
+    }
+
+    section.style.display = 'block';
+
+    // 중요 알림 개수 배지
+    var impCount = notices.filter(function(n) { return n.important; }).length;
+    if (impCount > 0) {
+      badge.style.display = 'inline-block';
+      badge.innerText = impCount;
+    } else {
+      badge.style.display = 'none';
+    }
+
+    var typeStyle = {
+      '알림': 'background:#eff6ff; color:#2563eb;',
+      '일정': 'background:#f0fdf4; color:#16a34a;',
+      '준비물': 'background:#fffbeb; color:#d97706;'
+    };
+    var typeIcon = { '알림': '📌', '일정': '📅', '준비물': '🎒' };
+
+    var html = notices.map(function(n) {
+      var ts = typeStyle[n.type] || typeStyle['알림'];
+      var ti = typeIcon[n.type] || '📌';
+      var impClass = n.important ? ' important' : '';
+      var dateStr = n.date ? '<div class="notice-item-date">' + n.date + '</div>' : '';
+      var content = n.content ? '<div class="notice-item-content">' + n.content.replace(/\n/g, '<br>') + '</div>' : '';
+      return '<div class="notice-item' + impClass + '">' +
+        '<div class="notice-item-top">' +
+          '<div class="notice-item-title">' + (n.important ? '⭐ ' : '') + n.title + '</div>' +
+          '<span class="notice-type-badge" style="' + ts + '">' + ti + ' ' + n.type + '</span>' +
+        '</div>' +
+        content + dateStr +
+      '</div>';
+    }).join('');
+
+    listDiv.innerHTML = html;
+  }
+
+  function toggleNotices() {
+    noticesOpen = !noticesOpen;
+    document.getElementById('noticeList').style.display = noticesOpen ? 'block' : 'none';
+    document.getElementById('noticeToggleIcon').innerText = noticesOpen ? '▲ 접기' : '▼ 펼치기';
+  }
+
+  function refreshData() {
+    var btn = document.getElementById('refreshBtn'); btn.innerText = "로딩중..."; btn.disabled = true;
+    google.script.run.withSuccessHandler(function(data) {
+      gActivities = data.activities; gRoster = data.roster; activeSurvey = data.activeSurvey;
+
+      // 활동 목록
+      var o = '<option value="">어떤 활동을 했나요?</option>';
+      data.activities.forEach(function(a) { o += '<option value="' + a.name + '">[' + a.category + '] ' + a.name + '</option>'; });
+      document.getElementById('actSelect').innerHTML = o; updateGuide();
+
+      // 기록
+      var h = '';
+      if (data.myRecords.length === 0) {
+        h = '<div style="text-align:center; color:#94a3b8; padding:30px; font-size:14px; background:#f8fafc; border-radius:16px;">첫 번째 활동을 기록해 보세요!</div>';
+      } else {
+        data.myRecords.forEach(function(r) {
+          var pic = r.url !== "첨부파일 없음" ? '<div style="margin-top:12px;"><a href="' + r.url + '" target="_blank" style="font-size:13px; color:#a18cd1; font-weight:800; text-decoration:none;">📸 첨부 사진 보기 ➔</a></div>' : '';
+          h += '<div class="record-card"><div class="record-title">' + r.activity + '</div><div class="record-date">' + r.date + ' 작성됨</div><div class="record-content"><span class="record-label">나의 역할</span>' + r.role.replace(/\n/g,'<br>') + '<br><br><span class="record-label">배우고 느낀 점</span>' + r.reflection.replace(/\n/g,'<br>') + '</div>' + pic + '</div>';
+        });
+      }
+      document.getElementById('myRecordsList').innerHTML = h;
+
+      // 설문
+      if (activeSurvey && !data.hasSubmittedSurvey) {
+        document.getElementById('svBadge').style.display = 'inline-block';
+        document.getElementById('svWaitTitle').innerText = activeSurvey.title;
+        document.getElementById('svWaitTitle').style.color = '#a18cd1';
+        document.getElementById('svWaitDesc').innerHTML = "새로운 설문이 도착했습니다.<br>지금 바로 시작해볼까요?";
+        document.getElementById('svStartBtn').style.display = 'block';
+      } else {
+        document.getElementById('svBadge').style.display = 'none';
+        document.getElementById('svWaitTitle').innerText = "진행 중인 설문이 없습니다.";
+        document.getElementById('svWaitTitle').style.color = '#1e293b';
+        document.getElementById('svWaitDesc').innerHTML = data.hasSubmittedSurvey ? "이번 달 설문을 이미 완료하셨습니다. 최고예요! 👍" : "선생님이 새로운 설문을 시작하면<br>여기에 표시됩니다.";
+        document.getElementById('svStartBtn').style.display = 'none';
+      }
+
+      // ✅ 학급 알림 렌더링
+      renderNotices(data.notices || []);
+
+      btn.innerText = "🔄 새로고침"; btn.disabled = false;
+    }).getHomeroomData(currentUser.id);
+  }
+
+  // ==== 설문 플레이어 (기존 로직 동일) ====
+  function startSurvey() {
+    if (!activeSurvey) return;
+    if (activeSurvey.guide) {
+      if (!confirm('📋 안내\n\n' + activeSurvey.guide + '\n\n설문을 시작할까요?')) return;
+    }
+    var baseQs = JSON.parse(activeSurvey.questions);
+    svQuestions = []; svAnswers = [];
+    baseQs.forEach(function(q, originalIdx) {
+      if (q.type === 'score' || q.type === 'text' || q.type === 'choice') { svQuestions.push(Object.assign({}, q, { originalIdx: originalIdx })); svAnswers[originalIdx] = q.type === 'choice' && q.multi ? [] : ""; }
+      else if (q.type === 'dynamic') { svQuestions.push(Object.assign({}, q, { step: 'A', originalIdx: originalIdx })); svAnswers[originalIdx] = {}; }
+    });
+    currentQIdx = 0;
+    document.getElementById('dashboardScreen').style.display = 'none';
+    document.getElementById('surveyScreen').style.display = 'block';
+    renderSurveyQuestion();
+  }
+
+  function renderSurveyQuestion() {
+    var q = svQuestions[currentQIdx];
+    document.getElementById('svStepIndicator').innerText = 'Step ' + (currentQIdx + 1) + ' / ' + svQuestions.length;
+    document.getElementById('svQTitle').innerHTML = (q.text || q.title || '') + (q.req ? ' <span style="color:#ef4444; font-size:14px;">*필수</span>' : '');
+    var content = document.getElementById('svQContent');
+    document.getElementById('svPrevBtn').style.visibility = currentQIdx === 0 ? 'hidden' : 'visible';
+    document.getElementById('svNextBtn').innerText = currentQIdx === svQuestions.length - 1 ? '설문 제출하기 🚀' : '다음 단계로 ▶';
+    var h = ''; var origAns = svAnswers[q.originalIdx];
+    if (q.type === 'score') {
+      var emojis = ['😭','☹️','😐','🙂','😍'];
+      h += '<div class="score-grid">';
+      for (var i = 1; i <= 5; i++) { var sel = origAns == i ? 'selected' : ''; h += '<div class="score-btn ' + sel + '" onclick="selectScore(this,' + i + ')"><div style="font-size:30px;">' + emojis[i-1] + '</div><span>' + i + '점</span></div>'; }
+      h += '</div>';
+    } else if (q.type === 'text') {
+      var limitHint = '';
+      if (q.minLen > 0 || q.maxLen > 0) {
+        var hints = [];
+        if (q.minLen > 0) hints.push('최소 ' + q.minLen + '자');
+        if (q.maxLen > 0) hints.push('최대 ' + q.maxLen + '자');
+        limitHint = '<div style="font-size:12px; color:#a18cd1; font-weight:700; margin-bottom:8px;">✏️ ' + hints.join(' / ') + '</div>';
+      }
+      h += limitHint + '<textarea id="ansText" rows="5" placeholder="자유롭게 적어주세요." ' + (q.maxLen > 0 ? 'maxlength="' + q.maxLen + '"' : '') + '>' + origAns + '</textarea>';
+      if (q.maxLen > 0) {
+        h += '<div id="charCount" style="text-align:right; font-size:12px; color:#94a3b8; margin-top:4px;">0 / ' + q.maxLen + '자</div>';
+      }
+    } else if (q.type === 'choice') {
+      var isMulti = q.multi;
+      var selArr = Array.isArray(origAns) ? origAns : (origAns ? [origAns] : []);
+      h += '<div style="display:flex;flex-direction:column;gap:8px;">';
+      (q.choices || []).forEach(function(ch) {
+        var isSel = selArr.indexOf(ch) >= 0;
+        h += '<div data-val="' + ch.replace(/"/g, '&quot;') + '" data-multi="' + (isMulti ? '1' : '0') + '" onclick="selectChoiceByEl(this)" '
+          + 'style="padding:12px 16px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;border:2px solid ' + (isSel ? '#6366f1' : '#e2e8f0') + ';background:' + (isSel ? '#ede9fe' : 'white') + ';color:' + (isSel ? '#4338ca' : '#334155') + ';">' + ch + '</div>';
+          + ch + '</div>';
+      });
+      h += '</div>';
+    } else if (q.type === 'dynamic') {
+      if (q.step === 'A') {
+        h += '<div style="font-size:13px; color:#94a3b8; text-align:center; margin-bottom:15px;">해당하는 친구를 모두 골라주세요.</div><div class="stu-chip-grid">';
+        gRoster.forEach(function(s) { var isSel = (origAns && origAns[s.id + ' ' + s.name] !== undefined) ? 'selected' : ''; h += '<div class="stu-chip ' + isSel + '" onclick="toggleChip(this)">' + s.name + '</div>'; });
+        h += '</div>';
+      } else if (q.step === 'B') {
+        h += '<div style="font-size:13px; color:#a18cd1; font-weight:bold; text-align:center; margin-bottom:15px;">선택한 친구들에 대한 사유를 적어주세요.</div>';
+        var targets = q.targets || [];
+        targets.forEach(function(target) { var prevReason = origAns[target] || ''; h += '<div class="dynamic-reason-box"><div style="font-weight:800; color:#1e293b; margin-bottom:8px;">👤 [' + target + ']</div><textarea class="ans-reason" data-target="' + target + '" rows="2" placeholder="' + (q.reasonTitle || '이유를 적어주세요') + '">' + prevReason + '</textarea></div>'; });
+      }
+    }
+    content.innerHTML = h;
+  }
+
+  function selectChoiceByEl(elem) {
+    selectChoice(elem, elem.dataset.val, elem.dataset.multi === '1');
+  }
+
+  function selectChoice(elem, val, isMulti) {
+    var q = svQuestions[currentQIdx];
+    var origIdx = q.originalIdx;
+    if (isMulti) {
+      if (!Array.isArray(svAnswers[origIdx])) svAnswers[origIdx] = [];
+      var idx2 = svAnswers[origIdx].indexOf(val);
+      if (idx2 >= 0) svAnswers[origIdx].splice(idx2, 1);
+      else svAnswers[origIdx].push(val);
+    } else {
+      svAnswers[origIdx] = val;
+    }
+    renderSurveyQuestion();
+  }
+
+  function selectScore(elem, val) { document.querySelectorAll('.score-btn').forEach(function(b) { b.classList.remove('selected'); }); elem.classList.add('selected'); svAnswers[svQuestions[currentQIdx].originalIdx] = val; }
+  function toggleChip(elem) { elem.classList.toggle('selected'); }
+
+  function navSurvey(dir) {
+    var q = svQuestions[currentQIdx]; var origIdx = q.originalIdx;
+    if (dir > 0) {
+      if (q.type === 'score') { if (q.req && !svAnswers[origIdx]) return alert('점수를 선택해 주세요!'); }
+      else if (q.type === 'choice') { if (q.req && (!svAnswers[origIdx] || (Array.isArray(svAnswers[origIdx]) && svAnswers[origIdx].length === 0))) return alert('항목을 선택해 주세요!'); }
+      else if (q.type === 'text') {
+        var txt = document.getElementById('ansText').value.trim();
+        if (q.req && !txt) return alert('내용을 입력해 주세요!');
+        if (q.minLen > 0 && txt.length < q.minLen) return alert('최소 ' + q.minLen + '자 이상 입력해주세요. (현재 ' + txt.length + '자)');
+        if (q.maxLen > 0 && txt.length > q.maxLen) return alert('최대 ' + q.maxLen + '자까지 입력 가능해요. (현재 ' + txt.length + '자)');
+        svAnswers[origIdx] = txt;
+      }
+      else if (q.type === 'dynamic') {
+        if (q.step === 'A') {
+          var fullNames = [];
+          document.querySelectorAll('.stu-chip.selected').forEach(function(c) { var t = gRoster.find(function(r) { return r.name === c.innerText; }); if (t) fullNames.push(t.id + ' ' + t.name); });
+          if (q.req && fullNames.length === 0) return alert('최소 1명 이상 선택해 주세요!');
+          if (svQuestions[currentQIdx+1] && svQuestions[currentQIdx+1].step === 'B') svQuestions.splice(currentQIdx+1, 1);
+          if (fullNames.length > 0) {
+            var newAnsObj = {}; fullNames.forEach(function(fn) { newAnsObj[fn] = svAnswers[origIdx][fn] || ''; }); svAnswers[origIdx] = newAnsObj;
+            svQuestions.splice(currentQIdx+1, 0, Object.assign({}, q, { step: 'B', targets: fullNames, title: '이유 작성하기' }));
+          } else { svAnswers[origIdx] = {}; }
+        } else if (q.step === 'B') {
+          var allFilled = true;
+          document.querySelectorAll('.ans-reason').forEach(function(ta) { var t = ta.getAttribute('data-target'); var val = ta.value.trim(); if (q.req && !val) allFilled = false; svAnswers[origIdx][t] = val; });
+          if (!allFilled) return alert('모든 친구에 대한 이유를 적어주세요!');
+        }
+      }
+    }
+    currentQIdx += dir;
+    if (currentQIdx >= svQuestions.length) { submitFinalSurvey(); } else { renderSurveyQuestion(); }
+  }
+
+  function submitFinalSurvey() {
+    var btn = document.getElementById('svNextBtn'); btn.innerText = '서버 전송 중...'; btn.disabled = true;
+    var payload = { svId: activeSurvey.id, stuId: currentUser.id, stuName: currentUser.name, answers: JSON.stringify(svAnswers) };
+    google.script.run.withSuccessHandler(function(res) {
+      btn.innerText = '설문 제출하기 🚀'; btn.disabled = false;
+      if (res.success) { document.getElementById('surveyScreen').style.display = 'none'; document.getElementById('surveyEndMsg').style.display = 'block'; }
+      else alert(res.message);
+    }).submitSurveyResponse(payload);
+  }
+
+  function updateGuide() {
+    var sel       = document.getElementById('actSelect').value;
+    var guideArea = document.getElementById('actGuideArea');
+    var guideText = document.getElementById('actGuide');
+    if (!sel) { guideArea.style.display='none'; return; }
+    var act = gActivities.find(function(a){ return a.name===sel; });
+    if (!act) { guideArea.style.display='none'; return; }
+    if (act.desc) {
+      guideText.innerHTML = '💡 <b>선생님 안내</b><br>' + act.desc;
+      guideArea.style.display = 'block';
+    } else {
+      guideArea.style.display = 'none';
+    }
+  }
+
+  function upload() {
+    var act = document.getElementById('actSelect').value; var role = document.getElementById('actRole').value; var ref = document.getElementById('actReflect').value;
+    if (!act || !role || !ref) return (document.getElementById('submitStatus').innerText = '빈칸을 모두 채워주세요!');
+    var f = document.getElementById('fileInput').files[0]; document.getElementById('submitBtn').disabled = true; document.getElementById('submitStatus').innerText = '저장 중...';
+    var payload = { studentId: currentUser.id, studentName: currentUser.name, activity: act, role: role, reflection: ref };
+    // 추가 입력항목 수집
+    var extraAnswers = {};
+    document.querySelectorAll('.extra-field-input').forEach(function(inp) {
+      if (inp.dataset.fieldLabel) extraAnswers[inp.dataset.fieldLabel] = inp.value;
+    });
+    if (Object.keys(extraAnswers).length > 0) payload.extraAnswers = extraAnswers;
+    if (f) {
+      if (f.size > 5*1024*1024) { alert('용량 초과!'); document.getElementById('submitBtn').disabled = false; return; }
+      var r = new FileReader(); r.onload = function(e) { payload.fileData = e.target.result.split(',')[1]; payload.fileMimeType = e.target.result.split(',')[0].split(':')[1].split(';')[0]; payload.fileName = f.name; sendToServer(payload); }; r.readAsDataURL(f);
+    } else { sendToServer(payload); }
+  }
+
+  function sendToServer(p) {
+    google.script.run.withSuccessHandler(function(res) {
+      if (res.success) { document.getElementById('dashboardScreen').style.display = 'none'; document.getElementById('successMsg').style.display = 'block'; }
+      else { alert(res.message); document.getElementById('submitStatus').innerText = '제출 실패'; document.getElementById('submitBtn').disabled = false; }
+    }).processHomeroomForm(p);
+  }
+
+  function backToDashboard() {
+    document.getElementById('actRole').value = ''; document.getElementById('actReflect').value = ''; document.getElementById('fileInput').value = ''; document.getElementById('submitStatus').innerText = '';
+    document.getElementById('successMsg').style.display = 'none'; document.getElementById('surveyEndMsg').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block'; refreshData(); switchTab(2);
+  }
+</script>
+</body>
+</html>

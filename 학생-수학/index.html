@@ -1,0 +1,1384 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <base target="_top">
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMWQ0ZWQ4Ii8+PHRleHQgeD0iOTAiIHk9IjExNSIgZm9udC1zaXplPSIxMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfk5A8L3RleHQ+PC9zdmc+">
+  <link rel="icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxODAgMTgwIj48cmVjdCB3aWR0aD0iMTgwIiBoZWlnaHQ9IjE4MCIgcng9IjQwIiBmaWxsPSIjMWQ0ZWQ4Ii8+PHRleHQgeD0iOTAiIHk9IjExNSIgZm9udC1zaXplPSIxMDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfk5A8L3RleHQ+PC9zdmc+">
+  <meta name="theme-color" content="#1d4ed8">
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>수학 과제 시스템</title>
+  
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="수학교실">
+  <meta name="description" content="수학 과제 제출 및 피드백 확인">
+  <!-- 파비콘 -->
+
+<!-- ✅ Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+  <style>
+    body { font-family: 'Pretendard', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; color: #1f2937; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; min-height: 100vh; box-sizing: border-box; }
+    .card { background: white; width: 100%; max-width: 450px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); overflow: hidden; box-sizing: border-box; margin-top: 10px;}
+    .banner-img { height: 140px; background-image: url('https://images.unsplash.com/photo-1509228468518-180dd4864904?auto=format&fit=crop&w=800&q=80'); background-size: cover; background-position: center; position: relative;}
+    .banner-overlay { position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(to bottom, rgba(30,58,138,0.7), rgba(15,23,42,0.9)); display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-sizing: border-box;}
+    .banner-title { color: white; font-size: 22px; font-weight: bold;}
+    .refresh-btn { background: rgba(255,255,255,0.25); color: white; border: 1px solid rgba(255,255,255,0.4); padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px;}
+    .card-content { padding: 25px; }
+    .field { margin-bottom: 22px; }
+    label { display: block; margin-bottom: 8px; font-weight: 700; font-size: 15px; color: #374151;}
+    .helper-text { display: block; font-size: 12px; color: #6b7280; font-weight: normal; margin-top: 4px; margin-bottom: 6px;}
+    input, select, textarea { width: 100%; padding: 14px; border: 1.5px solid #e5e7eb; border-radius: 12px; box-sizing: border-box; font-size: 15px; background: #f9fafb;}
+    input:focus, select:focus, textarea:focus { outline: none; border-color: #3b82f6; background: white;}
+    .radio-group { display: flex; gap: 10px; background: #f3f4f6; padding: 6px; border-radius: 14px;}
+    .radio-group label { flex: 1; text-align: center; margin: 0; cursor: pointer;}
+    .radio-group input[type="radio"] { display: none; }
+    .radio-group span { display: block; padding: 12px 0; border-radius: 10px; color: #6b7280; font-size: 14px;}
+    .radio-group input[type="radio"]:checked + span { background: white; box-shadow: 0 2px 8px rgba(0,0,0,0.1); font-weight: bold; color: #2563eb;}
+    button.primary-btn { width: 100%; padding: 16px; background: #2563eb; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer;}
+    .status-msg { text-align: center; margin-top: 15px; font-weight: 600; color: #ef4444; font-size: 14px;}
+    .logout-btn { width: 100%; background: transparent; color: #9ca3af; border: none; padding: 10px; font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 10px; text-decoration: underline;}
+    .tab-container { display: flex; background: #f3f4f6; padding: 6px; border-radius: 14px; margin-bottom: 25px;}
+    .tab-btn { flex: 1; padding: 10px 0; text-align: center; font-weight: 800; font-size: 13px; color: #6b7280; cursor: pointer; border-radius: 10px; border: none; background: transparent;}
+    .tab-btn.active { background: white; color: #1e3a8a; box-shadow: 0 2px 8px rgba(0,0,0,0.08);}
+    .tab-content { display: none; }
+    .tab-content.active { display: block;}
+
+    /* ✅ 설문 스타일 */
+    .missing-task-card { background: #fff1f2; border: 1px solid #fecdd3; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px;}
+    .resubmit-task-card { background: #fff7ed; border: 1px solid #fed7aa; padding: 15px; border-radius: 12px; margin-bottom: 10px; display: flex; align-items: flex-start; gap: 10px;}
+    .task-title { font-weight: 700; line-height: 1.4; word-break: keep-all; font-size: 15px;}
+    .history-item { background: white; padding: 18px; border-radius: 14px; margin-bottom: 15px; border: 1px solid #e5e7eb; border-left: 5px solid #3b82f6;}
+    .history-item.is-best { border-left: 5px solid #f59e0b; background: #fffbeb;}
+    .history-item.is-new { border-left: 5px solid #10b981; background: #f0fdf4;}
+    .new-badge { display:inline-block; background:#10b981; color:white; font-size:11px; font-weight:800; padding:2px 8px; border-radius:10px; margin-left:6px; vertical-align:middle; animation: pulse 1.5s ease-in-out infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.6} }
+    .reject-reason-box { background:#fef2f2; border:1.5px solid #fca5a5; border-radius:10px; padding:12px 14px; margin-top:10px; }
+    .reject-reason-box::before { content:'🚨 반려 사유'; display:block; font-size:11px; font-weight:800; color:#dc2626; margin-bottom:5px; }
+    .reject-reason-text { font-size:13px; color:#7f1d1d; line-height:1.6; white-space:pre-wrap; }
+    .teacher-feedback { background: #eff6ff; border-radius: 10px; padding: 14px; margin-top: 15px; font-size: 14px; color: #1e3a8a; line-height: 1.5; border: 1px solid #bfdbfe;}
+    .teacher-feedback::before { content: '👩\200d🏫 선생님 코멘트'; display: block; font-weight: 700; margin-bottom: 8px; color: #2563eb; font-size: 12px;}
+    .score-badge { display: inline-block; background: #fef3c7; color: #b45309; border: 1px solid #fde68a; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: bold; margin-left: 8px; vertical-align: top;}
+    .reply-section { margin-top: 12px; background: #f8fafc; padding: 12px; border-radius: 10px; border: 1px solid #e2e8f0; display:flex; flex-direction:column; gap:8px;}
+    .reply-input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; resize: none; background: white;}
+    .reply-btn { background: #0f766e; color: white; border: none; padding: 8px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size:13px;}
+    .my-reply { background: #dcfce3; color: #15803d; padding: 12px; border-radius: 10px; font-size: 13px; line-height:1.5; border: 1px solid #bbf7d0; margin-top:10px;}
+    .my-reply::before { content: '💡 나의 오답노트/답장'; display: block; font-weight: 700; margin-bottom: 5px; color: #166534; font-size: 12px;}
+
+    .best-folder { border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 12px; background: white; overflow: hidden; }
+    .best-folder-header { padding: 15px 20px; font-weight: 800; font-size: 15px; color: #1e3a8a; background: #f8fafc; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid transparent; transition: 0.2s;}
+    .best-folder-header:hover { background: #f1f5f9; }
+    .best-folder-header.open { border-bottom: 1px dashed #cbd5e1; }
+    .best-folder-content { display: none; padding: 20px; background: #f1f5f9; }
+    .best-folder.open .best-folder-content { display: block; }
+    .best-item { background: white; border-radius: 12px; padding: 15px; border: 1px solid #e2e8f0; margin-bottom: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+    .best-author { font-weight: bold; color: #f59e0b; margin-bottom: 10px; font-size: 14px; }
+    .best-comment-box { font-size: 13px; color: #334155; line-height: 1.5; background: #fffbeb; padding: 12px; border-radius: 8px; border-left: 4px solid #f59e0b; margin-bottom: 10px;}
+
+    .carousel-container { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 10px; padding-bottom: 10px; margin-top: 10px; margin-bottom: 5px; -webkit-overflow-scrolling: touch; }
+    .carousel-container::-webkit-scrollbar { height: 6px; }
+    .carousel-container::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .carousel-item { flex: 0 0 85%; scroll-snap-align: center; position: relative; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #f8fafc; cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05);}
+    .carousel-img { width: 100%; height: 220px; object-fit: cover; display: block; -webkit-touch-callout: none; user-select: none; pointer-events: none; }
+    .carousel-tag { position: absolute; top: 8px; left: 8px; background: rgba(15,23,42,0.7); color: white; padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; pointer-events: none;}
+    .carousel-tag.anno { background: rgba(220,38,38,0.8); }
+
+    .new-badge { background: #ef4444; color: white; padding: 2px 6px; border-radius: 6px; font-size: 10px; font-weight: 800; margin-left: 6px; vertical-align: middle; display: inline-block; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; transform: scale(1.05); } 100% { opacity: 1; } }
+
+    #notiModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.7); z-index: 2000; justify-content: center; align-items: center; padding: 20px;}
+    .noti-card { background: white; width: 100%; max-width: 380px; border-radius: 20px; padding: 30px 20px; text-align: center; box-sizing:border-box; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2); display: flex; flex-direction: column; max-height: 85vh;}
+    #notiContent { overflow-y: auto; padding: 5px 10px; margin-bottom: 15px; text-align: left; }
+    .noti-item { background: #f8fafc; padding: 15px; border-radius: 12px; margin-bottom: 12px; border: 1px solid #e2e8f0;}
+
+    #imageModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(17, 24, 39, 0.95); z-index: 3000; justify-content: center; align-items: center; flex-direction: column; backdrop-filter: blur(5px);}
+    .modal-img-wrapper { position: relative; width: 95%; max-height: 80%; display: flex; justify-content: center; align-items: center; }
+    #modalImg { max-width: 100%; max-height: 80vh; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5); -webkit-touch-callout: none; user-select: none; pointer-events: none;}
+    .watermark-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; justify-content: center; align-items: center; z-index: 10; opacity: 0.3; overflow: hidden; }
+    .watermark-text { font-size: 28px; color: white; font-weight: 900; transform: rotate(-30deg); text-shadow: 2px 2px 4px rgba(0,0,0,0.8); white-space: pre-wrap; text-align: center; pointer-events: none;}
+    #closeModalBtn { margin-top: 25px; background: white; color: #1f2937; border: none; font-weight: bold; border-radius: 20px; padding: 12px 30px; cursor: pointer; font-size: 15px;}
+
+    .upload-slot { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 15px; margin-bottom: 15px; background: #f8fafc; text-align: center; transition: 0.3s;}
+    .upload-slot.locked { border: 2px solid #10b981; background: #ecfdf5; pointer-events: none; opacity: 0.8;}
+    .upload-slot-title { font-weight: 800; color: #1e3a8a; margin-bottom: 8px; font-size: 14px;}
+    .locked-msg { color: #10b981; font-weight: bold; font-size: 13px; margin-top: 5px;}
+
+    .chip-grid { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 15px;}
+    .choice-chip { background: white; border: 2px solid #cbd5e1; color: #475569; padding: 10px 16px; border-radius: 20px; font-size: 14px; font-weight: bold; cursor: pointer; transition: 0.2s;}
+    .choice-chip.selected { background: #e0f2fe; color: #0284c7; border-color: #0284c7; box-shadow: 0 4px 10px rgba(2,132,199,0.2);}
+    .choice-chip.locked { background: #ecfdf5; color: #10b981; border-color: #10b981; pointer-events: none; opacity: 0.7;}
+
+    #dashboardScreen, #successMsg { display: none; }
+  </style>
+</head>
+<body>
+
+<div oncontextmenu="return false;" style="width:100%; display:flex; flex-direction:column; align-items:center;">
+
+<div class="card" id="loginScreen">
+  <div class="banner-img"><div class="banner-overlay" style="justify-content: center;"><div class="banner-title">📐 수학 교실 로그인</div></div></div>
+  <div class="card-content">
+    <div class="field"><label>학번</label><input type="number" id="loginId" placeholder="학번 4자리 (예: 1305)"></div>
+    <div class="field"><label>이름</label><input type="text" id="loginName" placeholder="홍길동"></div>
+    <div class="field"><label>비밀번호</label><input type="password" id="loginPw" onkeypress="if(event.keyCode==13) doLogin()"></div>
+    <button id="loginBtn" class="primary-btn" onclick="doLogin()">접속하기</button>
+    <div class="status-msg" id="loginStatus"></div>
+    <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
+      📐 수학 과제 제출 시스템<br>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span style="color:#d1d5db;">v1.2</span>
+    </div>
+  </div>
+</div>
+
+<!-- ✅ 최초 비밀번호 설정 화면 -->
+<div class="card" id="pwSetupScreen" style="display:none;">
+  <div class="banner-img" style="background: linear-gradient(135deg, #1e3a8a, #2563eb);"><div class="banner-overlay" style="justify-content:center;"><div class="banner-title">🔑 비밀번호 설정</div></div></div>
+  <div class="card-content">
+    <div style="background:#eff6ff; border-radius:12px; padding:14px; margin-bottom:20px; font-size:13px; color:#1e40af; line-height:1.6;">
+      처음 로그인하셨군요!<br>사용할 <b>비밀번호를 설정</b>해주세요.
+    </div>
+    <div class="field">
+      <label>새 비밀번호</label>
+      <input type="password" id="newPw1" placeholder="비밀번호 입력 (4자 이상)">
+    </div>
+    <div class="field">
+      <label>비밀번호 확인</label>
+      <input type="password" id="newPw2" placeholder="한 번 더 입력" onkeypress="if(event.keyCode==13) submitNewPw()">
+    </div>
+    <button id="setPwBtn" class="primary-btn" onclick="submitNewPw()">비밀번호 설정 완료</button>
+    <div class="status-msg" id="pwSetupStatus"></div>
+  </div>
+</div>
+
+<div class="card" id="dashboardScreen">
+  <div class="banner-img" style="height: 100px;"><div class="banner-overlay"><div class="banner-title" id="welcomeMsg" style="font-size: 20px;">환영합니다!</div><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div>
+  <div class="card-content" style="padding-top: 15px;">
+    <button class="logout-btn" onclick="clearLoginInfo()">🔒 다른 기기인가요? 로그아웃하기</button>
+    <div class="tab-container">
+      <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">📝 과제 제출</button>
+      <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">🔍 내 제출현황</button>
+      <button class="tab-btn" id="btnTab3" onclick="switchTab(3)" style="color:#f59e0b;">🌟 우수작 갤러리</button>
+    </div>
+
+    <div id="tab1" class="tab-content active">
+      <div class="field"><label>어떤 과제를 제출할까요?</label><select id="taskName" onchange="initTaskUI()"><option value="">로딩 중...</option></select></div>
+
+      <!-- ✅ 반려 사유 박스 (재제출 시 표시) -->
+      <div id="rejectionReasonBox" style="display:none; background:#fef2f2; border:2px solid #ef4444; border-radius:12px; padding:16px; margin-bottom:4px;">
+        <div style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:8px;">🚨 선생님의 반려 사유</div>
+        <div id="rejectionReasonText" style="font-size:14px; color:#1f2937; line-height:1.6; white-space:pre-wrap;"></div>
+      </div>
+
+      <div id="choiceArea" class="field" style="display:none; background:#f8fafc; padding:15px; border-radius:12px; border:2px dashed #3b82f6;">
+        <label style="color:#1e3a8a; text-align:center;">🎯 제출할 문제를 고르세요 (필수 <span id="reqChoiceCnt"></span>개)</label>
+        <div id="choiceChips" class="chip-grid" style="margin-top:15px;"></div>
+      </div>
+
+      <div class="field"><label>난이도 선택</label><div class="radio-group"><label><input type="radio" name="level" value="😀 쉬움" checked><span>😀 쉬움</span></label><label><input type="radio" name="level" value="😐 보통"><span>😐 보통</span></label><label><input type="radio" name="level" value="😭 어려움"><span>😭 어려움</span></label></div></div>
+      <div class="field"><label>코멘트 (선택)</label><textarea id="message" rows="2" placeholder="선생님께 드릴 질문이나 코멘트"></textarea></div>
+
+      <div class="field">
+        <label>사진 첨부 (필수)</label>
+        <span class="helper-text" style="color:#ea580c; font-weight:bold; margin-bottom:10px;">⚠️ 고화질 사진도 자동 압축되어 순식간에 제출됩니다!</span>
+        <div id="multiUploadArea">
+          <div style="text-align:center; padding:20px; color:#9ca3af; border:2px dashed #e5e7eb; border-radius:12px;">과제를 먼저 선택해 주세요.</div>
+        </div>
+      </div>
+      <button id="submitBtn" class="primary-btn" onclick="upload()" disabled>데이터 불러오는 중...</button>
+      <div class="status-msg" id="submitStatus"></div>
+    </div>
+
+    <div id="tab2" class="tab-content">
+      <h3 style="font-size:15px; color:#be123c; margin-top:0;">🚨 해결해야 할 과제</h3>
+      <div id="missingList" style="margin-bottom: 25px;"></div>
+      <h3 style="font-size:15px; color:#1e3a8a; border-top: 2px dashed #e5e7eb; padding-top: 20px;">✅ 내가 제출한 기록</h3>
+      <div id="historyList"></div>
+    </div>
+
+    <div id="tab3" class="tab-content">
+      <h3 style="font-size:15px; color:#b45309; margin-top:0;">🌟 이달의 명예의 전당</h3>
+      <p style="font-size:13px; color:#64748b; line-height:1.4; margin-bottom:12px;">선생님이 특별히 칭찬한 친구들의 훌륭한 과제입니다!</p>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:16px; background:#f8fafc; padding:10px; border-radius:12px; border:1px solid #e2e8f0;">
+        <select id="galleryTaskFilter" onchange="applyGalleryFilter()" style="flex:1; min-width:140px; padding:8px 12px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:13px; font-weight:700; background:white; color:#1e293b;">
+          <option value="all">📚 전체 과제</option>
+        </select>
+        <select id="gallerySortFilter" onchange="applyGalleryFilter()" style="flex:1; min-width:120px; padding:8px 12px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:13px; font-weight:700; background:white; color:#1e293b;">
+          <option value="newest">🕐 최신순</option>
+          <option value="oldest">🕐 오래된 순</option>
+          <option value="new_only">🆕 NEW만 보기</option>
+        </select>
+      </div>
+      <div id="bestWorksGallery"><div style="text-align:center; padding:20px; color:#94a3b8; font-size:13px;">데이터를 불러오는 중입니다...</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="successMsg">
+  <div class="banner-img" style="height: 140px; background-color: #10b981; background-image: none;">
+    <div class="banner-overlay" style="background: transparent; justify-content: center;">
+      <div class="banner-title" style="font-size: 26px;" id="successBannerTitle">제출 완료! 🎉</div>
+    </div>
+  </div>
+  <div class="card-content" style="text-align: center;">
+    <p style="color:#4b5563; margin-bottom: 16px;">선생님께 안전하게 전달되었습니다.</p>
+
+    <!-- ✅ AI 채점 로딩 화면 -->
+    <div id="aiGradingLoader" style="display:none;">
+      <div style="background:linear-gradient(135deg,#eff6ff,#dbeafe); border:1.5px solid #93c5fd; border-radius:16px; padding:24px 20px; margin-bottom:16px;">
+        <div style="font-size:36px; margin-bottom:10px;" id="aiLoaderEmoji">🤖</div>
+        <div style="font-size:16px; font-weight:800; color:#1d4ed8; margin-bottom:6px;" id="aiLoaderTitle">AI가 채점하고 있어요...</div>
+        <div style="font-size:13px; color:#3b82f6; line-height:1.5;" id="aiLoaderDesc">답안을 분석하고 피드백을 작성 중이에요.<br>잠시만 기다려 주세요! (보통 10~20초)</div>
+        <div style="margin-top:16px;">
+          <div style="background:#bfdbfe; border-radius:20px; height:8px; overflow:hidden;">
+            <div id="aiProgressBar" style="background:#2563eb; height:100%; width:0%; border-radius:20px; transition: width 0.5s;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ AI 채점 결과 화면 -->
+    <div id="aiGradeResultBox" style="display:none;">
+      <div style="background:linear-gradient(135deg,#f0f9ff,#e0f2fe); border:1.5px solid #7dd3fc; border-radius:16px; padding:20px; margin-bottom:16px; text-align:left;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <span style="font-size:14px; font-weight:800; color:#0369a1;">🤖 AI 참고 채점 결과</span>
+          <span style="font-size:22px; font-weight:900; color:#0284c7;" id="aiResultScore"></span>
+        </div>
+        <div id="aiResultFeedback" style="font-size:14px; color:#334155; line-height:1.7; margin-bottom:10px; white-space:pre-wrap;"></div>
+        <div id="aiResultPerQuestion" style="margin-bottom:10px;"></div>
+        <div id="aiResultConfidence" style="margin-bottom:10px;"></div>
+        <div style="font-size:11px; color:#94a3b8; font-style:italic; padding-top:8px; border-top:1px solid #bae6fd;">
+          ⚠️ AI 참고 점수입니다. 선생님 최종 채점이 공식 점수예요!
+        </div>
+      </div>
+    </div>
+
+    <!-- ✅ AI 없는 경우 (채점기준 미등록 등) -->
+    <div id="aiGradeSkippedBox" style="display:none;">
+      <div style="background:#f8fafc; border:1px dashed #e2e8f0; border-radius:12px; padding:14px 16px; margin-bottom:16px;">
+        <div style="font-size:13px; color:#64748b; line-height:1.5;">
+          📝 선생님이 직접 채점해주실 거예요!<br>
+          <span style="font-size:12px; color:#94a3b8;">내 제출현황에서 결과를 확인할 수 있어요.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 제출 순위 표시 -->
+    <div id="submitRankBox" style="display:none; background:linear-gradient(135deg,#ecfdf5,#d1fae5); border:1.5px solid #6ee7b7; border-radius:14px; padding:16px; margin-bottom:20px;">
+      <div style="font-size:28px; font-weight:900; color:#059669;" id="submitRankNum"></div>
+      <div style="font-size:13px; color:#065f46; font-weight:600; margin-top:4px;" id="submitRankMsg"></div>
+    </div>
+
+    <button class="primary-btn" id="successBackBtn" onclick="backToDashboard()">메인 화면으로</button>
+  </div>
+</div>
+
+<div id="notiModal">
+  <div class="noti-card">
+    <div style="font-size: 40px; margin-bottom: 10px;">💌</div>
+    <div style="font-size: 18px; font-weight: 800; color: #1e3a8a; margin-bottom: 15px;" id="notiTitle">새로운 알림이 있어요!</div>
+    <div id="notiContent"></div>
+    <div style="padding: 10px 10px 0 10px;"><button class="primary-btn" id="ackBtn" onclick="acknowledgeFeedback()">확인했습니다</button></div>
+  </div>
+</div>
+
+<div id="imageModal">
+  <div class="modal-img-wrapper">
+    <img id="modalImg" src="">
+    <div class="watermark-overlay"><div class="watermark-text" id="modalWatermark"></div></div>
+  </div>
+  <button id="closeModalBtn" onclick="closeImageModal()">❌ 닫기</button>
+</div>
+
+</div>
+
+<script>
+  // ✅ D-day 계산 함수
+  function getDdayText(deadlineStr) {
+    if (!deadlineStr) return null;
+    var deadline = new Date(deadlineStr);
+    if (isNaN(deadline.getTime())) return null;
+    var now = new Date();
+    var diffMs = deadline - now;
+    if (diffMs < 0) return { text: "마감됨", urgent: false, passed: true };
+    var diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    var diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    if (diffHours < 1) return { text: diffMins + "분 남음", urgent: true, passed: false };
+    if (diffHours < 24) return { text: diffHours + "시간 " + diffMins + "분 남음", urgent: true, passed: false };
+    var diffDays = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+    return { text: "D-" + diffDays, urgent: false, passed: false };
+  }
+
+  var currentUser = { id: "", name: "" };
+  var pendingFeedbackRows = [];
+  var isOnlyMissingTasks = false;
+  var gMissingTasks = [];
+  var gResubmitTasks = [];
+  var currentTargetTask = null;
+  var selectedChoices = [];
+  // ✅ 갤러리 필터용 전역 변수
+  var gBestWorksMap = {};
+  var gViewedBest = [];
+
+  // ✅ 갤러리 렌더링 함수 (필터 적용)
+  function renderGallery() {
+    var galleryDiv = document.getElementById('bestWorksGallery');
+    var taskFilter = document.getElementById('galleryTaskFilter') ? document.getElementById('galleryTaskFilter').value : 'all';
+    var sortFilter = document.getElementById('gallerySortFilter') ? document.getElementById('gallerySortFilter').value : 'newest';
+
+    var taskNames = Object.keys(gBestWorksMap);
+
+    // 과제 필터
+    if (taskFilter !== 'all') taskNames = taskNames.filter(function(n) { return n === taskFilter; });
+
+    // 정렬
+    if (sortFilter === 'oldest') taskNames = taskNames.reverse();
+    // newest는 기본(reverse 안 함 — 이미 reverse 상태)
+
+    // NEW만 보기
+    if (sortFilter === 'new_only') {
+      taskNames = taskNames.filter(function(tName) {
+        return gBestWorksMap[tName].some(function(b) { return !gViewedBest.includes(b.rowIdx); });
+      });
+    }
+
+    if (taskNames.length === 0) {
+      galleryDiv.innerHTML = '<div style="text-align:center; padding:30px; background:white; border-radius:12px; color:#94a3b8; font-size:14px; border:1px solid #e2e8f0;">' +
+        (sortFilter === 'new_only' ? '새로 확인할 우수작이 없습니다. 👍' : '아직 선정된 우수작이 없습니다.<br>다음 명예의 전당 주인공에 도전해 보세요!') +
+        '</div>';
+      return;
+    }
+
+    var gHtml = '';
+    taskNames.forEach(function(tName) {
+      var items = gBestWorksMap[tName];
+      // ✅ 클라이언트 방어: 학급공개는 같은 반만, 학년공개는 모두 표시
+      var myClass = currentUser ? (String(currentUser.id).substring(0,1) + '학년 ' + String(currentUser.id).substring(1,2) + '반') : '';
+      items = items.filter(function(b) {
+        if (b.bestType === '학년공개') return true;
+        if (b.bestType === '학급공개') {
+          var authorClass = String(b.id || '').length >= 2
+            ? String(b.id).substring(0,1) + '학년 ' + String(b.id).substring(1,2) + '반'
+            : '';
+          return authorClass === myClass;
+        }
+        return true; // bestType 없으면 그냥 표시
+      });
+      if (items.length === 0) return;
+      // NEW만 보기 필터 적용 시 해당 폴더 아이템도 NEW만
+      if (sortFilter === 'new_only') items = items.filter(function(b) { return !gViewedBest.includes(b.rowIdx); });
+
+      var itemsHtml = ''; var hasNewInFolder = false;
+      items.forEach(function(bItem) {
+        var authorStr = bItem.isAnon ? "👤 익명 학생" : ('👤 ' + bItem.id + ' ' + bItem.name);
+        var commentStr = bItem.comment ? '<div class="best-comment-box">👩‍🏫 <b>선생님의 한 줄 평</b><br>' + bItem.comment + '</div>' : '';
+        var isNew = !gViewedBest.includes(bItem.rowIdx);
+        if (isNew) hasNewInFolder = true;
+        var newBadge = isNew ? '<span class="new-badge" id="badge_' + bItem.rowIdx + '">NEW</span>' : '';
+        // 공개 범위 배지 — 학년공개일 때만 표시, 학급공개는 배지 없음
+        var scopeBadge = bItem.bestType === '학년공개'
+          ? '<span style="background:#dbeafe; color:#1d4ed8; font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px; margin-left:4px;">🏫 학년 전체</span>'
+          : '';
+
+        var savedKeys = [];
+        if (bItem.bestKey) { try { savedKeys = JSON.parse(bItem.bestKey); } catch(e) { savedKeys = [bItem.bestKey]; } }
+        if (savedKeys.length === 0) {
+          var firstKey = Object.keys(bItem.annoUrls || {}).length > 0 ? Object.keys(bItem.annoUrls)[0] : (Object.keys(bItem.urls || {}).length > 0 ? Object.keys(bItem.urls)[0] : null);
+          if (firstKey) savedKeys.push(firstKey);
+        }
+        var filteredUrls = {}; var filteredAnnoUrls = {};
+        savedKeys.forEach(function(k) {
+          if (bItem.urls && bItem.urls[k]) filteredUrls[k] = bItem.urls[k];
+          if (bItem.annoUrls && bItem.annoUrls[k]) filteredAnnoUrls[k] = bItem.annoUrls[k];
+        });
+        var carouselHtml = buildCarouselHtml(filteredUrls, filteredAnnoUrls, bItem.rowIdx);
+        itemsHtml += '<div class="best-item"><div class="best-author">' + authorStr + newBadge + scopeBadge + '</div>' + carouselHtml + commentStr + '</div>';
+      });
+
+      var safeKey = tName.replace(/\s/g, '');
+      var folderNewBadge = hasNewInFolder ? '<span class="new-badge" id="folder_badge_' + safeKey + '">N</span>' : '';
+      var totalCount = items.length;
+      var newCount = items.filter(function(b) { return !gViewedBest.includes(b.rowIdx); }).length;
+      var countLabel = newCount > 0 ? '(' + totalCount + '건, NEW ' + newCount + '개) 🔽' : '(' + totalCount + '건) 🔽';
+      gHtml += '<div class="best-folder" onclick="this.classList.toggle(\'open\')"><div class="best-folder-header"><div>📚 ' + tName + folderNewBadge + '</div><span style="font-size:12px; color:#94a3b8;">' + countLabel + '</span></div><div class="best-folder-content" onclick="event.stopPropagation()">' + itemsHtml + '</div></div>';
+    });
+    galleryDiv.innerHTML = gHtml;
+  }
+
+  function applyGalleryFilter() { renderGallery(); }
+
+  window.onload = function() {
+    var sId = localStorage.getItem("math_student_id");
+    var sName = localStorage.getItem("math_student_name");
+    if (sId) document.getElementById('loginId').value = sId;
+    if (sName) document.getElementById('loginName').value = sName;
+    if (sId && sName) doLogin();
+  };
+
+// ✅ 미제출/재제출 카드 클릭 시 제출 페이지로 이동 + 과제 자동 선택
+  function goToSubmit(taskName) {
+    switchTab(1); // 과제 제출 탭으로 이동
+    var sel = document.getElementById('taskName');
+    if (!sel) return;
+    
+    // 드롭다운에서 해당 과제 찾아서 선택
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === taskName) {
+        sel.selectedIndex = i;
+        initTaskUI(); // 과제 선택 UI 초기화
+        
+        // 스크롤을 제출 폼 쪽으로 부드럽게 이동
+        setTimeout(function() {
+          sel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+        
+        // 시각적 피드백
+        sel.style.transition = '0.3s';
+        sel.style.background = '#dbeafe';
+        setTimeout(function() { sel.style.background = ''; }, 1500);
+        return;
+      }
+    }
+  }
+
+  function switchTab(t) {
+    for (var i = 1; i <= 3; i++) {
+      var btn = document.getElementById('btnTab' + i);
+      var tab = document.getElementById('tab' + i);
+      if (btn) btn.classList.remove('active');
+      if (tab) tab.classList.remove('active');
+    }
+    var activeBtn = document.getElementById('btnTab' + t);
+    var activeTab = document.getElementById('tab' + t);
+    if (activeBtn) activeBtn.classList.add('active');
+    if (activeTab) activeTab.classList.add('active');
+  }
+
+  function clearLoginInfo() {
+    localStorage.removeItem("math_student_id");
+    localStorage.removeItem("math_student_name");
+    location.reload();
+  }
+
+  function doLogin() {
+    var id = document.getElementById('loginId').value.trim();
+    var name = document.getElementById('loginName').value.trim();
+    var pwEl = document.getElementById('loginPw');
+    var pw = pwEl ? pwEl.value.trim() : "";
+    if (!id || !name) return;
+    document.getElementById('loginBtn').disabled = true;
+    document.getElementById('loginStatus').innerText = "인증 중...";
+    google.script.run
+      .withFailureHandler(function(err) {
+        document.getElementById('loginStatus').innerText = '오류: ' + err.message;
+        document.getElementById('loginBtn').disabled = false;
+      })
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          currentUser.id = id; currentUser.name = name;
+          localStorage.setItem("math_student_id", id);
+          localStorage.setItem("math_student_name", name);
+          document.getElementById('welcomeMsg').innerText = name + " 학생, 환영합니다! 🎉";
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('dashboardScreen').style.display = 'block';
+          onLoginSuccess(id);
+          refreshData();
+        } else {
+          document.getElementById('loginStatus').innerText = res.message;
+          document.getElementById('loginBtn').disabled = false;
+        }
+      })
+      .verifyLogin(id, name, pw);
+  }
+
+  function refreshData() {
+    var btn = document.getElementById('refreshBtn');
+    btn.innerText = "⏳ 로딩중..."; btn.disabled = true;
+    google.script.run.withSuccessHandler(function(data) {
+      renderDashboard(data);
+      btn.innerText = "🔄 새로고침"; btn.disabled = false;
+    }).getDashboardData(currentUser.id, currentUser.name);
+  }
+
+  function buildCarouselHtml(urlsObj, annoUrlsObj, rowIdx) {
+    var keys = Object.keys(urlsObj);
+    if (keys.length === 0 || urlsObj[keys[0]] === "첨부파일 없음") return "";
+    var html = '<div class="carousel-container">';
+    keys.forEach(function(k) {
+      var isAnno = annoUrlsObj && annoUrlsObj[k] && annoUrlsObj[k] !== "";
+      var targetUrl = isAnno ? annoUrlsObj[k] : urlsObj[k];
+      var fIdMatch = targetUrl.match(/[-\w]{25,}/);
+      if (fIdMatch) {
+        var fId = fIdMatch[0];
+        var thumbUrl = 'https://drive.google.com/thumbnail?id=' + fId + '&sz=w400';
+        var tag = isAnno
+          ? '<span class="carousel-tag anno">🖍️ 선생님 첨삭 (' + k + ')</span>'
+          : '<span class="carousel-tag">📷 원본 (' + k + ')</span>';
+        html += '<div class="carousel-item" onclick="openDirectImage(\'' + fId + '\', ' + rowIdx + ')">' + tag + '<img class="carousel-img" src="' + thumbUrl + '" loading="lazy"></div>';
+      }
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function renderDashboard(data) {
+    gMissingTasks = data.missingTasks;
+    gResubmitTasks = data.resubmitTasks;
+
+    var select = document.getElementById('taskName');
+    select.innerHTML = '<option value="">선택하세요</option>';
+
+    if (data.resubmitTasks.length > 0) {
+      var g1 = document.createElement('optgroup');
+      g1.label = "🚨 반려된 과제 (다시 제출 요망)";
+      data.resubmitTasks.forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t.name; opt.dataset.isResubmit = "true";
+        opt.innerText = '[재제출] ' + t.name;
+        g1.appendChild(opt);
+      });
+      select.appendChild(g1);
+    }
+
+    if (data.missingTasks.length > 0) {
+      var g2 = document.createElement('optgroup');
+      g2.label = "📚 해결해야 할 과제";
+      data.missingTasks.forEach(function(t) {
+        var opt = document.createElement('option');
+        opt.value = t.name; opt.dataset.isResubmit = "false";
+        var submittedCnt = 0;
+        if (t.submittedUrls) { for (var k in t.submittedUrls) { if (t.submittedUrls[k] && t.submittedUrls[k] !== "") submittedCnt++; } }
+        var prefix = submittedCnt > 0 ? '[진행중 ' + submittedCnt + '/' + t.reqPics + '개] ' : '';
+        var ddayInfo = t.deadline ? getDdayText(t.deadline) : null;
+        var ddaySuffix = ddayInfo ? (' ⏰' + ddayInfo.text) : '';
+        opt.innerText = prefix + t.name + ddaySuffix;
+        g2.appendChild(opt);
+      });
+      select.appendChild(g2);
+    }
+
+    if (select.options.length <= 1) {
+      select.innerHTML = '<option value="">제출할 과제가 없습니다 (모두 제출 완료!)</option>';
+      document.getElementById('multiUploadArea').innerHTML = '';
+      document.getElementById('choiceArea').style.display = 'none';
+    }
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitBtn').innerText = '과제를 선택하세요';
+
+    var missingDiv = document.getElementById('missingList');
+    if (data.missingTasks.length === 0 && data.resubmitTasks.length === 0) {
+      missingDiv.innerHTML = '<div style="color:#059669; font-weight:bold; background:#ecfdf5; padding:12px; border-radius:10px; text-align:center;">✨ 완벽해요! 밀린 과제가 없습니다.</div>';
+    } else {
+      var mHtml = '';
+
+      data.resubmitTasks.forEach(function(t) {
+        var ddayInfo = t.deadline ? getDdayText(t.deadline) : null;
+        var ddayBadge = '';
+        if (ddayInfo) {
+          if (ddayInfo.passed) {
+            ddayBadge = '<span style="background:#e2e8f0; color:#475569; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; white-space:nowrap;">⏰ 마감됨</span>';
+          } else if (ddayInfo.urgent) {
+            ddayBadge = '<span style="background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; white-space:nowrap;">🚨 ' + ddayInfo.text + '</span>';
+          } else {
+            ddayBadge = '<span style="background:#fff7ed; color:#ea580c; border:1px solid #fed7aa; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; white-space:nowrap;">' + ddayInfo.text + '</span>';
+          }
+        }
+        
+        var escapedName = t.name.replace(/'/g, "\\'");
+        mHtml += '<div onclick="goToSubmit(\'' + escapedName + '\')" style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02); cursor:pointer; transition:0.2s;" onmouseover="this.style.background=\'#ffedd5\'; this.style.transform=\'translateX(-2px)\'" onmouseout="this.style.background=\'#fff7ed\'; this.style.transform=\'translateX(0)\'">' +
+                   '<div style="display:flex; align-items:center; gap:10px; min-width:0;">' +
+                     '<span style="font-size:18px; flex-shrink:0;">🚨</span>' +
+                     '<div style="min-width:0;">' +
+                       '<div style="font-size:11px; font-weight:800; color:#ea580c; margin-bottom:3px;">재제출 요망 · 클릭하여 제출 ▶</div>' +
+                       '<div style="font-size:14px; font-weight:700; color:#9a3412; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+                     '</div>' +
+                   '</div>' +
+                   '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
+                 '</div>';
+      });
+
+      data.missingTasks.forEach(function(t) {
+        var submittedCnt = 0;
+        if (t.submittedUrls) { for (var k in t.submittedUrls) { if (t.submittedUrls[k] && t.submittedUrls[k] !== "") submittedCnt++; } }
+        var subTxt = submittedCnt > 0 ? '<span style="font-size:11px; color:#0284c7; margin-left:6px; font-weight:600;">(' + submittedCnt + '/' + t.reqPics + '개 제출)</span>' : '';
+
+        var ddayInfo = t.deadline ? getDdayText(t.deadline) : null;
+        var ddayBadge = '';
+        if (ddayInfo) {
+          if (ddayInfo.passed) {
+            ddayBadge = '<span style="background:#e2e8f0; color:#475569; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; white-space:nowrap;">⏰ 마감됨</span>';
+          } else if (ddayInfo.urgent) {
+            ddayBadge = '<span style="background:#fef2f2; color:#dc2626; border:1px solid #fca5a5; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; white-space:nowrap;">🚨 ' + ddayInfo.text + '</span>';
+          } else {
+            var dNum = ddayInfo.text;
+            var dColor = dNum === 'D-1' ? '#dc2626' : dNum === 'D-2' || dNum === 'D-3' ? '#ea580c' : '#0284c7';
+            var dBg = dNum === 'D-1' ? '#fef2f2' : dNum === 'D-2' || dNum === 'D-3' ? '#fff7ed' : '#eff6ff';
+            var dBorder = dNum === 'D-1' ? '#fca5a5' : dNum === 'D-2' || dNum === 'D-3' ? '#fed7aa' : '#bfdbfe';
+            ddayBadge = '<span style="background:' + dBg + '; color:' + dColor + '; border:1px solid ' + dBorder + '; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; white-space:nowrap;">' + dNum + '</span>';
+          }
+        }
+
+        var escapedName = t.name.replace(/'/g, "\\'");
+        mHtml += '<div onclick="goToSubmit(\'' + escapedName + '\')" style="background:#fff1f2; border:1px solid #fecdd3; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02); cursor:pointer; transition:0.2s;" onmouseover="this.style.background=\'#ffe4e6\'; this.style.transform=\'translateX(-2px)\'" onmouseout="this.style.background=\'#fff1f2\'; this.style.transform=\'translateX(0)\'">' +
+                   '<div style="display:flex; align-items:center; gap:10px; min-width:0;">' +
+                     '<span style="font-size:18px; flex-shrink:0;">📝</span>' +
+                     '<div style="min-width:0;">' +
+                       '<div style="font-size:11px; font-weight:800; color:#e11d48; margin-bottom:3px;">미제출 · 클릭하여 제출 ▶' + subTxt + '</div>' +
+                       '<div style="font-size:14px; font-weight:700; color:#9f1239; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+                     '</div>' +
+                   '</div>' +
+                   '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
+                 '</div>';
+      });
+
+      missingDiv.innerHTML = mHtml;
+    }
+
+    var historyDiv = document.getElementById('historyList');
+    if (data.history.length === 0) {
+      historyDiv.innerHTML = '<div style="text-align:center; color:#9ca3af; padding:20px; font-size:14px;">기록이 없습니다.</div>';
+    } else {
+      var hHtml = '';
+      data.history.forEach(function(item) {
+        var bestBadge = item.isMyBest ? '<div style="background:#fef08a; color:#a16207; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:bold; margin-bottom:8px; display:inline-block;">🌟 축하합니다! 이 과제가 명예의 전당에 선정되었습니다.</div>' : '';
+        var isNew = item.isUnread && (item.status === '채점완료' || item.status === '이전기록채점완료');
+        var cardClass = item.isMyBest ? "history-item is-best" : (isNew ? "history-item is-new" : "history-item");
+        var badge = '';
+        var newBadge = isNew ? '<span class="new-badge">NEW ✓</span>' : '';
+        
+        if (item.status === '재제출요청') badge = '<span style="color:#ef4444; font-size:12px; font-weight:bold; margin-left:8px;">(재제출 대기중)</span>';
+        else if (item.status === '이전기록채점완료') badge = '<span style="color:#64748b; font-size:12px; font-weight:bold; margin-left:8px;">(이전 기록)</span>';
+
+        // ✅ 등수 배지 생성 (반 등수 강조)
+        var rankBadge = '';
+        if (item.classRank > 0 && item.status !== '재제출요청' && item.status !== '반려검토' && item.status !== '이전기록채점완료') {
+           var emoji = item.classRank === 1 ? '🥇' : item.classRank === 2 ? '🥈' : item.classRank === 3 ? '🥉' : item.classRank <= 5 ? '🏅' : item.classRank <= 10 ? '🎖️' : '👍';
+           var bg = item.classRank <= 3 ? '#fef08a' : item.classRank <= 10 ? '#d1fae5' : '#f1f5f9';
+           var col = item.classRank <= 3 ? '#a16207' : item.classRank <= 10 ? '#047857' : '#475569';
+           var border = item.classRank <= 3 ? '#fde68a' : item.classRank <= 10 ? '#a7f3d0' : '#cbd5e1';
+           
+           var rText = item.classRank <= 3 ? `반 ${item.classRank}등` : item.classRank <= 5 ? `반 TOP 5` : item.classRank <= 10 ? `반 TOP 10` : `반 ${item.classRank}등`;
+           
+           rankBadge = '<span style="display:inline-flex; align-items:center; gap:4px; background:'+bg+'; color:'+col+'; padding:3px 8px; border-radius:8px; font-size:12px; font-weight:800; margin-left:6px; margin-top:4px; border:1px solid '+border+'; vertical-align:middle;">' + emoji + ' ' + rText + ' <span style="font-size:10px; font-weight:600; opacity:0.7;">(전체 ' + item.totalRank + '등)</span></span>';
+        }
+
+        var rejectBox = '';
+        if (item.status === '재제출요청' && item.feedback) {
+          rejectBox = '<div class="reject-reason-box"><div class="reject-reason-text">' + item.feedback + '</div></div>';
+        }
+
+        var hasPqData = item.perQuestionData && Object.keys(item.perQuestionData).length > 0;
+        var pqHasContent = hasPqData && Object.values(item.perQuestionData).some(function(d) { return d.fb || d.sc; });
+        var feedHtml = '';
+        var scoreBadge = '';
+
+        if (pqHasContent) {
+          feedHtml = '<div style="margin-top:12px;">';
+          Object.keys(item.perQuestionData).forEach(function(qk) {
+            var qd = item.perQuestionData[qk];
+            if (!qd.fb && !qd.sc) return;
+            feedHtml += '<div style="background:#eff6ff; border-radius:10px; padding:10px 14px; margin-bottom:8px; border:1px solid #bfdbfe;">';
+            feedHtml += '<div style="font-size:11px; font-weight:800; color:#2563eb; margin-bottom:4px;">📝 ' + qk;
+            if (qd.sc) feedHtml += ' <span style="background:#fef3c7; color:#b45309; padding:1px 6px; border-radius:6px; font-size:11px; margin-left:4px;">💯 ' + qd.sc + '</span>';
+            if (qd.best && qd.best.comment) feedHtml += ' <span style="background:#fef08a; color:#a16207; padding:1px 6px; border-radius:6px; font-size:10px; margin-left:4px;">🌟 우수작</span>';
+            feedHtml += '</div>';
+            if (qd.fb) feedHtml += '<div style="font-size:13px; color:#1e3a8a; line-height:1.5;">' + qd.fb + '</div>';
+            feedHtml += '</div>';
+          });
+          feedHtml += '</div>';
+          if (item.feedback) feedHtml += '<div class="teacher-feedback">' + item.feedback + '</div>';
+          if (item.score) scoreBadge = '<span class="score-badge">💯 합계: ' + item.score + '</span>';
+        } else {
+          feedHtml = item.feedback ? '<div class="teacher-feedback">' + item.feedback + '</div>' : '';
+          scoreBadge = item.score ? '<span class="score-badge">💯 평가: ' + item.score + '</span>' : '';
+        }
+        var carouselHtml = buildCarouselHtml(item.urls, item.annoUrls, item.rowIdx);
+        var replySection = '';
+        if (item.reply) {
+          replySection = '<div class="my-reply">' + item.reply.replace(/\n/g, '<br>') + '</div>';
+        } else if (item.feedback || (item.annoUrls && Object.keys(item.annoUrls).length > 0)) {
+          replySection = '<div class="reply-section"><textarea id="reply_' + item.rowIdx + '" class="reply-input" rows="2" placeholder="선생님께 드릴 답장이나 나의 오답 성찰을 적어보세요."></textarea><button class="reply-btn" onclick="sendReply(' + item.rowIdx + ')">답장 보내기</button></div>';
+        }
+
+        var aiRefBox = '';
+        if (item.aiGradeTemp) {
+          var ai = item.aiGradeTemp;
+          var aiScore = ai.grade 
+            || (ai.perQuestion 
+                  ? Object.values(ai.perQuestion).reduce(function(s,q){return s+(Number(q.score)||0);},0) + '점'
+                  : (ai.score || 0) + '점');
+          var aiFb = ai.overallFeedback || ai.feedback || '';
+          var isNotYetConfirmed = item.status !== '채점완료' && item.status !== '이전기록채점완료';
+          
+          var pqDetail = '';
+          if (ai.perQuestion) {
+            pqDetail = '<div style="margin-top:8px; padding-top:8px; border-top:1px dashed #bae6fd;">';
+            Object.keys(ai.perQuestion).forEach(function(k) {
+              var q = ai.perQuestion[k];
+              pqDetail += '<div style="display:flex; justify-content:space-between; font-size:12px; padding:3px 0;">'
+                + '<span style="color:#334155; font-weight:600;">' + k + '</span>'
+                + '<span style="color:#0284c7; font-weight:700;">' + q.score + '/' + q.maxScore + '점</span>'
+                + '</div>';
+              if (q.feedback) pqDetail += '<div style="font-size:11px; color:#64748b; padding-left:6px; margin-bottom:4px;">' + q.feedback + '</div>';
+            });
+            pqDetail += '</div>';
+          }
+          
+          aiRefBox = '<div style="background:#f0f9ff; border:1.5px dashed #7dd3fc; border-radius:10px; padding:12px 14px; margin-top:12px;">'
+            + '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">'
+              + '<span style="font-size:12px; font-weight:800; color:#0369a1;">🤖 AI 참고 채점</span>'
+              + '<span style="font-size:17px; font-weight:900; color:#0284c7;">' + aiScore + '</span>'
+            + '</div>'
+            + (aiFb ? '<div style="font-size:13px; color:#334155; line-height:1.6; margin-bottom:4px;">' + aiFb + '</div>' : '')
+            + pqDetail
+            + '<div style="font-size:10px; color:#94a3b8; font-style:italic; margin-top:6px; padding-top:6px; border-top:1px solid #e0f2fe;">'
+              + (isNotYetConfirmed 
+                  ? '⏳ 참고용 AI 결과입니다. 선생님이 곧 최종 채점해주실 거예요!'
+                  : '✅ 선생님 최종 채점과 비교해보세요. (AI는 참고용)')
+            + '</div>'
+          + '</div>';
+        }
+
+        var gradingPlaceholder = '';
+        if (!item.aiGradeTemp && !item.feedback && item.status === '' && !item.score) {
+          gradingPlaceholder = '<div style="background:#fef9c3; border:1px dashed #fde047; border-radius:10px; padding:10px 14px; margin-top:12px; text-align:center;">'
+            + '<span style="font-size:13px; color:#a16207; font-weight:700;">⏳ AI 채점 진행 중... 새로고침해서 확인해보세요</span>'
+            + '</div>';
+        }
+
+        hHtml += '<div class="' + cardClass + '">' + bestBadge +
+          '<div style="font-weight:700; font-size:15px; color:#1e3a8a; margin-bottom:4px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;"><span>' + item.task + '</span>' + badge + newBadge + scoreBadge + rankBadge + '</div>' +
+          '<div style="font-size:12px; color:#6b7280;">' + item.date + '</div>' +
+          carouselHtml + rejectBox + feedHtml + aiRefBox + gradingPlaceholder + replySection + '</div>';
+      });
+      historyDiv.innerHTML = hHtml;
+    }
+
+    var viewedBest = JSON.parse(localStorage.getItem('viewed_best_' + currentUser.id) || '[]');
+    gBestWorksMap = data.bestWorksMap;
+    gViewedBest = viewedBest;
+
+    var taskSel = document.getElementById('galleryTaskFilter');
+    var taskNames = Object.keys(data.bestWorksMap).reverse();
+    var taskOpts = '<option value="all">📚 전체 과제</option>';
+    taskNames.forEach(function(tName) { taskOpts += '<option value="' + tName + '">' + tName + '</option>'; });
+    taskSel.innerHTML = taskOpts;
+
+    renderGallery();
+
+    var hasFeedback = data.unreadFeedbacks.length > 0;
+    var hasPending = data.missingTasks.length > 0 || data.resubmitTasks.length > 0;
+
+    if (hasFeedback || hasPending) {
+      pendingFeedbackRows = [];
+      var nHtml = '';
+      if (hasFeedback) {
+        nHtml += '<div style="color:#1e3a8a; font-weight:bold; margin-bottom:10px; font-size: 15px;">👩‍🏫 선생님의 코멘트 & 알림</div>';
+        data.unreadFeedbacks.forEach(function(fb) {
+          pendingFeedbackRows.push(fb.rowIdx);
+          var tag = fb.status === "재제출요청" ? "<span style='color:#ef4444; font-weight:bold;'>[재제출 요청]</span><br>" : "";
+          var annoTag = (fb.annoUrls && Object.keys(fb.annoUrls).length > 0) ? "<br><span style='color:#ea580c; font-weight:bold;'>[🖍️ 첨삭도 도착했어요!]</span>" : "";
+          var bestTag = fb.isMyBest ? "<br><span style='color:#b45309; font-weight:bold; background:#fef08a; padding:2px 4px; border-radius:4px;'>🌟 우수작 선정 축하!</span>" : "";
+          nHtml += '<div class="noti-item"><div style="font-size:12px; color:#64748b; font-weight:bold; margin-bottom:5px;">과제: ' + fb.baseName + '</div><div style="font-size:14px; color:#0f172a; line-height:1.5;">' + tag + fb.feedback + annoTag + bestTag + '</div></div>';
+        });
+      }
+      if (hasPending) {
+        var marginStyle = hasFeedback ? "margin-top:20px; border-top:2px dashed #e2e8f0; padding-top:15px;" : "";
+        nHtml += '<div style="' + marginStyle + '"><div style="color:#be123c; font-weight:bold; margin-bottom:10px; font-size: 15px;">🚨 꼭 해결해야 할 과제</div>';
+        data.resubmitTasks.forEach(function(t) { nHtml += '<div style="font-size:14px; color:#c2410c; margin-bottom:6px; font-weight:600; line-height:1.4; word-break:keep-all;">[재제출] ' + t.name + '</div>'; });
+        data.missingTasks.forEach(function(t) { nHtml += '<div style="font-size:14px; color:#be123c; margin-bottom:6px; font-weight:600; line-height:1.4; word-break:keep-all;">[미제출] ' + t.name + '</div>'; });
+        nHtml += '</div>';
+      }
+      isOnlyMissingTasks = !hasFeedback;
+      document.getElementById('notiTitle').innerText = isOnlyMissingTasks ? "안 낸 과제가 있어요!" : "새로운 알림이 도착했어요!";
+      document.getElementById('notiContent').innerHTML = nHtml;
+      document.getElementById('notiModal').style.display = 'flex';
+    }
+  }
+
+  function openDirectImage(fileId, rowIdx) {
+    if (rowIdx) {
+      var viewed = JSON.parse(localStorage.getItem('viewed_best_' + currentUser.id) || '[]');
+      if (!viewed.includes(rowIdx)) {
+        viewed.push(rowIdx);
+        localStorage.setItem('viewed_best_' + currentUser.id, JSON.stringify(viewed));
+        var badge = document.getElementById('badge_' + rowIdx);
+        if (badge) badge.style.display = 'none';
+      }
+    }
+    var m = document.getElementById('imageModal');
+    var img = document.getElementById('modalImg');
+    var wm = document.getElementById('modalWatermark');
+    img.src = "";
+    m.style.display = 'flex';
+    wm.innerText = '조회자:\n' + currentUser.id + ' ' + currentUser.name;
+    // ✅ Drive 직접 임베딩 대신 base64로 안전하게 로드
+    img.alt = "로딩 중...";
+    img.style.opacity = '0.3';
+    google.script.run
+      .withFailureHandler(function(err) {
+        img.alt = "이미지를 불러올 수 없습니다.";
+        img.style.opacity = '1';
+      })
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          img.src = 'data:' + res.mimeType + ';base64,' + res.data;
+          img.style.opacity = '1';
+        } else {
+          img.alt = "이미지를 불러올 수 없습니다: " + (res.message || "");
+          img.style.opacity = '1';
+        }
+      })
+      .getSecureFileBase64('https://drive.google.com/file/d/' + fileId + '/view');
+  }
+
+  function initTaskUI() {
+    var sel = document.getElementById('taskName');
+    var choiceArea = document.getElementById('choiceArea');
+    var uploadArea = document.getElementById('multiUploadArea');
+    var btn = document.getElementById('submitBtn');
+
+    // ✅ 반려 사유 박스 초기화
+    var rejBox = document.getElementById('rejectionReasonBox');
+    if (rejBox) rejBox.style.display = 'none';
+
+    if (!sel.value) {
+      choiceArea.style.display = 'none';
+      uploadArea.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af; border:2px dashed #e5e7eb; border-radius:12px;">과제를 먼저 선택해 주세요.</div>';
+      btn.disabled = true; btn.innerText = '과제를 선택하세요'; 
+      btn.style.background = '#2563eb';
+      return;
+    }
+
+    // ✨ 현재 선택한 항목이 '재제출'인지 확인
+    var isResub = sel.options[sel.selectedIndex].getAttribute('data-is-resubmit') === 'true';
+
+    currentTargetTask = gMissingTasks.find(function(t) { return t.name === sel.value; }) || gResubmitTasks.find(function(t) { return t.name === sel.value; });
+    if (!currentTargetTask) return;
+    
+    // 객체에도 재제출 여부 저장 (나중을 위해)
+    currentTargetTask.isResubmit = isResub;
+    selectedChoices = [];
+
+    if (currentTargetTask.isResubmit && currentTargetTask.rejectionFeedback && rejBox) {
+      document.getElementById('rejectionReasonText').innerText = currentTargetTask.rejectionFeedback;
+      rejBox.style.display = 'block';
+    }
+
+    // ✨ 마감 시간 초과 여부 확인 (재제출인 경우 마감 무시!)
+    var ddayInfo = currentTargetTask.deadline ? getDdayText(currentTargetTask.deadline) : null;
+    var isDeadlinePassed = ddayInfo && ddayInfo.passed;
+
+    // 💡 [수정 포인트] 마감되었더라도 '재제출'인 경우에는 로직을 통과시킴
+    if (isDeadlinePassed && !isResub) {
+      choiceArea.style.display = 'none';
+      uploadArea.innerHTML = '<div style="text-align:center; padding:20px; color:#dc2626; border:2px dashed #fecaca; border-radius:12px; background:#fef2f2; font-weight:bold;">🚨 제출 기한이 지났습니다.<br><span style="font-size:12px; font-weight:normal; color:#ef4444; margin-top:4px; display:inline-block;">선생님께 문의해 주세요.</span></div>';
+      btn.disabled = true; 
+      btn.innerText = '마감된 과제입니다';
+      btn.style.background = '#9ca3af';
+      return; 
+    } else {
+      btn.style.background = '#2563eb';
+      btn.innerText = isResub ? '📤 재제출하기' : '📤 과제 제출하기';
+    }
+
+    // 이하 선택 문항 및 업로드 슬롯 렌더링 로직 (기존과 동일)
+    if (currentTargetTask.choices && currentTargetTask.choices.length > 0) {
+      document.getElementById('reqChoiceCnt').innerText = currentTargetTask.reqPics;
+      choiceArea.style.display = 'block';
+      var cHtml = '';
+      currentTargetTask.choices.forEach(function(c) {
+        var subUrls = currentTargetTask.submittedUrls || {};
+        var completedKeys = currentTargetTask.completedKeys || [];
+        var isCompleted = currentTargetTask.isResubmit && completedKeys.includes(c);
+        var isLocked = (subUrls[c] && subUrls[c] !== "" && subUrls[c] !== "첨부파일 없음" && !currentTargetTask.isResubmit) || isCompleted;
+        var cls = isLocked ? "choice-chip locked" : "choice-chip";
+        var txt = isCompleted ? ('✅ ' + c + ' (채점완료)') : (isLocked ? ('✅ ' + c + ' (제출됨)') : c);
+        cHtml += '<div class="' + cls + '" onclick="toggleTaskChoice(this, \'' + c + '\')">' + txt + '</div>';
+      });
+      document.getElementById('choiceChips').innerHTML = cHtml;
+      uploadArea.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af; border:2px dashed #e5e7eb; border-radius:12px;">위에서 문제를 먼저 선택해 주세요.</div>';
+      btn.disabled = true;
+    } else {
+      choiceArea.style.display = 'none';
+      var html = ''; var hasUploadableSlot = false;
+      var reqCount = currentTargetTask.reqPics || 1;
+      var subUrls = currentTargetTask.submittedUrls || {};
+      for (var i = 0; i < reqCount; i++) {
+        var key = '사진 ' + (i + 1);
+        var url = subUrls[key];
+        var isLocked = (url && url !== "" && url !== "첨부파일 없음" && !currentTargetTask.isResubmit);
+        if (isLocked) {
+          html += '<div class="upload-slot locked"><div class="upload-slot-title">📸 ' + key + '</div><div class="locked-msg">✅ 이미 제출됨</div></div>';
+        } else {
+          hasUploadableSlot = true;
+          html += '<div class="upload-slot"><div class="upload-slot-title" style="color:#ea580c;">📸 ' + key + ' 첨부</div><input type="file" id="fileInput_' + key + '" class="dynamic-file-input" accept="image/*" data-key="' + key + '"></div>';
+        }
+      }
+      uploadArea.innerHTML = html;
+      btn.disabled = !hasUploadableSlot;
+    }
+  }
+
+  function toggleTaskChoice(elem, choiceStr) {
+    if (elem.classList.contains('locked')) return;
+    var idx = selectedChoices.indexOf(choiceStr);
+    if (idx > -1) { selectedChoices.splice(idx, 1); elem.classList.remove('selected'); }
+    else {
+      var lockedCount = document.querySelectorAll('.choice-chip.locked').length;
+      if (selectedChoices.length + lockedCount >= currentTargetTask.reqPics) { alert('이 과제는 총 ' + currentTargetTask.reqPics + '개만 제출하면 됩니다!'); return; }
+      selectedChoices.push(choiceStr); elem.classList.add('selected');
+    }
+    renderDynamicUploadSlots();
+  }
+
+  function renderDynamicUploadSlots() {
+    var area = document.getElementById('multiUploadArea');
+    var btn = document.getElementById('submitBtn');
+    if (selectedChoices.length === 0) {
+      area.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af; border:2px dashed #e5e7eb; border-radius:12px;">위에서 문제를 먼저 선택해 주세요.</div>';
+      btn.disabled = true; btn.innerText = '문제를 선택하세요'; return;
+    }
+    var html = '';
+    selectedChoices.forEach(function(c) {
+      html += '<div class="upload-slot" style="border-color:#3b82f6; background:#eff6ff;"><div class="upload-slot-title" style="color:#1e3a8a;">📸 [' + c + '] 문제 사진 첨부</div><input type="file" id="fileInput_' + c + '" class="dynamic-file-input" accept="image/*" style="background: white;" data-key="' + c + '"></div>';
+    });
+    area.innerHTML = html;
+    btn.disabled = false; btn.innerText = '📤 선택한 문제 제출하기';
+  }
+
+  function compressImage(file, maxWidth) {
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = function(event) {
+      var img = new Image();
+      img.onload = function() {
+        var cvs = document.createElement('canvas');
+        var width = img.width;
+        var height = img.height;
+
+        // 대용량 사진 대응: 최대 해상도를 1200px로 제한 (인쇄용이 아니면 충분한 화질)
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        cvs.width = width;
+        cvs.height = height;
+        
+        var ctx = cvs.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        // 품질을 0.6~0.7로 조절하면 용량이 1/10 수준으로 줄어듭니다.
+        resolve(cvs.toDataURL('image/jpeg', 0.6).split(',')[1]);
+      };
+      img.src = event.target.result;
+    };
+  });
+}
+
+  async function upload() {
+    if (!currentTargetTask) return;
+
+    // ✨ 마감 검사에서 '재제출'은 통과시키는 조건 추가
+    var ddayInfo = currentTargetTask.deadline ? getDdayText(currentTargetTask.deadline) : null;
+    if (ddayInfo && ddayInfo.passed && !currentTargetTask.isResubmit) {
+        document.getElementById('submitStatus').innerText = "🚨 이미 제출 기한이 지났습니다!";
+        var btn = document.getElementById('submitBtn');
+        btn.disabled = true;
+        btn.innerText = '마감된 과제입니다';
+        btn.style.background = '#9ca3af';
+        document.getElementById('multiUploadArea').innerHTML = '<div style="text-align:center; padding:20px; color:#dc2626; border:2px dashed #fecaca; border-radius:12px; background:#fef2f2; font-weight:bold;">🚨 제출 기한 초과</div>';
+        return; 
+    }
+
+    // 이하 파일 처리 및 전송 로직 (기존과 동일)
+    var filesToProcess = [];
+    document.querySelectorAll('.dynamic-file-input').forEach(function(fInput) {
+      if (fInput.files[0]) filesToProcess.push({ key: fInput.getAttribute('data-key'), file: fInput.files[0] });
+    });
+
+    var requiredCount = document.querySelectorAll('.dynamic-file-input').length;
+    if (filesToProcess.length === 0) {
+      document.getElementById('submitStatus').innerText = "최소 1장 이상의 사진을 첨부해 주세요!";
+      return;
+    }
+    if (filesToProcess.length < requiredCount) {
+      document.getElementById('submitStatus').innerText = "⚠️ 모든 사진을 첨부해야 합니다!";
+      return;
+    }
+
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('submitStatus').innerText = "사진 압축 및 전송 중... 🚀";
+    var base64Files = []; var filesProcessedCount = 0;
+    for (var i = 0; i < filesToProcess.length; i++) {
+      var fObj = filesToProcess[i];
+      var b64Data = await compressImage(fObj.file, 1500);
+      base64Files.push({ key: fObj.key, b64: b64Data, mime: 'image/jpeg', name: fObj.file.name });
+      filesProcessedCount++;
+      if (filesProcessedCount === filesToProcess.length) {
+        sendToServer(currentTargetTask.isResubmit ? "true" : "false", base64Files);
+      }
+    }
+  }
+
+  function sendToServer(isResubmitStr, base64FilesArray) {
+    var s = document.getElementById('taskName');
+    var taskNameVal = s.value;
+    document.getElementById('submitStatus').innerText = "서버에 전송 중... ☁️";
+    
+    google.script.run
+      .withFailureHandler(function(err) {
+        document.getElementById('submitStatus').innerText = "⚠️ 제출 실패: " + err.message;
+        document.getElementById('submitBtn').disabled = false;
+        document.getElementById('submitBtn').innerText = '📤 과제 제출하기';
+        alert("제출 중 오류가 발생했습니다.\n" + err.message + "\n\n다시 시도해주세요.");
+      })
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          document.getElementById('dashboardScreen').style.display = 'none';
+          document.getElementById('submitRankBox').style.display = 'none';
+          document.getElementById('successMsg').style.display = 'block';
+
+          // ✅ 초기 상태: 결과 박스들 숨기기
+          document.getElementById('aiGradingLoader').style.display = 'none';
+          document.getElementById('aiGradeResultBox').style.display = 'none';
+          document.getElementById('aiGradeSkippedBox').style.display = 'none';
+          
+          // ✨ 제출 순위 조회 (반 등수 중심)
+          google.script.run
+            .withSuccessHandler(function(rankRes) {
+              if (rankRes.success && rankRes.classRank > 0) {
+                var tRank = rankRes.totalRank;
+                var cRank = rankRes.classRank;
+                
+                var emoji = cRank === 1 ? '🥇' : cRank === 2 ? '🥈' : cRank === 3 ? '🥉' : cRank <= 5 ? '🏅' : cRank <= 10 ? '🎖️' : '👍';
+                
+                document.getElementById('submitRankNum').innerHTML = 
+                  '<div style="font-size:24px; color:#059669; font-weight:900; margin-bottom:6px;">' + emoji + ' 우리 반 <span style="font-size:36px;">' + cRank + '</span>등 제출!</div>' +
+                  '<div style="display:inline-block; background:#eff6ff; color:#1e3a8a; padding:4px 14px; border-radius:20px; font-size:13px; font-weight:700; border:1px solid #bfdbfe;">전체 ' + tRank + '등</div>';
+                  
+                var encouragement = cRank === 1 ? '대단해요! 우리 반에서 가장 먼저 제출했습니다! 🚀'
+                  : cRank === 2 ? '엄청난 스피드! 우리 반 2등으로 제출 완료! 🥈 멋져요!'
+                  : cRank === 3 ? '빠른 제출 칭찬해요! 우리 반 3등 제출입니다! 🥉 최고!'
+                  : cRank <= 5 ? '엄청 빨라요! 우리 반 TOP 5 안에 들었네요! 🏅 잘했어요!'
+                  : cRank <= 10 ? '부지런하네요! 우리 반 TOP 10 안에 들었어요! 🎖️'
+                  : '성실하게 제출 완료! 선생님 피드백을 기다려봐요! 😊';
+                  
+                document.getElementById('submitRankMsg').innerText = encouragement;
+                document.getElementById('submitRankBox').style.display = 'block';
+              }
+            })
+            .getSubmitRank(currentUser.id, taskNameVal);
+          // ✅ AI 자동 채점 실행 (결과 올 때까지 로딩 화면 표시)
+          if (res.rowIdx) {
+            // 로딩 화면 표시
+            document.getElementById('aiGradingLoader').style.display = 'block';
+            document.getElementById('successBackBtn').style.display = 'none';
+            
+            // 프로그레스 바 애니메이션
+            var progress = 0;
+            var progressTimer = setInterval(function() {
+              progress += 2;
+              if (progress > 90) progress = 90; // 90%에서 멈춤 (완료 시 100%으로 점프)
+              var bar = document.getElementById('aiProgressBar');
+              if (bar) bar.style.width = progress + '%';
+            }, 400);
+            
+            // 로딩 메시지 변경 애니메이션
+            var msgs = [
+              { emoji: '🤖', title: 'AI가 채점하고 있어요...', desc: '답안을 분석하고 피드백을 작성 중이에요.' },
+              { emoji: '🔍', title: '답안을 꼼꼼히 확인하는 중...', desc: '풀이 과정과 답을 하나하나 보고 있어요.' },
+              { emoji: '📝', title: '피드백을 작성하고 있어요...', desc: '곧 결과를 알려드릴게요!' }
+            ];
+            var msgIdx = 0;
+            var msgTimer = setInterval(function() {
+              msgIdx = (msgIdx + 1) % msgs.length;
+              var m = msgs[msgIdx];
+              var e1 = document.getElementById('aiLoaderEmoji');
+              var e2 = document.getElementById('aiLoaderTitle');
+              var e3 = document.getElementById('aiLoaderDesc');
+              if (e1) e1.textContent = m.emoji;
+              if (e2) e2.textContent = m.title;
+              if (e3) e3.innerHTML = m.desc;
+            }, 5000);
+            
+            google.script.run
+              .withFailureHandler(function(err) {
+                clearInterval(progressTimer);
+                clearInterval(msgTimer);
+                // AI 실패 → 조용히 스킵 화면 표시
+                document.getElementById('aiGradingLoader').style.display = 'none';
+                document.getElementById('aiGradeSkippedBox').style.display = 'block';
+                document.getElementById('successBackBtn').style.display = 'block';
+              })
+              .withSuccessHandler(function(aiRes) {
+                clearInterval(progressTimer);
+                clearInterval(msgTimer);
+                
+                // 프로그레스 바 100%
+                var bar = document.getElementById('aiProgressBar');
+                if (bar) bar.style.width = '100%';
+                
+                setTimeout(function() {
+                  document.getElementById('aiGradingLoader').style.display = 'none';
+                  
+                  if (aiRes && aiRes.success && aiRes.result) {
+                    // ✅ AI 결과 표시
+                    var r = aiRes.result;
+                    
+                    // 점수 표시
+                    var scoreText = r.grade 
+                      || (r.perQuestion 
+                            ? Object.values(r.perQuestion).reduce(function(s,q){return s+(Number(q.score)||0);},0) + '점'
+                            : (r.score || 0) + '/' + (r.maxScore || '?') + '점');
+                    document.getElementById('aiResultScore').textContent = scoreText;
+                    
+                    // 피드백 표시
+                    var fbText = r.overallFeedback || r.feedback || '';
+                    document.getElementById('aiResultFeedback').textContent = fbText;
+                    
+                    // 문항별 결과 표시
+                    var pqDiv = document.getElementById('aiResultPerQuestion');
+                    if (r.perQuestion) {
+                      var pqHtml = '';
+                      Object.keys(r.perQuestion).forEach(function(k) {
+                        var q = r.perQuestion[k];
+                        pqHtml += '<div style="display:flex; justify-content:space-between; align-items:flex-start; padding:8px 10px; background:white; border-radius:8px; margin-bottom:6px; border:1px solid #e0f2fe;">'
+                          + '<div style="flex:1;">'
+                            + '<div style="font-size:13px; font-weight:700; color:#1e293b;">' + k + '</div>'
+                            + (q.feedback ? '<div style="font-size:12px; color:#64748b; margin-top:2px; line-height:1.5;">' + q.feedback + '</div>' : '')
+                          + '</div>'
+                          + '<div style="font-size:15px; font-weight:900; color:#0284c7; flex-shrink:0; margin-left:10px;">' + q.score + '/' + q.maxScore + '</div>'
+                        + '</div>';
+                      });
+                      pqDiv.innerHTML = pqHtml;
+                    } else {
+                      pqDiv.innerHTML = '';
+                    }
+                    
+                    // 신뢰도 표시
+                    var confDiv = document.getElementById('aiResultConfidence');
+                    var confInfo = r.confidence === 'high' 
+                      ? { emoji: '🟢', text: 'AI가 꽤 자신 있어하는 결과예요!' }
+                      : r.confidence === 'low'
+                        ? { emoji: '🔴', text: '이 결과는 불확실할 수 있어요. 선생님 채점을 기다려보세요.' }
+                        : { emoji: '🟡', text: '참고용으로 확인하고, 선생님 채점을 기다려보세요.' };
+                    confDiv.innerHTML = '<div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#64748b;">'
+                      + '<span style="font-size:16px;">' + confInfo.emoji + '</span>'
+                      + '<span>' + confInfo.text + '</span>'
+                      + '</div>';
+                    
+                    // 배너 타이틀 변경
+                    document.getElementById('successBannerTitle').textContent = 'AI 채점 완료! 🤖';
+                    
+                    document.getElementById('aiGradeResultBox').style.display = 'block';
+                  } else {
+                    // AI 실패 (채점기준 없음 등)
+                    document.getElementById('aiGradeSkippedBox').style.display = 'block';
+                  }
+                  
+                  document.getElementById('successBackBtn').style.display = 'block';
+                }, 500); // 0.5초 딜레이 (100% 바 보여주기)
+              })
+              .autoGradeNewSubmission(res.rowIdx, taskNameVal, currentUser.id, currentUser.name);
+          } else {
+            // rowIdx 없으면 AI 채점 불가
+            document.getElementById('aiGradeSkippedBox').style.display = 'block';
+            document.getElementById('successBackBtn').style.display = 'block';
+          }
+        } else {
+          document.getElementById('submitStatus').innerText = "⚠️ " + (res.message || "제출 실패");
+          document.getElementById('submitBtn').disabled = false;
+          document.getElementById('submitBtn').innerText = '📤 과제 제출하기';
+          alert(res.message || "제출에 실패했습니다. 다시 시도해주세요.");
+        }
+      })
+      .processForm({
+        studentId: currentUser.id, studentName: currentUser.name,
+        taskName: taskNameVal, isResubmit: isResubmitStr,
+        level: document.querySelector('input[name="level"]:checked').value,
+        message: document.getElementById('message').value,
+        filesData: base64FilesArray
+      });
+  }
+
+  function acknowledgeFeedback() {
+    if (isOnlyMissingTasks) { document.getElementById('notiModal').style.display = 'none'; switchTab(2); return; }
+    document.getElementById('ackBtn').innerText = "처리 중..."; document.getElementById('ackBtn').disabled = true;
+    google.script.run.withSuccessHandler(function() {
+      document.getElementById('notiModal').style.display = 'none';
+      document.getElementById('ackBtn').innerText = "확인했습니다"; document.getElementById('ackBtn').disabled = false;
+      switchTab(2);
+    }).markFeedbacksAsSeen(pendingFeedbackRows);
+  }
+
+  function sendReply(rowIdx) {
+    var text = document.getElementById('reply_' + rowIdx).value.trim();
+    if (!text) return alert("내용을 입력해 주세요!");
+    var btn = event.target; btn.innerText = "전송 중..."; btn.disabled = true;
+    google.script.run.withSuccessHandler(function(success) {
+      if (success) { alert("선생님께 전달되었습니다!"); refreshData(); }
+      else { alert("오류가 발생했습니다."); btn.innerText = "답장 보내기"; btn.disabled = false; }
+    }).saveStudentReply(rowIdx, text);
+  }
+
+  function closeImageModal() { document.getElementById('imageModal').style.display = 'none'; }
+
+  function backToDashboard() {
+    document.getElementById('message').value = '';
+    document.getElementById('multiUploadArea').innerHTML = '';
+    document.getElementById('choiceArea').style.display = 'none';
+    document.getElementById('taskName').value = '';
+    document.getElementById('submitStatus').innerText = '';
+    document.getElementById('successMsg').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
+    refreshData(); 
+    switchTab(2);
+    
+    // ✅ AI 채점이 완료될 시간을 주고 15초 후 자동 새로고침
+    setTimeout(function() {
+      refreshData();
+    }, 15000);
+  }
+
+  // =====================================================
+  // ✅ PWA + FCM 푸시 알림
+  // 아래 Firebase 설정값을 본인 것으로 교체하세요
+  // =====================================================
+  var FIREBASE_CONFIG = {
+    apiKey: "여기에_API_KEY_입력",
+    projectId: "여기에_PROJECT_ID_입력",
+    messagingSenderId: "여기에_SENDER_ID_입력",
+    appId: "여기에_APP_ID_입력"
+  };
+  var FIREBASE_VAPID_KEY = "여기에_VAPID_KEY_입력";
+
+  var messagingInstance = null;
+
+  // Firebase 초기화 및 FCM 토큰 등록
+  function initFirebaseAndRegisterToken(studentId) {
+    try {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(FIREBASE_CONFIG);
+      }
+      messagingInstance = firebase.messaging();
+
+      // Service Worker 등록
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('firebase-messaging-sw.js')
+          .then(function(registration) {
+            messagingInstance.useServiceWorker(registration);
+            return Notification.requestPermission();
+          })
+          .then(function(permission) {
+            if (permission === 'granted') {
+              return messagingInstance.getToken({ vapidKey: FIREBASE_VAPID_KEY });
+            } else {
+              console.log('알림 권한 거부됨');
+              return null;
+            }
+          })
+          .then(function(token) {
+            if (token) {
+              // 토큰을 서버(스프레드시트)에 저장
+              var savedToken = localStorage.getItem('fcm_token_' + studentId);
+              if (savedToken !== token) {
+                google.script.run.withSuccessHandler(function(res) {
+                  if (res.success) {
+                    localStorage.setItem('fcm_token_' + studentId, token);
+                    console.log('FCM 토큰 저장 완료');
+                  }
+                }).saveFcmToken(studentId, token);
+              }
+            }
+          })
+          .catch(function(err) {
+            console.log('FCM 초기화 오류:', err);
+          });
+      }
+
+      // 포그라운드(앱 열려있을 때) 메시지 수신 처리
+      messagingInstance.onMessage(function(payload) {
+        var title = payload.notification.title || '수학 교실 알림';
+        var body = payload.notification.body || '';
+        showInAppNotification(title, body);
+      });
+
+    } catch(e) {
+      console.log('Firebase 초기화 실패:', e);
+    }
+  }
+
+  // 앱 내 알림 토스트 (포그라운드용)
+  function showInAppNotification(title, body) {
+    var existing = document.getElementById('inAppToast');
+    if (existing) existing.remove();
+
+    var toast = document.createElement('div');
+    toast.id = 'inAppToast';
+    toast.style.cssText = 'position:fixed; top:20px; left:50%; transform:translateX(-50%); background:#1e3a8a; color:white; padding:14px 20px; border-radius:12px; font-size:14px; font-weight:bold; z-index:9999; max-width:320px; text-align:center; box-shadow:0 8px 20px rgba(0,0,0,0.3); animation:slideDown 0.3s ease;';
+    toast.innerHTML = '<div style="font-size:16px; margin-bottom:4px;">' + title + '</div><div style="font-weight:normal; font-size:13px; opacity:0.9;">' + body + '</div>';
+
+    var style = document.createElement('style');
+    style.textContent = '@keyframes slideDown { from { top:-60px; opacity:0; } to { top:20px; opacity:1; } }';
+    document.head.appendChild(style);
+
+    document.body.appendChild(toast);
+    setTimeout(function() { if (toast.parentNode) toast.remove(); }, 4000);
+  }
+
+  // iOS PWA 설치 유도 배너
+  function showIosInstallBanner() {
+    var isIos = /iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());
+    var isInStandaloneMode = window.navigator.standalone;
+    var dismissed = localStorage.getItem('pwa_banner_dismissed');
+
+    if (isIos && !isInStandaloneMode && !dismissed) {
+      var banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed; bottom:0; left:0; right:0; background:#1e3a8a; color:white; padding:16px 20px; z-index:9998; font-size:13px; text-align:center; box-shadow:0 -4px 15px rgba(0,0,0,0.2);';
+      banner.innerHTML = '<div style="font-weight:bold; margin-bottom:6px;">📲 앱으로 설치하면 알림을 받을 수 있어요!</div><div style="opacity:0.9; margin-bottom:10px;">Safari 하단의 <b>공유 버튼 ↑</b> → <b>"홈 화면에 추가"</b> 를 눌러주세요</div><button onclick="this.parentElement.remove(); localStorage.setItem(\'pwa_banner_dismissed\', \'1\')" style="background:rgba(255,255,255,0.2); color:white; border:1px solid rgba(255,255,255,0.4); padding:6px 16px; border-radius:8px; font-size:13px; cursor:pointer;">닫기</button>';
+      document.body.appendChild(banner);
+    }
+  }
+
+  // 안드로이드 PWA 설치 프롬프트
+  var deferredPrompt = null;
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    var dismissed = localStorage.getItem('pwa_banner_dismissed');
+    if (!dismissed) {
+      var banner = document.createElement('div');
+      banner.style.cssText = 'position:fixed; bottom:0; left:0; right:0; background:#1e3a8a; color:white; padding:16px 20px; z-index:9998; font-size:13px; text-align:center; box-shadow:0 -4px 15px rgba(0,0,0,0.2); display:flex; align-items:center; justify-content:center; gap:10px;';
+      banner.innerHTML = '<span>📲 <b>앱으로 설치</b>하고 알림 받기</span><button id="installBtn" style="background:#2563eb; color:white; border:none; padding:8px 16px; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer;">설치하기</button><button onclick="this.parentElement.remove(); localStorage.setItem(\'pwa_banner_dismissed\', \'1\')" style="background:transparent; color:rgba(255,255,255,0.7); border:none; font-size:20px; cursor:pointer; padding:0 4px;">×</button>';
+      document.body.appendChild(banner);
+
+      document.getElementById('installBtn').addEventListener('click', function() {
+        banner.remove();
+        deferredPrompt.prompt();
+        deferredPrompt.userChoice.then(function() { deferredPrompt = null; });
+      });
+    }
+  });
+
+  // 로그인 성공 후 FCM 초기화 (doLogin 함수의 성공 핸들러에서 호출됨)
+  function onLoginSuccess(studentId) {
+    setTimeout(function() {
+      initFirebaseAndRegisterToken(studentId);
+      showIosInstallBanner();
+    }, 1000);
+  }
+
+</script>
+
+<!-- 하단 크레딧 -->
+<div style="text-align:center; padding:14px; color:#9ca3af; font-size:11px; margin-top:8px;">
+  📐 수학 과제 제출 시스템 &nbsp;|&nbsp; Made with ❤️ by 홍쌤
+</div>
+
+</body>
+</html>
+

@@ -1,0 +1,14 @@
+# clasp 자격증명 (보안)
+.clasprc.json
+
+# Mac 시스템 파일
+.DS_Store
+
+# 백업 파일
+*.bak
+*.backup
+
+# 에디터 임시 파일
+*.swp
+*.tmp
+.vscode/
