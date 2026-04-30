@@ -370,13 +370,22 @@ function markFeedbacksAsSeen(rowIndices) {
   return true; 
 }
 
-function saveStudentReply(rowIdx, replyText) { 
-  try { 
-    SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황").getRange(rowIdx, 16).setValue(replyText); 
-    return true; 
-  } catch(e) { 
-    return false; 
-  } 
+function saveStudentReply(rowIdx, replyText) {
+  try {
+    SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황").getRange(rowIdx, 16).setValue(replyText);
+    return true;
+  } catch(e) {
+    return false;
+  }
+}
+
+function requestResubmission(rowIdx) {
+  try {
+    SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황").getRange(rowIdx, 16).setValue("[재제출요청]");
+    return { success: true };
+  } catch(e) {
+    return { success: false };
+  }
 }
 
 function processForm(formData) {

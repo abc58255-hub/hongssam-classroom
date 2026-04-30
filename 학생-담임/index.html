@@ -454,7 +454,6 @@
         var isSel = selArr.indexOf(ch) >= 0;
         h += '<div data-val="' + ch.replace(/"/g, '&quot;') + '" data-multi="' + (isMulti ? '1' : '0') + '" onclick="selectChoiceByEl(this)" '
           + 'style="padding:12px 16px;border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;border:2px solid ' + (isSel ? '#6366f1' : '#e2e8f0') + ';background:' + (isSel ? '#ede9fe' : 'white') + ';color:' + (isSel ? '#4338ca' : '#334155') + ';">' + ch + '</div>';
-          + ch + '</div>';
       });
       h += '</div>';
     } else if (q.type === 'dynamic') {

@@ -2619,3 +2619,14 @@ function clearStudentReply(rowIdx) {
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
+
+// 학생 재제출 요청 승인: 상태를 재제출요청으로 변경 + P열 초기화
+function approveResubmitRequest(rowIdx) {
+  try {
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('제출현황');
+    if (!sheet) return { success: false };
+    sheet.getRange(rowIdx, 11).setValue('재제출요청'); // K열 = 상태
+    sheet.getRange(rowIdx, 16).setValue('');           // P열 = 답글 초기화
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}

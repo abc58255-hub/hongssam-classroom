@@ -1,0 +1,55 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install clasp
+        run: npm install -g @google/clasp
+
+      - name: Write clasp credentials
+        run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+
+      - name: Deploy 교사용-대시보드
+        run: |
+          cd "교사용-대시보드"
+          clasp push
+          clasp deploy -i "AKfycbw3vgIohq3lmByYtYPW6VBK7shvp84GwPsn_h9ZtdNXtD6Vm2kSEnrhfMD2BZkYbz6AvA"
+
+      - name: Deploy 학생-수학
+        run: |
+          cd "학생-수학"
+          clasp push
+          clasp deploy -i "AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA"
+
+      - name: Deploy 학생-담임
+        run: |
+          cd "학생-담임"
+          clasp push
+          clasp deploy -i "AKfycbyur2cLLWQp-kEpgyYhJ0wOSmvVgbuEcFC7btI0DblyyPLsINygtOZvglb1xDFmOeTWmA"
+
+      - name: Deploy 회원가입
+        run: |
+          cd "회원가입"
+          clasp push
+          clasp deploy -i "AKfycbzA_D6nyZplLSka3YNoq8ynHBn1NxnHj7FXoFjS6WpqY8e_mZArdFoBq6nSPRr63Gcg"
+
+      - name: Deploy 교실-알림판
+        run: |
+          cd "교실-알림판"
+          clasp push
+          clasp deploy -i "AKfycbyl9-rX1YY4hrkEMdGT5uasMF1c38R7qu5I7YpN9vlPl95CYJpXG0ptkNDz0Wlj73jK"

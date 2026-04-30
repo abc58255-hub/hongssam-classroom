@@ -695,10 +695,25 @@
         }
         var carouselHtml = buildCarouselHtml(item.urls, item.annoUrls, item.rowIdx);
         var replySection = '';
-        if (item.reply) {
+        var isResubmitRequested = item.reply && item.reply.startsWith('[재제출요청]');
+        if (isResubmitRequested) {
+          replySection = '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-top:10px;display:flex;align-items:center;gap:8px;">'
+            + '<span style="font-size:20px;">🔄</span>'
+            + '<div><div style="font-size:12px;font-weight:800;color:#c2410c;margin-bottom:2px;">재제출 요청 완료</div>'
+            + '<div style="font-size:12px;color:#92400e;">선생님이 승인하면 재제출할 수 있어요.</div></div>'
+            + '</div>';
+        } else if (item.reply) {
           replySection = '<div class="my-reply">' + item.reply.replace(/\n/g, '<br>') + '</div>';
+          if (item.status === '채점완료') {
+            replySection += '<div style="margin-top:6px;">'
+              + '<button onclick="requestResubmit(' + item.rowIdx + ', this)" style="background:#f97316;color:white;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">🔄 재제출 요청하기</button>'
+              + '</div>';
+          }
         } else if (item.feedback || (item.annoUrls && Object.keys(item.annoUrls).length > 0)) {
-          replySection = '<div class="reply-section"><textarea id="reply_' + item.rowIdx + '" class="reply-input" rows="2" placeholder="선생님께 드릴 답장이나 나의 오답 성찰을 적어보세요."></textarea><button class="reply-btn" onclick="sendReply(' + item.rowIdx + ')">답장 보내기</button></div>';
+          var resubmitBtn = item.status === '채점완료'
+            ? '<button onclick="requestResubmit(' + item.rowIdx + ', this)" style="background:#f97316;color:white;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-top:6px;">🔄 재제출 요청하기</button>'
+            : '';
+          replySection = '<div class="reply-section"><textarea id="reply_' + item.rowIdx + '" class="reply-input" rows="2" placeholder="선생님께 드릴 답장이나 나의 오답 성찰을 적어보세요."></textarea><button class="reply-btn" onclick="sendReply(' + item.rowIdx + ')">답장 보내기</button>' + resubmitBtn + '</div>';
         }
 
         var aiRefBox = '';
@@ -1222,6 +1237,15 @@
       if (success) { alert("선생님께 전달되었습니다!"); refreshData(); }
       else { alert("오류가 발생했습니다."); btn.innerText = "답장 보내기"; btn.disabled = false; }
     }).saveStudentReply(rowIdx, text);
+  }
+
+  function requestResubmit(rowIdx, btn) {
+    if (!confirm("선생님께 재제출을 요청할까요?\n승인되면 다시 제출할 수 있어요.")) return;
+    btn.innerText = "요청 중..."; btn.disabled = true;
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { refreshData(); }
+      else { alert("오류가 발생했습니다."); btn.innerText = "🔄 재제출 요청하기"; btn.disabled = false; }
+    }).requestResubmission(rowIdx);
   }
 
   function closeImageModal() { document.getElementById('imageModal').style.display = 'none'; }
