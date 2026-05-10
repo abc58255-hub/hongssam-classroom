@@ -533,9 +533,12 @@
       var g1 = document.createElement('optgroup');
       g1.label = "🚨 반려된 과제 (다시 제출 요망)";
       data.resubmitTasks.forEach(function(t) {
+        var ddayInfo = t.deadline ? getDdayText(t.deadline) : null;
+        if (ddayInfo && ddayInfo.passed) return; // 기한 지난 항목은 드롭다운에서도 제외
         var opt = document.createElement('option');
         opt.value = t.name; opt.dataset.isResubmit = "true";
-        opt.innerText = '[재제출] ' + t.name;
+        var ddaySuffix = ddayInfo ? (' ⏰' + ddayInfo.text) : '';
+        opt.innerText = '[재제출] ' + t.name + ddaySuffix;
         g1.appendChild(opt);
       });
       select.appendChild(g1);

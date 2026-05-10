@@ -407,6 +407,35 @@ function processForm(formData) {
     const records = sheet.getDataRange().getValues();
     incomingFiles.forEach(f => { fileHashObj[f.key] = getHash(Utilities.base64Decode(f.b64)); });
 
+    // ✅ 마감일 서버측 검증
+    const taskSheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("과제설정");
+    if (taskSheet) {
+      const taskRows = taskSheet.getDataRange().getValues();
+      const className = inputId.length >= 2 ? `${inputId.substring(0,1)}학년 ${inputId.substring(1,2)}반` : "기타";
+      for (let i = 1; i < taskRows.length; i++) {
+        if (String(taskRows[i][1] || "").trim() === baseTaskName) {
+          const dStr = String(taskRows[i][3] || "").trim();
+          if (dStr && dStr.startsWith("{")) {
+            try {
+              const dl = JSON.parse(dStr);
+              if (isResubmit) {
+                const resubDl = dl["resub_" + className] || dl["resub_all"] || dl[className] || dl["all"];
+                if (resubDl && new Date(resubDl) < now) {
+                  return { success: false, message: "⏰ 재제출 기한이 지났습니다. 선생님께 문의하세요." };
+                }
+              } else {
+                const mainDl = dl[className] || dl["all"];
+                if (mainDl && new Date(mainDl) < now) {
+                  return { success: false, message: "⏰ 제출 기한이 지났습니다." };
+                }
+              }
+            } catch(e) {}
+          }
+          break;
+        }
+      }
+    }
+
     // ✅ 채점 완료 또는 채점중인 과제는 제출 불가 (중복 방지)
     for (let i = records.length - 1; i >= 1; i--) {
       if (String(records[i][1] || "").trim() === inputId && 
