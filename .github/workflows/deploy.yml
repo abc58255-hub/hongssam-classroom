@@ -53,3 +53,9 @@ jobs:
           cd "교실-알림판"
           clasp push
           clasp deploy -i "AKfycbyl9-rX1YY4hrkEMdGT5uasMF1c38R7qu5I7YpN9vlPl95CYJpXG0ptkNDz0Wlj73jK"
+
+      - name: Deploy 진도표
+        run: |
+          cd "진도표"
+          clasp push
+          clasp deploy -i "AKfycbwn_9wAf1Qyb744x-t3b46CkuikXhg748qryip_tMQYpYUDVz65nPuK_rxVN7LUBkHf9g"
