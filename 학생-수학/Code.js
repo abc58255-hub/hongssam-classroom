@@ -285,18 +285,19 @@ function getDashboardData(studentId, studentName) {
           if (aiRaw.startsWith('{')) aiGradeTemp = JSON.parse(aiRaw);
         } catch(e) {}
 
-        let item = { 
-          rowIdx: i + 1, 
-          date: historyData[i][0] ? Utilities.formatDate(new Date(historyData[i][0]), "Asia/Seoul", "MM/dd HH:mm") : "", 
-          task: rawTaskName, baseName: baseName, level: historyData[i][4] || "", 
-          urls: urls, feedback: fb, status: status, annoUrls: annoUrls, 
-          score: score, reply: reply, isMyBest: isMyBest, 
+        let item = {
+          rowIdx: i + 1,
+          date: historyData[i][0] ? Utilities.formatDate(new Date(historyData[i][0]), "Asia/Seoul", "MM/dd HH:mm") : "",
+          task: rawTaskName, baseName: baseName, level: historyData[i][4] || "",
+          urls: urls, feedback: fb, status: status, annoUrls: annoUrls,
+          score: score, reply: reply, isMyBest: isMyBest,
           reqPics: ts.reqPics, choices: ts.choiceArray,
           perQuestionData: perQuestionData,
           isUnread: (fb !== "" || isMyBest) && isSeen === "",
           aiGradeTemp: aiGradeTemp,
           totalRank: myTotalRank,
-          classRank: myClassRank
+          classRank: myClassRank,
+          deadline: taskDeadlineMap[baseName] ? taskDeadlineMap[baseName].main : null
         };
         history.push(item); 
         if (status !== "이전기록채점완료") {
@@ -331,20 +332,24 @@ function getDashboardData(studentId, studentName) {
         }
 
         if (st === "재제출요청") {
-          let rejectionFeedback = taskStatusMap[t].feedback || "";
-          let rejectionPqData = taskStatusMap[t].perQuestionData || {};
-          let completedKeys = Object.keys(rejectionPqData).filter(k =>
-            rejectionPqData[k] && rejectionPqData[k].status === "완료"
-          );
-          resubmitTasks.push({
+          let resubDl = dMap.resub;
+          let resubExpired = resubDl && new Date(resubDl) < now;
+          if (!resubExpired) {
+            let rejectionFeedback = taskStatusMap[t].feedback || "";
+            let rejectionPqData = taskStatusMap[t].perQuestionData || {};
+            let completedKeys = Object.keys(rejectionPqData).filter(k =>
+              rejectionPqData[k] && rejectionPqData[k].status === "완료"
+            );
+            resubmitTasks.push({
+              name: t, reqPics: ts.reqPics, choices: ts.choiceArray,
+              submittedUrls: {}, isResubmit: true,
+              deadline: dMap.resub,
+              rejectionFeedback: rejectionFeedback, completedKeys: completedKeys
+            });
+          }
+        } else if (submittedCount < ts.reqPics && st === "" && validMissingTasksSet.has(t)) {
+          missingTasks.push({
             name: t, reqPics: ts.reqPics, choices: ts.choiceArray,
-            submittedUrls: {}, isResubmit: true, 
-            deadline: dMap.resub,
-            rejectionFeedback: rejectionFeedback, completedKeys: completedKeys 
-          });
-        } else if (submittedCount < ts.reqPics && st === "") {
-          missingTasks.push({ 
-            name: t, reqPics: ts.reqPics, choices: ts.choiceArray, 
             submittedUrls: currentUrls, deadline: dMap.main
           });
         }

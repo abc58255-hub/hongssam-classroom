@@ -584,18 +584,31 @@
             ddayBadge = '<span style="background:#fff7ed; color:#ea580c; border:1px solid #fed7aa; padding:4px 8px; border-radius:6px; font-size:11px; font-weight:800; white-space:nowrap;">' + ddayInfo.text + '</span>';
           }
         }
-        
+
         var escapedName = t.name.replace(/'/g, "\\'");
-        mHtml += '<div onclick="goToSubmit(\'' + escapedName + '\')" style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02); cursor:pointer; transition:0.2s;" onmouseover="this.style.background=\'#ffedd5\'; this.style.transform=\'translateX(-2px)\'" onmouseout="this.style.background=\'#fff7ed\'; this.style.transform=\'translateX(0)\'">' +
-                   '<div style="display:flex; align-items:center; gap:10px; min-width:0;">' +
-                     '<span style="font-size:18px; flex-shrink:0;">🚨</span>' +
-                     '<div style="min-width:0;">' +
-                       '<div style="font-size:11px; font-weight:800; color:#ea580c; margin-bottom:3px;">재제출 요망 · 클릭하여 제출 ▶</div>' +
-                       '<div style="font-size:14px; font-weight:700; color:#9a3412; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+        if (ddayInfo && ddayInfo.passed) {
+          mHtml += '<div style="background:#f1f5f9; border:1px solid #cbd5e1; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02); opacity:0.7;">' +
+                     '<div style="display:flex; align-items:center; gap:10px; min-width:0;">' +
+                       '<span style="font-size:18px; flex-shrink:0;">🔒</span>' +
+                       '<div style="min-width:0;">' +
+                         '<div style="font-size:11px; font-weight:800; color:#64748b; margin-bottom:3px;">재제출 기한 초과 · 제출 불가</div>' +
+                         '<div style="font-size:14px; font-weight:700; color:#475569; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+                       '</div>' +
                      '</div>' +
-                   '</div>' +
-                   '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
-                 '</div>';
+                     '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
+                   '</div>';
+        } else {
+          mHtml += '<div onclick="goToSubmit(\'' + escapedName + '\')" style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02); cursor:pointer; transition:0.2s;" onmouseover="this.style.background=\'#ffedd5\'; this.style.transform=\'translateX(-2px)\'" onmouseout="this.style.background=\'#fff7ed\'; this.style.transform=\'translateX(0)\'">' +
+                     '<div style="display:flex; align-items:center; gap:10px; min-width:0;">' +
+                       '<span style="font-size:18px; flex-shrink:0;">🚨</span>' +
+                       '<div style="min-width:0;">' +
+                         '<div style="font-size:11px; font-weight:800; color:#ea580c; margin-bottom:3px;">재제출 요망 · 클릭하여 제출 ▶</div>' +
+                         '<div style="font-size:14px; font-weight:700; color:#9a3412; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+                       '</div>' +
+                     '</div>' +
+                     '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
+                   '</div>';
+        }
       });
 
       data.missingTasks.forEach(function(t) {
@@ -696,24 +709,35 @@
         var carouselHtml = buildCarouselHtml(item.urls, item.annoUrls, item.rowIdx);
         var replySection = '';
         var isResubmitRequested = item.reply && item.reply.startsWith('[재제출요청]');
+        var itemDeadlinePassed = item.deadline ? (getDdayText(item.deadline) || {}).passed : false;
+
+        // 재제출 요청 버튼/상태 결정
+        var resubmitBtnHtml = '';
         if (isResubmitRequested) {
-          replySection = '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-top:10px;display:flex;align-items:center;gap:8px;">'
+          resubmitBtnHtml = '<div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:10px;padding:10px 14px;margin-top:8px;display:flex;align-items:center;gap:8px;">'
             + '<span style="font-size:20px;">🔄</span>'
             + '<div><div style="font-size:12px;font-weight:800;color:#c2410c;margin-bottom:2px;">재제출 요청 완료</div>'
             + '<div style="font-size:12px;color:#92400e;">선생님이 승인하면 재제출할 수 있어요.</div></div>'
             + '</div>';
-        } else if (item.reply) {
-          replySection = '<div class="my-reply">' + item.reply.replace(/\n/g, '<br>') + '</div>';
-          if (item.status === '채점완료') {
-            replySection += '<div style="margin-top:6px;">'
+        } else if (item.status === '채점완료') {
+          if (itemDeadlinePassed) {
+            resubmitBtnHtml = '<div style="margin-top:8px;">'
+              + '<button disabled style="background:#e2e8f0;color:#94a3b8;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:not-allowed;">⏰ 기한 초과 · 재제출 요청 불가</button>'
+              + '</div>';
+          } else {
+            resubmitBtnHtml = '<div style="margin-top:8px;">'
               + '<button onclick="requestResubmit(' + item.rowIdx + ', this)" style="background:#f97316;color:white;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">🔄 재제출 요청하기</button>'
               + '</div>';
           }
-        } else if (item.feedback || (item.annoUrls && Object.keys(item.annoUrls).length > 0)) {
-          var resubmitBtn = item.status === '채점완료'
-            ? '<button onclick="requestResubmit(' + item.rowIdx + ', this)" style="background:#f97316;color:white;border:none;padding:7px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;margin-top:6px;">🔄 재제출 요청하기</button>'
+        }
+
+        if (item.reply && !isResubmitRequested) {
+          replySection = '<div class="my-reply">' + item.reply.replace(/\n/g, '<br>') + '</div>' + resubmitBtnHtml;
+        } else if (item.feedback || (item.annoUrls && Object.keys(item.annoUrls).length > 0) || item.status === '채점완료' || isResubmitRequested) {
+          var replyInputHtml = !isResubmitRequested
+            ? '<textarea id="reply_' + item.rowIdx + '" class="reply-input" rows="2" placeholder="선생님께 드릴 답장이나 나의 오답 성찰을 적어보세요."></textarea><button class="reply-btn" onclick="sendReply(' + item.rowIdx + ')">답장 보내기</button>'
             : '';
-          replySection = '<div class="reply-section"><textarea id="reply_' + item.rowIdx + '" class="reply-input" rows="2" placeholder="선생님께 드릴 답장이나 나의 오답 성찰을 적어보세요."></textarea><button class="reply-btn" onclick="sendReply(' + item.rowIdx + ')">답장 보내기</button>' + resubmitBtn + '</div>';
+          replySection = '<div class="reply-section">' + replyInputHtml + resubmitBtnHtml + '</div>';
         }
 
         var aiRefBox = '';
@@ -881,18 +905,20 @@
       rejBox.style.display = 'block';
     }
 
-    // ✨ 마감 시간 초과 여부 확인 (재제출인 경우 마감 무시!)
+    // ✨ 마감 시간 초과 여부 확인 (재제출은 재제출 마감일 기준으로 체크)
     var ddayInfo = currentTargetTask.deadline ? getDdayText(currentTargetTask.deadline) : null;
     var isDeadlinePassed = ddayInfo && ddayInfo.passed;
 
-    // 💡 [수정 포인트] 마감되었더라도 '재제출'인 경우에는 로직을 통과시킴
-    if (isDeadlinePassed && !isResub) {
+    if (isDeadlinePassed) {
       choiceArea.style.display = 'none';
-      uploadArea.innerHTML = '<div style="text-align:center; padding:20px; color:#dc2626; border:2px dashed #fecaca; border-radius:12px; background:#fef2f2; font-weight:bold;">🚨 제출 기한이 지났습니다.<br><span style="font-size:12px; font-weight:normal; color:#ef4444; margin-top:4px; display:inline-block;">선생님께 문의해 주세요.</span></div>';
-      btn.disabled = true; 
-      btn.innerText = '마감된 과제입니다';
+      var msg = isResub
+        ? '🚨 재제출 기한이 지났습니다.<br><span style="font-size:12px; font-weight:normal; color:#ef4444; margin-top:4px; display:inline-block;">선생님께 문의해 주세요.</span>'
+        : '🚨 제출 기한이 지났습니다.<br><span style="font-size:12px; font-weight:normal; color:#ef4444; margin-top:4px; display:inline-block;">선생님께 문의해 주세요.</span>';
+      uploadArea.innerHTML = '<div style="text-align:center; padding:20px; color:#dc2626; border:2px dashed #fecaca; border-radius:12px; background:#fef2f2; font-weight:bold;">' + msg + '</div>';
+      btn.disabled = true;
+      btn.innerText = isResub ? '재제출 기한 초과' : '마감된 과제입니다';
       btn.style.background = '#9ca3af';
-      return; 
+      return;
     } else {
       btn.style.background = '#2563eb';
       btn.innerText = isResub ? '📤 재제출하기' : '📤 과제 제출하기';
@@ -996,16 +1022,17 @@
   async function upload() {
     if (!currentTargetTask) return;
 
-    // ✨ 마감 검사에서 '재제출'은 통과시키는 조건 추가
+    // ✨ 마감 검사 (재제출은 재제출 마감일 기준으로 체크)
     var ddayInfo = currentTargetTask.deadline ? getDdayText(currentTargetTask.deadline) : null;
-    if (ddayInfo && ddayInfo.passed && !currentTargetTask.isResubmit) {
-        document.getElementById('submitStatus').innerText = "🚨 이미 제출 기한이 지났습니다!";
+    if (ddayInfo && ddayInfo.passed) {
+        var isResub2 = currentTargetTask.isResubmit;
+        document.getElementById('submitStatus').innerText = isResub2 ? "🚨 재제출 기한이 지났습니다!" : "🚨 이미 제출 기한이 지났습니다!";
         var btn = document.getElementById('submitBtn');
         btn.disabled = true;
-        btn.innerText = '마감된 과제입니다';
+        btn.innerText = isResub2 ? '재제출 기한 초과' : '마감된 과제입니다';
         btn.style.background = '#9ca3af';
-        document.getElementById('multiUploadArea').innerHTML = '<div style="text-align:center; padding:20px; color:#dc2626; border:2px dashed #fecaca; border-radius:12px; background:#fef2f2; font-weight:bold;">🚨 제출 기한 초과</div>';
-        return; 
+        document.getElementById('multiUploadArea').innerHTML = '<div style="text-align:center; padding:20px; color:#dc2626; border:2px dashed #fecaca; border-radius:12px; background:#fef2f2; font-weight:bold;">' + (isResub2 ? '🚨 재제출 기한 초과' : '🚨 제출 기한 초과') + '</div>';
+        return;
     }
 
     // 이하 파일 처리 및 전송 로직 (기존과 동일)

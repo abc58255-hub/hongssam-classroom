@@ -6105,7 +6105,8 @@
   function renderSurveyStats() {
     const svId = document.getElementById('surveyResultFilter').value; const area = document.getElementById('surveyStatsList');
     if (!svId) { area.innerHTML = "<div style='text-align:center; color:#94a3b8; padding:50px;'>설문을 선택하면 분석 결과가 나타납니다.</div>"; return; }
-    const sv = gSurveys.find(function(s) { return s.id === svId; }); const resList = gSurveyRes.filter(function(r) { return r.svId === svId; });
+    try {
+    const sv = gSurveys.find(function(s) { return s.id === svId; }); const resList = gSurveyRes.filter(function(r) { return String(r.svId).trim() === String(svId).trim(); });
     let allStudents = allRoster.filter(function(s) { return s.cls === hrStr; });
     let submittedIds = resList.map(function(r) { return String(r.stuId).trim(); });
     let missingStudents = allStudents.filter(function(s) { return !submittedIds.includes(s.id); });
@@ -6116,7 +6117,13 @@
     mHtml += '<div style="font-size:13px; color:#b91c1c; background:#fee2e2; padding:8px; border-radius:6px;"><b>🚨 미제출자:</b> ' + (missingStudents.map(function(s) { return s.name; }).join(', ') || '없음 (전원 제출 완료!)') + '</div></div>';
     if (resList.length === 0) { area.innerHTML = mHtml + '<div style="text-align:center; padding:30px;">아직 응답한 학생이 없습니다.</div>'; return; }
     let qData = JSON.parse(sv.questions);
-    let html = mHtml + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;"><h3 style="margin:0; color:#b45309;">' + sv.title + ' 전체 통계</h3></div>';
+    // 🔍 임시 디버그: 실제 데이터 확인용
+    let debugHtml = '<details style="margin-bottom:15px; background:#fefce8; border:1px solid #fde047; border-radius:8px; padding:10px; font-size:11px;"><summary style="cursor:pointer; font-weight:700; color:#854d0e;">🔍 [디버그] 클릭해서 원본 데이터 확인</summary>';
+    debugHtml += '<div style="margin-top:8px;"><b>문항 타입:</b> ' + qData.map(function(q,i){ return 'Q'+(i+1)+':'+q.type; }).join(', ') + '</div>';
+    debugHtml += '<div><b>응답 수:</b> ' + resList.length + '명</div>';
+    if (resList.length > 0) { try { var firstAns = JSON.parse(resList[0].answers); debugHtml += '<div><b>첫 번째 응답 원본:</b> ' + JSON.stringify(firstAns) + '</div>'; } catch(de){ debugHtml += '<div><b>응답 파싱 실패:</b> ' + resList[0].answers + '</div>'; } }
+    debugHtml += '</details>';
+    let html = mHtml + debugHtml + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;"><h3 style="margin:0; color:#b45309;">' + sv.title + ' 전체 통계</h3></div>';
     qData.forEach(function(q, idx) {
       html += '<div style="margin-bottom:30px; background:#f8fafc; padding:20px; border-radius:12px; border:1px solid #cbd5e1;"><div style="font-weight:bold; font-size:16px; margin-bottom:15px; color:#1e293b;">Q' + (idx+1) + '. ' + (q.text || q.title || '') + '</div>';
       if (q.type === 'score') { let sum = 0, count = 0; resList.forEach(function(r) { let ans = JSON.parse(r.answers); if (ans[idx]) { sum += parseInt(ans[idx]); count++; } }); let avg = count > 0 ? (sum/count).toFixed(1) : 0; html += '<div style="font-size:24px; font-weight:800; color:#0284c7;">평균 ' + avg + ' 점 <span style="font-size:14px; color:#64748b; font-weight:normal;">(' + count + '명 참여)</span></div>'; }
@@ -6128,12 +6135,54 @@
         if (sortedTargets.length === 0) { html += "<div style='color:#94a3b8; font-size:13px;'>언급된 학생이 없습니다.</div>"; }
         else { sortedTargets.forEach(function(target) { html += '<div style="margin-bottom:10px;"><div style="font-weight:bold; color:#b91c1c; display:inline-block; margin-right:10px; white-space:nowrap;">' + target + ' <span style="background:#fee2e2; padding:2px 6px; border-radius:4px; font-size:11px;">' + targetMap[target].length + '표</span></div><div style="background:white; padding:8px; border-radius:6px; border:1px dashed #cbd5e1; margin-top:5px; font-size:13px; color:#334155;">'; targetMap[target].forEach(function(reason) { html += '• ' + reason + '<br>'; }); html += '</div></div>'; }); }
       }
+      else if (q.type === 'choice') {
+        var choiceCount = {};
+        (q.choices || []).forEach(function(c) { if (c) choiceCount[String(c)] = 0; });
+        var respCount = 0;
+        resList.forEach(function(r) {
+          try {
+            var ans = JSON.parse(r.answers);
+            if (!ans) return;
+            var aVal = ans[idx];
+            if (aVal === null || aVal === undefined || aVal === '') return;
+            respCount++;
+            if (Array.isArray(aVal)) {
+              aVal.forEach(function(c) { if (c) choiceCount[String(c)] = (choiceCount[String(c)] || 0) + 1; });
+            } else {
+              choiceCount[String(aVal)] = (choiceCount[String(aVal)] || 0) + 1;
+            }
+          } catch(e2) {}
+        });
+        var allKeys = Object.keys(choiceCount);
+        var maxVal = allKeys.length > 0 ? Math.max.apply(null, allKeys.map(function(k){ return choiceCount[k]; }).concat([1])) : 1;
+        html += '<div style="margin-top:5px;">';
+        if (allKeys.length === 0) {
+          html += '<div style="color:#94a3b8; font-size:13px;">선택지가 없습니다.</div>';
+        } else {
+          allKeys.forEach(function(c) {
+            var cnt = choiceCount[c];
+            var pct = respCount > 0 ? Math.round(cnt / respCount * 100) : 0;
+            var barW = maxVal > 0 ? Math.round(cnt / maxVal * 100) : 0;
+            html += '<div style="margin-bottom:10px;">'
+              + '<div style="display:flex; justify-content:space-between; font-size:13px; color:#1e293b; margin-bottom:4px;">'
+              + '<span>' + c + '</span>'
+              + '<span style="color:#0284c7; font-weight:700;">' + cnt + '명 (' + pct + '%)</span>'
+              + '</div>'
+              + '<div style="background:#e2e8f0; border-radius:8px; height:18px; overflow:hidden;">'
+              + '<div style="width:' + barW + '%; background:#0284c7; height:100%; border-radius:8px;"></div>'
+              + '</div>'
+              + '</div>';
+          });
+        }
+        html += '<div style="font-size:12px; color:#64748b; margin-top:4px;">' + respCount + '명 응답 · ' + (q.multi ? '복수선택' : '단일선택') + '</div></div>';
+      }
       html += '</div>';
     });
     html += '<h3 style="margin-top:40px; color:#1e293b; border-bottom:2px solid #e2e8f0; padding-bottom:10px;">👤 학생별 개별 응답 확인</h3>';
     html += '<div class="sv-viewer" id="svViewerCard"><div class="sv-viewer-header"><button class="sv-nav-btn" onclick="navSurveyViewer(-1)" id="svViewPrev">◀ 이전 학생</button><div class="sv-student-info" id="svViewTitle">로딩중...</div><button class="sv-nav-btn" onclick="navSurveyViewer(1)" id="svViewNext">다음 학생 ▶</button></div><div class="sv-viewer-body" id="svViewContent"></div></div>';
     area.innerHTML = html;
     currentSurveyData = qData; currentSurveyResponses = resList; currentViewerIdx = 0; renderSurveyViewer();
+    } catch(e) { area.innerHTML = '<div style="color:#dc2626; padding:20px; background:#fef2f2; border-radius:10px; border:1px solid #fecaca;"><b>⚠️ 통계 렌더링 오류:</b><br>' + e.message + '</div>'; }
   }
   function navSurveyViewer(dir) { currentViewerIdx += dir; renderSurveyViewer(); }
   function renderSurveyViewer() {
@@ -6147,6 +6196,7 @@
       cHtml += '<div style="font-size:13px; font-weight:bold; color:#475569; margin-top:15px;">Q' + (idx+1) + '. ' + (q.text || q.title || '') + '</div>';
       let aVal = ans[idx];
       if (q.type === 'score' || q.type === 'text') { cHtml += '<div style="font-size:14px; color:#1e293b; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-top:6px;">' + (aVal || '<span style="color:#94a3b8">미응답</span>') + '</div>'; }
+      else if (q.type === 'choice') { var dispVal = Array.isArray(aVal) ? aVal.join(', ') : (aVal || ''); cHtml += '<div style="font-size:14px; color:#1e293b; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-top:6px;">' + (dispVal || '<span style="color:#94a3b8">미응답</span>') + '</div>'; }
       else if (q.type === 'dynamic') { let dHtml = ''; if (aVal && typeof aVal === 'object' && Object.keys(aVal).length > 0) { for (let t in aVal) { if (aVal[t].trim() !== "") dHtml += '• <b>' + t + '</b> : ' + aVal[t] + '<br>'; } } if (dHtml === '') dHtml = '<span style="color:#94a3b8">선택/응답 없음</span>'; cHtml += '<div style="font-size:14px; color:#1e293b; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #e2e8f0; margin-top:6px;">' + dHtml + '</div>'; }
     });
     document.getElementById('svViewContent').innerHTML = cHtml;
