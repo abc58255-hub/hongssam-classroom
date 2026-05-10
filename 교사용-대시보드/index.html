@@ -7438,7 +7438,7 @@
       return;
     }
     var html = '';
-    hrActivities.forEach(function(act) {
+    hrActivities.filter(function(act){ return act && act.name; }).forEach(function(act) {
       var subs = hrSubmissions.filter(function(s){ return s.actName===act.name||s.activity===act.name; });
       var submittedIds = subs.map(function(s){ return s.id; });
       var missing = myStudents.filter(function(r){ return submittedIds.indexOf(r.id)<0; });
@@ -7447,17 +7447,16 @@
       var pct   = total>0 ? Math.round(cnt/total*100) : 0;
       var col   = pct>=80?'#10b981':pct>=50?'#f59e0b':'#ef4444';
       html += '<div style="background:white;border-radius:12px;border:1px solid #e2e8f0;margin-bottom:8px;overflow:hidden;">'
-        + '<div data-idx="'+hrActivities.indexOf(act)+'" onclick="toggleHrCard(this)" '
-          + 'style="padding:14px 16px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;">'
-          + '<div>'
-            + '<div style="font-size:13px;font-weight:800;color:#0f172a;">'+act.name+'</div>'
-            + '<div style="font-size:11px;color:#64748b;margin-top:2px;">['+act.category+']</div>'
-          + '</div>'
-          + '<div style="text-align:right;">'
-            + '<div style="font-size:14px;font-weight:900;color:'+col+';">'+cnt+'/'+total+'명</div>'
-            + '<div style="width:60px;background:#e2e8f0;border-radius:4px;height:5px;margin-top:4px;overflow:hidden;">'
-              + '<div style="background:'+col+';height:100%;width:'+pct+'%;border-radius:4px;"></div>'
+        + '<div data-idx="'+hrActivities.indexOf(act)+'" onclick="toggleHrCard(this)" style="padding:14px 16px;cursor:pointer;">'
+          + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">'
+            + '<div style="display:flex;align-items:center;gap:8px;">'
+              + '<span style="font-size:13px;font-weight:800;color:#0f172a;">'+act.name+'</span>'
+              + '<span style="font-size:11px;color:#64748b;background:#f1f5f9;padding:2px 7px;border-radius:10px;">'+act.category+'</span>'
             + '</div>'
+            + '<span style="font-size:14px;font-weight:900;color:'+col+';white-space:nowrap;">'+cnt+'/'+total+'명 ('+pct+'%)</span>'
+          + '</div>'
+          + '<div style="background:#e2e8f0;border-radius:4px;height:6px;overflow:hidden;">'
+            + '<div style="background:'+col+';height:100%;width:'+pct+'%;border-radius:4px;transition:width 0.3s;"></div>'
           + '</div>'
         + '</div>'
         + '<div class="hr-detail" style="display:none;padding:0 16px 14px;border-top:1px solid #f1f5f9;">'
