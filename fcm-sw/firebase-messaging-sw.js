@@ -17,8 +17,8 @@ messaging.onBackgroundMessage(function(payload) {
   const title   = (payload.notification && payload.notification.title) || '홍쌤 교실';
   const options = {
     body:  (payload.notification && payload.notification.body) || '',
-    icon:  'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png',
-    badge: 'https://abc58255-hub.github.io/hongssam-classroom/badge.png',
+    icon:  'https://abc58255-hub.github.io/fcm-sw/icon-192.png',
+    badge: 'https://abc58255-hub.github.io/fcm-sw/badge.png',
     tag:   (payload.data && payload.data.tag) || 'hongssam',
     data:  payload.data || {}
   };
