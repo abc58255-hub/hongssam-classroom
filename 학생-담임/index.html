@@ -302,6 +302,7 @@
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('dashboardScreen').style.display = 'block';
         refreshData();
+        setTimeout(function(){ initFcmForHomeroom(id); }, 1500);
       } else { document.getElementById('loginStatus').innerText = res.message; document.getElementById('loginBtn').disabled = false; }
     }).verifyHomeroomLogin(id, name, pw);
   }
@@ -606,6 +607,53 @@
     document.getElementById('actRole').value = ''; document.getElementById('actReflect').value = ''; document.getElementById('fileInput').value = ''; document.getElementById('submitStatus').innerText = '';
     document.getElementById('successMsg').style.display = 'none'; document.getElementById('surveyEndMsg').style.display = 'none';
     document.getElementById('dashboardScreen').style.display = 'block'; refreshData(); switchTab(2);
+  }
+
+  // ✅ FCM 푸시 알림 — GitHub Pages iframe 방식
+  var FCM_REGISTER_URL = 'https://abc58255-hub.github.io/hongssam-classroom/register.html';
+  var fcmFrame = null;
+  var fcmFrameReady = false;
+  var pendingFcmStudentId = null;
+
+  function setupFcmIframe() {
+    if (fcmFrame) return;
+    fcmFrame = document.createElement('iframe');
+    fcmFrame.src = FCM_REGISTER_URL;
+    fcmFrame.style.cssText = 'display:none;width:0;height:0;border:none;position:absolute;';
+    fcmFrame.setAttribute('allow', 'notifications');
+    document.body.appendChild(fcmFrame);
+
+    window.addEventListener('message', function(e) {
+      var d = e.data;
+      if (!d || !d.type) return;
+      if (d.type === 'FCM_FRAME_READY') {
+        fcmFrameReady = true;
+        if (pendingFcmStudentId) {
+          fcmFrame.contentWindow.postMessage({ type: 'INIT_FCM', studentId: pendingFcmStudentId }, '*');
+          pendingFcmStudentId = null;
+        }
+      } else if (d.type === 'FCM_TOKEN' && !d.cached) {
+        google.script.run.saveFcmToken(d.studentId, d.token);
+      } else if (d.type === 'FCM_MESSAGE') {
+        var p = d.payload;
+        var title = (p.notification && p.notification.title) || '담임 교실 알림';
+        var body  = (p.notification && p.notification.body)  || '';
+        var toast = document.createElement('div');
+        toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#7c3aed;color:white;padding:14px 20px;border-radius:12px;font-size:14px;font-weight:bold;z-index:9999;max-width:320px;text-align:center;box-shadow:0 8px 20px rgba(0,0,0,0.3);';
+        toast.innerHTML = '<div style="font-size:15px;margin-bottom:4px;">'+title+'</div><div style="font-weight:normal;font-size:13px;opacity:0.9;">'+body+'</div>';
+        document.body.appendChild(toast);
+        setTimeout(function(){ if(toast.parentNode) toast.remove(); }, 4000);
+      }
+    });
+  }
+
+  function initFcmForHomeroom(studentId) {
+    setupFcmIframe();
+    if (fcmFrameReady) {
+      fcmFrame.contentWindow.postMessage({ type: 'INIT_FCM', studentId: studentId }, '*');
+    } else {
+      pendingFcmStudentId = studentId;
+    }
   }
 </script>
 </body>

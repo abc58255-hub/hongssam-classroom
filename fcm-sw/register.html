@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>알림 등록</title>
+</head>
+<body>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+<script>
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyD7292UEKSrbWmBnnDVuC9n9VXOBFQkmb4",
+    authDomain: "send-alarm-220c3.firebaseapp.com",
+    projectId: "send-alarm-220c3",
+    storageBucket: "send-alarm-220c3.firebasestorage.app",
+    messagingSenderId: "235927215728",
+    appId: "1:235927215728:web:23705e0a3f6ac393e81eb5"
+  };
+  var VAPID_KEY = "BLRJLeOqmEKv6R3-gV9tsKSV-EgqDosMKwUXIf9iWddMCRIp7cMcbtVMhpDJCUHGN2concQbSOJbvTNsciapJNo";
+
+  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+  var messaging = firebase.messaging();
+
+  function toParent(msg) { window.parent.postMessage(msg, '*'); }
+
+  // 준비 완료 알림
+  toParent({ type: 'FCM_FRAME_READY' });
+
+  // 부모로부터 studentId 수신 시 등록 시작
+  window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'INIT_FCM' && e.data.studentId) {
+      registerFCM(e.data.studentId);
+    }
+  });
+
+  function registerFCM(studentId) {
+    // 캐시된 토큰이 있으면 먼저 전달
+    var cached = localStorage.getItem('fcm_token_' + studentId);
+    if (cached) toParent({ type: 'FCM_TOKEN', studentId: studentId, token: cached, cached: true });
+
+    Notification.requestPermission().then(function(permission) {
+      if (permission !== 'granted') {
+        toParent({ type: 'FCM_DENIED' });
+        return;
+      }
+      navigator.serviceWorker.register('./firebase-messaging-sw.js').then(function(reg) {
+        return messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+      }).then(function(token) {
+        if (token && token !== cached) {
+          localStorage.setItem('fcm_token_' + studentId, token);
+          toParent({ type: 'FCM_TOKEN', studentId: studentId, token: token });
+        }
+      }).catch(function(err) {
+        toParent({ type: 'FCM_ERROR', error: err.message });
+      });
+    });
+  }
+
+  // 앱이 열려있는 상태(포그라운드)에서 메시지 수신 → 부모에게 전달
+  messaging.onMessage(function(payload) {
+    toParent({ type: 'FCM_MESSAGE', payload: payload });
+  });
+</script>
+</body>
+</html>

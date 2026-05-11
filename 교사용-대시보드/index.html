@@ -229,6 +229,7 @@
     <li class="menu-item" onclick="switchPage('page-best', this)">🌟 명예의 전당 관리</li>
     <li class="menu-item" onclick="switchPage('page-observe-math', this)" style="color:#93c5fd;">📐 수학 관찰기록</li>
     <li class="menu-item" onclick="switchPage('page-notice', this)" style="border-top:1px solid #1e293b; margin-top:10px; color:#fde68a;">📢 학급 알림 관리</li>
+    <li class="menu-item" onclick="openPushModal()" style="color:#fb923c;">🔔 푸시 알림 전송</li>
     <li class="menu-item" onclick="switchPage('page-observe', this)" style="color:#86efac;">📓 담임 관찰기록</li>
     <li class="menu-item" onclick="switchPage('page-ai-task', this)" style="color:#f9a8d4; border-top:1px solid #1e293b; margin-top:10px;">🤖 AI 업무 분석</li>
     <li class="menu-item" onclick="switchPage('page-report-inbox', this)" style="color:#fca5a5;">🚨 신고 접수함</li>
@@ -711,6 +712,68 @@
   </div>
 
   <!-- 설문 빌더 모달 -->
+  <!-- ✅ 푸시 알림 전송 모달 -->
+  <div id="pushModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:white;border-radius:16px;padding:24px;width:96%;max-width:480px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+        <div style="font-size:17px;font-weight:800;color:#0f172a;">🔔 푸시 알림 전송</div>
+        <button onclick="document.getElementById('pushModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
+      </div>
+
+      <!-- 수신 대상 -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">📌 수신 대상</label>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;background:#f1f5f9;padding:6px 12px;border-radius:8px;border:2px solid transparent;" id="pushTarget_all_lbl">
+            <input type="radio" name="pushTarget" value="all" checked onchange="onPushTargetChange()"> 전체 학생
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;background:#f1f5f9;padding:6px 12px;border-radius:8px;border:2px solid transparent;" id="pushTarget_unsub_lbl">
+            <input type="radio" name="pushTarget" value="unsub" onchange="onPushTargetChange()"> 미제출자
+          </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;background:#f1f5f9;padding:6px 12px;border-radius:8px;border:2px solid transparent;" id="pushTarget_class_lbl">
+            <input type="radio" name="pushTarget" value="class" onchange="onPushTargetChange()"> 특정 반
+          </label>
+        </div>
+      </div>
+
+      <!-- 미제출자 선택 시 과제 선택 -->
+      <div id="pushUnsubRow" style="display:none;margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">과제 선택</label>
+        <select id="pushTaskSelect" class="filter-select" style="width:100%;"></select>
+      </div>
+
+      <!-- 특정 반 선택 시 -->
+      <div id="pushClassRow" style="display:none;margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">반 선택</label>
+        <select id="pushClassSelect" class="filter-select" style="width:100%;"></select>
+      </div>
+
+      <!-- 빠른 메시지 템플릿 -->
+      <div style="margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">⚡ 빠른 선택</label>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="setPushTemplate('과제 출제 알림','새 수학 과제가 출제됐습니다. 지금 확인해보세요!')" style="background:#dbeafe;color:#1d4ed8;border:none;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">📚 과제 출제</button>
+          <button onclick="setPushTemplate('제출 마감 임박','오늘 자정까지 제출해야 합니다. 서두르세요!')" style="background:#fef3c7;color:#92400e;border:none;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">⏰ 마감 임박</button>
+          <button onclick="setPushTemplate('채점 완료','과제 채점이 완료됐습니다. 피드백을 확인하세요!')" style="background:#dcfce7;color:#166534;border:none;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">✅ 채점 완료</button>
+          <button onclick="setPushTemplate('우수작 선정','축하합니다! 우수작으로 선정됐습니다 🎉')" style="background:#fdf4ff;color:#7e22ce;border:none;padding:5px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">🌟 우수작</button>
+        </div>
+      </div>
+
+      <!-- 제목 / 내용 -->
+      <div style="margin-bottom:10px;">
+        <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">알림 제목 *</label>
+        <input type="text" id="pushTitle" class="form-input" placeholder="예) 수학 과제 제출 마감 안내">
+      </div>
+      <div style="margin-bottom:16px;">
+        <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:4px;">알림 내용 *</label>
+        <textarea id="pushBody" class="form-input" rows="2" style="resize:vertical;" placeholder="예) 오늘 자정까지 제출해주세요!"></textarea>
+      </div>
+
+      <div id="pushResult" style="display:none;margin-bottom:12px;padding:10px;border-radius:8px;font-size:13px;font-weight:700;text-align:center;"></div>
+      <button id="pushSendBtn" onclick="sendPushNotification()" style="width:100%;background:#f97316;color:white;border:none;padding:13px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">🔔 알림 전송</button>
+    </div>
+  </div>
+
   <div id="surveyBuilderModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
     <div style="background:white;border-radius:16px;padding:22px;width:96%;max-width:560px;max-height:94vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
@@ -5738,6 +5801,75 @@
     area.innerHTML = html;
     currentSurveyData = qData; currentSurveyResponses = resList; currentViewerIdx = 0; renderSurveyViewer();
     } catch(e) { area.innerHTML = '<div style="color:#dc2626; padding:20px; background:#fef2f2; border-radius:10px; border:1px solid #fecaca;"><b>⚠️ 통계 렌더링 오류:</b><br>' + e.message + '</div>'; }
+  }
+  // ✅ 푸시 알림 전송 모달
+  function openPushModal() {
+    document.getElementById('pushTitle').value = '';
+    document.getElementById('pushBody').value = '';
+    document.getElementById('pushResult').style.display = 'none';
+    document.getElementById('pushSendBtn').disabled = false;
+    document.getElementById('pushSendBtn').textContent = '🔔 알림 전송';
+    document.querySelector('input[name="pushTarget"][value="all"]').checked = true;
+    onPushTargetChange();
+    // 과제 목록 채우기
+    var sel = document.getElementById('pushTaskSelect');
+    sel.innerHTML = '<option value="">— 과제 선택 —</option>';
+    if (window.allTasks) {
+      allTasks.forEach(function(t){ sel.innerHTML += '<option value="'+t.name+'">'+t.name+'</option>'; });
+    }
+    // 반 목록 채우기
+    var csel = document.getElementById('pushClassSelect');
+    csel.innerHTML = '<option value="">— 반 선택 —</option>';
+    if (window.allClasses) {
+      allClasses.forEach(function(c){ csel.innerHTML += '<option value="'+c+'">'+c+'</option>'; });
+    }
+    document.getElementById('pushModal').style.display = 'flex';
+  }
+  function onPushTargetChange() {
+    var val = document.querySelector('input[name="pushTarget"]:checked').value;
+    document.getElementById('pushUnsubRow').style.display  = val === 'unsub'  ? '' : 'none';
+    document.getElementById('pushClassRow').style.display  = val === 'class'  ? '' : 'none';
+  }
+  function setPushTemplate(title, body) {
+    document.getElementById('pushTitle').value = title;
+    document.getElementById('pushBody').value  = body;
+  }
+  function sendPushNotification() {
+    var title  = document.getElementById('pushTitle').value.trim();
+    var body   = document.getElementById('pushBody').value.trim();
+    var target = document.querySelector('input[name="pushTarget"]:checked').value;
+    if (!title || !body) return alert('제목과 내용을 모두 입력하세요.');
+    var btn    = document.getElementById('pushSendBtn');
+    var result = document.getElementById('pushResult');
+    btn.disabled = true; btn.textContent = '전송 중...';
+    result.style.display = 'none';
+
+    function onDone(res) {
+      btn.disabled = false; btn.textContent = '🔔 알림 전송';
+      if (res && res.success) {
+        result.style.cssText = 'display:block;padding:10px;border-radius:8px;font-size:13px;font-weight:700;text-align:center;background:#dcfce7;color:#166534;margin-bottom:12px;';
+        result.textContent = '✅ ' + (res.sent || 0) + '명에게 전송 완료' + (res.skipped > 0 ? ' (미등록 ' + res.skipped + '명 제외)' : '');
+      } else {
+        result.style.cssText = 'display:block;padding:10px;border-radius:8px;font-size:13px;font-weight:700;text-align:center;background:#fee2e2;color:#b91c1c;margin-bottom:12px;';
+        result.textContent = '❌ 전송 실패: ' + ((res && res.message) || '알 수 없는 오류');
+      }
+    }
+
+    if (target === 'unsub') {
+      var task = document.getElementById('pushTaskSelect').value;
+      if (!task) { btn.disabled=false; btn.textContent='🔔 알림 전송'; return alert('과제를 선택하세요.'); }
+      google.script.run.withSuccessHandler(onDone).withFailureHandler(function(e){ onDone({success:false,message:e.message}); })
+        .sendPushToUnsubmitted(task, title, body);
+    } else if (target === 'class') {
+      var cls = document.getElementById('pushClassSelect').value;
+      if (!cls) { btn.disabled=false; btn.textContent='🔔 알림 전송'; return alert('반을 선택하세요.'); }
+      // 해당 반 학생 ID 필터링은 서버에서 처리
+      google.script.run.withSuccessHandler(onDone).withFailureHandler(function(e){ onDone({success:false,message:e.message}); })
+        .sendPushToStudents(null, title, body, 'class', cls);
+    } else {
+      google.script.run.withSuccessHandler(onDone).withFailureHandler(function(e){ onDone({success:false,message:e.message}); })
+        .sendPushToAll(title, body, 'general');
+    }
   }
   function toggleSurveyNames(idx) {
     var checked = document.getElementById('svShowName-'+idx).checked;

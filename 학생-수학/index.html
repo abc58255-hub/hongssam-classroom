@@ -16,9 +16,7 @@
   <meta name="description" content="수학 과제 제출 및 피드백 확인">
   <!-- 파비콘 -->
 
-<!-- ✅ Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js"></script>
+<!-- FCM은 GitHub Pages iframe(register.html)에서 처리 -->
   <style>
     body { font-family: 'Pretendard', sans-serif; background-color: #f3f4f6; margin: 0; padding: 20px; color: #1f2937; display: flex; flex-direction: column; justify-content: flex-start; align-items: center; min-height: 100vh; box-sizing: border-box; }
     .card { background: white; width: 100%; max-width: 450px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.08); overflow: hidden; box-sizing: border-box; margin-top: 10px;}
@@ -1298,70 +1296,48 @@
   }
 
   // =====================================================
-  // ✅ PWA + FCM 푸시 알림
-  // 아래 Firebase 설정값을 본인 것으로 교체하세요
-  // =====================================================
-  var FIREBASE_CONFIG = {
-    apiKey: "여기에_API_KEY_입력",
-    projectId: "여기에_PROJECT_ID_입력",
-    messagingSenderId: "여기에_SENDER_ID_입력",
-    appId: "여기에_APP_ID_입력"
-  };
-  var FIREBASE_VAPID_KEY = "여기에_VAPID_KEY_입력";
+  // ✅ FCM 푸시 알림 — GitHub Pages iframe 방식
+  var FCM_REGISTER_URL = 'https://abc58255-hub.github.io/hongssam-classroom/register.html';
+  var fcmFrame = null;
+  var fcmFrameReady = false;
+  var pendingFcmStudentId = null;
 
-  var messagingInstance = null;
+  function setupFcmIframe() {
+    if (fcmFrame) return;
+    fcmFrame = document.createElement('iframe');
+    fcmFrame.src = FCM_REGISTER_URL;
+    fcmFrame.style.cssText = 'display:none;width:0;height:0;border:none;position:absolute;';
+    fcmFrame.setAttribute('allow', 'notifications');
+    document.body.appendChild(fcmFrame);
 
-  // Firebase 초기화 및 FCM 토큰 등록
-  function initFirebaseAndRegisterToken(studentId) {
-    try {
-      if (!firebase.apps.length) {
-        firebase.initializeApp(FIREBASE_CONFIG);
-      }
-      messagingInstance = firebase.messaging();
-
-      // Service Worker 등록
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('firebase-messaging-sw.js')
-          .then(function(registration) {
-            messagingInstance.useServiceWorker(registration);
-            return Notification.requestPermission();
-          })
-          .then(function(permission) {
-            if (permission === 'granted') {
-              return messagingInstance.getToken({ vapidKey: FIREBASE_VAPID_KEY });
-            } else {
-              console.log('알림 권한 거부됨');
-              return null;
-            }
-          })
-          .then(function(token) {
-            if (token) {
-              // 토큰을 서버(스프레드시트)에 저장
-              var savedToken = localStorage.getItem('fcm_token_' + studentId);
-              if (savedToken !== token) {
-                google.script.run.withSuccessHandler(function(res) {
-                  if (res.success) {
-                    localStorage.setItem('fcm_token_' + studentId, token);
-                    console.log('FCM 토큰 저장 완료');
-                  }
-                }).saveFcmToken(studentId, token);
-              }
-            }
-          })
-          .catch(function(err) {
-            console.log('FCM 초기화 오류:', err);
-          });
-      }
-
-      // 포그라운드(앱 열려있을 때) 메시지 수신 처리
-      messagingInstance.onMessage(function(payload) {
-        var title = payload.notification.title || '수학 교실 알림';
-        var body = payload.notification.body || '';
+    window.addEventListener('message', function(e) {
+      var d = e.data;
+      if (!d || !d.type) return;
+      if (d.type === 'FCM_FRAME_READY') {
+        fcmFrameReady = true;
+        if (pendingFcmStudentId) {
+          fcmFrame.contentWindow.postMessage({ type: 'INIT_FCM', studentId: pendingFcmStudentId }, '*');
+          pendingFcmStudentId = null;
+        }
+      } else if (d.type === 'FCM_TOKEN' && !d.cached) {
+        // 새 토큰 → 스프레드시트 저장
+        google.script.run.saveFcmToken(d.studentId, d.token);
+      } else if (d.type === 'FCM_MESSAGE') {
+        // 포그라운드 알림
+        var p = d.payload;
+        var title = (p.notification && p.notification.title) || '수학 교실 알림';
+        var body  = (p.notification && p.notification.body)  || '';
         showInAppNotification(title, body);
-      });
+      }
+    });
+  }
 
-    } catch(e) {
-      console.log('Firebase 초기화 실패:', e);
+  function initFirebaseAndRegisterToken(studentId) {
+    setupFcmIframe();
+    if (fcmFrameReady) {
+      fcmFrame.contentWindow.postMessage({ type: 'INIT_FCM', studentId: studentId }, '*');
+    } else {
+      pendingFcmStudentId = studentId;
     }
   }
 

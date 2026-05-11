@@ -1,5 +1,118 @@
-const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ"; 
+const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ";
 const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
+
+// =====================================================
+// ✅ FCM 푸시 알림 (HTTP v1 API + 서비스 계정)
+// 최초 1회: GAS 스크립트 편집기에서 setupFCMCredentials() 실행
+// =====================================================
+
+function setupFCMCredentials() {
+  var props = PropertiesService.getScriptProperties();
+  props.setProperty('FCM_PROJECT_ID',   'send-alarm-220c3');
+  props.setProperty('FCM_CLIENT_EMAIL', 'firebase-adminsdk-fbsvc@send-alarm-220c3.iam.gserviceaccount.com');
+  props.setProperty('FCM_PRIVATE_KEY',  '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC5xXXlzic2Ykf5\naMW9BoMD1VFLvO4ShawVjtyUFwnf5Swufq6fLNxGsXdVfpt2sXDBGgXD97EwoUTQ\nMmJ/UPWw2ulG23cbbA4mK9Xu+Jh3Z9bYC3wutW3NNOpb0G/ivdcbeMu6XoDtuAMt\ndgKESakK3Ta05KuU3JFSBqTAlwIIRrtEeiXFERV6fv7jUvua/0ncTKDqOymSRuph\nYOK5TAHlTBHitqojoJ0KGK6TWAgGUGnshtXwlcyxyqAcdN6Mq75G8/LRbc6hMMIY\n5BMzsrhJt5MLcXV7Kr+iPb1yJmb1Px7vjmnsT5IAQZHkGYRDEWvKJQNSHsTJ0MW6\nEDtcknQ9AgMBAAECggEAA2cg4v+cdCKjAN+wxW9uGb3O6CXJVuDZr+h44gZb4IvW\n/BNPthRyN/drB5PQuZqZRYrpN/3vt25kRuVbxkK4Hnicm5CqPru++QD1OPqF91/U\n9ht54h9IQa31DuSOEbaYYC3ZRX9oMZSuC9IikLvGSJYx9KzYKrCgbEtbQmuXCb15\nYJ00GD1R0WUkCjoJGCWKoZmuuqOj/o/LvkTOywHw3Wx0w50V/SldpgGT0aJ1ZRjj\n2+MC7Yd+06RQ2aDcLxqIn4YM73MKd0kkUGWZ84JyfHdVxOA4kQoz52b7VIjDLx9C\n6qji9+Dddy+ULmgQFgHLsPE9I9sdszianbIK2O2evQKBgQDx083+eShG9H4iZAIj\npNpWSpj/hTzx50D+W1nuYiYM+v7AoiZgAqflsDqFcyeXcTE1WCH1Jt9HqMka3G0k\n3BomzFKXoQqPTLxEbLu7sPONzuGETUqfEC53Rm7SlZW7Zf7nSi+qHEuGNryr+IKp\nVC0Ry/yjGzU8aVT6LJ9xFOh7xwKBgQDEqKIqFolxb7+y4LZlZJm0IefgrOv4Y5m9\nLhJivnX7MT72DSyAhqUQI+jyHmjqmX8px6ieFOZs0sRtDQ3V/Rm7b16CzckoDwE8\neTy5tdA9uCJO9Q8Hn4XQDk8cCnN45tSIKGBSRCUVWBpkx2mgXBZUqRmWTZNufMuV\n5EclvgDn2wKBgQCl5GSlszucIVD+CpklFovpMlduwloioD+HvecdjxsHQI/OWe31\nYx0GhjQ/I9X/H9lf/Muev0HgiLscwCXnaU5PW081UXZLA5sLXYQTp7oMh+VQuyz7\nnUAi9qBDufXzjm6k/9Fe4vY0Zgxb9Ki9vE8GrGbtBVcp0CBJVp8yFeO+NQKBgEur\nW2J4c4A7cHaismwHLoE6Pp+bydw0btZ1IMvv3zO9Oi2w2fvGU0MHnj1zaAlE8MIh\nugbBofwjiUMwr680CS+u5Z3NEuagB2i+eZg3lh35ePIKpzLWtcVdjCENAGt33jVZ\n294rrF0vHlDCzijO5iTDQD4uMVllGWzefmXOW0jbAoGBALcUbVtH59FaHCZThuKS\nom659DWn4LePqDFal8bfEcgTko+zBZv7lZIZ9unps3GdtccR5XZCKfn9MchNKfT1\nVzqB3CPuh21vHJcMegn9WzzYwP2ezCKgjNBqbUJve7YUYuvQpZ/QFEGJEbte56pC\np2Grlq/5dEOE81GOHW8TeRAv\n-----END PRIVATE KEY-----\n');
+  return '✅ FCM 자격증명 저장 완료';
+}
+
+function getFCMAccessToken_() {
+  var props = PropertiesService.getScriptProperties();
+  var privateKey  = props.getProperty('FCM_PRIVATE_KEY').replace(/\\n/g, '\n');
+  var clientEmail = props.getProperty('FCM_CLIENT_EMAIL');
+  var now = Math.floor(Date.now() / 1000);
+  var header  = Utilities.base64EncodeWebSafe(JSON.stringify({alg:'RS256',typ:'JWT'})).replace(/=+$/,'');
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify({
+    iss: clientEmail,
+    scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token',
+    exp: now + 3600,
+    iat: now
+  })).replace(/=+$/,'');
+  var toSign    = header + '.' + payload;
+  var signature = Utilities.base64EncodeWebSafe(
+    Utilities.computeRsaSha256Signature(toSign, privateKey)
+  ).replace(/=+$/,'');
+  var jwt = toSign + '.' + signature;
+  var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    contentType: 'application/x-www-form-urlencoded',
+    payload: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + jwt
+  });
+  return JSON.parse(res.getContentText()).access_token;
+}
+
+function sendFcmToToken_(token, title, body, clickUrl, tag) {
+  try {
+    var projectId   = PropertiesService.getScriptProperties().getProperty('FCM_PROJECT_ID');
+    var accessToken = getFCMAccessToken_();
+    var message = {
+      message: {
+        token: token,
+        notification: { title: title, body: body },
+        data: { url: clickUrl || '', tag: tag || 'default' },
+        webpush: {
+          notification: { icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png', tag: tag || 'default' },
+          fcm_options: { link: clickUrl || 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec' }
+        }
+      }
+    };
+    var res = UrlFetchApp.fetch(
+      'https://fcm.googleapis.com/v1/projects/' + projectId + '/messages:send',
+      { method:'POST', contentType:'application/json',
+        headers:{'Authorization':'Bearer ' + accessToken},
+        payload: JSON.stringify(message), muteHttpExceptions: true }
+    );
+    return res.getResponseCode() === 200;
+  } catch(e) { return false; }
+}
+
+// 선택한 학생들에게 알림 발송 (클라이언트에서 호출)
+function sendPushToStudents(studentIds, title, body, tag, filterClass) {
+  try {
+    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
+    var data  = sheet.getDataRange().getValues();
+    var clickUrl = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+    var sent = 0, skipped = 0;
+    var idSet = studentIds ? new Set(studentIds.map(String)) : null;
+    for (var i = 1; i < data.length; i++) {
+      var sid   = String(data[i][1] || '').trim();
+      var token = String(data[i][6] || '').trim();
+      if (!sid || !token) { skipped++; continue; }
+      if (idSet && !idSet.has(sid)) continue;
+      if (filterClass) {
+        var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+        if (cls !== filterClass) continue;
+      }
+      if (sendFcmToToken_(token, title, body, clickUrl, tag || 'default')) sent++;
+      else skipped++;
+    }
+    return { success: true, sent: sent, skipped: skipped };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 전체 학생 알림
+function sendPushToAll(title, body, tag) {
+  return sendPushToStudents(null, title, body, tag);
+}
+
+// 특정 과제 미제출자에게 알림
+function sendPushToUnsubmitted(taskName, title, body) {
+  try {
+    var roster  = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부').getDataRange().getValues();
+    var history = SpreadsheetApp.openById(SHEET_ID).getSheetByName('제출현황').getDataRange().getValues();
+    var submittedIds = new Set();
+    for (var i = 1; i < history.length; i++) {
+      var tn = String(history[i][3] || '').split(' (')[0];
+      if (tn === taskName) submittedIds.add(String(history[i][1] || '').trim());
+    }
+    var unsubIds = [];
+    for (var j = 1; j < roster.length; j++) {
+      var sid = String(roster[j][1] || '').trim();
+      if (sid && !submittedIds.has(sid)) unsubIds.push(sid);
+    }
+    if (unsubIds.length === 0) return { success: true, sent: 0, skipped: 0, message: '미제출자 없음' };
+    return sendPushToStudents(unsubIds, title || ('📢 [' + taskName + '] 아직 제출 안 했어요!'), body || '지금 바로 제출해주세요.', 'unsub');
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
 
 // =====================================================
 // ✅ 피드백 템플릿 (시스템설정 시트 C열 저장)
