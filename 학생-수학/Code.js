@@ -175,17 +175,22 @@ function getDashboardData(studentId, studentName) {
       let myDeadline = null;
       let resubDeadline = null;
 
-      if (dStr && dStr.startsWith("{")) { 
-        try { 
-          let deadlines = JSON.parse(dStr); 
+      if (dStr && dStr.startsWith("{")) {
+        try {
+          let deadlines = JSON.parse(dStr);
           let dl = deadlines[className] || deadlines["all"];
-          if (dl) { 
-            hasDeadline = true; 
+          const hasClassSpecificKeys = Object.keys(deadlines).some(k => k !== "all" && !k.startsWith("resub_"));
+          if (dl) {
+            hasDeadline = true;
             myDeadline = dl;
-            if (new Date(dl) < now) isExpired = true; 
-          } 
+            if (new Date(dl) < now) isExpired = true;
+          } else if (hasClassSpecificKeys) {
+            // 다른 반에만 마감일이 설정된 경우 → 이 학생에겐 과제 숨김
+            hasDeadline = true;
+            isExpired = true;
+          }
           resubDeadline = deadlines["resub_" + className] || deadlines["resub_all"] || myDeadline;
-        } catch(e) {} 
+        } catch(e) {}
       }
 
       taskDeadlineMap[tName] = {
@@ -427,6 +432,11 @@ function processForm(formData) {
                 const mainDl = dl[className] || dl["all"];
                 if (mainDl && new Date(mainDl) < now) {
                   return { success: false, message: "⏰ 제출 기한이 지났습니다." };
+                }
+                // 다른 반에만 마감일이 설정된 경우 이 반은 제출 불가
+                const hasClassSpecificKeys = Object.keys(dl).some(k => k !== "all" && !k.startsWith("resub_"));
+                if (!mainDl && hasClassSpecificKeys) {
+                  return { success: false, message: "🚫 이 과제는 해당 반에 제공되지 않습니다." };
                 }
               }
             } catch(e) {}
