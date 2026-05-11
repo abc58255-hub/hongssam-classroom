@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="홍쌤 알림">
+  <link rel="manifest" href="manifest.json">
+  <title>홍쌤 교실 알림 등록</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f4ff; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: white; border-radius: 20px; padding: 32px 24px; max-width: 380px; width: 100%; box-shadow: 0 8px 32px rgba(0,0,0,0.1); }
+    h1 { font-size: 22px; color: #1e3a8a; margin-bottom: 8px; }
+    .sub { color: #64748b; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+    .step { background: #f8fafc; border-radius: 12px; padding: 16px; margin-bottom: 12px; display: flex; align-items: flex-start; gap: 12px; }
+    .step-num { background: #1e3a8a; color: white; border-radius: 50%; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; flex-shrink: 0; margin-top: 1px; }
+    .step-text { font-size: 14px; color: #374151; line-height: 1.5; }
+    .step-text b { color: #1e3a8a; }
+    input { width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid #e2e8f0; border-radius: 12px; margin-bottom: 12px; outline: none; transition: border-color 0.2s; }
+    input:focus { border-color: #1e3a8a; }
+    button.primary { width: 100%; padding: 15px; background: #1e3a8a; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button.primary:active { background: #1e40af; }
+    #status { margin-top: 12px; font-size: 13px; color: #64748b; text-align: center; min-height: 20px; }
+    #success { text-align: center; }
+    #success .icon { font-size: 64px; margin-bottom: 16px; }
+    #success h2 { color: #16a34a; margin-bottom: 8px; }
+    #success p { color: #64748b; font-size: 14px; line-height: 1.6; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- iOS 비PWA: 홈 화면 추가 안내 -->
+  <div id="iosGuide" class="hidden">
+    <h1>🔔 홍쌤 교실 알림</h1>
+    <p class="sub">아이폰에서 알림을 받으려면 먼저 이 페이지를 홈 화면에 추가해야 해요.</p>
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-text">아래쪽 <b>공유 버튼 (□↑)</b> 을 탭하세요</div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-text"><b>"홈 화면에 추가"</b> 를 선택하세요</div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-text">홈 화면에 생긴 <b>앱 아이콘</b>으로 다시 열어주세요</div>
+    </div>
+  </div>
+
+  <!-- 등록 폼 (Android or iOS 홈화면 모드) -->
+  <div id="formSection" class="hidden">
+    <h1>🔔 홍쌤 교실 알림</h1>
+    <p class="sub">학번을 입력하고 알림을 허용하면 선생님이 보내는 알림을 받을 수 있어요.</p>
+    <input type="text" id="studentId" placeholder="학번 입력 (예: 21001)" maxlength="10" inputmode="numeric">
+    <button class="primary" onclick="register()">알림 등록하기</button>
+    <div id="status"></div>
+  </div>
+
+  <!-- 성공 화면 -->
+  <div id="success" class="hidden">
+    <div class="icon">✅</div>
+    <h2>알림 등록 완료!</h2>
+    <p>이제 홍쌤 교실에서 알림을 받을 수 있어요.<br>이 페이지는 닫아도 됩니다.</p>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+<script>
+  var FIREBASE_CONFIG = {
+    apiKey: "AIzaSyD7292UEKSrbWmBnnDVuC9n9VXOBFQkmb4",
+    authDomain: "send-alarm-220c3.firebaseapp.com",
+    projectId: "send-alarm-220c3",
+    storageBucket: "send-alarm-220c3.firebasestorage.app",
+    messagingSenderId: "235927215728",
+    appId: "1:235927215728:web:23705e0a3f6ac393e81eb5"
+  };
+  var VAPID_KEY = "BLRJLeOqmEKv6R3-gV9tsKSV-EgqDosMKwUXIf9iWddMCRIp7cMcbtVMhpDJCUHGN2concQbSOJbvTNsciapJNo";
+  var GAS_URL = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+  // URL에서 학번 파라미터 읽기
+  var urlParams = new URLSearchParams(window.location.search);
+  var prefilledId = urlParams.get('sid') || '';
+
+  if (isIOS && !isStandalone) {
+    document.getElementById('iosGuide').classList.remove('hidden');
+  } else {
+    document.getElementById('formSection').classList.remove('hidden');
+    if (prefilledId) document.getElementById('studentId').value = prefilledId;
+  }
+
+  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+  var messaging = firebase.messaging();
+
+  function setStatus(msg) { document.getElementById('status').textContent = msg; }
+
+  function register() {
+    var studentId = document.getElementById('studentId').value.trim();
+    if (!studentId) { alert('학번을 입력해주세요'); return; }
+
+    setStatus('알림 권한 요청 중...');
+
+    Notification.requestPermission().then(function(permission) {
+      if (permission !== 'granted') {
+        setStatus('❌ 알림이 거부되었습니다. 설정 → Safari → 알림에서 허용해주세요.');
+        return;
+      }
+      setStatus('토큰 발급 중...');
+      navigator.serviceWorker.register('./firebase-messaging-sw.js').then(function(reg) {
+        return messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+      }).then(function(token) {
+        if (!token) throw new Error('토큰을 받지 못했습니다');
+        setStatus('서버에 저장 중...');
+        return fetch(GAS_URL + '?action=saveFcmToken&studentId=' + encodeURIComponent(studentId) + '&token=' + encodeURIComponent(token));
+      }).then(function() {
+        localStorage.setItem('fcm_registered_ios_' + studentId, '1');
+        document.getElementById('formSection').classList.add('hidden');
+        document.getElementById('success').classList.remove('hidden');
+      }).catch(function(err) {
+        setStatus('❌ 오류: ' + err.message);
+      });
+    });
+  }
+</script>
+</body>
+</html>

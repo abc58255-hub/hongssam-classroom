@@ -83,7 +83,12 @@ function sendFcmMessage(token, title, body, tag) {
 }
 
 
-function doGet() { 
+function doGet(e) {
+  if (e && e.parameter && e.parameter.action === 'saveFcmToken') {
+    var result = saveFcmToken(e.parameter.studentId, e.parameter.token);
+    return ContentService.createTextOutput(JSON.stringify(result))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('수학 과제 제출기')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)

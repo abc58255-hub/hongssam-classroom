@@ -1,0 +1,10 @@
+{
+  "name": "홍쌤 교실 알림",
+  "short_name": "홍쌤 알림",
+  "description": "홍쌤 교실 푸시 알림 등록",
+  "start_url": "/fcm-sw/",
+  "display": "standalone",
+  "background_color": "#f0f4ff",
+  "theme_color": "#1e3a8a",
+  "lang": "ko"
+}
