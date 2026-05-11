@@ -719,12 +719,16 @@
       </div>
       <!-- 템플릿 버튼 -->
       <div id="surveyTemplateRow" style="margin-bottom:14px;">
-        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;">📌 템플릿으로 빠르게 시작</div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;">📌 기본 템플릿</div>
         <div style="display:flex;gap:5px;flex-wrap:wrap;">
           <button onclick="applySurveyTemplate('satisfaction')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">⭐ 학습 만족도</button>
           <button onclick="applySurveyTemplate('activity')" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">🏃 학급 활동 평가</button>
           <button onclick="applySurveyTemplate('praise')" style="background:#fdf4ff;color:#7e22ce;border:1px solid #e9d5ff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">👥 친구 칭찬 설문</button>
           <button onclick="applySurveyTemplate('free')" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">✏️ 자유 응답</button>
+        </div>
+        <div id="surveyCustomTmplRow" style="margin-top:8px;display:none;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;">📁 내 템플릿</div>
+          <div id="surveyCustomTmplBtns" style="display:flex;gap:5px;flex-wrap:wrap;"></div>
         </div>
       </div>
       <div style="margin-bottom:12px;">
@@ -748,7 +752,10 @@
         </div>
         <div id="surveyQuestionList"></div>
       </div>
-      <button id="surveySaveBtn" onclick="saveSurvey()" style="width:100%;background:#fbbf24;color:#78350f;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">💾 설문 저장</button>
+      <div style="display:flex;gap:8px;margin-top:4px;">
+        <button id="surveySaveBtn" onclick="saveSurvey()" style="flex:1;background:#fbbf24;color:#78350f;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">💾 설문 저장</button>
+        <button onclick="saveAsTemplate()" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:12px 14px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;" title="현재 질문 구성을 내 템플릿으로 저장">📌 템플릿 저장</button>
+      </div>
     </div>
   </div>
 
@@ -5219,10 +5226,18 @@
     if (filter) filter.innerHTML = fOpts;
   }
   function viewSurveyStats(svId) {
-    var filterEl = document.getElementById('surveyResultFilter');
-    if (filterEl) filterEl.value = svId;
-    switchPage('page-survey-result', document.querySelector('[onclick*="page-survey-result"]'));
-    setTimeout(function() { renderSurveyStats(); }, 100);
+    // 페이지 전환만 직접 처리하고, loadSurveyTab 콜백에서 filter 값을 설정
+    document.querySelectorAll('.page-section').forEach(function(p){ p.style.display='none'; });
+    document.querySelectorAll('.menu-item').forEach(function(m){ m.classList.remove('active'); });
+    document.getElementById('page-survey-result').style.display = 'block';
+    var menuEl = document.querySelector('[onclick*="page-survey-result"]');
+    if (menuEl) menuEl.classList.add('active');
+    if (window.innerWidth <= 768) toggleSidebar();
+    loadSurveyTab(function() {
+      renderSurveyList();
+      var filterEl = document.getElementById('surveyResultFilter');
+      if (filterEl) { filterEl.value = svId; renderSurveyStats(); }
+    });
   }
   function copySurvey(svId) {
     var sv = gSurveys.find(function(s){ return s.id === svId; });
@@ -5290,7 +5305,84 @@
     }
     var tmplRow = document.getElementById('surveyTemplateRow');
     if (tmplRow) tmplRow.style.display = sv ? 'none' : 'block';
+    renderCustomTemplates();
     document.getElementById('surveyBuilderModal').style.display = 'flex';
+  }
+  function renderCustomTemplates() {
+    var templates = JSON.parse(localStorage.getItem('hongSurveyTemplates') || '[]');
+    var btnContainer = document.getElementById('surveyCustomTmplBtns');
+    var section = document.getElementById('surveyCustomTmplRow');
+    if (!btnContainer || !section) return;
+    if (templates.length === 0) { section.style.display = 'none'; return; }
+    section.style.display = '';
+    btnContainer.innerHTML = templates.map(function(t) {
+      return '<span style="display:inline-flex;align-items:center;">'
+        + '<button data-tmplid="'+t.id+'" onclick="applyCustomTemplate(this.dataset.tmplid)" style="background:#fef9c3;color:#713f12;border:1px solid #fde047;border-right:none;padding:4px 8px;border-radius:6px 0 0 6px;font-size:11px;font-weight:700;cursor:pointer;">'+t.name+'</button>'
+        + '<button data-tmplid="'+t.id+'" onclick="deleteCustomTemplate(this.dataset.tmplid)" style="background:#fee2e2;color:#dc2626;border:1px solid #fca5a5;padding:4px 7px;border-radius:0 6px 6px 0;font-size:11px;cursor:pointer;">✕</button>'
+        + '</span>';
+    }).join('');
+  }
+  function applyCustomTemplate(tmplId) {
+    var templates = JSON.parse(localStorage.getItem('hongSurveyTemplates') || '[]');
+    var tmpl = templates.find(function(t){ return t.id === tmplId; });
+    if (!tmpl) return;
+    document.getElementById('surveyQuestionList').innerHTML = '';
+    surveyQCount = 0;
+    document.getElementById('surveyTitle').value = tmpl.title || '';
+    document.getElementById('surveyGuide').value = tmpl.guide || '';
+    var qs = [];
+    try { qs = typeof tmpl.questions === 'string' ? JSON.parse(tmpl.questions) : (tmpl.questions || []); } catch(e) {}
+    qs.forEach(function(q) { addSurveyQuestion(q.type || 'text', q); });
+  }
+  function deleteCustomTemplate(tmplId) {
+    if (!confirm('이 템플릿을 삭제할까요?')) return;
+    var templates = JSON.parse(localStorage.getItem('hongSurveyTemplates') || '[]');
+    templates = templates.filter(function(t){ return t.id !== tmplId; });
+    localStorage.setItem('hongSurveyTemplates', JSON.stringify(templates));
+    renderCustomTemplates();
+  }
+  function saveAsTemplate() {
+    var title = (document.getElementById('surveyTitle').value || '').trim();
+    var guide = (document.getElementById('surveyGuide') ? document.getElementById('surveyGuide').value : '') || '';
+    var questions = [];
+    document.querySelectorAll('#surveyQuestionList > div[id^="svq-"]').forEach(function(div) {
+      var n = div.id.replace('svq-','');
+      var typeEl = document.getElementById('svq-type-'+n);
+      var textEl = document.getElementById('svq-text-'+n);
+      if (!typeEl || !textEl || !textEl.value.trim()) return;
+      var type = typeEl.value;
+      var q = { type: type, text: textEl.value.trim() };
+      var reqEl = document.getElementById('svq-req-'+n);
+      q.req = reqEl ? reqEl.checked : true;
+      if (type === 'score') {
+        q.minLabel = (document.getElementById('svq-minLabel-'+n)||{}).value || '매우 별로';
+        q.maxLabel = (document.getElementById('svq-maxLabel-'+n)||{}).value || '매우 좋아요';
+      } else if (type === 'dynamic') {
+        q.maxPick = parseInt((document.getElementById('svq-maxPick-'+n)||{}).value||'2')||2;
+        q.reasonTitle = (document.getElementById('svq-reasonTitle-'+n)||{}).value||'이유를 적어주세요';
+      } else if (type === 'choice') {
+        var choices = [];
+        var list = document.getElementById('svq-choice-list-'+n);
+        if (list) list.querySelectorAll('.svq-choice-inp').forEach(function(inp) {
+          if (inp.value.trim()) choices.push(inp.value.trim());
+        });
+        q.choices = choices;
+        var multiEl = document.getElementById('svq-multi-'+n);
+        q.multi = multiEl ? multiEl.checked : false;
+      } else {
+        q.minLen = parseInt((document.getElementById('svq-minLen-'+n)||{}).value||'0')||0;
+        q.maxLen = parseInt((document.getElementById('svq-maxLen-'+n)||{}).value||'200')||200;
+      }
+      questions.push(q);
+    });
+    if (questions.length === 0) return alert('저장할 질문이 없습니다.');
+    var name = prompt('템플릿 이름을 입력하세요:', title || '새 템플릿');
+    if (!name || !name.trim()) return;
+    var templates = JSON.parse(localStorage.getItem('hongSurveyTemplates') || '[]');
+    templates.push({ id: 'tmpl_'+Date.now(), name: name.trim(), title: title, guide: guide, questions: questions });
+    localStorage.setItem('hongSurveyTemplates', JSON.stringify(templates));
+    renderCustomTemplates();
+    alert('템플릿 "'+name.trim()+'"이 저장되었습니다!');
   }
   function applySurveyTemplate(type) {
     document.getElementById('surveyQuestionList').innerHTML = '';
