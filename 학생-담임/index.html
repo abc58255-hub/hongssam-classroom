@@ -431,8 +431,18 @@
     var h = ''; var origAns = svAnswers[q.originalIdx];
     if (q.type === 'score') {
       var emojis = ['😭','☹️','😐','🙂','😍'];
+      var minV = q.minVal || 1, maxV = q.maxVal || 5;
+      var total = maxV - minV + 1;
+      if (q.minLabel || q.maxLabel) {
+        h += '<div style="display:flex;justify-content:space-between;font-size:12px;color:#a18cd1;font-weight:700;margin-bottom:8px;">'
+          + '<span>' + (q.minLabel||'') + '</span><span>' + (q.maxLabel||'') + '</span></div>';
+      }
       h += '<div class="score-grid">';
-      for (var i = 1; i <= 5; i++) { var sel = origAns == i ? 'selected' : ''; h += '<div class="score-btn ' + sel + '" onclick="selectScore(this,' + i + ')"><div style="font-size:30px;">' + emojis[i-1] + '</div><span>' + i + '점</span></div>'; }
+      for (var i = minV; i <= maxV; i++) {
+        var sel = origAns == i ? 'selected' : '';
+        var eIdx = total <= 5 ? (i - minV) : Math.round((i - minV) / (total - 1) * 4);
+        h += '<div class="score-btn ' + sel + '" onclick="selectScore(this,' + i + ')"><div style="font-size:30px;">' + emojis[eIdx] + '</div><span>' + i + '점</span></div>';
+      }
       h += '</div>';
     } else if (q.type === 'text') {
       var limitHint = '';
@@ -458,7 +468,14 @@
       h += '</div>';
     } else if (q.type === 'dynamic') {
       if (q.step === 'A') {
-        h += '<div style="font-size:13px; color:#94a3b8; text-align:center; margin-bottom:15px;">해당하는 친구를 모두 골라주세요.</div><div class="stu-chip-grid">';
+        var pickHint = '';
+        if (q.minPick > 0 || q.maxPick > 0) {
+          var pickParts = [];
+          if (q.minPick > 0) pickParts.push('최소 '+q.minPick+'명');
+          if (q.maxPick > 0) pickParts.push('최대 '+q.maxPick+'명');
+          pickHint = '<div style="font-size:12px;color:#a18cd1;font-weight:700;text-align:center;margin-bottom:8px;">👥 '+pickParts.join(' / ')+' 선택</div>';
+        }
+        h += '<div style="font-size:13px; color:#94a3b8; text-align:center; margin-bottom:8px;">해당하는 친구를 골라주세요.</div>' + pickHint + '<div class="stu-chip-grid">';
         gRoster.forEach(function(s) { var isSel = (origAns && origAns[s.id + ' ' + s.name] !== undefined) ? 'selected' : ''; h += '<div class="stu-chip ' + isSel + '" onclick="toggleChip(this)">' + s.name + '</div>'; });
         h += '</div>';
       } else if (q.step === 'B') {
@@ -489,7 +506,16 @@
   }
 
   function selectScore(elem, val) { document.querySelectorAll('.score-btn').forEach(function(b) { b.classList.remove('selected'); }); elem.classList.add('selected'); svAnswers[svQuestions[currentQIdx].originalIdx] = val; }
-  function toggleChip(elem) { elem.classList.toggle('selected'); }
+  function toggleChip(elem) {
+    var q = svQuestions[currentQIdx];
+    if (!elem.classList.contains('selected')) {
+      var maxP = q.maxPick || 0;
+      if (maxP > 0 && document.querySelectorAll('.stu-chip.selected').length >= maxP) {
+        return alert('최대 '+maxP+'명까지 선택할 수 있습니다.');
+      }
+    }
+    elem.classList.toggle('selected');
+  }
 
   function navSurvey(dir) {
     var q = svQuestions[currentQIdx]; var origIdx = q.originalIdx;
@@ -507,6 +533,9 @@
         if (q.step === 'A') {
           var fullNames = [];
           document.querySelectorAll('.stu-chip.selected').forEach(function(c) { var t = gRoster.find(function(r) { return r.name === c.innerText; }); if (t) fullNames.push(t.id + ' ' + t.name); });
+          var minP = q.minPick || (q.req ? 1 : 0), maxP = q.maxPick || 0;
+          if (minP > 0 && fullNames.length < minP) return alert('최소 '+minP+'명 이상 선택해 주세요!');
+          if (maxP > 0 && fullNames.length > maxP) return alert('최대 '+maxP+'명까지 선택할 수 있습니다.');
           if (q.req && fullNames.length === 0) return alert('최소 1명 이상 선택해 주세요!');
           if (svQuestions[currentQIdx+1] && svQuestions[currentQIdx+1].step === 'B') svQuestions.splice(currentQIdx+1, 1);
           if (fullNames.length > 0) {

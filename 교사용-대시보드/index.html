@@ -5357,8 +5357,11 @@
       if (type === 'score') {
         q.minLabel = (document.getElementById('svq-minLabel-'+n)||{}).value || '매우 별로';
         q.maxLabel = (document.getElementById('svq-maxLabel-'+n)||{}).value || '매우 좋아요';
+        q.minVal   = parseInt((document.getElementById('svq-minVal-'+n)||{}).value||'1')||1;
+        q.maxVal   = parseInt((document.getElementById('svq-maxVal-'+n)||{}).value||'5')||5;
       } else if (type === 'dynamic') {
         q.maxPick = parseInt((document.getElementById('svq-maxPick-'+n)||{}).value||'2')||2;
+        q.minPick = parseInt((document.getElementById('svq-minPick-'+n)||{}).value||'1')||1;
         q.reasonTitle = (document.getElementById('svq-reasonTitle-'+n)||{}).value||'이유를 적어주세요';
       } else if (type === 'choice') {
         var choices = [];
@@ -5455,19 +5458,25 @@
     if (type === 'score') {
       extra = '<input type="text" id="svq-text-'+n+'" class="form-input" placeholder="질문 내용" style="margin-bottom:6px;font-size:13px;">'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
+          + '<label style="font-size:11px;color:#64748b;">점수 범위</label>'
+          + '<input type="number" id="svq-minVal-'+n+'" class="form-input" value="1" min="1" max="10" style="width:45px;font-size:12px;" title="최솟값">'
+          + '<span style="font-size:11px;color:#94a3b8;">~</span>'
+          + '<input type="number" id="svq-maxVal-'+n+'" class="form-input" value="5" min="2" max="10" style="width:45px;font-size:12px;" title="최댓값">'
           + '<label style="font-size:11px;color:#64748b;">최솟값 레이블</label>'
-          + '<input type="text" id="svq-minLabel-'+n+'" class="form-input" value="매우 별로" style="width:90px;font-size:12px;">'
+          + '<input type="text" id="svq-minLabel-'+n+'" class="form-input" value="매우 별로" style="width:80px;font-size:12px;">'
           + '<label style="font-size:11px;color:#64748b;">최댓값 레이블</label>'
-          + '<input type="text" id="svq-maxLabel-'+n+'" class="form-input" value="매우 좋아요" style="width:90px;font-size:12px;">'
+          + '<input type="text" id="svq-maxLabel-'+n+'" class="form-input" value="매우 좋아요" style="width:80px;font-size:12px;">'
           + '<label style="display:flex;align-items:center;gap:3px;font-size:12px;cursor:pointer;"><input type="checkbox" id="svq-req-'+n+'" checked> 필수</label>'
         + '</div>';
     } else if (type === 'dynamic') {
       extra = '<input type="text" id="svq-text-'+n+'" class="form-input" placeholder="질문 내용 (예: 칭찬할 친구를 골라주세요)" style="margin-bottom:6px;font-size:13px;">'
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;">'
-          + '<label style="font-size:11px;color:#64748b;">최대 선택 수</label>'
-          + '<input type="number" id="svq-maxPick-'+n+'" class="form-input" value="2" min="1" max="10" style="width:55px;font-size:12px;">'
+          + '<label style="font-size:11px;color:#64748b;">최소 선택</label>'
+          + '<input type="number" id="svq-minPick-'+n+'" class="form-input" value="1" min="0" max="10" style="width:48px;font-size:12px;">'
+          + '<label style="font-size:11px;color:#64748b;">최대 선택</label>'
+          + '<input type="number" id="svq-maxPick-'+n+'" class="form-input" value="2" min="1" max="10" style="width:48px;font-size:12px;">'
           + '<label style="font-size:11px;color:#64748b;">이유 질문 안내</label>'
-          + '<input type="text" id="svq-reasonTitle-'+n+'" class="form-input" value="이 친구를 칭찬하는 이유를 써주세요" style="flex:1;min-width:120px;font-size:12px;">'
+          + '<input type="text" id="svq-reasonTitle-'+n+'" class="form-input" value="이 친구를 칭찬하는 이유를 써주세요" style="flex:1;min-width:100px;font-size:12px;">'
         + '</div>';
     } else if (type === 'choice') {
       extra = '<input type="text" id="svq-text-'+n+'" class="form-input" placeholder="질문 내용" style="margin-bottom:6px;font-size:13px;">'
@@ -5508,12 +5517,18 @@
       if (type === 'score') {
         var minLEl = document.getElementById('svq-minLabel-'+n);
         var maxLEl = document.getElementById('svq-maxLabel-'+n);
+        var minVEl = document.getElementById('svq-minVal-'+n);
+        var maxVEl = document.getElementById('svq-maxVal-'+n);
         if (minLEl) minLEl.value = initQ.minLabel || '매우 별로';
         if (maxLEl) maxLEl.value = initQ.maxLabel || '매우 좋아요';
+        if (minVEl) minVEl.value = initQ.minVal || 1;
+        if (maxVEl) maxVEl.value = initQ.maxVal || 5;
       } else if (type === 'dynamic') {
         var mpEl = document.getElementById('svq-maxPick-'+n);
+        var mnEl = document.getElementById('svq-minPick-'+n);
         var rtEl = document.getElementById('svq-reasonTitle-'+n);
         if (mpEl) mpEl.value = initQ.maxPick || 2;
+        if (mnEl) mnEl.value = initQ.minPick || 1;
         if (rtEl) rtEl.value = initQ.reasonTitle || '이유를 적어주세요';
       } else if (type === 'choice') {
         var mEl = document.getElementById('svq-multi-'+n);
@@ -5554,8 +5569,11 @@
       if (type === 'score') {
         q.minLabel = (document.getElementById('svq-minLabel-'+n)||{}).value || '매우 별로';
         q.maxLabel = (document.getElementById('svq-maxLabel-'+n)||{}).value || '매우 좋아요';
+        q.minVal   = parseInt((document.getElementById('svq-minVal-'+n)||{}).value||'1')||1;
+        q.maxVal   = parseInt((document.getElementById('svq-maxVal-'+n)||{}).value||'5')||5;
       } else if (type === 'dynamic') {
         q.maxPick     = parseInt((document.getElementById('svq-maxPick-'+n)||{}).value||'2')||2;
+        q.minPick     = parseInt((document.getElementById('svq-minPick-'+n)||{}).value||'1')||1;
         q.reasonTitle = (document.getElementById('svq-reasonTitle-'+n)||{}).value||'이유를 적어주세요';
       } else if (type === 'choice') {
         var choices = [];
@@ -5635,14 +5653,35 @@
     let html = mHtml + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;"><h3 style="margin:0; color:#b45309;">' + sv.title + ' 전체 통계</h3></div>';
     qData.forEach(function(q, idx) {
       html += '<div style="margin-bottom:30px; background:#f8fafc; padding:20px; border-radius:12px; border:1px solid #cbd5e1;"><div style="font-weight:bold; font-size:16px; margin-bottom:15px; color:#1e293b;">Q' + (idx+1) + '. ' + (q.text || q.title || '') + '</div>';
-      if (q.type === 'score') { let sum = 0, count = 0; resList.forEach(function(r) { let ans = JSON.parse(r.answers); if (ans[idx]) { sum += parseInt(ans[idx]); count++; } }); let avg = count > 0 ? (sum/count).toFixed(1) : 0; html += '<div style="font-size:24px; font-weight:800; color:#0284c7;">평균 ' + avg + ' 점 <span style="font-size:14px; color:#64748b; font-weight:normal;">(' + count + '명 참여)</span></div>'; }
-      else if (q.type === 'text') { html += '<ul style="margin:0; padding-left:20px; font-size:14px; color:#475569; line-height:1.6;">'; resList.forEach(function(r) { let ans = JSON.parse(r.answers); if (ans[idx] && ans[idx].trim() !== "") html += '<li>' + ans[idx].replace(/\n/g,'<br>') + '</li>'; }); html += '</ul>'; }
+      if (q.type === 'score') {
+        let sum = 0, count = 0, breakdown = {};
+        resList.forEach(function(r) { let ans = JSON.parse(r.answers); if (ans[idx] !== undefined && ans[idx] !== null && ans[idx] !== '') { let v = parseInt(ans[idx]); sum += v; count++; breakdown[v] = (breakdown[v]||0)+1; } });
+        let avg = count > 0 ? (sum/count).toFixed(1) : 0;
+        let minV = q.minVal||1, maxV = q.maxVal||5;
+        let bParts = []; for (let v=minV; v<=maxV; v++) bParts.push(v+'점 <b>'+(breakdown[v]||0)+'명</b>');
+        html += '<div style="font-size:24px; font-weight:800; color:#0284c7;">평균 ' + avg + ' 점 <span style="font-size:14px; color:#64748b; font-weight:normal;">(' + count + '명 참여)</span></div>'
+              + '<div style="font-size:12px; color:#94a3b8; margin-top:5px;">' + bParts.join(' · ') + '</div>';
+      }
+      else if (q.type === 'text') {
+        html += '<div style="margin-bottom:8px;"><label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="svShowName-'+idx+'" onchange="toggleSurveyNames('+idx+')"> 작성자 이름 표시</label></div>';
+        html += '<ul id="svtxt-'+idx+'" style="margin:0; padding-left:20px; font-size:14px; color:#475569; line-height:1.8;">';
+        resList.forEach(function(r) { let ans = JSON.parse(r.answers); if (ans[idx] && ans[idx].trim() !== "") { var sn = String(r.stuName||r.stuId||'').replace(/</g,'&lt;').replace(/>/g,'&gt;'); html += '<li><span class="sv-author" style="display:none;font-size:11px;color:#7c3aed;font-weight:700;margin-right:5px;background:#f3e8ff;padding:1px 6px;border-radius:10px;">'+sn+'</span>'+ans[idx].replace(/\n/g,'<br>')+'</li>'; } });
+        html += '</ul>';
+      }
       else if (q.type === 'dynamic') {
-        let targetMap = {};
-        resList.forEach(function(r) { let ans = JSON.parse(r.answers); let dData = ans[idx]; if (dData && typeof dData === 'object') { for (let target in dData) { if (dData[target].trim() === "") continue; if (!targetMap[target]) targetMap[target] = []; targetMap[target].push(dData[target]); } } });
+        let targetMap = {}, voterMap = {};
+        resList.forEach(function(r) { let ans = JSON.parse(r.answers); let dData = ans[idx]; if (dData && typeof dData === 'object') { for (let target in dData) { if (dData[target].trim() === "") continue; if (!targetMap[target]) targetMap[target] = []; targetMap[target].push(dData[target]); if (!voterMap[target]) voterMap[target] = []; voterMap[target].push(r.stuName||r.stuId||''); } } });
         let sortedTargets = Object.keys(targetMap).sort(function(a, b) { return targetMap[b].length - targetMap[a].length; });
         if (sortedTargets.length === 0) { html += "<div style='color:#94a3b8; font-size:13px;'>언급된 학생이 없습니다.</div>"; }
-        else { sortedTargets.forEach(function(target) { html += '<div style="margin-bottom:10px;"><div style="font-weight:bold; color:#b91c1c; display:inline-block; margin-right:10px; white-space:nowrap;">' + target + ' <span style="background:#fee2e2; padding:2px 6px; border-radius:4px; font-size:11px;">' + targetMap[target].length + '표</span></div><div style="background:white; padding:8px; border-radius:6px; border:1px dashed #cbd5e1; margin-top:5px; font-size:13px; color:#334155;">'; targetMap[target].forEach(function(reason) { html += '• ' + reason + '<br>'; }); html += '</div></div>'; }); }
+        else { sortedTargets.forEach(function(target) {
+          var voters = voterMap[target]||[]; var tip = '<b>투표한 학생 ('+voters.length+'명):</b><br>'+(voters.length>0?voters.join(', '):'없음');
+          html += '<div class="sv-bar-wrap" style="margin-bottom:10px;">'
+            + '<div class="sv-bar-tip">'+tip+'</div>'
+            + '<div style="font-weight:bold; color:#b91c1c; display:inline-block; margin-right:10px; white-space:nowrap;">'+target+' <span style="background:#fee2e2; padding:2px 6px; border-radius:4px; font-size:11px;">'+targetMap[target].length+'표</span></div>'
+            + '<div style="background:white; padding:8px; border-radius:6px; border:1px dashed #cbd5e1; margin-top:5px; font-size:13px; color:#334155;">';
+          targetMap[target].forEach(function(reason) { html += '• '+reason+'<br>'; });
+          html += '</div></div>';
+        }); }
       }
       else if (q.type === 'choice') {
         var choiceCount = {};
@@ -5699,6 +5738,10 @@
     area.innerHTML = html;
     currentSurveyData = qData; currentSurveyResponses = resList; currentViewerIdx = 0; renderSurveyViewer();
     } catch(e) { area.innerHTML = '<div style="color:#dc2626; padding:20px; background:#fef2f2; border-radius:10px; border:1px solid #fecaca;"><b>⚠️ 통계 렌더링 오류:</b><br>' + e.message + '</div>'; }
+  }
+  function toggleSurveyNames(idx) {
+    var checked = document.getElementById('svShowName-'+idx).checked;
+    document.querySelectorAll('#svtxt-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'inline' : 'none'; });
   }
   function navSurveyViewer(dir) { currentViewerIdx += dir; renderSurveyViewer(); }
   function renderSurveyViewer() {
