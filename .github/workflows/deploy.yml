@@ -57,5 +57,5 @@ jobs:
       - name: Deploy 진도표
         run: |
           cd "진도표"
-          clasp push
+          clasp push --force
           clasp deploy -i "AKfycbwn_9wAf1Qyb744x-t3b46CkuikXhg748qryip_tMQYpYUDVz65nPuK_rxVN7LUBkHf9g"
