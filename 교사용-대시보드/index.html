@@ -230,7 +230,6 @@
     <li class="menu-item" onclick="switchPage('page-observe-math', this)" style="color:#93c5fd;">📐 수학 관찰기록</li>
     <li class="menu-item" onclick="switchPage('page-notice', this)" style="border-top:1px solid #1e293b; margin-top:10px; color:#fde68a;">📢 학급 알림 관리</li>
     <li class="menu-item" onclick="switchPage('page-observe', this)" style="color:#86efac;">📓 담임 관찰기록</li>
-    <li class="menu-item" onclick="switchPage('page-calendar', this)" style="color:#fde68a;">📅 학급 캘린더</li>
     <li class="menu-item" onclick="switchPage('page-ai-task', this)" style="color:#f9a8d4; border-top:1px solid #1e293b; margin-top:10px;">🤖 AI 업무 분석</li>
     <li class="menu-item" onclick="switchPage('page-report-inbox', this)" style="color:#fca5a5;">🚨 신고 접수함</li>
     <li class="menu-item" onclick="switchPage('page-homeroom', this)" style="color:#a7f3d0;">🏫 우리 반 활동 모아보기</li>
@@ -303,6 +302,7 @@
         <select id="taskFilter" class="filter-select" onchange="renderList()" style="flex:1.5; min-width:120px;"></select>
         <select id="statusFilter" class="filter-select" onchange="renderList()" style="flex:1; min-width:115px;">
           <option value="not_completed" selected>⏳ 완료 숨기기</option>
+          <option value="hide_done_resub">🙈 완료+재제출 숨기기</option>
           <option value="all">🗂️ 전체 보기</option>
           <optgroup label="── 제출 상태 ──">
             <option value="대기중">📥 대기중</option>
@@ -717,6 +717,16 @@
         <div style="font-size:17px;font-weight:800;color:#0f172a;"><span id="surveyBuilderModalTitle">📋 새 설문 만들기</span></div>
         <button onclick="document.getElementById('surveyBuilderModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
       </div>
+      <!-- 템플릿 버튼 -->
+      <div id="surveyTemplateRow" style="margin-bottom:14px;">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:6px;">📌 템플릿으로 빠르게 시작</div>
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          <button onclick="applySurveyTemplate('satisfaction')" style="background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">⭐ 학습 만족도</button>
+          <button onclick="applySurveyTemplate('activity')" style="background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">🏃 학급 활동 평가</button>
+          <button onclick="applySurveyTemplate('praise')" style="background:#fdf4ff;color:#7e22ce;border:1px solid #e9d5ff;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">👥 친구 칭찬 설문</button>
+          <button onclick="applySurveyTemplate('free')" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">✏️ 자유 응답</button>
+        </div>
+      </div>
       <div style="margin-bottom:12px;">
         <label class="form-label">설문 제목 *</label>
         <input type="hidden" id="surveyEditId" value="">
@@ -838,86 +848,6 @@
         </div>
       </div>
       <button onclick="saveAiSettings()" style="background:#6366f1;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;width:100%;">💾 모델 설정 저장</button>
-    </div>
-  </div>
-
-
-  <!-- ✅ 학급 캘린더 -->
-  <div id="page-calendar" class="page-section" style="display:none;">
-    <h2 class="page-title">
-      <span style="display:flex;align-items:center;">
-        <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
-        📅 학급 캘린더
-      </span>
-      <button onclick="openCalendarMemoModal(null, calSelectedDate || (new Date()).toISOString().substring(0,10))" style="background:#6366f1;color:white;border:none;padding:9px 16px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">+ 일정 추가</button>
-    </h2>
-
-    <!-- 월 네비게이션 -->
-    <div style="display:flex;align-items:center;justify-content:center;gap:16px;margin-bottom:16px;">
-      <button onclick="calNav(-1)" style="background:#f1f5f9;border:none;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;font-weight:700;">‹</button>
-      <div id="calMonthTitle" style="font-size:18px;font-weight:800;color:#0f172a;min-width:140px;text-align:center;"></div>
-      <button onclick="calNav(1)" style="background:#f1f5f9;border:none;width:36px;height:36px;border-radius:50%;font-size:18px;cursor:pointer;font-weight:700;">›</button>
-    </div>
-
-    <!-- 범례 -->
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;">
-      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#10b981;display:inline-block;"></span>관찰기록</span>
-      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>과제마감</span>
-      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>설문</span>
-      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#6366f1;display:inline-block;"></span>학급알림</span>
-      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#ec4899;display:inline-block;"></span>수업·담임관찰</span>
-      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>기타메모</span>
-    </div>
-
-    <!-- 캘린더 그리드 -->
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px;margin-bottom:16px;">
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#ef4444;padding:6px 0;">일</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#64748b;padding:6px 0;">월</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#64748b;padding:6px 0;">화</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#64748b;padding:6px 0;">수</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#64748b;padding:6px 0;">목</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#64748b;padding:6px 0;">금</div>
-      <div style="text-align:center;font-size:12px;font-weight:700;color:#3b82f6;padding:6px 0;">토</div>
-    </div>
-    <div id="calGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;"></div>
-
-    <!-- 선택된 날 상세 -->
-    <div id="calDayDetail" style="display:none;margin-top:16px;background:white;border-radius:14px;border:1px solid #e2e8f0;padding:16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div id="calDayTitle" style="font-size:15px;font-weight:800;color:#0f172a;"></div>
-        <button onclick="openCalendarMemoModal(null, calSelectedDate)" style="background:#6366f1;color:white;border:none;padding:6px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">+ 이 날 추가</button>
-      </div>
-      <div id="calDayEvents"></div>
-    </div>
-  </div>
-
-  <!-- 캘린더 메모 입력 모달 -->
-  <div id="calMemoModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;align-items:center;justify-content:center;">
-    <div style="background:white;border-radius:16px;padding:22px;width:96%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,0.25);">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-        <div style="font-size:16px;font-weight:800;color:#0f172a;">📅 일정 추가</div>
-        <button onclick="document.getElementById('calMemoModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
-      </div>
-      <input type="hidden" id="calMemoRowIdx">
-      <div style="margin-bottom:12px;">
-        <label class="form-label">날짜</label>
-        <input type="date" id="calMemoDate" class="form-input">
-      </div>
-      <div style="margin-bottom:12px;">
-        <label class="form-label">유형</label>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;" id="calMemoTypeBtns">
-          <button class="cal-type-btn active" data-type="수업기록" data-color="#ec4899" onclick="selectCalType(this)">📖 수업기록</button>
-          <button class="cal-type-btn" data-type="학사일정" data-color="#3b82f6" onclick="selectCalType(this)">🏫 학사일정</button>
-          <button class="cal-type-btn" data-type="기타메모" data-color="#94a3b8" onclick="selectCalType(this)">📌 기타메모</button>
-        </div>
-      </div>
-      <div style="margin-bottom:16px;">
-        <label class="form-label">내용</label>
-        <textarea id="calMemoContent" class="form-input" rows="4" style="resize:vertical;" placeholder="내용을 입력하세요."></textarea>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button id="calMemoSaveBtn" onclick="saveCalMemo()" style="flex:1;background:#6366f1;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">💾 저장</button>
-      </div>
     </div>
   </div>
 
@@ -1736,7 +1666,6 @@
     else if (pageId === 'page-homeroom') loadHomeroomTab();
     else if (pageId === 'page-survey' || pageId === 'page-survey-build') loadSurveyTab(renderSurveyList);
     else if (pageId === 'page-survey-result') { loadSurveyTab(function(){ renderSurveyList(); if(document.getElementById('surveyResultFilter').value) renderSurveyStats(); }); }
-    else if (pageId === 'page-calendar') loadCalendar();
     else if (pageId === 'page-ai-task') initAiTaskPage();
   }
   function runCheatCheck(taskName) {
@@ -2043,11 +1972,12 @@
       if (statF === "has_message" && !i.message) return false;
       if (statF === "has_reply"   && !i.reply)   return false;  
       if (statF === "not_completed" && (st === "채점완료" || st === "이전기록채점완료")) return false;
+      if (statF === "hide_done_resub" && (st === "채점완료" || st === "이전기록채점완료" || st === "재제출요청")) return false;
       if (statF === "ai_graded") {
         var hasAi = aiGradePending[i.rowIdx] || (i.aiGradeTemp && typeof i.aiGradeTemp === 'object');
         if (!hasAi) return false;
       }
-      if (statF !== "all" && statF !== "not_completed" && statF !== "has_message") {
+      if (statF !== "all" && statF !== "not_completed" && statF !== "hide_done_resub" && statF !== "has_message") {
         if (statF === "대기중" && st !== "" && st !== "대기중") return false;
         if (statF === "채점중" && st !== "채점중" && st !== "임시저장") return false; 
         if (statF === "반려검토" && st !== "반려검토") return false;
@@ -5278,13 +5208,31 @@
         + '<div style="display:flex;gap:6px;flex-wrap:wrap;">'
           + (canStart ? '<button data-svid="'+sv.id+'" data-st="진행중" onclick="changeSurveyStatus(this.dataset.svid,this.dataset.st)" style="background:#10b981;color:white;border:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">▶ 시작</button>' : '')
           + (canStop  ? '<button data-svid="'+sv.id+'" data-st="마감됨" onclick="changeSurveyStatus(this.dataset.svid,this.dataset.st)" style="background:#f59e0b;color:white;border:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">⏹ 마감</button>' : '')
-          + '<button data-svid="'+sv.id+'" onclick="editSurvey(this.dataset.svid)" style="background:#e0e7ff;color:#4338ca;border:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;margin-right:4px;">✏️ 수정</button>'
+          + '<button data-svid="'+sv.id+'" onclick="viewSurveyStats(this.dataset.svid)" style="background:#dbeafe;color:#1d4ed8;border:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">📊 통계</button>'
+          + '<button data-svid="'+sv.id+'" onclick="copySurvey(this.dataset.svid)" style="background:#f0fdf4;color:#15803d;border:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">📋 복사</button>'
+          + '<button data-svid="'+sv.id+'" onclick="editSurvey(this.dataset.svid)" style="background:#e0e7ff;color:#4338ca;border:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">✏️ 수정</button>'
           + '<button data-svid="'+sv.id+'" onclick="deleteSurvey(this.dataset.svid)" style="background:#fee2e2;color:#dc2626;border:none;padding:6px 12px;border-radius:7px;font-size:12px;font-weight:700;cursor:pointer;">🗑 삭제</button>'
         + '</div>'
         + '</div>';
     });
     if (grid)   grid.innerHTML   = html;
     if (filter) filter.innerHTML = fOpts;
+  }
+  function viewSurveyStats(svId) {
+    var filterEl = document.getElementById('surveyResultFilter');
+    if (filterEl) filterEl.value = svId;
+    switchPage('page-survey-result', document.querySelector('[onclick*="page-survey-result"]'));
+    setTimeout(function() { renderSurveyStats(); }, 100);
+  }
+  function copySurvey(svId) {
+    var sv = gSurveys.find(function(s){ return s.id === svId; });
+    if (!sv) return;
+    var copy = JSON.parse(JSON.stringify(sv));
+    copy.id = '';
+    copy.title = sv.title + ' (복사본)';
+    copy.status = '대기중';
+    copy.date = '';
+    openSurveyBuilder(copy);
   }
   var surveyQCount = 0;
   function moveSurveyQ(btn) { var dir = btn.dataset.dir;
@@ -5340,7 +5288,57 @@
       addSurveyQuestion('text');
       addSurveyQuestion('dynamic');
     }
+    var tmplRow = document.getElementById('surveyTemplateRow');
+    if (tmplRow) tmplRow.style.display = sv ? 'none' : 'block';
     document.getElementById('surveyBuilderModal').style.display = 'flex';
+  }
+  function applySurveyTemplate(type) {
+    document.getElementById('surveyQuestionList').innerHTML = '';
+    surveyQCount = 0;
+    var templates = {
+      satisfaction: {
+        title: '수학 학습 만족도 조사',
+        guide: '솔직하게 답해주세요. 이 설문은 수업 개선을 위한 것입니다.',
+        questions: [
+          { type: 'score', text: '이번 수업의 전반적인 만족도는 어떤가요?', minLabel: '매우 별로', maxLabel: '매우 좋아요' },
+          { type: 'score', text: '수업 내용이 잘 이해됐나요?', minLabel: '전혀 모르겠다', maxLabel: '완벽히 이해' },
+          { type: 'text', text: '가장 어려웠던 부분은 무엇인가요?' },
+          { type: 'text', text: '선생님에게 하고 싶은 말이 있다면?' }
+        ]
+      },
+      activity: {
+        title: '학급 활동 평가',
+        guide: '오늘 활동에 대한 소감을 남겨주세요.',
+        questions: [
+          { type: 'score', text: '오늘 활동에 얼마나 적극적으로 참여했나요?', minLabel: '별로', maxLabel: '매우 열심히' },
+          { type: 'score', text: '활동이 즐거웠나요?', minLabel: '즐겁지 않았다', maxLabel: '매우 즐거웠다' },
+          { type: 'text', text: '활동에서 배운 점이나 느낀 점을 적어주세요.' }
+        ]
+      },
+      praise: {
+        title: '친구 칭찬 설문',
+        guide: '우리 반 친구들을 칭찬해 주세요. 진심을 담아 선택해주세요.',
+        questions: [
+          { type: 'dynamic', text: '수업 시간에 가장 열심히 참여한 친구를 선택해주세요.' },
+          { type: 'dynamic', text: '배려심이 깊고 친절한 친구를 선택해주세요.' },
+          { type: 'text', text: '친구에게 전하고 싶은 칭찬 한마디를 적어주세요.' }
+        ]
+      },
+      free: {
+        title: '자유 응답 설문',
+        guide: '',
+        questions: [
+          { type: 'text', text: '질문 1을 입력하세요.' },
+          { type: 'text', text: '질문 2를 입력하세요.' },
+          { type: 'text', text: '질문 3을 입력하세요.' }
+        ]
+      }
+    };
+    var tmpl = templates[type];
+    if (!tmpl) return;
+    document.getElementById('surveyTitle').value = tmpl.title;
+    document.getElementById('surveyGuide').value = tmpl.guide;
+    tmpl.questions.forEach(function(q) { addSurveyQuestion(q.type, q); });
   }
   function addSurveyChoice(n) {
     var list = document.getElementById('svq-choice-list-'+n);
@@ -5929,32 +5927,36 @@
       .getAppLinkUrl(meta.cell);
   }
   function openAppLinkSettings() {
-    var html = '<div style="font-size:14px; font-weight:700; margin-bottom:12px;">🔗 바로가기 URL 설정</div>';
-    html += '<div style="font-size:12px; color:#64748b; margin-bottom:16px;">시스템설정 시트에 직접 입력하거나 아래에서 수정하세요.</div>';
+    var html = ''
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">'
+        + '<div>'
+          + '<div style="font-size:17px;font-weight:800;color:#0f172a;">⚙️ 바로가기 URL 설정</div>'
+          + '<div style="font-size:12px;color:#64748b;margin-top:3px;">각 앱의 배포 URL을 입력하세요. 시스템설정 시트에 저장됩니다.</div>'
+        + '</div>'
+        + '<button onclick="document.getElementById(\'appLinkSettingsModal\').style.display=\'none\'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;line-height:1;">✕</button>'
+      + '</div>'
+      + '<div style="display:flex;flex-direction:column;gap:10px;">';
     Object.keys(APP_LINK_META).forEach(function(type) {
       var meta = APP_LINK_META[type];
       var cur = appLinkCache[type] || '';
-      html += '<div style="margin-bottom:10px;">';
-      html += '<div style="font-size:12px; font-weight:700; color:#334155; margin-bottom:4px;">' + meta.label + ' <span style="color:#94a3b8;">(' + meta.cell + ')</span></div>';
-      html += '<div style="display:flex; gap:6px;">';
-      html += '<input id="linkInput_' + type + '" type="text" value="' + cur + '" placeholder="https://..." style="flex:1; padding:8px; border:1px solid #e2e8f0; border-radius:8px; font-size:12px;">';
-      html += '<button onclick="saveOneLink(\'' + type + '\')" style="background:#0284c7; color:white; border:none; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap;">저장</button>';
-      html += '<button onclick="testOneLink(\'' + type + '\')" style="background:#e2e8f0; color:#374151; border:none; padding:8px 10px; border-radius:8px; font-size:12px; cursor:pointer;">열기</button>';
-      html += '</div></div></div>';
+      html += '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px;">'
+        + '<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:8px;">' + meta.label + '<span style="font-weight:400;color:#94a3b8;font-size:11px;margin-left:6px;">시트 ' + meta.cell + '셀</span></div>'
+        + '<div style="display:flex;gap:6px;align-items:center;">'
+          + '<input id="linkInput_' + type + '" type="text" value="' + cur + '" placeholder="https://script.google.com/macros/s/..." style="flex:1;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none;">'
+          + '<button onclick="saveOneLink(\'' + type + '\')" style="background:#1e3a8a;color:white;border:none;padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">저장</button>'
+          + '<button onclick="testOneLink(\'' + type + '\')" style="background:#e2e8f0;color:#374151;border:none;padding:8px 10px;border-radius:8px;font-size:12px;cursor:pointer;flex-shrink:0;">↗</button>'
+        + '</div>'
+        + '</div>';
     });
-    html += '<div style="margin-top:4px; font-size:11px; color:#94a3b8;">* 저장하면 시스템설정 시트에도 반영됩니다.</div>';
+    html += '</div>';
     var modal = document.getElementById('appLinkSettingsModal');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'appLinkSettingsModal';
-      modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; justify-content:center;';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
       document.body.appendChild(modal);
     }
-    modal.innerHTML = '<div style="background:white; border-radius:16px; padding:24px; width:100%; max-width:460px; max-height:80vh; overflow-y:auto; box-shadow:0 20px 40px rgba(0,0,0,0.2);">' +
-      html +
-      '<div style="display:flex; justify-content:flex-end; margin-top:16px;">' +
-      '<button onclick="document.getElementById(\'appLinkSettingsModal\').style.display=\'none\'" style="background:#e2e8f0; color:#374151; border:none; padding:10px 20px; border-radius:8px; font-weight:700; cursor:pointer;">닫기</button>' +
-      '</div></div>';
+    modal.innerHTML = '<div style="background:white;border-radius:20px;padding:24px;width:96%;max-width:480px;max-height:85vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,0.2);">' + html + '</div>';
     modal.style.display = 'flex';
     Object.keys(APP_LINK_META).forEach(function(type) {
       google.script.run
@@ -6223,279 +6225,6 @@
     });
     h += '</div></div>';
     result.innerHTML = h;
-  }
-  var calCurrentDate = new Date();
-  var calSelectedDate = '';
-  var calMemos = [];
-  var calMemosLoaded = false;
-  function loadCalendar() {
-    if (!observeCache) loadObserveRecords(false);
-    if (calMemosLoaded) { renderCalendar(); return; }
-    google.script.run
-      .withFailureHandler(function(e) { calMemosLoaded = true; renderCalendar(); })
-      .withSuccessHandler(function(res) {
-        calMemos = (res.success ? res.memos : []) || [];
-        calMemosLoaded = true;
-        renderCalendar();
-      })
-      .getCalendarMemos();
-  }
-  function buildCalEventMap() {
-    var map = {};
-    function addEv(dateStr, label, color, detail, src) {
-      if (!dateStr || dateStr.length < 10) return;
-      var d = dateStr.substring(0,10);
-      if (!map[d]) map[d] = [];
-      map[d].push({ label: label, color: color, detail: detail || '', src: src || '' });
-    }
-    (noticesCache || []).forEach(function(n) {
-      if (!n.date) return;
-      var label = (n.type === '아침조회' || n.type === '종례') ? n.type : ('알림: ' + (n.title||'').substring(0,10));
-      addEv(n.date, label, '#6366f1', n.title + (n.content ? '\n' + n.content : ''), 'notice');
-    });
-    if (observeCache) {
-      var mathMap = {};
-      observeCache.filter(function(r){ return r.type === '수학수업'; }).forEach(function(r) {
-        if (!mathMap[r.date]) mathMap[r.date] = [];
-        mathMap[r.date].push(r.studentName + ' [' + r.category + '] ' + r.content.substring(0,20));
-      });
-      Object.keys(mathMap).forEach(function(d) {
-        addEv(d, '수업관찰 ' + mathMap[d].length + '건', '#ec4899', mathMap[d].join('\n'), 'mathobs');
-      });
-      var hrMap = {};
-      observeCache.filter(function(r){ return r.type === '담임학급'; }).forEach(function(r) {
-        if (!hrMap[r.date]) hrMap[r.date] = [];
-        hrMap[r.date].push(r.studentName + ' [' + r.category + '] ' + r.content.substring(0,20));
-      });
-      Object.keys(hrMap).forEach(function(d) {
-        addEv(d, '담임관찰 ' + hrMap[d].length + '건', '#10b981', hrMap[d].join('\n'), 'hrobs');
-      });
-    }
-    allTasks.forEach(function(t) {
-      try {
-        var dl = JSON.parse(t.deadlines || '{}');
-        Object.keys(dl).forEach(function(cls) {
-          var dStr = (dl[cls] || '').substring(0,10);
-          if (dStr) addEv(dStr, '마감: ' + t.name.substring(0,8), '#f59e0b', t.name + ' (' + cls + ')', 'task');
-        });
-      } catch(e) {}
-    });
-    gSurveys.forEach(function(sv) {
-      if (sv.date) addEv(sv.date.substring(0,10), '설문: ' + (sv.title||'').substring(0,8), '#3b82f6', sv.title||'', 'survey');
-    });
-    calMemos.forEach(function(m) {
-      var color = m.type === '수업기록' ? '#ec4899' : m.type === '학사일정' ? '#3b82f6' : '#94a3b8';
-      addEv(m.date, m.type + (m.content ? ': ' + m.content.substring(0,10) : ''), color, m.content, 'memo');
-    });
-    return map;
-  }
-    function renderCalendar() {
-    var y = calCurrentDate.getFullYear();
-    var m = calCurrentDate.getMonth();
-    var monthNames = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
-    var titleEl = document.getElementById('calMonthTitle');
-    if (titleEl) titleEl.textContent = y + '년 ' + monthNames[m];
-    var grid = document.getElementById('calGrid');
-    if (!grid) return;
-    var eventMap = buildCalEventMap();
-    var firstDay = new Date(y, m, 1).getDay();
-    var lastDate = new Date(y, m + 1, 0).getDate();
-    var prevLastDate = new Date(y, m, 0).getDate();
-    var t2 = new Date();
-    var todayStr = t2.getFullYear() + '-' + String(t2.getMonth()+1).padStart(2,'0') + '-' + String(t2.getDate()).padStart(2,'0');
-    var totalCells = Math.ceil((firstDay + lastDate) / 7) * 7;
-    var cells = '';
-    for (var i = 0; i < totalCells; i++) {
-      var dayNum, dateStr, isOther = false;
-      if (i < firstDay) {
-        dayNum = prevLastDate - firstDay + i + 1;
-        var pm = m === 0 ? 12 : m; var py = m === 0 ? y - 1 : y;
-        dateStr = py + '-' + String(pm).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
-        isOther = true;
-      } else if (i >= firstDay + lastDate) {
-        dayNum = i - firstDay - lastDate + 1;
-        var nm = m === 11 ? 1 : m + 2; var ny = m === 11 ? y + 1 : y;
-        dateStr = ny + '-' + String(nm).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
-        isOther = true;
-      } else {
-        dayNum = i - firstDay + 1;
-        dateStr = y + '-' + String(m+1).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
-      }
-      var dow = i % 7;
-      var isToday = dateStr === todayStr;
-      var isSelected = dateStr === calSelectedDate;
-      var events = eventMap[dateStr] || [];
-      var dateColor = dow === 0 ? '#ef4444' : (dow === 6 ? '#3b82f6' : '#475569');
-      var dotColors = [];
-      events.forEach(function(ev) { if (dotColors.indexOf(ev.color) < 0) dotColors.push(ev.color); });
-      var dotsHtml = dotColors.slice(0,5).map(function(col) {
-        return '<span class="cal-dot" style="background:' + col + ';"></span>';
-      }).join('');
-      var labelsHtml = events.slice(0,2).map(function(ev) {
-        return '<span class="cal-event-label" style="background:' + ev.color + '22;color:' + ev.color + ';">' + ev.label + '</span>';
-      }).join('');
-      if (events.length > 2) labelsHtml += '<span style="font-size:9px;color:#94a3b8;">+' + (events.length-2) + '</span>';
-      var cls = 'cal-cell' + (isOther?' other-month':'') + (isToday?' today':'') + (isSelected?' selected':'');
-      cells += '<div class="' + cls + '" onclick="selectCalDay(\'' + dateStr + '\')">' +
-        '<div class="cal-date" style="color:' + dateColor + ';">' + dayNum + '</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:1px;margin-bottom:2px;">' + dotsHtml + '</div>' +
-        labelsHtml + '</div>';
-    }
-    grid.innerHTML = cells;
-    if (calSelectedDate) showCalDayDetail(calSelectedDate);
-  }
-  function calNav(dir) {
-    calCurrentDate = new Date(calCurrentDate.getFullYear(), calCurrentDate.getMonth() + dir, 1);
-    renderCalendar();
-  }
-  function selectCalDay(dateStr) {
-    calSelectedDate = dateStr;
-    renderCalendar();
-    showCalDayDetail(dateStr);
-  }
-  function showCalDayDetail(dateStr) {
-    var panel    = document.getElementById('calDayDetail');
-    var titleEl  = document.getElementById('calDayTitle');
-    var eventsEl = document.getElementById('calDayEvents');
-    if (!panel || !titleEl || !eventsEl) return;
-    panel.style.display = 'block';
-    var d    = new Date(dateStr + 'T00:00:00');
-    var days = ['일','월','화','수','목','금','토'];
-    titleEl.textContent = dateStr + ' (' + days[d.getDay()] + ')';
-    var noticeEvs = (noticesCache || []).filter(function(n){ return n.date === dateStr; });
-    var mathEvs   = observeCache ? observeCache.filter(function(r){ return r.date===dateStr && r.type==='수학수업'; }) : [];
-    var hrEvs     = observeCache ? observeCache.filter(function(r){ return r.date===dateStr && r.type==='담임학급'; }) : [];
-    var taskEvs   = [];
-    allTasks.forEach(function(t) {
-      try {
-        var dl = JSON.parse(t.deadlines||'{}');
-        Object.keys(dl).forEach(function(cls) {
-          if ((dl[cls]||'').substring(0,10)===dateStr) taskEvs.push({ name: t.name, cls: cls });
-        });
-      } catch(e) {}
-    });
-    var surveyEvs = gSurveys.filter(function(sv){ return (sv.date||'').substring(0,10)===dateStr; });
-    var memoEvs   = calMemos.filter(function(m){ return m.date===dateStr; });
-    var total = noticeEvs.length + mathEvs.length + hrEvs.length + taskEvs.length + surveyEvs.length + memoEvs.length;
-    if (total === 0) {
-      eventsEl.innerHTML = '<div style="text-align:center;padding:20px;color:#94a3b8;font-size:13px;">이 날 일정이 없습니다.</div>';
-      return;
-    }
-    function makeAccordion(color, label, icon, summary, detail, editBtns) {
-      var uid = 'ev_' + Math.random().toString(36).slice(2,7);
-      return '<div style="border-left:4px solid '+color+';border-radius:0 8px 8px 0;margin-bottom:8px;background:#fafafa;overflow:hidden;">'
-        + '<div data-uid="'+uid+'" onclick="toggleCalEv(this.dataset.uid)" style="display:flex;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;background:white;border-bottom:1px solid #f1f5f9;">'
-          + '<span style="background:'+color+'22;color:'+color+';padding:2px 10px;border-radius:10px;font-size:11px;font-weight:800;white-space:nowrap;">'+icon+' '+label+'</span>'
-          + '<span style="flex:1;font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+summary+'</span>'
-          + '<span style="font-size:12px;color:#94a3b8;">▾</span>'
-        + '</div>'
-        + '<div id="'+uid+'" style="display:none;padding:10px 14px;font-size:13px;color:#334155;line-height:1.7;white-space:pre-wrap;">'+detail+'</div>'
-        + (editBtns ? '<div style="padding:6px 12px;border-top:1px solid #f1f5f9;">'+editBtns+'</div>' : '')
-        + '</div>';
-    }
-    var html = '';
-    noticeEvs.forEach(function(n) {
-      var lbl  = n.type || '알림';
-      var icon = lbl==='아침조회' ? '🌅' : lbl==='종례' ? '🌇' : '📢';
-      var detail = (n.title ? n.title : '') + (n.content ? ' ' + n.content : '') || '내용 없음';
-      html += makeAccordion('#6366f1', lbl, icon, n.title||'', detail, '');
-    });
-    if (mathEvs.length > 0) {
-      var mathDetail = mathEvs.map(function(r){
-        return '▸ ' + r.studentId + ' ' + r.studentName + '  [' + r.category + ']\n' + r.content;
-      }).join('\n\n');
-      html += makeAccordion('#ec4899', '수업관찰 '+mathEvs.length+'건', '📐',
-        mathEvs.slice(0,3).map(function(r){return r.studentName;}).join(', ')+(mathEvs.length>3?' 외':''),
-        mathDetail, '');
-    }
-    if (hrEvs.length > 0) {
-      var hrDetail = hrEvs.map(function(r){
-        return '▸ ' + r.studentId + ' ' + r.studentName + '  [' + r.category + ']\n' + r.content;
-      }).join('\n\n');
-      html += makeAccordion('#10b981', '담임관찰 '+hrEvs.length+'건', '📓',
-        hrEvs.slice(0,3).map(function(r){return r.studentName;}).join(', ')+(hrEvs.length>3?' 외':''),
-        hrDetail, '');
-    }
-    taskEvs.forEach(function(t) {
-      html += makeAccordion('#f59e0b', '과제마감', '📝', t.name, t.name + ' (' + t.cls + ')', '');
-    });
-    surveyEvs.forEach(function(sv) {
-      html += makeAccordion('#3b82f6', '설문', '📋', sv.title||'', sv.title||'', '');
-    });
-    memoEvs.forEach(function(m) {
-      var color   = m.type === '수업기록' ? '#ec4899' : m.type === '학사일정' ? '#3b82f6' : '#94a3b8';
-      var icon2   = m.type === '수업기록' ? '📖' : m.type === '학사일정' ? '🏫' : '📌';
-      var editBtns = '<button data-ridx="'+m.rowIdx+'" data-date="'+dateStr+'" onclick="openCalendarMemoModal(parseInt(this.dataset.ridx), this.dataset.date)" style="background:#e2e8f0;color:#374151;border:none;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;margin-right:4px;">수정</button>'
-        + '<button data-ridx="'+m.rowIdx+'" onclick="deleteCalMemo(parseInt(this.dataset.ridx))" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;">삭제</button>';
-      html += makeAccordion(color, m.type, icon2, m.content.substring(0,20), m.content, editBtns);
-    });
-    eventsEl.innerHTML = html;
-  }
-    function toggleCalEv(uid) {
-    var el = document.getElementById(uid);
-    if (!el) return;
-    var isOpen = el.style.display !== 'none';
-    el.style.display = isOpen ? 'none' : 'block';
-    var btn = el.previousElementSibling;
-    if (btn) {
-      var arrow = btn.querySelector('span:last-child');
-      if (arrow) arrow.textContent = isOpen ? '▾' : '▴';
-    }
-  }
-    function openCalendarMemoModal(rowIdx, dateStr) {
-    document.getElementById('calMemoRowIdx').value = rowIdx || '';
-    document.getElementById('calMemoDate').value = dateStr || calSelectedDate || '';
-    document.getElementById('calMemoContent').value = '';
-    document.querySelectorAll('.cal-type-btn').forEach(function(b, i){ b.classList.toggle('active', i===0); });
-    if (rowIdx) {
-      var memo = calMemos.find(function(m){ return m.rowIdx === rowIdx; });
-      if (memo) {
-        document.getElementById('calMemoDate').value = memo.date;
-        document.getElementById('calMemoContent').value = memo.content;
-        document.querySelectorAll('.cal-type-btn').forEach(function(b){
-          b.classList.toggle('active', b.dataset.type === memo.type);
-        });
-      }
-    }
-    document.getElementById('calMemoModal').style.display = 'flex';
-  }
-  function selectCalType(btn) {
-    document.querySelectorAll('.cal-type-btn').forEach(function(b){ b.classList.remove('active'); });
-    btn.classList.add('active');
-  }
-  function saveCalMemo() {
-    var rowIdx  = document.getElementById('calMemoRowIdx').value;
-    var date    = document.getElementById('calMemoDate').value;
-    var content = document.getElementById('calMemoContent').value.trim();
-    var typeBtn = document.querySelector('.cal-type-btn.active');
-    var type    = typeBtn ? typeBtn.dataset.type : '기타메모';
-    var color   = typeBtn ? typeBtn.dataset.color : '#94a3b8';
-    if (!date)    return alert('날짜를 선택하세요.');
-    if (!content) return alert('내용을 입력하세요.');
-    var saveBtn = document.getElementById('calMemoSaveBtn');
-    saveBtn.disabled = true; saveBtn.textContent = '저장 중...';
-    var data = { date: date, type: type, content: content, color: color };
-    if (rowIdx) data.rowIdx = parseInt(rowIdx);
-    google.script.run
-      .withFailureHandler(function(e) { saveBtn.disabled=false; saveBtn.textContent='💾 저장'; alert('오류: '+e.message); })
-      .withSuccessHandler(function(res) {
-        saveBtn.disabled=false; saveBtn.textContent='💾 저장';
-        if (!res.success) { alert('오류: '+(res.message||'')); return; }
-        document.getElementById('calMemoModal').style.display='none';
-        calMemosLoaded = false; loadCalendar();
-      })
-      .saveCalendarMemo(data);
-  }
-  function deleteCalMemo(rowIdx) {
-    if (!confirm('이 일정을 삭제할까요?')) return;
-    google.script.run
-      .withSuccessHandler(function(res) {
-        if (res.success) {
-          calMemos = calMemos.filter(function(m){ return m.rowIdx !== rowIdx; });
-          renderCalendar(); showCalDayDetail(calSelectedDate);
-        }
-      })
-      .deleteCalendarMemo(rowIdx);
   }
   var aiAnalysisResult = null; // 마지막 분석 결과 저장
   function initAiTaskPage() {
@@ -7389,31 +7118,32 @@
         + '</div>';
     }
     
-    html += '<div style="background:white;border:2px solid #6366f1;border-radius:10px;padding:12px;margin-bottom:12px;">'
-      + '<div style="font-size:12px;font-weight:700;color:#6366f1;margin-bottom:8px;">✏️ 교사 최종 결정 (이 내용이 저장됨)</div>'
-      + '<textarea id="aiGradeTeacherFb_'+rowIdx+'" class="form-input" rows="4" style="font-size:13px;margin-bottom:8px;width:100%;box-sizing:border-box;" '
-      + 'placeholder="AI 피드백을 참고해서 작성하거나, 아래 버튼으로 복사하세요."></textarea>'
-      + '<button data-rid="'+rowIdx+'" onclick="copyAiFeedback(this.dataset.rid)" '
-      + 'style="background:#f1f5f9;color:#475569;border:none;padding:5px 12px;border-radius:6px;'
-      + 'font-size:11px;font-weight:700;cursor:pointer;">← AI 내용 복사</button>'
-      + '</div>';
-      
     if (aiBatchReturnState) {
+      html += '<div style="background:white;border:2px solid #6366f1;border-radius:10px;padding:12px;margin-bottom:12px;">'
+        + '<div style="font-size:12px;font-weight:700;color:#6366f1;margin-bottom:8px;">✏️ 교사 최종 결정 (이 내용이 저장됨)</div>'
+        + '<textarea id="aiGradeTeacherFb_'+rowIdx+'" class="form-input" rows="4" style="font-size:13px;margin-bottom:8px;width:100%;box-sizing:border-box;" '
+        + 'placeholder="AI 피드백을 참고해서 작성하거나, 아래 버튼으로 복사하세요."></textarea>'
+        + '<button data-rid="'+rowIdx+'" onclick="copyAiFeedback(this.dataset.rid)" '
+        + 'style="background:#f1f5f9;color:#475569;border:none;padding:5px 12px;border-radius:6px;'
+        + 'font-size:11px;font-weight:700;cursor:pointer;">← AI 내용 복사</button>'
+        + '</div>';
       html += '<button onclick="returnToBatch()" '
         + 'style="width:100%;margin-bottom:10px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;'
         + 'padding:10px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;">← 일괄채점 화면으로 돌아가기</button>';
+      html += '<div style="display:flex;gap:8px;">'
+        + '<button onclick="confirmAiGrade('+rowIdx+',false)" '
+        + 'style="flex:2;background:#10b981;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">✅ 확정 저장</button>'
+        + (result.needsReview
+            ? '<button onclick="confirmAiGrade('+rowIdx+',true)" '
+              + 'style="flex:1;background:#ef4444;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">↩️ 반려</button>'
+            : '')
+        + '<button onclick="openMultiDrawModal('+rowIdx+')" '
+        + 'style="flex:1;background:#6366f1;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">✍️ 펜에디터</button>'
+        + '</div>';
+    } else {
+      html += '<button onclick="document.getElementById(\'aiGradeModal\').style.display=\'none\'" '
+        + 'style="width:100%;background:#0f172a;color:white;border:none;padding:13px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">확인</button>';
     }
-    
-    html += '<div style="display:flex;gap:8px;">'
-      + '<button onclick="confirmAiGrade('+rowIdx+',false)" '
-      + 'style="flex:2;background:#10b981;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">✅ 확정 저장</button>'
-      + (result.needsReview
-          ? '<button onclick="confirmAiGrade('+rowIdx+',true)" '
-            + 'style="flex:1;background:#ef4444;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">↩️ 반려</button>'
-          : '')
-      + '<button onclick="openMultiDrawModal('+rowIdx+')" '
-      + 'style="flex:1;background:#6366f1;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">✍️ 펜에디터</button>'
-      + '</div>';
       
     document.getElementById('aiGradeModalContent').innerHTML = html;
     document.getElementById('aiGradeModal').style.display = 'flex';
