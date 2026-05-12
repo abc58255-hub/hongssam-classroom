@@ -6882,15 +6882,15 @@
     addNext(0);
   }
   var OR_MODEL_PRICE = {
-    'google/gemini-2.5-flash':      { in: 0.15,  out: 0.60,  img: 0.039 },
-    'google/gemini-2.5-pro':        { in: 1.25,  out: 10.00, img: 0.039 },
-    'google/gemini-2.0-flash-001':  { in: 0.10,  out: 0.40,  img: 0.039 },
-    'anthropic/claude-sonnet-4-6':  { in: 3.00,  out: 15.00, img: 4.80  },
-    'anthropic/claude-sonnet-4-5':  { in: 3.00,  out: 15.00, img: 4.80  },
-    'anthropic/claude-3.5-sonnet':  { in: 3.00,  out: 15.00, img: 4.80  },
-    'anthropic/claude-3-haiku':     { in: 0.25,  out: 1.25,  img: 0.40  },
-    'openai/gpt-4o':                { in: 2.50,  out: 10.00, img: 3.613 },
-    'openai/gpt-4o-mini':           { in: 0.15,  out: 0.60,  img: 0.217 }
+    'google/gemini-2.5-flash':      { in: 0.15,  out: 0.60  },
+    'google/gemini-2.5-pro':        { in: 1.25,  out: 10.00 },
+    'google/gemini-2.0-flash-001':  { in: 0.10,  out: 0.40  },
+    'anthropic/claude-sonnet-4-6':  { in: 3.00,  out: 15.00 },
+    'anthropic/claude-sonnet-4-5':  { in: 3.00,  out: 15.00 },
+    'anthropic/claude-3.5-sonnet':  { in: 3.00,  out: 15.00 },
+    'anthropic/claude-3-haiku':     { in: 0.25,  out: 1.25  },
+    'openai/gpt-4o':                { in: 2.50,  out: 10.00 },
+    'openai/gpt-4o-mini':           { in: 0.15,  out: 0.60  }
   };
 
   function updateModelPriceHint() {
@@ -6899,11 +6899,15 @@
     if (!sel || !hint) return;
     var p = OR_MODEL_PRICE[sel.value];
     if (!p) { hint.style.display = 'none'; return; }
+    // 채점 1건 기준: 입력 ~2,500 토큰 (프롬프트+이미지), 출력 ~300 토큰
+    var EST_IN = 2500, EST_OUT = 300;
+    var cost = (EST_IN * p.in + EST_OUT * p.out) / 1000000;
+    var costKRW = cost * 1400;
     hint.style.display = 'block';
     hint.innerHTML =
-      '입력 <b>$' + p.in.toFixed(2) + '</b> / 출력 <b>$' + p.out.toFixed(2) + '</b>'
-      + ' / 이미지 <b>$' + p.img.toFixed(3) + '</b>'
-      + ' &nbsp;<span style="color:#94a3b8">(1M 토큰 기준 · USD)</span>';
+      '채점 1건당 약 <b style="color:#4f46e5;">$' + cost.toFixed(5) + '</b>'
+      + ' <span style="color:#94a3b8;">(≈ ' + costKRW.toFixed(1) + '원)</span>'
+      + '<br><span style="color:#94a3b8;font-size:10px;">입력 2,500 · 출력 300 토큰 기준 추정 · 이미지 수에 따라 달라질 수 있음</span>';
   }
 
   function loadOrBalance() {
