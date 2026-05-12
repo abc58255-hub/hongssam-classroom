@@ -1333,29 +1333,22 @@
   }
 
   function initFirebaseAndRegisterToken(studentId) {
-    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    if (isIOS) {
-      // iOS는 iframe 방식 불가 — PWA 설치 유도 배너 표시
-      if (localStorage.getItem('fcm_registered_ios_' + studentId)) return;
-      showIosFcmBanner(studentId);
-      return;
-    }
-    setupFcmIframe();
-    if (fcmFrameReady) {
-      fcmFrame.contentWindow.postMessage({ type: 'INIT_FCM', studentId: studentId }, '*');
-    } else {
-      pendingFcmStudentId = studentId;
-    }
+    if (localStorage.getItem('fcm_registered_ios_' + studentId)) return;
+    showFcmBanner(studentId);
   }
 
-  function showIosFcmBanner(studentId) {
+  function showFcmBanner(studentId) {
     if (document.getElementById('iosFcmBanner')) return;
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     var pwaUrl = 'https://abc58255-hub.github.io/fcm-sw/?sid=' + encodeURIComponent(studentId);
+    var desc = isIOS
+      ? '알림을 받으려면 한 번만 설정이 필요해요'
+      : '알림을 받으려면 한 번만 허용이 필요해요';
     var banner = document.createElement('div');
     banner.id = 'iosFcmBanner';
     banner.style.cssText = 'position:fixed;bottom:70px;left:12px;right:12px;background:#1e3a8a;color:white;border-radius:14px;padding:14px 16px;z-index:9000;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
     banner.innerHTML = '<span style="font-size:24px;">🔔</span>'
-      + '<div style="flex:1"><div style="font-weight:bold;font-size:14px;">아이폰 알림 설정</div><div style="font-size:12px;opacity:.85;margin-top:2px;">알림을 받으려면 한 번만 설정이 필요해요</div></div>'
+      + '<div style="flex:1"><div style="font-weight:bold;font-size:14px;">알림 설정</div><div style="font-size:12px;opacity:.85;margin-top:2px;">' + desc + '</div></div>'
       + '<a href="' + pwaUrl + '" target="_blank" style="background:white;color:#1e3a8a;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:bold;text-decoration:none;white-space:nowrap;">설정하기</a>'
       + '<button onclick="document.getElementById(\'iosFcmBanner\').remove()" style="background:none;border:none;color:white;font-size:18px;cursor:pointer;padding:0 4px;">✕</button>';
     document.body.appendChild(banner);
