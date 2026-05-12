@@ -6,40 +6,69 @@
   <style>
     :root { --primary: #5c6ac4; --text-main: #2d3748; }
     body { font-family: 'Pretendard', sans-serif; background: linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%); color: var(--text-main); margin: 0; padding: 2.5vw 4vw; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; overflow: hidden; }
-    
+
     .header-container { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 2.5vw; }
     .header-title { font-size: 3.5vw; font-weight: 800; color: #1a202c; margin: 0; }
     .header-date { font-size: 1.8vw; font-weight: 700; color: #4a5568; background: rgba(255,255,255,0.6); padding: 0.8vw 1.8vw; border-radius: 50px; }
-    
+
     .content-container { display: flex; gap: 2.5vw; flex: 1; min-height: 0; }
-    
-    /* 기존 7 비율 복구 */
+
     .text-section { flex: 7; display: flex; flex-direction: row; gap: 2.5vw; min-height: 0; }
     .card { background: rgba(255,255,255,0.95); padding: 2.5vw; border-radius: 2vw; flex: 1; display: flex; flex-direction: column; min-height: 0; box-shadow: 0 10px 30px rgba(0,0,0,0.05); }
     .card-title { font-size: 2vw; font-weight: 800; color: var(--primary); margin-bottom: 1.5vw; border-bottom: 2px solid rgba(0,0,0,0.1); padding-bottom: 1vw; flex-shrink: 0; }
-    
+
     .scroll-wrapper { flex: 1; position: relative; overflow: hidden; }
     .scroll-content { position: absolute; top: 0; left: 0; width: 100%; font-size: 2.5vw; line-height: 1.6; font-weight: 600; white-space: pre-wrap; word-break: keep-all; }
-    
-    /* 기존 3 비율 복구 */
+
     .media-section { flex: 3; display: flex; flex-direction: column; gap: 1.5vw; min-height: 0; }
-    
-    .slideshow-wrapper { flex: 1; background: #000; border-radius: 1.5vw; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.15); transition: all 0.5s ease; }
+
+    .slideshow-wrapper { flex: 1; background: #000; border-radius: 1.5vw; position: relative; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
     iframe { width: 100%; height: 100%; border: none; }
-    
-    .video-wrapper { background: #000; border-radius: 1.5vw; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.15); transition: all 0.5s ease; display: none; }
-    
-    .empty-msg { color: #fff; font-size: 1.5vw; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; line-height: 1.5;}
+
+    .video-wrapper { background: #000; border-radius: 1.5vw; overflow: hidden; box-shadow: 0 10px 20px rgba(0,0,0,0.15); display: none; }
+
+    .empty-msg { color: #fff; font-size: 1.5vw; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; line-height: 1.5; }
     .audio-notice { position: absolute; top: 10px; right: 10px; background: rgba(255,0,0,0.8); color: white; padding: 10px; border-radius: 10px; z-index: 1000; cursor: pointer; display: none; }
+
+    /* ── 리모컨 UI ── */
+    #remoteBtn {
+      position: fixed; bottom: 2vw; right: 2vw; z-index: 500;
+      background: rgba(0,0,0,0.45); color: white; border: 2px solid rgba(255,255,255,0.25);
+      border-radius: 50px; padding: 0.6vw 1.4vw; font-size: 1.3vw; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; gap: 0.5vw;
+      backdrop-filter: blur(6px); transition: 0.2s; user-select: none;
+    }
+    #remoteBtn:hover { background: rgba(0,0,0,0.65); }
+    #remoteBtn.paused { background: rgba(220,38,38,0.75); border-color: rgba(255,100,100,0.5); }
+
+    #pauseOverlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.55); z-index: 400; display: none;
+      align-items: center; justify-content: center; flex-direction: column; gap: 2vw;
+    }
+    #pauseOverlay .pause-card {
+      background: white; border-radius: 2vw; padding: 3vw 4vw; text-align: center;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    }
+    #pauseOverlay .pause-icon { font-size: 5vw; margin-bottom: 1vw; }
+    #pauseOverlay .pause-title { font-size: 2.5vw; font-weight: 800; color: #dc2626; margin-bottom: 0.8vw; }
+    #pauseOverlay .pause-hint { font-size: 1.4vw; color: #64748b; line-height: 1.7; }
+    #pauseOverlay .pause-hint b { color: #1e3a8a; }
+    #pauseOverlay .resume-btn {
+      margin-top: 2vw; padding: 1vw 3vw; background: #1e3a8a; color: white;
+      border: none; border-radius: 50px; font-size: 1.8vw; font-weight: 800;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 0.5vw;
+    }
   </style>
 </head>
 <body>
   <div id="audioNotice" class="audio-notice" onclick="this.style.display='none';">🔊 화면을 클릭하면 BGM이 켜집니다!</div>
+
   <div class="header-container">
     <h1 class="header-title">우리반 알림판</h1>
     <div class="header-date" id="dateHeader"></div>
   </div>
-  
+
   <div class="content-container">
     <div class="text-section">
       <div class="card">
@@ -55,7 +84,7 @@
         </div>
       </div>
     </div>
-    
+
     <div class="media-section" id="mediaSection">
       <div class="slideshow-wrapper" id="slideshowContainer">
         <div class="empty-msg">📷 화면 준비중</div>
@@ -64,80 +93,160 @@
     </div>
   </div>
 
+  <!-- 일시정지 오버레이 -->
+  <div id="pauseOverlay">
+    <div class="pause-card">
+      <div class="pause-icon">⏸</div>
+      <div class="pause-title">슬라이드 일시정지</div>
+      <div class="pause-hint">
+        리모컨/키보드로 슬라이드를 직접 제어할 수 있습니다.<br>
+        <b>← →</b> 이전 / 다음 슬라이드 &nbsp;·&nbsp; <b>Space / Esc / B / .</b> 재개
+      </div>
+      <button class="resume-btn" onclick="togglePause()">▶ 재개하기</button>
+    </div>
+  </div>
+
+  <!-- 리모컨 버튼 (화면 우하단) -->
+  <div id="remoteBtn" onclick="togglePause()" title="Space / Esc / B 키로도 전환">
+    <span id="remoteBtnIcon">⏸</span>
+    <span id="remoteBtnText">일시정지</span>
+  </div>
+
   <script>
+    /* ── 시계 ── */
     function updateClock() {
       var now = new Date();
-      var days = ['일', '월', '화', '수', '목', '금', '토'];
-      document.getElementById('dateHeader').innerText = now.getFullYear() + '. ' + (now.getMonth() + 1) + '. ' + now.getDate() + ' (' + days[now.getDay()] + ')';
+      var days = ['일','월','화','수','목','금','토'];
+      document.getElementById('dateHeader').innerText =
+        now.getFullYear() + '. ' + (now.getMonth()+1) + '. ' + now.getDate() +
+        ' (' + days[now.getDay()] + ')';
     }
     updateClock();
 
-    var currentSlideUrl = "";
-    var currentVideo = "";
-    var currentMode = "";
+    /* ── 상태 ── */
+    var currentSlideUrl = '';
+    var currentVideo    = '';
+    var currentMode     = '';
+    var isPaused        = false;
 
-    function loadData() { google.script.run.withSuccessHandler(displayData).getTodayData(); }
+    /* ── 슬라이드 URL 빌더 ── */
+    function buildSlideUrl(raw, autoPlay) {
+      var url = raw;
+      if (url.indexOf('<iframe') !== -1) {
+        var m = url.match(/src="([^"]+)"/);
+        if (m) url = m[1];
+      }
+      // embed URL 변환
+      if (url.indexOf('/pub') !== -1) {
+        url = url.replace('/pub', '/embed');
+      } else if (url.indexOf('/edit') !== -1) {
+        url = url.substring(0, url.indexOf('/edit')) + '/embed';
+      }
+      // 기존 쿼리 제거 후 재구성
+      url = url.split('?')[0];
+      if (autoPlay) {
+        url += '?start=true&loop=true&delayms=5000&rm=minimal';
+      } else {
+        // 일시정지 모드: 자동넘김 없음 → 리모컨 화살표로 직접 제어 가능
+        url += '?start=false&loop=false&rm=minimal';
+      }
+      return url;
+    }
 
+    /* ── 슬라이드 iframe 갱신 ── */
+    function applySlide() {
+      var container = document.getElementById('slideshowContainer');
+      if (!currentSlideUrl) {
+        container.innerHTML = '<div class="empty-msg">📷<br>프레젠테이션 주소가<br>입력되지 않았습니다.</div>';
+        return;
+      }
+      var url = buildSlideUrl(currentSlideUrl, !isPaused);
+      container.innerHTML = '<iframe src="' + url + '" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>';
+    }
+
+    /* ── 일시정지 토글 ── */
+    function togglePause() {
+      isPaused = !isPaused;
+      var overlay = document.getElementById('pauseOverlay');
+      var btn     = document.getElementById('remoteBtn');
+      var icon    = document.getElementById('remoteBtnIcon');
+      var txt     = document.getElementById('remoteBtnText');
+
+      if (isPaused) {
+        overlay.style.display = 'flex';
+        btn.classList.add('paused');
+        icon.textContent = '▶';
+        txt.textContent  = '재개';
+      } else {
+        overlay.style.display = 'none';
+        btn.classList.remove('paused');
+        icon.textContent = '⏸';
+        txt.textContent  = '일시정지';
+      }
+      applySlide();
+    }
+
+    /* ── 키보드 / 리모컨 단축키 ── */
+    document.addEventListener('keydown', function(e) {
+      // 일시정지: Space, Esc, B, . (블루투스 리모컨의 Blackout/Stop 키)
+      if (e.key === ' ' || e.key === 'Escape' ||
+          e.key === 'b' || e.key === 'B' || e.key === '.') {
+        e.preventDefault();
+        togglePause();
+      }
+    });
+
+    /* ── 스크롤 애니메이션 ── */
     function applyAutoScroll(wrapperId, contentId) {
       var wrapper = document.getElementById(wrapperId);
       var content = document.getElementById(contentId);
       if (content._scroller) clearInterval(content._scroller);
       var y = 0, mode = 'wait_top', ticks = 0;
       content._scroller = setInterval(function() {
-        var wH = wrapper.clientHeight; var cH = content.scrollHeight;
+        var wH = wrapper.clientHeight, cH = content.scrollHeight;
         if (cH <= wH) { content.style.top = '0px'; return; }
-        if (mode === 'wait_top') { ticks++; if (ticks > 100) { mode = 'scroll'; ticks = 0; }
-        } else if (mode === 'scroll') { y -= 0.5; content.style.top = y + 'px'; if (-y >= (cH - wH + 20)) mode = 'wait_bottom';
-        } else if (mode === 'wait_bottom') { ticks++; if (ticks > 100) { mode = 'reset'; ticks = 0; }
-        } else if (mode === 'reset') { y += 10; content.style.top = y + 'px'; if (y >= 0) { y = 0; content.style.top = '0px'; mode = 'wait_top'; } }
+        if      (mode === 'wait_top')    { ticks++; if (ticks > 100) { mode = 'scroll'; ticks = 0; } }
+        else if (mode === 'scroll')      { y -= 0.5; content.style.top = y + 'px'; if (-y >= cH - wH + 20) mode = 'wait_bottom'; }
+        else if (mode === 'wait_bottom') { ticks++; if (ticks > 100) { mode = 'reset'; ticks = 0; } }
+        else if (mode === 'reset')       { y += 10; content.style.top = y + 'px'; if (y >= 0) { y = 0; content.style.top = '0px'; mode = 'wait_top'; } }
       }, 30);
     }
 
+    /* ── 데이터 표시 ── */
     function displayData(data) {
-      if (data && data.error) { 
-        document.getElementById('announcement').innerHTML = '<span style="color:red;">🚨 오류: ' + data.error + '</span>'; 
-        return; 
+      if (data && data.error) {
+        document.getElementById('announcement').innerHTML = '<span style="color:red;">🚨 오류: ' + data.error + '</span>';
+        return;
       }
 
       document.getElementById('announcement').innerText = data.announcement;
-      document.getElementById('notice').innerText = data.notice;
-      setTimeout(function() { applyAutoScroll('annWrapper', 'announcement'); applyAutoScroll('notWrapper', 'notice'); }, 500);
+      document.getElementById('notice').innerText       = data.notice;
+      setTimeout(function() {
+        applyAutoScroll('annWrapper', 'announcement');
+        applyAutoScroll('notWrapper', 'notice');
+      }, 500);
 
-      var slideContainer = document.getElementById('slideshowContainer');
-      if (data.slideUrl) {
-        if (currentSlideUrl !== data.slideUrl) {
-          currentSlideUrl = data.slideUrl;
-          var finalUrl = currentSlideUrl;
-          
-          if(finalUrl.indexOf('/pub') !== -1) {
-             finalUrl = finalUrl.replace('/pub', '/embed');
-          } else if(finalUrl.indexOf('/edit') !== -1) {
-             finalUrl = finalUrl.substring(0, finalUrl.indexOf('/edit')) + '/embed?start=true&loop=true&delayms=5000';
-          }
-          
-          if(finalUrl.indexOf('?') !== -1) finalUrl += "&rm=minimal";
-          else finalUrl += "?rm=minimal";
-          
-          slideContainer.innerHTML = '<iframe src="' + finalUrl + '" allowfullscreen="true" mozallowfullscreen="true" webkitallowfullscreen="true"></iframe>';
-        }
-      } else {
-        slideContainer.innerHTML = '<div class="empty-msg">📷<br>프레젠테이션 주소가<br>입력되지 않았습니다.</div>';
-        currentSlideUrl = "";
+      // 슬라이드 변경됐을 때만 다시 로드 (일시정지 상태 유지)
+      if (data.slideUrl !== currentSlideUrl) {
+        currentSlideUrl = data.slideUrl || '';
+        applySlide();
       }
 
+      // 유튜브
       var vidWrapper = document.getElementById('videoContainer');
-      var mode = data.videoMode || "소리만";
+      var mode = data.videoMode || '소리만';
+      var slideContainer = document.getElementById('slideshowContainer');
 
       if (currentVideo !== data.videoUrl || currentMode !== mode) {
         currentVideo = data.videoUrl; currentMode = mode;
         if (data.videoUrl) {
-          var vidId = "";
+          var vidId = '';
           if (data.videoUrl.indexOf('watch?v=') !== -1) vidId = data.videoUrl.split('v=')[1].split('&')[0];
           else if (data.videoUrl.indexOf('youtu.be/') !== -1) vidId = data.videoUrl.split('youtu.be/')[1].split('?')[0];
-          
           if (vidId) {
             document.getElementById('audioNotice').style.display = 'block';
-            vidWrapper.innerHTML = '<iframe src="https://www.youtube.com/embed/' + vidId + '?autoplay=1&mute=0&loop=1&playlist=' + vidId + '"></iframe>';
+            vidWrapper.innerHTML = '<iframe src="https://www.youtube.com/embed/' + vidId +
+              '?autoplay=1&mute=0&loop=1&playlist=' + vidId + '"></iframe>';
           }
           if (mode === '가득차게') { slideContainer.style.display = 'none'; vidWrapper.style.display = 'block'; vidWrapper.style.flex = '1'; }
           else if (mode === '보이기') { slideContainer.style.display = 'block'; vidWrapper.style.display = 'block'; vidWrapper.style.flex = '0 0 30%'; }
@@ -147,6 +256,8 @@
         }
       }
     }
+
+    function loadData() { google.script.run.withSuccessHandler(displayData).getTodayData(); }
 
     window.onload = function() { loadData(); setInterval(loadData, 60000); };
     document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; });
