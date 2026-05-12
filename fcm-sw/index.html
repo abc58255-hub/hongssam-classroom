@@ -113,19 +113,24 @@
         setStatus('❌ 알림이 거부되었습니다. 설정 → Safari → 알림에서 허용해주세요.');
         return;
       }
-      setStatus('토큰 발급 중...');
+      setStatus('서비스워커 등록 중...');
       navigator.serviceWorker.register('./firebase-messaging-sw.js').then(function(reg) {
+        setStatus('토큰 발급 중...');
         return messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
       }).then(function(token) {
         if (!token) throw new Error('토큰을 받지 못했습니다');
         setStatus('서버에 저장 중...');
-        return fetch(GAS_URL + '?action=saveFcmToken&studentId=' + encodeURIComponent(studentId) + '&token=' + encodeURIComponent(token));
+        var url = GAS_URL
+          + '?action=saveFcmToken'
+          + '&studentId=' + encodeURIComponent(studentId)
+          + '&token=' + encodeURIComponent(token);
+        return fetch(url, { mode: 'no-cors' });
       }).then(function() {
         localStorage.setItem('fcm_registered_ios_' + studentId, '1');
         document.getElementById('formSection').classList.add('hidden');
         document.getElementById('success').classList.remove('hidden');
       }).catch(function(err) {
-        setStatus('❌ 오류: ' + err.message);
+        setStatus('오류(' + err.name + '): ' + err.message);
       });
     });
   }
