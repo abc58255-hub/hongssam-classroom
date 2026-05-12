@@ -9,18 +9,27 @@ const FCM_SERVER_KEY = "여기에_FCM_SERVER_KEY_입력";
 // =====================================================
 
 // FCM 토큰 저장 (학생 앱에서 로그인 시 호출)
-function saveFcmToken(studentId, token) {
+// pwHash 파라미터가 있으면 비밀번호 검증 후 저장
+function saveFcmToken(studentId, token, pwHash) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][1] || "").trim() === String(studentId || "").trim()) {
-        // G열(7번째)에 FCM 토큰 저장
-        sheet.getRange(i + 1, 7).setValue(token);
+        if (pwHash) {
+          const storedHash = String(data[i][3] || "").trim(); // D열 = 비밀번호해시
+          if (storedHash && storedHash !== pwHash) {
+            return { success: false, message: "비밀번호가 올바르지 않습니다." };
+          }
+          if (!storedHash) {
+            return { success: false, message: "미가입 학생입니다. 먼저 회원가입을 해주세요." };
+          }
+        }
+        sheet.getRange(i + 1, 7).setValue(token); // G열
         return { success: true };
       }
     }
-    return { success: false, message: "학생을 찾을 수 없습니다." };
+    return { success: false, message: "학번을 찾을 수 없습니다." };
   } catch(e) {
     return { success: false, message: e.toString() };
   }
@@ -85,14 +94,18 @@ function sendFcmMessage(token, title, body, tag) {
 
 function doGet(e) {
   if (e && e.parameter && e.parameter.action === 'saveFcmToken') {
-    var result = saveFcmToken(e.parameter.studentId, e.parameter.token);
-    return ContentService.createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON);
+    var result = saveFcmToken(e.parameter.studentId, e.parameter.token, e.parameter.pwHash || null);
+    var output = JSON.stringify(result);
+    if (e.parameter.callback) {
+      return ContentService.createTextOutput(e.parameter.callback + '(' + output + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+    }
+    return ContentService.createTextOutput(output).setMimeType(ContentService.MimeType.JSON);
   }
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('수학 과제 제출기')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1'); 
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
 function getHash(text) { 

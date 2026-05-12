@@ -2510,10 +2510,10 @@
     div.innerHTML = '<select class="form-input dl-class" style="width:110px; padding:6px; font-size:13px; font-weight:700;">' + o + '</select>' +
                     '<span style="font-size:11px;color:#7c3aed;font-weight:700;white-space:nowrap;">공개:</span>' +
                     '<input type="date" class="form-input dl-open-date" style="width:115px; padding:6px; font-size:12px;" value="' + (openD || '') + '">' +
-                    '<input type="time" class="form-input dl-open-time" style="width:78px; padding:6px; font-size:12px;" value="' + (openT || '00:00') + '">' +
+                    '<input type="time" class="form-input dl-open-time" style="width:96px; padding:6px; font-size:12px;" value="' + (openT || '00:00') + '">' +
                     '<span style="font-size:11px;color:#64748b;font-weight:700;white-space:nowrap;">→ 마감:</span>' +
                     '<input type="date" class="form-input dl-date" style="width:115px; padding:6px; font-size:12px;" value="' + (d || '') + '">' +
-                    '<input type="time" class="form-input dl-time" style="width:78px; padding:6px; font-size:12px;" value="' + (t || '23:59') + '">' +
+                    '<input type="time" class="form-input dl-time" style="width:96px; padding:6px; font-size:12px;" value="' + (t || '23:59') + '">' +
                     '<label style="font-size:12px; font-weight:700; color:#d97706; display:flex; align-items:center; gap:4px;"><input type="checkbox" class="dl-is-resub" ' + resubChecked + '>재제출 마감일</label>' +
                     '<button type="button" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:800;font-size:12px;margin-left:auto;" onclick="this.parentElement.remove()">✕</button>';
     return div;
@@ -5865,7 +5865,7 @@
     // 학생 목록 채우기
     var stuListEl = document.getElementById('pushStudentList');
     stuListEl.innerHTML = '';
-    (window.allRoster || []).slice().sort(function(a,b){ return String(a.id).localeCompare(String(b.id)); }).forEach(function(s) {
+    (allRoster || []).slice().sort(function(a,b){ return String(a.id).localeCompare(String(b.id)); }).forEach(function(s) {
       var lbl = document.createElement('label');
       lbl.className = 'push-stu-item';
       lbl.dataset.search = (s.id + ' ' + s.name + ' ' + s.cls).toLowerCase();
