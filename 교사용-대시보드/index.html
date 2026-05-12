@@ -5814,15 +5814,15 @@
     // 과제 목록 채우기
     var sel = document.getElementById('pushTaskSelect');
     sel.innerHTML = '<option value="">— 과제 선택 —</option>';
-    if (window.allTasks) {
-      allTasks.forEach(function(t){ sel.innerHTML += '<option value="'+t.name+'">'+t.name+'</option>'; });
-    }
+    var tasks = window.allTasks || [];
+    if (!tasks.length) { var tf = document.getElementById('taskFilter'); if (tf) tasks = Array.from(tf.options).slice(1).map(function(o){ return {name: o.value}; }); }
+    tasks.forEach(function(t){ if(t.name && t.name !== 'all') sel.innerHTML += '<option value="'+t.name+'">'+t.name+'</option>'; });
     // 반 목록 채우기
     var csel = document.getElementById('pushClassSelect');
     csel.innerHTML = '<option value="">— 반 선택 —</option>';
-    if (window.allClasses) {
-      allClasses.forEach(function(c){ csel.innerHTML += '<option value="'+c+'">'+c+'</option>'; });
-    }
+    var classes = window.allClasses || [];
+    if (!classes.length) { var cf = document.getElementById('classFilter'); if (cf) classes = Array.from(cf.options).slice(1).map(function(o){ return o.value; }); }
+    classes.forEach(function(c){ if(c && c !== 'all') csel.innerHTML += '<option value="'+c+'">'+c+'</option>'; });
     document.getElementById('pushModal').style.display = 'flex';
   }
   function onPushTargetChange() {
