@@ -77,7 +77,6 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
         notification: { title: title, body: body },
         data: { url: clickUrl || '', tag: tag || 'default' },
         webpush: {
-          notification: { icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png', tag: tag || 'default' },
           fcm_options: { link: clickUrl || 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec' }
         }
       }
