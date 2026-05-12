@@ -6,6 +6,33 @@ const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
 // 최초 1회: GAS 스크립트 편집기에서 setupFCMCredentials() 실행
 // =====================================================
 
+function debugFCM() {
+  var props = PropertiesService.getScriptProperties();
+  var projectId = props.getProperty('FCM_PROJECT_ID');
+  var email = props.getProperty('FCM_CLIENT_EMAIL');
+  var key = props.getProperty('FCM_PRIVATE_KEY');
+  Logger.log('PROJECT_ID: ' + projectId);
+  Logger.log('KEY_LENGTH: ' + (key || '').length);
+  try {
+    var accessToken = getFCMAccessToken_();
+    Logger.log('ACCESS_TOKEN OK: ' + accessToken.substring(0, 30));
+    // 스프레드시트에서 첫 번째 FCM 토큰 찾아서 테스트 발송
+    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
+    var data = sheet.getDataRange().getValues();
+    for (var i = 1; i < data.length; i++) {
+      var token = String(data[i][6] || '').trim();
+      if (token) {
+        Logger.log('첫 번째 토큰 발견 (학번 ' + data[i][1] + '): ' + token.substring(0, 30) + '...');
+        var res = sendFcmToToken_(token, '테스트 알림', '테스트입니다', '', 'test');
+        Logger.log('발송 결과: ' + res);
+        break;
+      }
+    }
+  } catch(e) {
+    Logger.log('오류: ' + e.toString());
+  }
+}
+
 function setupFCMCredentials() {
   var props = PropertiesService.getScriptProperties();
   props.setProperty('FCM_PROJECT_ID',   'send-alarm-220c3');
