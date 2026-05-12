@@ -914,13 +914,11 @@
           <optgroup label="🔵 Google Gemini">
             <option value="google/gemini-2.5-flash">google/gemini-2.5-flash ⭐ 권장</option>
             <option value="google/gemini-2.5-pro">google/gemini-2.5-pro (고품질)</option>
-            <option value="google/gemini-2.0-flash-001">google/gemini-2.0-flash-001</option>
           </optgroup>
-          <optgroup label="🟣 Anthropic Claude">
-            <option value="anthropic/claude-sonnet-4-6">anthropic/claude-sonnet-4-6 (최신)</option>
-            <option value="anthropic/claude-sonnet-4-5">anthropic/claude-sonnet-4-5</option>
-            <option value="anthropic/claude-3.5-sonnet">anthropic/claude-3.5-sonnet</option>
-            <option value="anthropic/claude-3-haiku">anthropic/claude-3-haiku (저렴)</option>
+          <optgroup label="🟣 Anthropic Claude 4">
+            <option value="anthropic/claude-opus-4-7">anthropic/claude-opus-4-7 (최고성능)</option>
+            <option value="anthropic/claude-sonnet-4-6">anthropic/claude-sonnet-4-6 (균형)</option>
+            <option value="anthropic/claude-haiku-4-5">anthropic/claude-haiku-4-5 (저렴)</option>
           </optgroup>
           <optgroup label="🟢 OpenAI">
             <option value="openai/gpt-4o">openai/gpt-4o</option>
@@ -6884,11 +6882,9 @@
   var OR_MODEL_PRICE = {
     'google/gemini-2.5-flash':      { in: 0.15,  out: 0.60  },
     'google/gemini-2.5-pro':        { in: 1.25,  out: 10.00 },
-    'google/gemini-2.0-flash-001':  { in: 0.10,  out: 0.40  },
+    'anthropic/claude-opus-4-7':    { in: 15.00, out: 75.00 },
     'anthropic/claude-sonnet-4-6':  { in: 3.00,  out: 15.00 },
-    'anthropic/claude-sonnet-4-5':  { in: 3.00,  out: 15.00 },
-    'anthropic/claude-3.5-sonnet':  { in: 3.00,  out: 15.00 },
-    'anthropic/claude-3-haiku':     { in: 0.25,  out: 1.25  },
+    'anthropic/claude-haiku-4-5':   { in: 0.80,  out: 4.00  },
     'openai/gpt-4o':                { in: 2.50,  out: 10.00 },
     'openai/gpt-4o-mini':           { in: 0.15,  out: 0.60  }
   };
@@ -6960,6 +6956,9 @@
           var m = res.model;
           if (m === 'google/gemini-2.5-flash-preview') m = 'google/gemini-2.5-flash';
           if (m === 'google/gemini-2.5-pro-preview')   m = 'google/gemini-2.5-pro';
+          if (m === 'google/gemini-2.0-flash-001')     m = 'google/gemini-2.5-flash';
+          if (m === 'anthropic/claude-3-haiku' || m === 'anthropic/claude-3.5-haiku') m = 'anthropic/claude-haiku-4-5';
+          if (m === 'anthropic/claude-sonnet-4-5' || m === 'anthropic/claude-3.5-sonnet') m = 'anthropic/claude-sonnet-4-6';
           sel.value = m;
           updateModelPriceHint();
         }
