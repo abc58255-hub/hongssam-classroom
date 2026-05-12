@@ -263,6 +263,7 @@
         <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left;" onclick="openAppLink('board')">📺 교실 알림판</button>
         <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left;" onclick="openAppLink('register')">📝 회원가입 앱</button>
         <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left;" onclick="openAppLink('portal')">🏫 스마트 포털</button>
+        <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left; color:#7c3aed;" onclick="openAlarmQRModal()">🔔 아이폰 알림 등록 QR</button>
       </div>
     </div>
 
@@ -756,8 +757,11 @@
         <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">학생 검색 및 선택</label>
         <input type="text" id="pushStudentSearch" placeholder="이름 또는 학번 검색..." oninput="filterPushStudentList()" style="width:100%;padding:8px 12px;font-size:13px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;outline:none;box-sizing:border-box;">
         <div id="pushStudentList" style="max-height:180px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#f8fafc;"></div>
-        <div style="display:flex;justify-content:space-between;margin-top:4px;">
-          <button onclick="document.querySelectorAll('#pushStudentList .push-stu-cb').forEach(function(cb){cb.checked=true;updatePushStudentCount();})" style="font-size:11px;color:#0284c7;background:none;border:none;cursor:pointer;padding:0;">전체 선택</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+          <div style="display:flex;gap:10px;">
+            <button onclick="document.querySelectorAll('#pushStudentList .push-stu-cb').forEach(function(cb){cb.checked=true;updatePushStudentCount();})" style="font-size:11px;color:#0284c7;background:none;border:none;cursor:pointer;padding:0;font-weight:700;">전체 선택</button>
+            <button onclick="document.querySelectorAll('#pushStudentList .push-stu-cb').forEach(function(cb){cb.checked=false;updatePushStudentCount();})" style="font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;padding:0;font-weight:700;">전체 해제</button>
+          </div>
           <span id="pushStudentCount" style="font-size:11px;color:#64748b;">0명 선택됨</span>
         </div>
       </div>
@@ -2502,20 +2506,31 @@
   // --- 여기서부터 복사해서 기존 과제 생성/수정/마감일 관련 함수들을 덮어쓰세요 ---
   function createDeadlineElement(c, d, t, isResub, openD, openT) {
     var div = document.createElement('div'); div.className = 'deadline-row';
-    div.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:8px; flex-wrap:wrap; background:#f1f5f9; padding:8px 10px; border-radius:8px; border:1px solid #e2e8f0;';
+    div.style.cssText = 'margin-bottom:8px; background:white; border-radius:10px; border:1px solid #e2e8f0; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.04);';
     var o = '<option value="all">전체 공통</option>';
     classList.forEach(function(x) { o += '<option value="' + x + '" ' + (x === c ? 'selected' : '') + '>' + x + '</option>'; });
     if (c === 'all') o = o.replace('value="all"', 'value="all" selected');
     var resubChecked = isResub ? 'checked' : '';
-    div.innerHTML = '<select class="form-input dl-class" style="width:110px; padding:6px; font-size:13px; font-weight:700;">' + o + '</select>' +
-                    '<span style="font-size:11px;color:#7c3aed;font-weight:700;white-space:nowrap;">공개:</span>' +
-                    '<input type="date" class="form-input dl-open-date" style="width:115px; padding:6px; font-size:12px;" value="' + (openD || '') + '">' +
-                    '<input type="time" class="form-input dl-open-time" style="width:96px; padding:6px; font-size:12px;" value="' + (openT || '00:00') + '">' +
-                    '<span style="font-size:11px;color:#64748b;font-weight:700;white-space:nowrap;">→ 마감:</span>' +
-                    '<input type="date" class="form-input dl-date" style="width:115px; padding:6px; font-size:12px;" value="' + (d || '') + '">' +
-                    '<input type="time" class="form-input dl-time" style="width:96px; padding:6px; font-size:12px;" value="' + (t || '23:59') + '">' +
-                    '<label style="font-size:12px; font-weight:700; color:#d97706; display:flex; align-items:center; gap:4px;"><input type="checkbox" class="dl-is-resub" ' + resubChecked + '>재제출 마감일</label>' +
-                    '<button type="button" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:800;font-size:12px;margin-left:auto;" onclick="this.parentElement.remove()">✕</button>';
+    div.innerHTML =
+      '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">' +
+        '<select class="form-input dl-class" style="flex:1;padding:6px 8px;font-size:13px;font-weight:700;border-radius:6px;">' + o + '</select>' +
+        '<label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#d97706;white-space:nowrap;cursor:pointer;">' +
+          '<input type="checkbox" class="dl-is-resub" ' + resubChecked + '> 재제출 마감일' +
+        '</label>' +
+        '<button type="button" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-weight:800;font-size:12px;flex-shrink:0;" onclick="this.closest(\'.deadline-row\').remove()">✕</button>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">' +
+        '<div style="padding:8px 10px;border-right:1px solid #e2e8f0;">' +
+          '<div style="font-size:10px;font-weight:800;color:#7c3aed;margin-bottom:4px;">🔓 공개일</div>' +
+          '<input type="date" class="form-input dl-open-date" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;margin-bottom:4px;" value="' + (openD || '') + '">' +
+          '<input type="time" class="form-input dl-open-time" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;" value="' + (openT || '00:00') + '">' +
+        '</div>' +
+        '<div style="padding:8px 10px;">' +
+          '<div style="font-size:10px;font-weight:800;color:#dc2626;margin-bottom:4px;">🔒 마감일</div>' +
+          '<input type="date" class="form-input dl-date" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;margin-bottom:4px;" value="' + (d || '') + '">' +
+          '<input type="time" class="form-input dl-time" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;" value="' + (t || '23:59') + '">' +
+        '</div>' +
+      '</div>';
     return div;
   }
 
@@ -6231,6 +6246,39 @@
         else { alert('오류: ' + res.message); }
       })
       .resetStudentPassword(studentId);
+  }
+  var ALARM_REGISTER_URL = 'https://abc58255-hub.github.io/fcm-sw/';
+  function copyAlarmUrl() {
+    navigator.clipboard.writeText(ALARM_REGISTER_URL).catch(function(){});
+    var btn = document.getElementById('alarmUrlCopyBtn');
+    if (btn) { btn.textContent = '✅ 복사됨'; setTimeout(function(){ btn.textContent = '링크 복사'; }, 1500); }
+  }
+  function openAlarmQRModal() {
+    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(ALARM_REGISTER_URL);
+    var modal = document.getElementById('alarmQRModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'alarmQRModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;';
+      modal.addEventListener('click', function(e){ if (e.target === modal) modal.style.display = 'none'; });
+      document.body.appendChild(modal);
+    }
+    modal.innerHTML = '<div style="background:white;border-radius:20px;padding:24px;width:90%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
+        + '<div style="font-size:17px;font-weight:800;color:#0f172a;">🔔 아이폰 알림 등록</div>'
+        + '<button onclick="document.getElementById(\'alarmQRModal\').style.display=\'none\'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>'
+      + '</div>'
+      + '<p style="font-size:13px;color:#64748b;margin-bottom:16px;line-height:1.6;text-align:left;">학생들에게 QR코드를 보여주세요.<br>학번과 비밀번호를 입력하면 알림이 등록됩니다.</p>'
+      + '<div style="background:#f0f4ff;border-radius:16px;padding:18px;margin-bottom:14px;display:inline-block;">'
+        + '<img src="' + qrUrl + '" width="200" height="200" style="display:block;border-radius:8px;" alt="QR코드">'
+      + '</div>'
+      + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;text-align:left;">'
+        + '<span style="font-size:11px;color:#64748b;flex:1;word-break:break-all;">' + ALARM_REGISTER_URL + '</span>'
+        + '<button id="alarmUrlCopyBtn" onclick="copyAlarmUrl()" style="background:#1e3a8a;color:white;border:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap;">링크 복사</button>'
+      + '</div>'
+      + '<p style="font-size:11px;color:#94a3b8;line-height:1.6;">📱 아이폰: 홈화면 추가 후 앱에서 등록<br>🤖 안드로이드: 학생 앱 로그인 시 자동 등록</p>'
+      + '</div>';
+    modal.style.display = 'flex';
   }
   var APP_LINK_META = {
     student:  { label: '📐 수학 교실 앱',  cell: 'H2' },
