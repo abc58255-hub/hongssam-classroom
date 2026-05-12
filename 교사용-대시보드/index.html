@@ -899,11 +899,20 @@
         <div style="font-size:17px;font-weight:800;color:#0f172a;">⚙️ AI / TickTick 설정</div>
         <button onclick="document.getElementById('aiSettingsModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
       </div>
+      <!-- 크레딧 잔여량 -->
+      <div id="orBalanceBox" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:13px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-weight:700;color:#15803d;">💳 OpenRouter 크레딧</span>
+          <span id="orBalanceRefreshBtn" onclick="loadOrBalance()" style="cursor:pointer;font-size:11px;color:#6366f1;font-weight:700;">🔄 새로고침</span>
+        </div>
+        <div id="orBalanceContent" style="color:#64748b;">조회 중...</div>
+      </div>
+
       <div style="margin-bottom:16px;">
         <label class="form-label">🤖 AI 모델 (시스템설정 Q2)</label>
-        <select id="aiModelSelect" class="form-input" style="margin-bottom:6px;">
+        <select id="aiModelSelect" class="form-input" style="margin-bottom:6px;" onchange="updateModelPriceHint()">
           <optgroup label="🔵 Google Gemini">
-            <option value="google/gemini-2.5-flash">google/gemini-2.5-flash (권장 ⭐ 빠름)</option>
+            <option value="google/gemini-2.5-flash">google/gemini-2.5-flash ⭐ 권장</option>
             <option value="google/gemini-2.5-pro">google/gemini-2.5-pro (고품질)</option>
             <option value="google/gemini-2.0-flash-001">google/gemini-2.0-flash-001</option>
           </optgroup>
@@ -918,6 +927,7 @@
             <option value="openai/gpt-4o-mini">openai/gpt-4o-mini (저렴)</option>
           </optgroup>
         </select>
+        <div id="modelPriceHint" style="font-size:11px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:6px 10px;margin-bottom:4px;display:none;"></div>
         <div style="font-size:11px;color:#94a3b8;">변경 후 저장하면 시스템설정 Q2에 반영돼요.</div>
       </div>
       <div style="background:#f8fafc;border-radius:10px;padding:14px;margin-bottom:16px;">
@@ -6871,6 +6881,66 @@
     }
     addNext(0);
   }
+  var OR_MODEL_PRICE = {
+    'google/gemini-2.5-flash':      { in: 0.15,  out: 0.60,  img: 0.039 },
+    'google/gemini-2.5-pro':        { in: 1.25,  out: 10.00, img: 0.039 },
+    'google/gemini-2.0-flash-001':  { in: 0.10,  out: 0.40,  img: 0.039 },
+    'anthropic/claude-sonnet-4-6':  { in: 3.00,  out: 15.00, img: 4.80  },
+    'anthropic/claude-sonnet-4-5':  { in: 3.00,  out: 15.00, img: 4.80  },
+    'anthropic/claude-3.5-sonnet':  { in: 3.00,  out: 15.00, img: 4.80  },
+    'anthropic/claude-3-haiku':     { in: 0.25,  out: 1.25,  img: 0.40  },
+    'openai/gpt-4o':                { in: 2.50,  out: 10.00, img: 3.613 },
+    'openai/gpt-4o-mini':           { in: 0.15,  out: 0.60,  img: 0.217 }
+  };
+
+  function updateModelPriceHint() {
+    var sel = document.getElementById('aiModelSelect');
+    var hint = document.getElementById('modelPriceHint');
+    if (!sel || !hint) return;
+    var p = OR_MODEL_PRICE[sel.value];
+    if (!p) { hint.style.display = 'none'; return; }
+    hint.style.display = 'block';
+    hint.innerHTML =
+      '입력 <b>$' + p.in.toFixed(2) + '</b> / 출력 <b>$' + p.out.toFixed(2) + '</b>'
+      + ' / 이미지 <b>$' + p.img.toFixed(3) + '</b>'
+      + ' &nbsp;<span style="color:#94a3b8">(1M 토큰 기준 · USD)</span>';
+  }
+
+  function loadOrBalance() {
+    var box = document.getElementById('orBalanceContent');
+    if (box) box.innerHTML = '<span style="color:#94a3b8;">조회 중...</span>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!box) return;
+        if (!res.success) {
+          box.innerHTML = '<span style="color:#dc2626;">❌ ' + res.message + '</span>';
+          document.getElementById('orBalanceBox').style.background = '#fef2f2';
+          document.getElementById('orBalanceBox').style.borderColor = '#fecaca';
+          return;
+        }
+        var usage = (res.usage || 0).toFixed(4);
+        if (res.limit) {
+          var remaining = Math.max(0, res.limit - (res.usage || 0));
+          var pct = Math.min(100, ((res.limit - remaining) / res.limit * 100)).toFixed(0);
+          var barColor = remaining / res.limit > 0.3 ? '#22c55e' : remaining / res.limit > 0.1 ? '#f59e0b' : '#ef4444';
+          box.innerHTML =
+            '<div style="display:flex;justify-content:space-between;margin-bottom:5px;">'
+            + '<span>잔여 <b style="color:#15803d;">$' + remaining.toFixed(4) + '</b></span>'
+            + '<span style="color:#94a3b8;">한도 $' + res.limit.toFixed(2) + '</span>'
+            + '</div>'
+            + '<div style="background:#dcfce7;border-radius:4px;height:6px;overflow:hidden;">'
+            + '<div style="width:' + pct + '%;height:100%;background:' + barColor + ';border-radius:4px;"></div>'
+            + '</div>'
+            + '<div style="margin-top:4px;color:#94a3b8;font-size:11px;">사용 $' + usage + ' / ' + pct + '%</div>';
+        } else {
+          box.innerHTML = res.isFreeTier
+            ? '<span style="color:#0284c7;">🆓 무료 티어 · 사용 $' + usage + '</span>'
+            : '<span style="color:#15803d;">✅ 한도 없음 · 누적 사용 $' + usage + '</span>';
+        }
+      })
+      .getOpenRouterBalance();
+  }
+
   function openAiSettings() {
     google.script.run
       .withSuccessHandler(function(res) {
@@ -6887,10 +6957,12 @@
           if (m === 'google/gemini-2.5-flash-preview') m = 'google/gemini-2.5-flash';
           if (m === 'google/gemini-2.5-pro-preview')   m = 'google/gemini-2.5-pro';
           sel.value = m;
+          updateModelPriceHint();
         }
         updateAiStatusBadge(res);
       })
       .getTickTickStatus();
+    loadOrBalance();
     document.getElementById('aiSettingsModal').style.display = 'flex';
   }
   function saveAiSettings() {

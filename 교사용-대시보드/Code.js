@@ -1732,6 +1732,21 @@ function saveApiSetting(cell, value) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
+function getOpenRouterBalance() {
+  try {
+    const key = String(SpreadsheetApp.openById(SHEET_ID)
+      .getSheetByName('시스템설정').getRange('P2').getValue() || '').trim();
+    if (!key) return { success: false, message: 'API 키 없음' };
+    const res = UrlFetchApp.fetch('https://openrouter.ai/api/v1/auth/key', {
+      headers: { 'Authorization': 'Bearer ' + key },
+      muteHttpExceptions: true
+    });
+    if (res.getResponseCode() !== 200) return { success: false, message: '조회 실패 (' + res.getResponseCode() + ')' };
+    const d = JSON.parse(res.getContentText()).data;
+    return { success: true, usage: d.usage, limit: d.limit, isFreeTier: d.is_free_tier };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 // ─── Claude via OpenRouter 텍스트 분석 ─────────────────
 function analyzeTaskText(text, fileAttachment) {
   try {
