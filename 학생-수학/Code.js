@@ -179,6 +179,7 @@ function getDashboardData(studentId, studentName) {
       let hasDeadline = false;
       let myDeadline = null;
       let resubDeadline = null;
+      let openDeadline = null;
 
       if (dStr && dStr.startsWith("{")) {
         try {
@@ -195,12 +196,14 @@ function getDashboardData(studentId, studentName) {
             isExpired = true;
           }
           resubDeadline = deadlines["resub_" + className] || deadlines["resub_all"] || myDeadline;
+          openDeadline = deadlines["open_" + className] || deadlines["open_all"] || null;
         } catch(e) {}
       }
 
       taskDeadlineMap[tName] = {
         main: myDeadline,
-        resub: resubDeadline
+        resub: resubDeadline,
+        open: openDeadline
       };
 
       if (!hasDeadline || !isExpired) { validMissingTasksSet.add(tName); }
@@ -326,12 +329,12 @@ function getDashboardData(studentId, studentName) {
       let ts = taskSettingsMap[t] || {reqPics:1, choiceArray:[]};
       let dMap = taskDeadlineMap[t] || {};
 
-      if (!taskStatusMap[t]) { 
+      if (!taskStatusMap[t]) {
         if (validMissingTasksSet.has(t)) {
-          missingTasks.push({ 
-            name: t, reqPics: ts.reqPics, choices: ts.choiceArray, 
-            submittedUrls: {}, deadline: dMap.main 
-          }); 
+          missingTasks.push({
+            name: t, reqPics: ts.reqPics, choices: ts.choiceArray,
+            submittedUrls: {}, deadline: dMap.main, openDate: dMap.open
+          });
         }
       } else {
         let st = taskStatusMap[t].status;
@@ -360,7 +363,7 @@ function getDashboardData(studentId, studentName) {
         } else if (submittedCount < ts.reqPics && st === "" && validMissingTasksSet.has(t)) {
           missingTasks.push({
             name: t, reqPics: ts.reqPics, choices: ts.choiceArray,
-            submittedUrls: currentUrls, deadline: dMap.main
+            submittedUrls: currentUrls, deadline: dMap.main, openDate: dMap.open
           });
         }
       }
@@ -439,9 +442,14 @@ function processForm(formData) {
                   return { success: false, message: "⏰ 제출 기한이 지났습니다." };
                 }
                 // 다른 반에만 마감일이 설정된 경우 이 반은 제출 불가
-                const hasClassSpecificKeys = Object.keys(dl).some(k => k !== "all" && !k.startsWith("resub_"));
+                const hasClassSpecificKeys = Object.keys(dl).some(k => k !== "all" && !k.startsWith("resub_") && !k.startsWith("open_"));
                 if (!mainDl && hasClassSpecificKeys) {
                   return { success: false, message: "🚫 이 과제는 해당 반에 제공되지 않습니다." };
+                }
+                // 공개일 이전 제출 불가
+                const openDl = dl["open_" + className] || dl["open_all"];
+                if (openDl && new Date(openDl) > now) {
+                  return { success: false, message: "⏳ 아직 제출 가능 시간이 아닙니다." };
                 }
               }
             } catch(e) {}

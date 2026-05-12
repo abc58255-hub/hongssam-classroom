@@ -546,6 +546,7 @@
       var g2 = document.createElement('optgroup');
       g2.label = "📚 해결해야 할 과제";
       data.missingTasks.forEach(function(t) {
+        if (t.openDate && new Date(t.openDate) > new Date()) return; // 공개 전 과제 제외
         var opt = document.createElement('option');
         opt.value = t.name; opt.dataset.isResubmit = "false";
         var submittedCnt = 0;
@@ -613,6 +614,23 @@
       });
 
       data.missingTasks.forEach(function(t) {
+        var now2 = new Date();
+        if (t.openDate && new Date(t.openDate) > now2) {
+          var oDt = new Date(t.openDate);
+          var oStr = (oDt.getMonth()+1) + '/' + oDt.getDate() + ' ' + String(oDt.getHours()).padStart(2,'0') + ':' + String(oDt.getMinutes()).padStart(2,'0');
+          mHtml += '<div style="background:#f5f3ff; border:1px solid #c4b5fd; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02);">' +
+                     '<div style="display:flex; align-items:center; gap:10px; min-width:0;">' +
+                       '<span style="font-size:18px; flex-shrink:0;">🔮</span>' +
+                       '<div style="min-width:0;">' +
+                         '<div style="font-size:11px; font-weight:800; color:#7c3aed; margin-bottom:3px;">공개 예정 · ' + oStr + ' 이후 제출 가능</div>' +
+                         '<div style="font-size:14px; font-weight:700; color:#5b21b6; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+                       '</div>' +
+                     '</div>' +
+                     '<span style="background:#ede9fe;color:#7c3aed;padding:4px 8px;border-radius:6px;font-size:11px;font-weight:800;white-space:nowrap;flex-shrink:0;">공개 예정</span>' +
+                   '</div>';
+          return;
+        }
+
         var submittedCnt = 0;
         if (t.submittedUrls) { for (var k in t.submittedUrls) { if (t.submittedUrls[k] && t.submittedUrls[k] !== "") submittedCnt++; } }
         var subTxt = submittedCnt > 0 ? '<span style="font-size:11px; color:#0284c7; margin-left:6px; font-weight:600;">(' + submittedCnt + '/' + t.reqPics + '개 제출)</span>' : '';
@@ -808,7 +826,9 @@
     renderGallery();
 
     var hasFeedback = data.unreadFeedbacks.length > 0;
-    var hasPending = data.missingTasks.length > 0 || data.resubmitTasks.length > 0;
+    var nowCheck = new Date();
+    var pendingMissingTasks = data.missingTasks.filter(function(t) { return !(t.openDate && new Date(t.openDate) > nowCheck); });
+    var hasPending = pendingMissingTasks.length > 0 || data.resubmitTasks.length > 0;
 
     if (hasFeedback || hasPending) {
       pendingFeedbackRows = [];
@@ -827,7 +847,7 @@
         var marginStyle = hasFeedback ? "margin-top:20px; border-top:2px dashed #e2e8f0; padding-top:15px;" : "";
         nHtml += '<div style="' + marginStyle + '"><div style="color:#be123c; font-weight:bold; margin-bottom:10px; font-size: 15px;">🚨 꼭 해결해야 할 과제</div>';
         data.resubmitTasks.forEach(function(t) { nHtml += '<div style="font-size:14px; color:#c2410c; margin-bottom:6px; font-weight:600; line-height:1.4; word-break:keep-all;">[재제출] ' + t.name + '</div>'; });
-        data.missingTasks.forEach(function(t) { nHtml += '<div style="font-size:14px; color:#be123c; margin-bottom:6px; font-weight:600; line-height:1.4; word-break:keep-all;">[미제출] ' + t.name + '</div>'; });
+        pendingMissingTasks.forEach(function(t) { nHtml += '<div style="font-size:14px; color:#be123c; margin-bottom:6px; font-weight:600; line-height:1.4; word-break:keep-all;">[미제출] ' + t.name + '</div>'; });
         nHtml += '</div>';
       }
       isOnlyMissingTasks = !hasFeedback;

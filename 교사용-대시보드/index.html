@@ -733,6 +733,9 @@
           <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;background:#f1f5f9;padding:6px 12px;border-radius:8px;border:2px solid transparent;" id="pushTarget_class_lbl">
             <input type="radio" name="pushTarget" value="class" onchange="onPushTargetChange()"> 특정 반
           </label>
+          <label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;background:#f1f5f9;padding:6px 12px;border-radius:8px;border:2px solid transparent;" id="pushTarget_student_lbl">
+            <input type="radio" name="pushTarget" value="student" onchange="onPushTargetChange()"> 특정 학생
+          </label>
         </div>
       </div>
 
@@ -746,6 +749,17 @@
       <div id="pushClassRow" style="display:none;margin-bottom:14px;">
         <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">반 선택</label>
         <select id="pushClassSelect" class="filter-select" style="width:100%;"></select>
+      </div>
+
+      <!-- 특정 학생 선택 시 -->
+      <div id="pushStudentRow" style="display:none;margin-bottom:14px;">
+        <label style="font-size:12px;font-weight:700;color:#64748b;display:block;margin-bottom:6px;">학생 검색 및 선택</label>
+        <input type="text" id="pushStudentSearch" placeholder="이름 또는 학번 검색..." oninput="filterPushStudentList()" style="width:100%;padding:8px 12px;font-size:13px;border:1px solid #e2e8f0;border-radius:8px;margin-bottom:6px;outline:none;box-sizing:border-box;">
+        <div id="pushStudentList" style="max-height:180px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:8px;padding:6px;background:#f8fafc;"></div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;">
+          <button onclick="document.querySelectorAll('#pushStudentList .push-stu-cb').forEach(function(cb){cb.checked=true;updatePushStudentCount();})" style="font-size:11px;color:#0284c7;background:none;border:none;cursor:pointer;padding:0;">전체 선택</button>
+          <span id="pushStudentCount" style="font-size:11px;color:#64748b;">0명 선택됨</span>
+        </div>
       </div>
 
       <!-- 빠른 메시지 템플릿 -->
@@ -2447,18 +2461,25 @@
         dH += '<div style="font-size:13px; color:#059669; font-weight:800; background:#dcfce7; padding:6px 10px; border-radius:6px; display:inline-block;">∞ 기한 없음</div>';
       } else {
         for (let c in dO) {
+          if (c.startsWith('open_')) continue;
           let dt = new Date(dO[c]);
-          if (isNaN(dt.getTime())) continue; 
-          
+          if (isNaN(dt.getTime())) continue;
           let isResub = c.startsWith('resub_');
           let realClass = isResub ? c.replace('resub_', '') : c;
-          let clsName = (realClass === 'all') ? '전체 공통' : realClass; 
+          let clsName = (realClass === 'all') ? '전체 공통' : realClass;
           let badge = isResub ? '<span style="background:#fef3c7;color:#d97706;padding:2px 6px;border-radius:4px;font-size:10px;margin-right:6px;">재제출</span>' : '<span style="background:#e0f2fe;color:#0284c7;padding:2px 6px;border-radius:4px;font-size:10px;margin-right:6px;">본제출</span>';
           let dtStr = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
-          
+          let openInfo = '';
+          if (!isResub && dO['open_' + realClass]) {
+            let oDt = new Date(dO['open_' + realClass]);
+            if (!isNaN(oDt.getTime())) {
+              let oStr = (oDt.getMonth()+1) + '/' + oDt.getDate() + ' ' + String(oDt.getHours()).padStart(2,'0') + ':' + String(oDt.getMinutes()).padStart(2,'0');
+              openInfo = '<span style="font-size:11px;color:#7c3aed;margin-right:4px;">공개 ' + oStr + ' →</span>';
+            }
+          }
           dH += '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed #cbd5e1; font-size:13px;">' +
                 '<div style="display:flex;align-items:center;"><span style="font-weight:800; color:#3b82f6; margin-right:8px;">' + clsName + '</span>' + badge + '</div>' +
-                '<b style="color:#1e293b;">' + dtStr + '</b></div>';
+                '<div style="display:flex;align-items:center;">' + openInfo + '<b style="color:#1e293b;">' + dtStr + '</b></div></div>';
         }
       }
       
@@ -2479,29 +2500,31 @@
   }
 
   // --- 여기서부터 복사해서 기존 과제 생성/수정/마감일 관련 함수들을 덮어쓰세요 ---
-  function createDeadlineElement(c, d, t, isResub) {
+  function createDeadlineElement(c, d, t, isResub, openD, openT) {
     var div = document.createElement('div'); div.className = 'deadline-row';
     div.style.cssText = 'display:flex; gap:6px; align-items:center; margin-bottom:8px; flex-wrap:wrap; background:#f1f5f9; padding:8px 10px; border-radius:8px; border:1px solid #e2e8f0;';
     var o = '<option value="all">전체 공통</option>';
     classList.forEach(function(x) { o += '<option value="' + x + '" ' + (x === c ? 'selected' : '') + '>' + x + '</option>'; });
     if (c === 'all') o = o.replace('value="all"', 'value="all" selected');
-    
-    let resubChecked = isResub ? 'checked' : '';
-    
+    var resubChecked = isResub ? 'checked' : '';
     div.innerHTML = '<select class="form-input dl-class" style="width:110px; padding:6px; font-size:13px; font-weight:700;">' + o + '</select>' +
-                    '<input type="date" class="form-input dl-date" style="width:120px; padding:6px; font-size:13px;" value="' + (d || '') + '">' +
-                    '<input type="time" class="form-input dl-time" style="width:90px; padding:6px; font-size:13px;" value="' + (t || '23:59') + '">' +
+                    '<span style="font-size:11px;color:#7c3aed;font-weight:700;white-space:nowrap;">공개:</span>' +
+                    '<input type="date" class="form-input dl-open-date" style="width:115px; padding:6px; font-size:12px;" value="' + (openD || '') + '">' +
+                    '<input type="time" class="form-input dl-open-time" style="width:78px; padding:6px; font-size:12px;" value="' + (openT || '00:00') + '">' +
+                    '<span style="font-size:11px;color:#64748b;font-weight:700;white-space:nowrap;">→ 마감:</span>' +
+                    '<input type="date" class="form-input dl-date" style="width:115px; padding:6px; font-size:12px;" value="' + (d || '') + '">' +
+                    '<input type="time" class="form-input dl-time" style="width:78px; padding:6px; font-size:12px;" value="' + (t || '23:59') + '">' +
                     '<label style="font-size:12px; font-weight:700; color:#d97706; display:flex; align-items:center; gap:4px;"><input type="checkbox" class="dl-is-resub" ' + resubChecked + '>재제출 마감일</label>' +
                     '<button type="button" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:6px 10px;cursor:pointer;font-weight:800;font-size:12px;margin-left:auto;" onclick="this.parentElement.remove()">✕</button>';
     return div;
   }
 
   function addDeadlineRow() {
-    document.getElementById('deadlineContainer').appendChild(createDeadlineElement('', '', '23:59', false));
+    document.getElementById('deadlineContainer').appendChild(createDeadlineElement('', '', '23:59', false, '', '00:00'));
   }
 
-  function addEditDeadlineRow(c, d, t, isResub) {
-    document.getElementById('editDeadlineContainer').appendChild(createDeadlineElement(c, d, t, isResub));
+  function addEditDeadlineRow(c, d, t, isResub, openD, openT) {
+    document.getElementById('editDeadlineContainer').appendChild(createDeadlineElement(c, d, t, isResub, openD, openT));
   }
 
   function extractDeadlinesJSON(containerId) {
@@ -2511,10 +2534,14 @@
       var date = row.querySelector('.dl-date').value;
       var time = row.querySelector('.dl-time').value;
       var isResub = row.querySelector('.dl-is-resub').checked;
-      
-      if (cls && date) { 
-          var key = isResub ? 'resub_' + cls : cls;
-          d[key] = date + 'T' + (time || '23:59'); 
+      var openDate = row.querySelector('.dl-open-date').value;
+      var openTime = row.querySelector('.dl-open-time').value;
+      if (cls && date) {
+        var key = isResub ? 'resub_' + cls : cls;
+        d[key] = date + 'T' + (time || '23:59');
+        if (!isResub && openDate) {
+          d['open_' + cls] = openDate + 'T' + (openTime || '00:00');
+        }
       }
     });
     return JSON.stringify(d);
@@ -2595,16 +2622,28 @@
     try { d = JSON.parse(o.deadlines || "{}"); } catch(e) {}
     
     if (Object.keys(d).length === 0) {
-      addEditDeadlineRow('all', '', '23:59', false);
+      addEditDeadlineRow('all', '', '23:59', false, '', '00:00');
     } else {
       for (var k in d) {
+        if (k.startsWith('open_')) continue;
         var isResub = k.startsWith('resub_');
         var realCls = isResub ? k.replace('resub_', '') : k;
         var dt = new Date(d[k]);
-        if (isNaN(dt.getTime())) continue; 
+        if (isNaN(dt.getTime())) continue;
         var dateStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
         var timeStr = String(dt.getHours()).padStart(2,'0') + ":" + String(dt.getMinutes()).padStart(2,'0');
-        addEditDeadlineRow(realCls, dateStr, timeStr, isResub);
+        var openDateStr = '', openTimeStr = '';
+        if (!isResub) {
+          var openKey = 'open_' + realCls;
+          if (d[openKey]) {
+            var oDt = new Date(d[openKey]);
+            if (!isNaN(oDt.getTime())) {
+              openDateStr = oDt.getFullYear() + "-" + String(oDt.getMonth()+1).padStart(2,'0') + "-" + String(oDt.getDate()).padStart(2,'0');
+              openTimeStr = String(oDt.getHours()).padStart(2,'0') + ":" + String(oDt.getMinutes()).padStart(2,'0');
+            }
+          }
+        }
+        addEditDeadlineRow(realCls, dateStr, timeStr, isResub, openDateStr, openTimeStr);
       }
     }
     document.getElementById('editTaskModal').style.display = 'flex';
@@ -5823,12 +5862,46 @@
     var classes = window.allClasses || [];
     if (!classes.length) { var cf = document.getElementById('classFilter'); if (cf) classes = Array.from(cf.options).slice(1).map(function(o){ return o.value; }); }
     classes.forEach(function(c){ if(c && c !== 'all') csel.innerHTML += '<option value="'+c+'">'+c+'</option>'; });
+    // 학생 목록 채우기
+    var stuListEl = document.getElementById('pushStudentList');
+    stuListEl.innerHTML = '';
+    (window.allRoster || []).slice().sort(function(a,b){ return String(a.id).localeCompare(String(b.id)); }).forEach(function(s) {
+      var lbl = document.createElement('label');
+      lbl.className = 'push-stu-item';
+      lbl.dataset.search = (s.id + ' ' + s.name + ' ' + s.cls).toLowerCase();
+      lbl.style.cssText = 'display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:13px;';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox'; cb.className = 'push-stu-cb'; cb.value = s.id;
+      cb.addEventListener('change', updatePushStudentCount);
+      lbl.appendChild(cb);
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = s.id + ' ' + s.name;
+      lbl.appendChild(nameSpan);
+      var clsSpan = document.createElement('span');
+      clsSpan.style.cssText = 'font-size:11px;color:#94a3b8;margin-left:auto;';
+      clsSpan.textContent = s.cls;
+      lbl.appendChild(clsSpan);
+      stuListEl.appendChild(lbl);
+    });
+    document.getElementById('pushStudentSearch').value = '';
+    document.getElementById('pushStudentCount').textContent = '0명 선택됨';
     document.getElementById('pushModal').style.display = 'flex';
   }
   function onPushTargetChange() {
     var val = document.querySelector('input[name="pushTarget"]:checked').value;
-    document.getElementById('pushUnsubRow').style.display  = val === 'unsub'  ? '' : 'none';
-    document.getElementById('pushClassRow').style.display  = val === 'class'  ? '' : 'none';
+    document.getElementById('pushUnsubRow').style.display    = val === 'unsub'   ? '' : 'none';
+    document.getElementById('pushClassRow').style.display    = val === 'class'   ? '' : 'none';
+    document.getElementById('pushStudentRow').style.display  = val === 'student' ? '' : 'none';
+  }
+  function filterPushStudentList() {
+    var q = document.getElementById('pushStudentSearch').value.toLowerCase();
+    document.querySelectorAll('#pushStudentList .push-stu-item').forEach(function(item) {
+      item.style.display = !q || item.dataset.search.includes(q) ? '' : 'none';
+    });
+  }
+  function updatePushStudentCount() {
+    var n = document.querySelectorAll('#pushStudentList .push-stu-cb:checked').length;
+    document.getElementById('pushStudentCount').textContent = n + '명 선택됨';
   }
   function setPushTemplate(title, body) {
     document.getElementById('pushTitle').value = title;
@@ -5863,9 +5936,13 @@
     } else if (target === 'class') {
       var cls = document.getElementById('pushClassSelect').value;
       if (!cls) { btn.disabled=false; btn.textContent='🔔 알림 전송'; return alert('반을 선택하세요.'); }
-      // 해당 반 학생 ID 필터링은 서버에서 처리
       google.script.run.withSuccessHandler(onDone).withFailureHandler(function(e){ onDone({success:false,message:e.message}); })
         .sendPushToStudents(null, title, body, 'class', cls);
+    } else if (target === 'student') {
+      var ids = Array.from(document.querySelectorAll('#pushStudentList .push-stu-cb:checked')).map(function(cb){ return cb.value; });
+      if (!ids.length) { btn.disabled=false; btn.textContent='🔔 알림 전송'; return alert('학생을 선택하세요.'); }
+      google.script.run.withSuccessHandler(onDone).withFailureHandler(function(e){ onDone({success:false,message:e.message}); })
+        .sendPushToStudents(ids, title, body, 'student', null);
     } else {
       google.script.run.withSuccessHandler(onDone).withFailureHandler(function(e){ onDone({success:false,message:e.message}); })
         .sendPushToAll(title, body, 'general');
