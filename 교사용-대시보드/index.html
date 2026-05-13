@@ -581,71 +581,72 @@
 
     <!-- 탭2: 교실 알림판 등록/관리 -->
     <div id="noticeTab2" style="display:none;">
+      <div style="display:grid;grid-template-columns:1fr 360px;gap:14px;align-items:start;">
 
-      <!-- 상단: 날짜 선택 + 빠른 저장 -->
-      <div style="background:white;border-radius:12px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-          <div style="font-size:14px;font-weight:800;color:#0f172a;white-space:nowrap;">📺 교실 알림판</div>
+        <!-- 왼쪽: 입력 폼 (항상 표시) -->
+        <div style="background:white;border-radius:12px;border:1px solid #e2e8f0;padding:16px;">
           <input type="hidden" id="boardRowIdx">
-          <input type="date" id="boardDate" class="form-input" style="width:160px;">
-          <button onclick="toggleBoardForm()" id="boardFormToggleBtn"
-            style="background:#f59e0b;color:white;border:none;padding:7px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
-            ✏️ 내용 입력
-          </button>
-          <button onclick="saveBoardEntry()" id="boardSaveBtn"
-            style="background:#10b981;color:white;border:none;padding:7px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap;">
-            💾 저장
-          </button>
-          <button onclick="clearBoardForm()" style="background:#f1f5f9;color:#64748b;border:none;padding:7px 10px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">초기화</button>
-          <div style="font-size:11px;color:#94a3b8;margin-left:auto;">시스템설정 G2: 알림판 ID</div>
-        </div>
-      </div>
+          <!-- 날짜 + 저장 버튼 -->
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+            <input type="date" id="boardDate" class="form-input" style="width:160px;font-size:14px;font-weight:700;">
+            <button onclick="saveBoardEntry()" id="boardSaveBtn"
+              style="background:#10b981;color:white;border:none;padding:9px 20px;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer;">
+              💾 저장
+            </button>
+            <button onclick="clearBoardForm()" style="background:#f1f5f9;color:#64748b;border:none;padding:9px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🔄 초기화</button>
+            <span id="boardEditingBadge" style="display:none;background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:4px 10px;border-radius:20px;">✏️ 수정 중</span>
+          </div>
 
-      <!-- 입력 폼 (접을 수 있음) -->
-      <div id="boardFormBody" style="display:none;background:white;border-radius:12px;border:1px solid #e2e8f0;padding:14px 16px;margin-bottom:12px;">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
           <!-- 아침조회 -->
-          <div style="background:#fef3c7;border-radius:8px;padding:10px;">
-            <div style="font-size:12px;font-weight:800;color:#92400e;margin-bottom:6px;">🌅 아침조회</div>
-            <textarea id="boardAnnouncement" class="form-input" rows="2" style="font-size:12px;resize:vertical;margin-bottom:6px;" placeholder="공지사항"></textarea>
-            <textarea id="boardNotice"       class="form-input" rows="2" style="font-size:12px;resize:vertical;" placeholder="전달사항"></textarea>
+          <div style="background:#fef9ec;border:1px solid #fde68a;border-radius:10px;padding:12px;margin-bottom:10px;">
+            <div style="font-size:13px;font-weight:800;color:#92400e;margin-bottom:8px;">🌅 아침조회</div>
+            <label class="form-label" style="font-size:11px;margin-bottom:4px;">📢 공지사항</label>
+            <textarea id="boardAnnouncement" class="form-input" rows="4" style="font-size:13px;resize:vertical;margin-bottom:8px;line-height:1.6;" placeholder="공지사항을 입력하세요&#10;(여러 줄 입력 가능)"></textarea>
+            <label class="form-label" style="font-size:11px;margin-bottom:4px;">📌 전달사항 / 준비물</label>
+            <textarea id="boardNotice" class="form-input" rows="3" style="font-size:13px;resize:vertical;line-height:1.6;" placeholder="전달사항, 준비물 등"></textarea>
           </div>
-          <!-- 종례 -->
-          <div style="background:#e0f2fe;border-radius:8px;padding:10px;">
-            <div style="font-size:12px;font-weight:800;color:#0369a1;margin-bottom:6px;">🌆 종례</div>
-            <textarea id="boardAnnouncementPm" class="form-input" rows="2" style="font-size:12px;resize:vertical;margin-bottom:6px;" placeholder="공지사항"></textarea>
-            <textarea id="boardNoticePm"       class="form-input" rows="2" style="font-size:12px;resize:vertical;" placeholder="전달사항"></textarea>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;align-items:end;">
-          <div>
-            <label class="form-label" style="font-size:11px;">🖼️ 슬라이드 URL</label>
-            <input type="text" id="boardSlideUrl" class="form-input" style="font-size:11px;" placeholder="비워두면 기존 유지">
-          </div>
-          <div>
-            <label class="form-label" style="font-size:11px;">🎬 영상 URL</label>
-            <input type="text" id="boardVideoUrl" class="form-input" style="font-size:11px;" placeholder="YouTube URL">
-          </div>
-          <div>
-            <label class="form-label" style="font-size:11px;">영상 모드</label>
-            <select id="boardVideoModeSelect" class="form-input" style="font-size:11px;">
-              <option value="소리만">🔊 소리만</option>
-              <option value="무음">🔇 무음</option>
-              <option value="전체">📺 전체재생</option>
-            </select>
-          </div>
-        </div>
-      </div>
 
-      <!-- 등록된 목록 (항상 표시, 위에 배치) -->
-      <div style="background:white;border-radius:12px;border:1px solid #e2e8f0;padding:14px 16px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-          <div style="font-size:14px;font-weight:800;color:#0f172a;">📋 등록된 알림판</div>
-          <button onclick="loadBoardList()" style="background:#f1f5f9;color:#475569;border:none;padding:5px 12px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;">🔄 새로고침</button>
+          <!-- 종례 -->
+          <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:12px;margin-bottom:12px;">
+            <div style="font-size:13px;font-weight:800;color:#0369a1;margin-bottom:8px;">🌆 종례</div>
+            <label class="form-label" style="font-size:11px;margin-bottom:4px;">📢 공지사항</label>
+            <textarea id="boardAnnouncementPm" class="form-input" rows="4" style="font-size:13px;resize:vertical;margin-bottom:8px;line-height:1.6;" placeholder="공지사항을 입력하세요&#10;(여러 줄 입력 가능)"></textarea>
+            <label class="form-label" style="font-size:11px;margin-bottom:4px;">📌 전달사항 / 준비물</label>
+            <textarea id="boardNoticePm" class="form-input" rows="3" style="font-size:13px;resize:vertical;line-height:1.6;" placeholder="전달사항, 준비물 등"></textarea>
+          </div>
+
+          <!-- 슬라이드/영상 -->
+          <div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:8px;">
+            <div>
+              <label class="form-label" style="font-size:11px;">🖼️ 슬라이드 URL</label>
+              <input type="text" id="boardSlideUrl" class="form-input" style="font-size:12px;" placeholder="비워두면 기본값 자동 적용">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px;">🎬 YouTube URL</label>
+              <input type="text" id="boardVideoUrl" class="form-input" style="font-size:12px;" placeholder="YouTube URL">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px;">영상 모드</label>
+              <select id="boardVideoModeSelect" class="form-input" style="font-size:12px;">
+                <option value="소리만">🔊 소리만</option>
+                <option value="무음">🔇 무음</option>
+                <option value="전체">📺 전체</option>
+              </select>
+            </div>
+          </div>
         </div>
-        <div id="boardList" style="color:#94a3b8;text-align:center;padding:16px;font-size:13px;">
-          새로고침을 눌러주세요.
+
+        <!-- 오른쪽: 이전 알림판 목록 -->
+        <div style="background:white;border-radius:12px;border:1px solid #e2e8f0;padding:14px;max-height:660px;display:flex;flex-direction:column;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-shrink:0;">
+            <div style="font-size:14px;font-weight:800;color:#0f172a;">📋 이전 알림판</div>
+            <button onclick="loadBoardList()" style="background:#f1f5f9;color:#475569;border:none;padding:5px 10px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;">🔄</button>
+          </div>
+          <div id="boardList" style="overflow-y:auto;flex:1;color:#94a3b8;text-align:center;padding:20px;font-size:13px;">
+            불러오는 중...
+          </div>
         </div>
+
       </div>
     </div>
   </div>
@@ -4311,14 +4312,7 @@
       .deleteNoticeData(rowIdx);
   }
   var currentNoticeTab = 1;
-  function toggleBoardForm() {
-    var body = document.getElementById('boardFormBody');
-    var btn  = document.getElementById('boardFormToggleBtn');
-    if (!body) return;
-    var isOpen = body.style.display !== 'none';
-    body.style.display = isOpen ? 'none' : 'block';
-    if (btn) btn.textContent = isOpen ? '✏️ 내용 입력' : '▲ 접기';
-  }
+  function toggleBoardForm() { /* 더 이상 사용 안 함 — 폼 항상 표시 */ }
   function saveBoardEntry() {
     var date = document.getElementById('boardDate').value;
     if (!date) return alert('날짜를 입력하세요.');
@@ -4380,6 +4374,8 @@
     document.getElementById('boardVideoUrl').value = '';
     var modeEl = document.getElementById('boardVideoModeSelect');
     if (modeEl) modeEl.value = '소리만';
+    var badge = document.getElementById('boardEditingBadge');
+    if (badge) badge.style.display = 'none';
     var btn = document.getElementById('boardSaveBtn');
     if (btn) btn.textContent = '💾 저장';
   }
@@ -4397,12 +4393,9 @@
     document.getElementById('boardVideoUrl').value = item.videoUrl || '';
     var modeEl2 = document.getElementById('boardVideoModeSelect');
     if (modeEl2) modeEl2.value = item.videoMode || '소리만';
-    var body = document.getElementById('boardFormBody');
-    if (body) body.style.display = 'block';
-    var toggleBtn = document.getElementById('boardFormToggleBtn');
-    if (toggleBtn) toggleBtn.textContent = '▲ 접기';
-    var dateEl = document.getElementById('boardDate');
-    if (dateEl) dateEl.scrollIntoView({behavior:'smooth', block:'center'});
+    var badge = document.getElementById('boardEditingBadge');
+    if (badge) badge.style.display = 'inline-block';
+    document.getElementById('boardDate').scrollIntoView({behavior:'smooth', block:'center'});
   }
   function deleteBoardEntry(rowIdx) {
     if (!confirm('이 알림판 항목을 삭제할까요?')) return;
@@ -4437,27 +4430,27 @@
         boards.forEach(function(b) {
           var hasContent = b.announcement||b.notice||b.announcementPm||b.noticePm;
           var hasMedia   = b.slideUrl || b.videoUrl;
-          html += '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px;margin-bottom:8px;">'
+          var clip = function(s, n) { return s ? (s.length > n ? s.substring(0,n)+'…' : s) : ''; };
+          html += '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer;" onclick="editBoardEntry('+b.rowIdx+')" title="클릭해서 불러오기">'
             + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-              + '<div style="font-size:14px;font-weight:800;color:#0f172a;">📅 ' + b.date + '</div>'
-              + '<div style="display:flex;gap:5px;">'
-                + (hasMedia ? '<span style="font-size:10px;background:#e0f2fe;color:#0369a1;padding:2px 7px;border-radius:10px;font-weight:700;">'+(b.slideUrl?'🖼️슬라이드':'')+' '+(b.videoUrl?'🎬영상':'')+'</span>' : '')
-                + '<button data-bid="'+b.rowIdx+'" onclick="editBoardEntry(parseInt(this.dataset.bid))" style="background:#e0e7ff;color:#4338ca;border:none;padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">수정</button>'
-                + '<button data-bid="'+b.rowIdx+'" onclick="deleteBoardEntry(parseInt(this.dataset.bid))" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 9px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">삭제</button>'
+              + '<div style="font-size:13px;font-weight:800;color:#0f172a;">📅 ' + b.date + (hasMedia ? ' <span style="font-size:10px;color:#0369a1;font-weight:600;">'+(b.slideUrl?'🖼️':'')+(b.videoUrl?'🎬':'')+'</span>' : '') + '</div>'
+              + '<div style="display:flex;gap:4px;" onclick="event.stopPropagation()">'
+                + '<button data-bid="'+b.rowIdx+'" onclick="editBoardEntry(parseInt(this.dataset.bid))" style="background:#e0e7ff;color:#4338ca;border:none;padding:3px 8px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">📥 불러오기</button>'
+                + '<button data-bid="'+b.rowIdx+'" onclick="deleteBoardEntry(parseInt(this.dataset.bid))" style="background:#fee2e2;color:#dc2626;border:none;padding:3px 7px;border-radius:6px;font-size:11px;cursor:pointer;font-weight:700;">삭제</button>'
               + '</div>'
             + '</div>'
-            + (hasContent ? '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">'
-              + (b.announcement||b.notice ? '<div style="background:#fef3c7;border-radius:6px;padding:6px 8px;">'
-                + '<div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:2px;">🌅 아침조회</div>'
-                + (b.announcement ? '<div style="font-size:11px;color:#334155;"><b>공지:</b> '+b.announcement.substring(0,40)+(b.announcement.length>40?'…':'')+'</div>' : '')
-                + (b.notice       ? '<div style="font-size:11px;color:#334155;"><b>전달:</b> '+b.notice.substring(0,40)+(b.notice.length>40?'…':'')+'</div>' : '')
+            + (hasContent ? ''
+              + (b.announcement||b.notice ? '<div style="background:#fef9ec;border-radius:6px;padding:6px 8px;margin-bottom:4px;">'
+                + '<div style="font-size:10px;font-weight:700;color:#92400e;margin-bottom:3px;">🌅 아침조회</div>'
+                + (b.announcement ? '<div style="font-size:12px;color:#334155;line-height:1.5;white-space:pre-wrap;">'+clip(b.announcement,80)+'</div>' : '')
+                + (b.notice       ? '<div style="font-size:12px;color:#64748b;margin-top:2px;line-height:1.5;white-space:pre-wrap;">📌 '+clip(b.notice,60)+'</div>' : '')
                 + '</div>' : '')
-              + (b.announcementPm||b.noticePm ? '<div style="background:#e0f2fe;border-radius:6px;padding:6px 8px;">'
-                + '<div style="font-size:10px;font-weight:700;color:#0369a1;margin-bottom:2px;">🌆 종례</div>'
-                + (b.announcementPm ? '<div style="font-size:11px;color:#334155;"><b>공지:</b> '+b.announcementPm.substring(0,40)+(b.announcementPm.length>40?'…':'')+'</div>' : '')
-                + (b.noticePm      ? '<div style="font-size:11px;color:#334155;"><b>전달:</b> '+b.noticePm.substring(0,40)+(b.noticePm.length>40?'…':'')+'</div>' : '')
+              + (b.announcementPm||b.noticePm ? '<div style="background:#f0f9ff;border-radius:6px;padding:6px 8px;">'
+                + '<div style="font-size:10px;font-weight:700;color:#0369a1;margin-bottom:3px;">🌆 종례</div>'
+                + (b.announcementPm ? '<div style="font-size:12px;color:#334155;line-height:1.5;white-space:pre-wrap;">'+clip(b.announcementPm,80)+'</div>' : '')
+                + (b.noticePm      ? '<div style="font-size:12px;color:#64748b;margin-top:2px;line-height:1.5;white-space:pre-wrap;">📌 '+clip(b.noticePm,60)+'</div>' : '')
                 + '</div>' : '')
-              + '</div>' : '')
+              : '<div style="font-size:12px;color:#94a3b8;text-align:center;padding:4px;">내용 없음</div>')
             + '</div>';
         });
         listDiv.innerHTML = html;
@@ -4475,10 +4468,6 @@
     btn2.style.background = n === 2 ? '#0284c7' : 'transparent';
     btn2.style.color = n === 2 ? 'white' : '#64748b';
     if (n === 2) {
-      var formBody = document.getElementById('boardFormBody');
-      if (formBody) formBody.style.display = 'none';
-      var fBtn = document.getElementById('boardFormToggleBtn');
-      if (fBtn) fBtn.textContent = '✏️ 내용 입력';
       var dateEl = document.getElementById('boardDate');
       if (dateEl && !dateEl.value) {
         var today = new Date();
