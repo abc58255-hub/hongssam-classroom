@@ -29,7 +29,19 @@
     .main-content { flex-grow: 1; padding: 25px 35px; overflow-y: auto; background: #f8fafc; position: relative;}
     .page-title { font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 0; margin-bottom: 20px; border-bottom: 2px solid #e2e8f0; padding-bottom: 15px; display:flex; justify-content:space-between; align-items:center;}
     .mobile-menu-btn { display: none; background: none; border: none; font-size: 24px; cursor: pointer; margin-right: 15px; color: #0f172a;}
-    @media (max-width: 768px) { .sidebar { position: fixed; left: -260px; height: 100%; box-shadow: 5px 0 15px rgba(0,0,0,0.5); } .sidebar.open { left: 0; } .mobile-menu-btn { display: inline-block; } .main-content { padding: 15px; } }
+    @media (max-width: 768px) {
+      .sidebar { position: fixed; left: -260px; height: 100%; box-shadow: 5px 0 15px rgba(0,0,0,0.5); }
+      .sidebar.open { left: 0; }
+      .mobile-menu-btn { display: inline-block; }
+      .main-content { padding: 15px; }
+    }
+    #mobileMenuFab { display: none; }
+    @media (max-width: 768px) {
+      #mobileMenuFab { display: flex; position: fixed; bottom: 22px; left: 18px; z-index: 200; width: 50px; height: 50px; border-radius: 50%; background: #0f172a; color: white; border: none; font-size: 22px; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(0,0,0,0.35); cursor: pointer; transition: 0.2s; }
+      #mobileMenuFab.open { background: #dc2626; }
+    }
+    #sidebarOverlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 99; }
+    #sidebarOverlay.show { display: block; }
     .top-actions { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;}
     .btn-smart, .btn-bulk, .btn-add-act { background: #0284c7; color: white; border: none; padding: 12px 20px; border-radius: 10px; font-weight: 800; font-size: 15px; cursor: pointer;}
     .btn-smart { background: #ea580c; } .btn-bulk { background: #10b981; }
@@ -213,6 +225,11 @@
     </div>
   </div>
 </div>
+
+<!-- 모바일: 사이드바 외부 탭으로 닫기 -->
+<div id="sidebarOverlay" onclick="toggleSidebar()"></div>
+<!-- 모바일: 항상 보이는 메뉴 플로팅 버튼 -->
+<button id="mobileMenuFab" onclick="toggleSidebar()" title="메뉴">☰</button>
 
 <div class="sidebar" id="sidebar">
   <div class="sidebar-header">
@@ -1743,7 +1760,14 @@
   } else {
     initApp();
   }
-  function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); }
+  function toggleSidebar() {
+    var sidebar = document.getElementById('sidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+    var fab     = document.getElementById('mobileMenuFab');
+    var isOpen  = sidebar.classList.toggle('open');
+    if (overlay) overlay.classList.toggle('show', isOpen);
+    if (fab) { fab.classList.toggle('open', isOpen); fab.textContent = isOpen ? '✕' : '☰'; }
+  }
   function switchPage(pageId, elem) {
     document.querySelectorAll('.page-section').forEach(function(p) { p.style.display = 'none'; });
     document.querySelectorAll('.menu-item').forEach(function(m) { m.classList.remove('active'); });
