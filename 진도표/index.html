@@ -117,7 +117,6 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     <div class="header-title">📋 진도표 관리</div>
     <div class="header-actions">
       <button class="btn btn-primary" onclick="openPlanEdit()">✏️ 계획 편집</button>
-      <button class="btn btn-amber" onclick="openBulkPlannedDate()">📅 예정일 일괄</button>
       <button class="btn btn-gray" onclick="openSylSettings()">⚙️ 설정</button>
     </div>
   </div>
@@ -193,7 +192,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
         <div id="ttClassGrid" style="overflow-x:auto;margin-bottom:14px;"></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
           <button class="btn btn-gray" id="ttCancelEditBtn" onclick="cancelTtEdit()" style="display:none;">취소</button>
-          <button class="btn btn-primary" id="ttSaveBtn" onclick="saveAndGenerateSchedule()" style="padding:10px 20px;font-size:14px;">💾 저장하고 진도표 생성</button>
+          <button class="btn btn-primary" id="ttSaveBtn" onclick="saveAndGenerateSchedule()" style="padding:10px 20px;font-size:14px;">💾 시간표 저장</button>
           <div id="ttSaveStatus" style="font-size:13px;"></div>
         </div>
       </div>
@@ -235,52 +234,23 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
   </div>
 </div>
 
-<!-- 예정일 일괄 모달 -->
-<div id="bulkPlannedModal" class="modal-bg">
-  <div class="modal-box" style="max-width:520px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
-      <div style="font-size:16px;font-weight:800;color:#0f172a;">📅 예정일 빠른 입력</div>
-      <button onclick="document.getElementById('bulkPlannedModal').classList.remove('open')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
-    </div>
-    <div style="margin-bottom:10px;font-size:12px;color:#64748b;">각 차시의 예정일을 직접 입력하세요.</div>
-    <div style="margin-bottom:10px;display:flex;gap:8px;align-items:center;">
-      <select id="bulkTargetCls" class="form-input" style="flex:1;padding:7px;">
-        <option value="all">전체 반 동일 적용</option>
-      </select>
-      <label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;white-space:nowrap;">
-        <input type="checkbox" id="bulkOverwrite2"> 기존 예정일 덮어쓰기
-      </label>
-    </div>
-    <div id="bulkDateRows" style="display:flex;flex-direction:column;gap:4px;max-height:55vh;overflow-y:auto;"></div>
-    <div style="display:flex;gap:8px;margin-top:14px;">
-      <button class="btn btn-gray" style="flex:1;" onclick="document.getElementById('bulkPlannedModal').classList.remove('open')">취소</button>
-      <button class="btn btn-amber" style="flex:2;font-weight:800;" onclick="applyBulkPlannedDate()">📅 저장</button>
-    </div>
-  </div>
-</div>
-
-<!-- 날짜 체크 모달 -->
+<!-- 수업 기록 모달 -->
 <div id="checkDateModal" class="modal-bg">
   <div class="modal-box" style="max-width:360px;">
-    <h3 style="margin:0 0 14px;font-size:16px;font-weight:800;color:#0f172a;" id="checkDateTitle">날짜 / 특이사항</h3>
-    <input type="hidden" id="checkLessonNo">
+    <h3 style="margin:0 0 14px;font-size:16px;font-weight:800;color:#0f172a;" id="checkDateTitle">수업 기록</h3>
+    <input type="hidden" id="checkDate">
     <input type="hidden" id="checkCls">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
-      <div>
-        <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:5px;">✅ 실제 수업일</div>
-        <input type="date" id="checkDate" class="form-input">
-      </div>
-      <div>
-        <div style="font-size:12px;font-weight:700;color:#f59e0b;margin-bottom:5px;">📅 예상 수업일</div>
-        <input type="date" id="checkPlannedDate" class="form-input">
-      </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:5px;">수업한 차시 번호</div>
+      <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시 번호 입력 (예: 3)" oninput="previewLesson(this.value)">
+      <div id="checkLessonPreview" style="font-size:12px;color:#64748b;margin-top:4px;min-height:18px;padding:2px 0;"></div>
     </div>
-    <div style="font-size:13px;color:#64748b;margin-bottom:6px;">메모 (선택)</div>
-    <textarea id="checkMemo" class="form-input" rows="4" placeholder="반 특이사항, 진도 차이, 학생 반응 등" style="margin-bottom:16px;resize:vertical;min-height:80px;"></textarea>
+    <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">메모 (선택)</div>
+    <textarea id="checkMemo" class="form-input" rows="3" placeholder="반 특이사항, 진도 차이, 학생 반응 등" style="margin-bottom:16px;resize:vertical;min-height:70px;"></textarea>
     <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button id="checkCancelBtn" class="btn btn-danger" onclick="cancelCheck()" style="display:none;">체크 해제</button>
+      <button id="checkCancelBtn" class="btn btn-danger" onclick="cancelCheck()" style="display:none;">기록 삭제</button>
       <button class="btn btn-gray" onclick="document.getElementById('checkDateModal').classList.remove('open')">취소</button>
-      <button class="btn" style="background:#10b981;color:white;" onclick="confirmCheck()">확인</button>
+      <button class="btn" style="background:#10b981;color:white;" onclick="confirmCheck()">저장</button>
     </div>
   </div>
 </div>
@@ -310,15 +280,16 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 </div>
 
 <script>
-var sylPlanCache   = [];
-var sylCheckCache  = {};
-var sylClassList   = [];
-var examRangeCache = [];
-var allClasses     = [];
-var currentGroupId = '기본';
-var groupsCache    = [];
-var semestersCache = [];
-var timetableCache = [];
+var sylPlanCache    = [];
+var sylCheckCache   = {};
+var sylScheduleCache= {};
+var sylClassList    = [];
+var examRangeCache  = [];
+var allClasses      = [];
+var currentGroupId  = '기본';
+var groupsCache     = [];
+var semestersCache  = [];
+var timetableCache  = [];
 
 // ─── 로그인 ───
 function doLogin() {
@@ -403,10 +374,11 @@ function loadSyllabusData(forceTab) {
     })
     .withSuccessHandler(function(res) {
       if (!res.success) return;
-      sylPlanCache   = res.plans      || [];
-      sylCheckCache  = res.checks     || {};
-      sylClassList   = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
-      examRangeCache = res.examRanges || [];
+      sylPlanCache    = res.plans      || [];
+      sylCheckCache   = res.checks     || {};
+      sylScheduleCache= res.schedule   || {};
+      sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
+      examRangeCache  = res.examRanges || [];
       var targetTab = forceTab || [1,2,3,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
         return el && el.style.display !== 'none';
@@ -432,152 +404,159 @@ function switchTab(n) {
   if (n === 4) loadTimetableTab();
 }
 
-// ─── 주별 색상 ───
-function getWeekColor(dateStr) {
-  if (!dateStr) return null;
-  var pp = String(dateStr).split('/');
-  if (pp.length !== 2) return null;
-  var yr = new Date().getMonth() < 2 && parseInt(pp[0]) >= 11 ? new Date().getFullYear()-1 : new Date().getFullYear();
-  var d = new Date(yr, parseInt(pp[0])-1, parseInt(pp[1]));
-  var jan1 = new Date(d.getFullYear(), 0, 1);
-  var wk = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
-  var pal = ['#bfdbfe','#bbf7d0','#fed7aa','#ddd6fe','#fef08a','#fecdd3','#bae6fd'];
-  return pal[wk % pal.length];
-}
 
 function escapeHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-// ─── 진도표 렌더 ───
+// ─── 진도표 렌더 (날짜 기반) ───
 function renderSylTable() {
   var wrap = document.getElementById('sylTableWrap');
   if (!wrap) return;
-  if (sylPlanCache.length === 0) {
-    wrap.innerHTML = '<div class="empty-state"><div class="emoji">📋</div><h3>아직 계획이 없어요</h3><p>상단 "✏️ 계획 편집" 버튼으로 차시별 계획을 먼저 입력하세요.</p><button class="btn btn-primary" onclick="openPlanEdit()">+ 계획 입력하기</button></div>';
+  var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
+
+  if (cols.length === 0) {
+    wrap.innerHTML = '<div class="empty-state"><div class="emoji">⚙️</div><h3>반 설정이 필요해요</h3><p>상단 "⚙️ 설정"에서 표시할 반을 선택하거나, 학생명부에 학생을 등록하세요.</p></div>';
     return;
   }
-  var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
-  var html = '<table class="syl-table" style="min-width:' + (320 + cols.length*100) + 'px;"><thead><tr>';
-  html += '<th style="min-width:52px;">차시</th>';
-  html += '<th style="text-align:left;padding:10px 16px;">계획 내용</th>';
+
+  var hasSchedule = cols.some(function(cls){ return (sylScheduleCache[cls]||[]).length > 0; });
+  if (!hasSchedule) {
+    wrap.innerHTML = '<div class="empty-state"><div class="emoji">📅</div><h3>시간표가 없어요</h3><p>수업 일정은 시간표에서 자동으로 계산됩니다.<br>아래 "시간표 생성" 탭에서 먼저 학기와 시간표를 등록하세요.</p>'
+      + '<button class="btn btn-primary" onclick="switchTab(4)">📅 시간표 설정하기</button></div>';
+    return;
+  }
+
+  // 표시 반들의 일정 날짜 합집합
+  var allDates = {};
+  cols.forEach(function(cls) {
+    (sylScheduleCache[cls]||[]).forEach(function(d){ allDates[d] = true; });
+  });
+  var sortedDates = Object.keys(allDates).sort();
+
+  var DAY_KR = ['일','월','화','수','목','금','토'];
+
+  var html = '<table class="syl-table" style="min-width:' + (140 + cols.length*120) + 'px;"><thead><tr>';
+  html += '<th style="min-width:120px;text-align:left;padding:10px 14px;">날짜</th>';
   cols.forEach(function(cls) {
     var yearMatch = cls.match(/\d+학년/);
     var yearPart  = yearMatch ? yearMatch[0] : '';
     var shortCls  = cls.replace(yearPart + ' ', '');
-    html += '<th style="min-width:90px;">'
+    html += '<th style="min-width:110px;">'
       + (yearPart ? '<div style="font-size:10px;opacity:0.7;font-weight:500;margin-bottom:2px;">' + yearPart + '</div>' : '')
-      + '<div>' + shortCls + '</div></th>';
+      + '<div>' + escapeHtml(shortCls) + '</div></th>';
   });
   html += '</tr></thead><tbody>';
-  sylPlanCache.forEach(function(plan) {
+
+  var lastMonth = '';
+  sortedDates.forEach(function(dateStr) {
+    var d = new Date(dateStr + 'T09:00:00');
+    var monthLabel = d.getFullYear() + '년 ' + (d.getMonth()+1) + '월';
+    if (monthLabel !== lastMonth) {
+      lastMonth = monthLabel;
+      html += '<tr><td colspan="' + (cols.length+1) + '" style="background:#1e3a8a;color:white;font-weight:800;padding:6px 16px;font-size:13px;">' + monthLabel + '</td></tr>';
+    }
+
+    var dow = d.getDay();
+    var dayLabel = DAY_KR[dow];
+    var dayColor = dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : '#334155';
     html += '<tr>';
-    html += '<td style="text-align:center;padding:12px 8px;font-weight:800;font-size:14px;color:#1e3a8a;">' + plan.lessonNo + '</td>';
-    html += '<td style="padding:10px 16px;cursor:pointer;" onclick="openPlanEdit(' + plan.lessonNo + ')">' +
-      (plan.content
-        ? '<div style="font-size:13px;font-weight:600;color:#1e293b;">' + escapeHtml(plan.content) + '</div>' +
-          (plan.memo ? '<div style="font-size:11px;color:#94a3b8;margin-top:2px;">' + escapeHtml(plan.memo) + '</div>' : '')
-        : '<div style="font-size:12px;color:#cbd5e1;font-style:italic;">클릭하여 내용 입력</div>') + '</td>';
+    html += '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;">'
+      + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + dayLabel + ')</span></td>';
+
     cols.forEach(function(cls) {
-      var key  = plan.lessonNo + '_' + cls;
-      var done = sylCheckCache[key];
-      if (done && done.date) {
-        var wkColor = getWeekColor(done.date) || '#f0fdf4';
-        html += '<td style="padding:3px 4px;background:' + wkColor + ';border-top:2px solid rgba(0,0,0,0.08);">'
-          + '<div style="display:flex;align-items:flex-start;gap:4px;min-height:36px;">'
-            + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;flex-shrink:0;">'
-              + '<span data-ln="' + plan.lessonNo + '" data-cl="' + escapeHtml(cls) + '" onclick="openCheckDate(parseInt(this.dataset.ln),this.dataset.cl)" style="font-size:15px;cursor:pointer;" title="클릭하여 수정">✅</span>'
-              + '<span style="font-size:9px;color:#065f46;font-weight:700;white-space:nowrap;">' + done.date + '</span>'
-              + (done.plannedDate ? '<span style="font-size:8px;color:#f59e0b;white-space:nowrap;">예상 ' + done.plannedDate + '</span>' : '')
+      var scheduled = (sylScheduleCache[cls]||[]).indexOf(dateStr) >= 0;
+      if (!scheduled) {
+        html += '<td style="background:#f8fafc;"></td>';
+        return;
+      }
+      var key = dateStr + '_' + cls;
+      var check = sylCheckCache[key];
+      if (check && check.lessonNo) {
+        var plan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
+        html += '<td style="padding:5px 8px;background:#f0fdf4;cursor:pointer;" data-date="' + escapeHtml(dateStr) + '" data-cls="' + escapeHtml(cls) + '" onclick="openCheckDate(this.dataset.date,this.dataset.cls)" title="클릭하여 수정">'
+          + '<div style="display:flex;align-items:center;gap:5px;">'
+            + '<span style="font-size:16px;">✅</span>'
+            + '<div style="font-size:12px;min-width:0;">'
+              + '<div style="font-weight:800;color:#065f46;">' + check.lessonNo + '차시</div>'
+              + (plan && plan.content ? '<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;">' + escapeHtml(plan.content) + '</div>' : '')
+              + (check.memo ? '<div style="font-size:9px;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;">' + escapeHtml(check.memo) + '</div>' : '')
             + '</div>'
-            + (done.memo ? '<div style="flex:1;background:rgba(255,255,255,0.9);border-radius:4px;padding:2px 5px;border-left:2px solid #6366f1;min-width:0;">'
-              + '<span style="font-size:9px;color:#3730a3;line-height:1.4;display:block;word-break:keep-all;" title="' + escapeHtml(done.memo) + '">' + escapeHtml(done.memo) + '</span>'
-              + '</div>' : '')
-          + '</div></td>';
-      } else if (done && done.plannedDate) {
-        var wkColor2 = getWeekColor(done.plannedDate);
-        html += '<td style="text-align:center;padding:6px 4px;background:' + (wkColor2||'#fffbeb') + ';opacity:0.75;border-top:2px dashed rgba(0,0,0,0.1);">'
-          + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
-          + '<span data-ln="' + plan.lessonNo + '" data-cl="' + escapeHtml(cls) + '" onclick="openCheckDate(parseInt(this.dataset.ln),this.dataset.cl)" style="font-size:16px;cursor:pointer;" title="클릭하여 완료 체크">☐</span>'
-          + '<span style="font-size:10px;color:#f59e0b;font-weight:700;">📅 ' + done.plannedDate + '</span>'
           + '</div></td>';
       } else {
-        html += '<td style="text-align:center;padding:8px 4px;">'
-          + '<span data-ln="' + plan.lessonNo + '" data-cl="' + escapeHtml(cls) + '" onclick="openCheckDate(parseInt(this.dataset.ln),this.dataset.cl)" '
-          + 'style="display:inline-block;width:22px;height:22px;border:2px solid #d1d5db;border-radius:4px;cursor:pointer;background:white;" '
-          + 'title="클릭하여 날짜 입력"></span></td>';
+        html += '<td style="text-align:center;padding:8px;cursor:pointer;" data-date="' + escapeHtml(dateStr) + '" data-cls="' + escapeHtml(cls) + '" onclick="openCheckDate(this.dataset.date,this.dataset.cls)" title="클릭하여 수업 기록">'
+          + '<span style="display:inline-block;width:22px;height:22px;border:2px solid #d1d5db;border-radius:4px;background:white;"></span>'
+          + '</td>';
       }
     });
     html += '</tr>';
   });
+
   html += '</tbody></table>';
-  html += '<div style="display:flex;gap:12px;padding:10px 4px;font-size:12px;color:#64748b;flex-wrap:wrap;">'
-    + '<span>✅ = 수업 완료</span>'
-    + '<span style="color:#f59e0b;">📅 = 예상 날짜만</span>'
-    + '<span>☐ = 미입력</span>'
-    + '<span style="color:#94a3b8;">· 칸 클릭하여 실제/예상 날짜 입력</span>'
-    + '</div>';
+  html += '<div style="display:flex;gap:14px;padding:10px 4px;font-size:12px;color:#64748b;flex-wrap:wrap;">'
+    + '<span>✅ = 수업 기록됨</span>'
+    + '<span>☐ = 미기록 (예정)</span>'
+    + '<span style="color:#94a3b8;">— = 해당 없음</span>'
+    + '<span style="color:#94a3b8;">· 셀 클릭 → 수업한 차시 기록</span></div>';
   wrap.innerHTML = html;
 }
 
-// ─── 날짜 체크 모달 ───
-function openCheckDate(lessonNo, cls) {
-  document.getElementById('checkLessonNo').value = lessonNo;
+// ─── 수업 기록 모달 ───
+function openCheckDate(date, cls) {
+  document.getElementById('checkDate').value = date;
   document.getElementById('checkCls').value = cls;
-  document.getElementById('checkDateTitle').textContent = lessonNo + '차시 — ' + cls;
-  var key = lessonNo + '_' + cls;
+  var d = new Date(date + 'T09:00:00');
+  var DAY_KR = ['일','월','화','수','목','금','토'];
+  document.getElementById('checkDateTitle').textContent =
+    (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[d.getDay()] + ') — ' + cls;
+  var key = date + '_' + cls;
   var existing = sylCheckCache[key] || {};
-  var today = new Date();
-  var todayStr = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
-  var existDate = '';
-  if (existing.date) {
-    var parts = existing.date.split('/');
-    if (parts.length === 2) existDate = today.getFullYear() + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
-  }
-  document.getElementById('checkDate').value = existDate || todayStr;
+  var lnInput = document.getElementById('checkLessonNo');
+  lnInput.value = existing.lessonNo ? String(existing.lessonNo) : '';
+  previewLesson(lnInput.value);
   document.getElementById('checkMemo').value = existing.memo || '';
-  var existPlanned = '';
-  if (existing.plannedDate) {
-    var pp = existing.plannedDate.split('/');
-    if (pp.length === 2) existPlanned = today.getFullYear() + '-' + pp[0].padStart(2,'0') + '-' + pp[1].padStart(2,'0');
-  }
-  document.getElementById('checkPlannedDate').value = existPlanned;
-  document.getElementById('checkCancelBtn').style.display = existing.date ? 'inline-block' : 'none';
+  document.getElementById('checkCancelBtn').style.display = existing.lessonNo ? 'inline-block' : 'none';
   document.getElementById('checkDateModal').classList.add('open');
+  setTimeout(function(){ lnInput.focus(); lnInput.select(); }, 80);
+}
+
+function previewLesson(val) {
+  var ln = parseInt(val);
+  var el = document.getElementById('checkLessonPreview');
+  if (!el) return;
+  if (!ln) { el.textContent = ''; return; }
+  var plan = sylPlanCache.find(function(p){ return p.lessonNo === ln; });
+  el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
 }
 
 function cancelCheck() {
-  var lessonNo = parseInt(document.getElementById('checkLessonNo').value);
-  var cls      = document.getElementById('checkCls').value;
-  var key      = lessonNo + '_' + cls;
-  if (!sylCheckCache[key] || !sylCheckCache[key].date) {
+  var date = document.getElementById('checkDate').value;
+  var cls  = document.getElementById('checkCls').value;
+  var key  = date + '_' + cls;
+  if (!sylCheckCache[key] || !sylCheckCache[key].lessonNo) {
     document.getElementById('checkDateModal').classList.remove('open'); return;
   }
-  if (!confirm(lessonNo + '차시 ' + cls + ' 체크를 해제할까요?')) return;
+  if (!confirm(date + ' ' + cls + ' 수업 기록을 삭제할까요?')) return;
   document.getElementById('checkDateModal').classList.remove('open');
   delete sylCheckCache[key];
   renderSylTable();
-  google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(lessonNo, cls, currentGroupId);
+  google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(date, cls, currentGroupId);
 }
 
 function confirmCheck() {
-  var lessonNo    = parseInt(document.getElementById('checkLessonNo').value);
-  var cls         = document.getElementById('checkCls').value;
-  var date        = document.getElementById('checkDate').value;
-  var plannedDate = document.getElementById('checkPlannedDate').value;
-  var memo        = document.getElementById('checkMemo').value.trim();
-  if (!date && !plannedDate) return alert('실제 수업일 또는 예상 수업일을 입력하세요.');
+  var date     = document.getElementById('checkDate').value;
+  var cls      = document.getElementById('checkCls').value;
+  var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
+  var memo     = document.getElementById('checkMemo').value.trim();
+  if (!lessonNo) return alert('수업한 차시 번호를 입력하세요.');
   document.getElementById('checkDateModal').classList.remove('open');
-  var key = lessonNo + '_' + cls;
-  var dispDate = '', dispPlanned = '';
-  if (date) { var d1 = new Date(date + 'T00:00:00'); dispDate = (d1.getMonth()+1) + '/' + d1.getDate(); }
-  if (plannedDate) { var d2 = new Date(plannedDate + 'T00:00:00'); dispPlanned = (d2.getMonth()+1) + '/' + d2.getDate(); }
-  sylCheckCache[key] = { date: dispDate, memo: memo, plannedDate: dispPlanned };
+  var key = date + '_' + cls;
+  sylCheckCache[key] = { lessonNo: lessonNo, memo: memo };
   renderSylTable();
   google.script.run
     .withSuccessHandler(function(res) { if (!res.success) alert('오류: ' + (res.message||'')); })
-    .saveSyllabusCheck({ lessonNo: lessonNo, cls: cls, date: date, memo: memo, plannedDate: plannedDate }, currentGroupId);
+    .saveSyllabusCheck({ date: date, cls: cls, lessonNo: lessonNo, memo: memo }, currentGroupId);
 }
 
 // ─── 계획 편집 ───
@@ -660,31 +639,43 @@ function renderSylStatusBoard() {
   var board = document.getElementById('sylStatusBoard');
   if (!board) return;
   var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
-  if (sylPlanCache.length === 0) {
-    board.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">계획을 먼저 입력하세요.</div>';
+
+  var hasSchedule = cols.some(function(cls){ return (sylScheduleCache[cls]||[]).length > 0; });
+  if (!hasSchedule) {
+    board.innerHTML = '<div style="text-align:center;padding:40px;color:#94a3b8;">시간표를 먼저 설정하세요. (탭4 "시간표 생성")</div>';
     return;
   }
-  var total = sylPlanCache.length;
+
   var html = '<div class="status-grid">';
   cols.forEach(function(cls) {
+    var scheduledDates = sylScheduleCache[cls] || [];
+    var total = scheduledDates.length;
+    if (total === 0) return;
     var done = 0;
-    sylPlanCache.forEach(function(p) { if (sylCheckCache[p.lessonNo + '_' + cls] && sylCheckCache[p.lessonNo + '_' + cls].date) done++; });
-    var pct = total > 0 ? Math.round(done/total*100) : 0;
+    var lastDoneDate = '', lastLessonNo = 0;
+    scheduledDates.forEach(function(d) {
+      var ch = sylCheckCache[d + '_' + cls];
+      if (ch && ch.lessonNo) {
+        done++;
+        lastDoneDate = d;
+        lastLessonNo = ch.lessonNo;
+      }
+    });
+    var pct = Math.round(done/total*100);
     var color = pct === 100 ? '#10b981' : pct >= 50 ? '#3b82f6' : '#f59e0b';
-    var lastDone = 0;
-    sylPlanCache.forEach(function(p) { if (sylCheckCache[p.lessonNo+'_'+cls] && sylCheckCache[p.lessonNo+'_'+cls].date) lastDone = p.lessonNo; });
-    var lastPlan = lastDone < total ? sylPlanCache.find(function(p){return p.lessonNo===lastDone+1;}) : null;
+    var lastPlan = lastLessonNo ? sylPlanCache.find(function(p){ return p.lessonNo === lastLessonNo; }) : null;
     html += '<div class="status-card" style="border-top:4px solid ' + color + ';">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
         '<div style="font-size:16px;font-weight:800;color:#0f172a;">' + escapeHtml(cls) + '</div>' +
-        '<div style="font-size:13px;font-weight:800;color:' + color + ';">' + done + ' / ' + total + '차시</div>' +
+        '<div style="font-size:13px;font-weight:800;color:' + color + ';">' + done + ' / ' + total + '일</div>' +
       '</div>' +
       '<div style="background:#f1f5f9;border-radius:20px;height:8px;overflow:hidden;margin-bottom:10px;">' +
         '<div style="background:' + color + ';height:100%;width:' + pct + '%;border-radius:20px;transition:0.3s;"></div>' +
       '</div>' +
       '<div style="font-size:11px;color:#64748b;">' +
-        (lastDone > 0 ? '📌 ' + lastDone + '차시까지 완료' : '아직 시작 전') +
-        (lastPlan && lastPlan.content ? ' &nbsp;·&nbsp; 다음: ' + escapeHtml(lastPlan.content) : '') +
+        (lastLessonNo > 0
+          ? '📌 최근: ' + lastDoneDate + ' → ' + lastLessonNo + '차시' + (lastPlan&&lastPlan.content?' · '+escapeHtml(lastPlan.content.substring(0,12)):'')
+          : '아직 기록 없음') +
       '</div></div>';
   });
   html += '</div>';
@@ -744,72 +735,6 @@ function saveExamRange() {
     .saveExamRange({ name: name, units: units.join(',') }, currentGroupId);
 }
 
-// ─── 예정일 일괄 ───
-function openBulkPlannedDate() {
-  var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
-  if (sylPlanCache.length === 0) return alert('먼저 차시 계획을 입력하세요.');
-  document.getElementById('bulkPlannedModal').classList.add('open');
-  var clsSel = document.getElementById('bulkTargetCls');
-  clsSel.innerHTML = '<option value="all">전체 반 동일 적용</option>';
-  cols.forEach(function(cls) {
-    var o = document.createElement('option');
-    o.value = cls; o.textContent = cls;
-    clsSel.appendChild(o);
-  });
-  var rows = document.getElementById('bulkDateRows');
-  rows.innerHTML = '';
-  sylPlanCache.forEach(function(plan) {
-    var existing = '';
-    if (cols.length > 0) {
-      var k0 = plan.lessonNo + '_' + cols[0];
-      if (sylCheckCache[k0] && sylCheckCache[k0].plannedDate) existing = convertDateToInput(sylCheckCache[k0].plannedDate);
-    }
-    var row = document.createElement('div');
-    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f1f5f9;';
-    row.innerHTML = '<span style="font-size:12px;font-weight:700;color:#1e3a8a;min-width:50px;">' + plan.lessonNo + '차시</span>'
-      + '<span style="font-size:11px;color:#64748b;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(plan.content||'') + '</span>'
-      + '<input type="date" data-ln="' + plan.lessonNo + '" value="' + existing + '" style="border:1px solid #e2e8f0;border-radius:6px;padding:4px 6px;font-size:12px;width:130px;">';
-    rows.appendChild(row);
-  });
-}
-
-function convertDateToInput(dateStr) {
-  if (!dateStr) return '';
-  var parts = String(dateStr).split('/');
-  if (parts.length !== 2) return '';
-  var yr = new Date().getFullYear();
-  var mm = String(parseInt(parts[0])).padStart(2,'0');
-  var dd = String(parseInt(parts[1])).padStart(2,'0');
-  return yr + '-' + mm + '-' + dd;
-}
-
-function applyBulkPlannedDate() {
-  var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
-  var targetCls = document.getElementById('bulkTargetCls').value;
-  var overwrite = document.getElementById('bulkOverwrite2').checked;
-  var saveData = [];
-  document.querySelectorAll('#bulkDateRows input[type="date"]').forEach(function(inp) {
-    var ln = parseInt(inp.dataset.ln);
-    var val = inp.value;
-    if (!val) return;
-    var d = new Date(val + 'T00:00:00');
-    var dateStr = (d.getMonth()+1) + '/' + d.getDate();
-    var targetCols = targetCls === 'all' ? cols : [targetCls];
-    targetCols.forEach(function(cls) {
-      var key = ln + '_' + cls;
-      if (!sylCheckCache[key]) sylCheckCache[key] = {};
-      if (overwrite || !sylCheckCache[key].plannedDate) sylCheckCache[key].plannedDate = dateStr;
-      saveData.push({ lessonNo: ln, cls: cls, plannedDate: dateStr, overwrite: overwrite });
-    });
-  });
-  if (saveData.length === 0) return alert('입력된 날짜가 없어요.');
-  renderSylTable();
-  document.getElementById('bulkPlannedModal').classList.remove('open');
-  google.script.run
-    .withSuccessHandler(function(){ alert('✅ ' + saveData.length + '개 저장 완료'); })
-    .withFailureHandler(function(e){ alert('저장 오류: ' + e.message); })
-    .saveBulkPlannedDates(saveData, currentGroupId);
-}
 
 // ═══════════════════════════════════════
 // 탭4: 시간표 생성
@@ -887,6 +812,7 @@ function cancelTtEdit() {
   document.getElementById('ttSemHolidays').value = '';
   document.getElementById('ttFormTitleText').textContent = '📝 시간표 등록';
   document.getElementById('ttCancelEditBtn').style.display = 'none';
+  document.getElementById('ttSaveBtn').textContent = '💾 시간표 저장';
   document.getElementById('ttSaveStatus').textContent = '';
   renderClassGrid(null);
 }
@@ -935,16 +861,16 @@ function saveAndGenerateSchedule() {
 
   google.script.run
     .withSuccessHandler(function(res) {
-      btn.disabled = false; btn.textContent = '💾 저장하고 진도표 생성';
+      btn.disabled = false; btn.textContent = '💾 시간표 저장';
       if (!res.success) {
         statusEl.style.color = '#ef4444';
         statusEl.textContent = '❌ ' + (res.message || '오류 발생');
         return;
       }
       var parts = [];
-      Object.keys(res.summary || {}).forEach(function(cls){ parts.push(cls + ' ' + res.summary[cls] + '차시'); });
+      Object.keys(res.summary || {}).forEach(function(cls){ parts.push(cls + ' ' + res.summary[cls] + '일'); });
       statusEl.style.color = '#16a34a';
-      statusEl.textContent = '✅ 완료! ' + parts.join(', ');
+      statusEl.textContent = '✅ 저장 완료! ' + parts.join(', ');
       cancelTtEdit();
       loadTimetableTab();
       loadSyllabusData(1);
@@ -953,7 +879,7 @@ function saveAndGenerateSchedule() {
       }
     })
     .withFailureHandler(function(e) {
-      btn.disabled = false; btn.textContent = '💾 저장하고 진도표 생성';
+      btn.disabled = false; btn.textContent = '💾 시간표 저장';
       statusEl.style.color = '#ef4444';
       statusEl.textContent = '❌ 오류: ' + e.message;
     })
@@ -990,7 +916,7 @@ function renderSavedTimetableList() {
         + '<button class="btn btn-danger" style="font-size:12px;padding:5px 10px;" onclick="deleteTimetableEntry(' + escapeHtml(JSON.stringify(sem.name)) + ')">삭제</button>'
       + '</div>'
       + '<div style="border-top:1px solid #e2e8f0;padding-top:8px;margin-bottom:10px;">' + entryRows + '</div>'
-      + '<button class="btn btn-amber" style="font-size:12px;padding:5px 12px;" onclick="regenerateTimetable(' + escapeHtml(JSON.stringify(sem.name)) + ')">↺ 일정 재생성</button>'
+      + '<button class="btn btn-amber" style="font-size:12px;padding:5px 12px;" onclick="regenerateTimetable(' + escapeHtml(JSON.stringify(sem.name)) + ')">↺ 일정 새로고침</button>'
       + '</div>';
   }).join('');
 }
@@ -1006,21 +932,8 @@ function deleteTimetableEntry(semName) {
 }
 
 function regenerateTimetable(semName) {
-  var sem = semestersCache.find(function(s){ return s.name === semName; });
-  var entries = timetableCache.filter(function(e){ return e.semester === semName; });
-  if (!sem) return alert('학기 데이터를 찾을 수 없습니다.');
-  if (entries.length === 0) return alert('시간표가 없습니다. 수정 버튼으로 먼저 등록해주세요.');
-  if (!confirm('"' + semName + '" 예상 수업일을 다시 생성할까요?\n(실제 수업 날짜는 유지됩니다)')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
-      var parts = [];
-      Object.keys(res.summary||{}).forEach(function(cls){ parts.push(cls+' '+res.summary[cls]+'차시'); });
-      alert('✅ 재생성 완료!\n' + parts.join('\n'));
-      loadSyllabusData(1);
-    })
-    .withFailureHandler(function(e){ alert('오류: ' + e.message); })
-    .generateAndApplySchedule(currentGroupId, { name: sem.name, start: sem.start, end: sem.end, holidays: sem.holidays||[] }, entries);
+  if (!confirm('"' + semName + '" 수업 일정을 새로 계산할까요?')) return;
+  loadSyllabusData(1);
 }
 
 // ═══════════════════════════════════════

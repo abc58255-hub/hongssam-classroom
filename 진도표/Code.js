@@ -108,7 +108,7 @@ function createGroup(data) {
 
     // 데이터 시트 생성
     _ensureSh(ss, '진도계획_' + id, ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
-    _ensureSh(ss, '진도체크_' + id, ['차시','반','날짜','메모','예상날짜'], '#10b981');
+    _ensureSh(ss, '진도체크_' + id, ['날짜','반','차시번호','메모'], '#10b981');
     _ensureSh(ss, '시험범위_' + id, ['시험명','차시목록'], '#f59e0b');
 
     return { success: true, id: id };
@@ -296,6 +296,65 @@ function deleteTimetable(groupId, cls, semester) {
 // 자동 일정 생성
 // =====================================================
 
+// 내부 헬퍼: 시트에 쓰지 않고 { cls: ['yyyy-MM-dd', ...] } 반환
+function _computeSchedule_(gid, ss) {
+  var semSh = ss.getSheetByName('학기설정');
+  var ttSh  = ss.getSheetByName('시간표설정');
+  var sems  = [];
+  if (semSh && semSh.getLastRow() >= 2) {
+    var sr = semSh.getRange(2, 1, semSh.getLastRow()-1, 5).getValues();
+    sr.forEach(function(r) {
+      if (String(r[0]).trim() !== gid) return;
+      if (!r[2] || !r[3]) return;
+      var hols = {};
+      if (r[4]) String(r[4]).split(',').forEach(function(d){ if (d.trim()) hols[d.trim()] = true; });
+      sems.push({
+        name:     String(r[1]||'').trim(),
+        start:    Utilities.formatDate(new Date(r[2]), 'Asia/Seoul', 'yyyy-MM-dd'),
+        end:      Utilities.formatDate(new Date(r[3]), 'Asia/Seoul', 'yyyy-MM-dd'),
+        holidays: hols
+      });
+    });
+  }
+  var ttMap = {};
+  if (ttSh && ttSh.getLastRow() >= 2) {
+    var tr = ttSh.getRange(2, 1, ttSh.getLastRow()-1, 8).getValues();
+    tr.forEach(function(r) {
+      if (String(r[0]).trim() !== gid) return;
+      var k = String(r[1]||'').trim() + '|' + String(r[2]||'').trim();
+      ttMap[k] = { cls: String(r[1]||'').trim(), semester: String(r[2]||'').trim(),
+        mon: parseInt(r[3])||0, tue: parseInt(r[4])||0, wed: parseInt(r[5])||0,
+        thu: parseInt(r[6])||0, fri: parseInt(r[7])||0 };
+    });
+  }
+  var DAY_MAP = { mon:1, tue:2, wed:3, thu:4, fri:5 };
+  var schedule = {};
+  sems.forEach(function(sem) {
+    Object.keys(ttMap).forEach(function(k) {
+      var entry = ttMap[k];
+      if (entry.semester !== sem.name) return;
+      var dow = [];
+      Object.keys(DAY_MAP).forEach(function(d){ if (entry[d]>0) dow.push(DAY_MAP[d]); });
+      if (dow.length === 0) return;
+      var cur = new Date(sem.start + 'T09:00:00');
+      var end = new Date(sem.end   + 'T09:00:00');
+      while (cur <= end) {
+        var ds = Utilities.formatDate(cur, 'Asia/Seoul', 'yyyy-MM-dd');
+        if (dow.indexOf(cur.getDay()) >= 0 && !sem.holidays[ds]) {
+          if (!schedule[entry.cls]) schedule[entry.cls] = {};
+          schedule[entry.cls][ds] = true;
+        }
+        cur.setDate(cur.getDate()+1);
+      }
+    });
+  });
+  var result = {};
+  Object.keys(schedule).forEach(function(cls){
+    result[cls] = Object.keys(schedule[cls]).sort();
+  });
+  return result;
+}
+
 function generateSchedule(groupId, semesterName) {
   try {
     var gid = groupId || '기본';
@@ -373,63 +432,6 @@ function generateSchedule(groupId, semesterName) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-function applySchedule(groupId, items) {
-  try {
-    var gid = groupId || '기본';
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var shName = _sn('진도체크', gid);
-    var sh = _ensureSh(ss, shName, ['차시','반','날짜','메모','예상날짜'], '#10b981');
-
-    // 기존 데이터 전체 읽기 (실제 수업일+메모 보존용)
-    var existingMap = {};
-    if (sh.getLastRow() >= 2) {
-      var oldRows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
-      oldRows.forEach(function(r) {
-        if (!r[0] || !r[1]) return;
-        existingMap[String(r[0]) + '_' + String(r[1]).trim()] = r.slice();
-      });
-    }
-
-    // 새 행 목록 구성
-    var newRows = [];
-    var processed = {};
-    items.forEach(function(item) {
-      var key = String(item.lessonNo) + '_' + String(item.cls).trim();
-      processed[key] = true;
-      var ex = existingMap[key];
-      if (ex && ex[2]) {
-        // 실제 수업일 있음: 날짜+메모 보존, 예상날짜만 갱신
-        newRows.push([item.lessonNo, item.cls, ex[2], ex[3]||'', item.plannedDate]);
-      } else {
-        newRows.push([item.lessonNo, item.cls, '', ex ? (ex[3]||'') : '', item.plannedDate]);
-      }
-    });
-
-    // 이 items에 없지만 실제 수업일이 있는 행은 보존
-    Object.keys(existingMap).forEach(function(key) {
-      if (!processed[key] && existingMap[key][2]) {
-        newRows.push(existingMap[key].slice());
-      }
-    });
-
-    // 차시·반 순서 정렬
-    newRows.sort(function(a, b) {
-      var d = (parseInt(a[0])||0) - (parseInt(b[0])||0);
-      return d !== 0 ? d : String(a[1]).localeCompare(String(b[1]));
-    });
-
-    // 기존 데이터 행 완전 삭제 후 일괄 쓰기 (clearContent는 getLastRow에 반영 안 되는 경우 있음)
-    if (sh.getLastRow() >= 2) {
-      sh.deleteRows(2, sh.getLastRow() - 1);
-    }
-    if (newRows.length > 0) {
-      sh.getRange(2, 1, newRows.length, 5).setValues(newRows);
-    }
-    SpreadsheetApp.flush();
-
-    return { success: true, count: items.length };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
 
 function generateAndApplySchedule(groupId, semData, ttEntries) {
   try {
@@ -455,15 +457,13 @@ function generateAndApplySchedule(groupId, semData, ttEntries) {
       if (!r2.success) return r2;
     }
 
-    // 일정 생성 + 적용
+    // 일정 미리보기 계산 (진도체크 시트에 쓰지 않음 — 일정은 매번 자동 계산됨)
     var gen = generateSchedule(gid, semData.name);
     if (!gen.success) return gen;
-    var apply = applySchedule(gid, gen.items);
-    if (!apply.success) return apply;
 
     var summary = {};
     Object.keys(gen.preview).forEach(function(cls) { summary[cls] = gen.preview[cls].length; });
-    return { success: true, count: apply.count, summary: summary, warnings: gen.warnings || [] };
+    return { success: true, count: gen.items.length, summary: summary, warnings: gen.warnings || [] };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -488,18 +488,21 @@ function getSyllabusData(groupId) {
       plans.sort(function(a,b){ return a.lessonNo - b.lessonNo; });
     }
 
-    // 진도체크
-    var checkSh = _ensureSh(ss, _sn('진도체크', gid), ['차시','반','날짜','메모','예상날짜'], '#10b981');
+    // 진도체크 (새 스키마: 날짜, 반, 차시번호, 메모)
+    // key = 'yyyy-MM-dd_반이름'
+    var checkSh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','차시번호','메모'], '#10b981');
     var checks = {};
     if (checkSh.getLastRow() >= 2) {
-      var cd = checkSh.getRange(2, 1, checkSh.getLastRow() - 1, 5).getValues();
+      var cd = checkSh.getRange(2, 1, checkSh.getLastRow() - 1, 4).getValues();
       cd.forEach(function(r) {
         if (!r[0] || !r[1]) return;
-        var dateStr = r[2] instanceof Date ? Utilities.formatDate(r[2],'Asia/Seoul','M/d') : String(r[2]||'').trim();
-        var plannedRaw = r[4];
-        var plannedStr = plannedRaw instanceof Date ? Utilities.formatDate(plannedRaw,'Asia/Seoul','M/d') : String(plannedRaw||'').trim();
-        var key = String(r[0]) + '_' + String(r[1]).trim();
-        checks[key] = { date: dateStr, memo: String(r[3]||'').trim(), plannedDate: plannedStr };
+        var dateStr = r[0] instanceof Date
+          ? Utilities.formatDate(r[0], 'Asia/Seoul', 'yyyy-MM-dd')
+          : String(r[0]).trim();
+        var ln = parseInt(r[2]) || 0;
+        if (!dateStr || !ln) return;
+        var key = dateStr + '_' + String(r[1]).trim();
+        checks[key] = { lessonNo: ln, memo: String(r[3]||'').trim() };
       });
     }
 
@@ -536,7 +539,10 @@ function getSyllabusData(groupId) {
       });
     }
 
-    return { success: true, plans: plans, checks: checks, classes: classes, examRanges: examRanges };
+    // 수업 일정 계산 (시트 기록 없이 시간표+학기 설정으로 매번 계산)
+    var schedule = _computeSchedule_(gid, ss);
+
+    return { success: true, plans: plans, checks: checks, classes: classes, examRanges: examRanges, schedule: schedule };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -552,34 +558,41 @@ function saveSyllabusPlan(plans, groupId) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
+// data = { date: 'yyyy-MM-dd', cls, lessonNo, memo }
 function saveSyllabusCheck(data, groupId) {
   try {
     var gid = groupId || '기본';
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, _sn('진도체크', gid), ['차시','반','날짜','메모','예상날짜'], '#10b981');
+    var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','차시번호','메모'], '#10b981');
     var found = false;
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
       for (var i = 0; i < rows.length; i++) {
-        if (parseInt(rows[i][0]) === parseInt(data.lessonNo) && String(rows[i][1]).trim() === String(data.cls).trim()) {
-          sh.getRange(i + 2, 1, 1, 5).setValues([[data.lessonNo, data.cls, data.date||'', data.memo||'', data.plannedDate||'']]);
+        var rowDate = rows[i][0] instanceof Date
+          ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
+          : String(rows[i][0]).trim();
+        if (rowDate === String(data.date).trim() && String(rows[i][1]).trim() === String(data.cls).trim()) {
+          sh.getRange(i + 2, 1, 1, 4).setValues([[data.date, data.cls, data.lessonNo||0, data.memo||'']]);
           found = true; break;
         }
       }
     }
-    if (!found) sh.appendRow([data.lessonNo, data.cls, data.date||'', data.memo||'', data.plannedDate||'']);
+    if (!found) sh.appendRow([data.date, data.cls, data.lessonNo||0, data.memo||'']);
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-function deleteSyllabusCheck(lessonNo, cls, groupId) {
+function deleteSyllabusCheck(date, cls, groupId) {
   try {
     var gid = groupId || '기본';
     var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(_sn('진도체크', gid));
     if (!sh || sh.getLastRow() < 2) return { success: true };
     var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
     for (var i = rows.length - 1; i >= 0; i--) {
-      if (parseInt(rows[i][0]) === parseInt(lessonNo) && String(rows[i][1]).trim() === String(cls).trim()) sh.deleteRow(i + 2);
+      var rowDate = rows[i][0] instanceof Date
+        ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
+        : String(rows[i][0]).trim();
+      if (rowDate === String(date).trim() && String(rows[i][1]).trim() === String(cls).trim()) sh.deleteRow(i + 2);
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -622,29 +635,3 @@ function deleteExamRange(name, groupId) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-function saveBulkPlannedDates(saveData, groupId) {
-  try {
-    var gid = groupId || '기본';
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, _sn('진도체크', gid), ['차시','반','날짜','메모','예상날짜'], '#10b981');
-    var existing = {};
-    if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
-      rows.forEach(function(r, i) {
-        if (r[0] && r[1]) existing[r[0] + '_' + String(r[1]).trim()] = i + 2;
-      });
-    }
-    saveData.forEach(function(d) {
-      var key = String(d.lessonNo) + '_' + String(d.cls).trim();
-      if (existing[key]) {
-        var curDate = sh.getRange(existing[key], 3).getValue();
-        if (!curDate || d.overwrite) sh.getRange(existing[key], 5).setValue(d.plannedDate);
-      } else {
-        var last = sh.getLastRow() + 1;
-        sh.getRange(last, 1, 1, 5).setValues([[d.lessonNo, d.cls, '', '', d.plannedDate]]);
-        existing[key] = last;
-      }
-    });
-    return { success: true };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
