@@ -116,6 +116,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
   <div class="header">
     <div class="header-title">📋 진도표 관리</div>
     <div class="header-actions">
+      <button class="btn btn-purple" onclick="openPlanManage()">📚 계획 관리</button>
       <button class="btn btn-primary" onclick="openPlanEdit()">✏️ 계획 편집</button>
       <button class="btn btn-gray" onclick="openSylSettings()">⚙️ 설정</button>
     </div>
@@ -210,8 +211,8 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 <!-- 계획 편집 모달 -->
 <div id="planEditModal" class="modal-bg">
   <div class="modal-box" style="max-width:680px;">
-    <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#0f172a;">✏️ 진도 계획 편집</h3>
-    <div style="font-size:12px;color:#64748b;margin-bottom:16px;">차시별 계획 내용과 메모를 입력하세요.</div>
+    <h3 id="planEditTitle" style="margin:0 0 6px;font-size:17px;font-weight:800;color:#0f172a;">✏️ 진도 계획 편집</h3>
+    <div id="planEditSubtitle" style="font-size:12px;color:#64748b;margin-bottom:16px;">차시별 계획 내용과 메모를 입력하세요.</div>
     <div id="planEditRows" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"></div>
     <button onclick="addPlanRow()" style="background:#f1f5f9;color:#475569;border:1px dashed #cbd5e1;padding:8px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;width:100%;">+ 차시 추가</button>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
@@ -284,15 +285,34 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">그룹 이름</div>
       <input type="text" id="groupModalName" class="form-input" placeholder="예: 2학년, 자유학기제, 방과후">
     </div>
-    <div style="margin-bottom:16px;">
+    <div style="margin-bottom:12px;">
       <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;">포함 반 선택 <span style="font-weight:400;color:#94a3b8;">(선택 안 하면 전체 반 표시)</span></div>
       <div id="groupModalClasses" style="display:flex;flex-wrap:wrap;gap:8px;min-height:36px;"></div>
+    </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">진도 계획</div>
+      <select id="groupModalPlanId" class="form-input"></select>
     </div>
     <div style="display:flex;gap:8px;justify-content:flex-end;">
       <button class="btn btn-danger" id="groupDeleteBtn" onclick="deleteCurrentGroup()" style="display:none;">삭제</button>
       <button class="btn btn-gray" onclick="document.getElementById('groupModal').classList.remove('open')">취소</button>
       <button class="btn btn-primary" onclick="saveGroupModal()">저장</button>
     </div>
+  </div>
+</div>
+
+<!-- 계획 관리 모달 -->
+<div id="planManageModal" class="modal-bg">
+  <div class="modal-box" style="max-width:480px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;">📚 진도 계획 관리</h3>
+      <button onclick="document.getElementById('planManageModal').classList.remove('open')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <input type="text" id="newPlanName" class="form-input" placeholder="새 계획 이름 (예: 2학년 1학기)" style="flex:1;">
+      <button class="btn btn-primary" onclick="doCreatePlan()" style="white-space:nowrap;">+ 추가</button>
+    </div>
+    <div id="planManageList" style="display:flex;flex-direction:column;gap:8px;"></div>
   </div>
 </div>
 
@@ -305,6 +325,8 @@ var examRangeCache  = [];
 var allClasses      = [];
 var currentGroupId  = '기본';
 var groupsCache     = [];
+var plansCache      = [];
+var _editingPlanId  = null;
 var semestersCache  = [];
 var timetableCache  = [];
 
@@ -338,11 +360,22 @@ function loadGroups() {
   google.script.run
     .withSuccessHandler(function(res) {
       groupsCache = (res.success ? res.groups : []) || [];
-      renderGroupBar();
-      loadData();
+      google.script.run
+        .withSuccessHandler(function(pRes) {
+          plansCache = (pRes.success ? pRes.plans : []) || [{ id: '기본', name: '기본 계획', isDefault: true }];
+          renderGroupBar();
+          loadData();
+        })
+        .withFailureHandler(function() {
+          plansCache = [{ id: '기본', name: '기본 계획', isDefault: true }];
+          renderGroupBar();
+          loadData();
+        })
+        .getPlanList();
     })
     .withFailureHandler(function() {
       groupsCache = [{ id: '기본', name: '기본', isDefault: true }];
+      plansCache = [{ id: '기본', name: '기본 계획', isDefault: true }];
       renderGroupBar();
       loadData();
     })
@@ -649,6 +682,13 @@ function confirmCheck() {
 
 // ─── 계획 편집 ───
 function openPlanEdit(focusLesson) {
+  _editingPlanId = null; // 현재 그룹의 계획 편집
+  var grp = groupsCache.find(function(g){ return g.id === currentGroupId; });
+  var planId = grp ? (grp.planId || currentGroupId) : currentGroupId;
+  var plan = plansCache.find(function(p){ return p.id === planId; });
+  var planName = plan ? plan.name : (planId === '기본' ? '기본 계획' : planId);
+  document.getElementById('planEditTitle').textContent = '✏️ 계획 편집: ' + planName;
+  document.getElementById('planEditSubtitle').textContent = '차시별 계획 내용과 메모를 입력하세요.';
   var rows = document.getElementById('planEditRows');
   rows.innerHTML = '';
   var data = sylPlanCache.length > 0 ? sylPlanCache
@@ -692,14 +732,17 @@ function savePlan() {
     plans.push({ lessonNo: idx + 1, content: content, material: '', memo: memo });
   });
   if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (btn) { btn.disabled = false; btn.textContent = '저장'; }
-      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
-      document.getElementById('planEditModal').classList.remove('open');
-      loadSyllabusData();
-    })
-    .saveSyllabusPlan(plans, currentGroupId);
+  var successHandler = function(res) {
+    if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+    if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+    document.getElementById('planEditModal').classList.remove('open');
+    loadSyllabusData();
+  };
+  if (_editingPlanId !== null) {
+    google.script.run.withSuccessHandler(successHandler).saveSyllabusPlanById(plans, _editingPlanId);
+  } else {
+    google.script.run.withSuccessHandler(successHandler).saveSyllabusPlan(plans, currentGroupId);
+  }
 }
 
 // ─── 반 설정 ───
@@ -1047,11 +1090,22 @@ function openGroupModal(gid) {
     var grp = groupsCache.find(function(g){ return g.id === gid; });
     document.getElementById('groupModalName').value = grp ? grp.name : '';
     renderGroupClassCheckboxes(grp ? grp.classes : []);
+    renderGroupPlanSelect(grp ? (grp.planId || gid) : '기본');
   } else {
     document.getElementById('groupModalName').value = '';
     renderGroupClassCheckboxes([]);
+    renderGroupPlanSelect('기본');
   }
   document.getElementById('groupModal').classList.add('open');
+}
+
+function renderGroupPlanSelect(selectedPlanId) {
+  var sel = document.getElementById('groupModalPlanId');
+  if (!sel) return;
+  sel.innerHTML = plansCache.map(function(plan) {
+    var sel2 = plan.id === selectedPlanId ? ' selected' : '';
+    return '<option value="' + escapeHtml(plan.id) + '"' + sel2 + '>' + escapeHtml(plan.name) + '</option>';
+  }).join('');
 }
 
 function renderGroupClassCheckboxes(selected) {
@@ -1073,6 +1127,8 @@ function saveGroupModal() {
   var name = document.getElementById('groupModalName').value.trim();
   if (!name) return alert('그룹 이름을 입력하세요.');
   var classes = Array.from(document.querySelectorAll('input[name="groupCls"]:checked')).map(function(b){return b.value;});
+  var planSel = document.getElementById('groupModalPlanId');
+  var planId = planSel ? planSel.value : '기본';
   var isEdit = !!gid;
 
   var handler = function(res) {
@@ -1083,10 +1139,106 @@ function saveGroupModal() {
   };
 
   if (isEdit) {
-    google.script.run.withSuccessHandler(handler).updateGroup({ id: gid, name: name, classes: classes });
+    google.script.run.withSuccessHandler(handler).updateGroup({ id: gid, name: name, classes: classes, planId: planId });
   } else {
-    google.script.run.withSuccessHandler(handler).createGroup({ name: name, classes: classes });
+    google.script.run.withSuccessHandler(handler).createGroup({ name: name, classes: classes, planId: planId });
   }
+}
+
+// ═══════════════════════════════════════
+// 계획 관리
+// ═══════════════════════════════════════
+
+function openPlanManage() {
+  document.getElementById('newPlanName').value = '';
+  renderPlanManageList();
+  document.getElementById('planManageModal').classList.add('open');
+}
+
+function renderPlanManageList() {
+  var div = document.getElementById('planManageList');
+  if (!div) return;
+  if (plansCache.length === 0) {
+    div.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:8px;">계획이 없어요.</div>';
+    return;
+  }
+  div.innerHTML = plansCache.map(function(plan) {
+    var isDefault = plan.isDefault || plan.id === '기본';
+    return '<div style="display:flex;align-items:center;gap:8px;background:#f8fafc;border-radius:10px;padding:12px;border:1px solid #e2e8f0;">'
+      + '<div style="flex:1;font-size:14px;font-weight:700;color:#0f172a;">' + escapeHtml(plan.name)
+        + (isDefault ? ' <span style="font-size:11px;color:#94a3b8;font-weight:400;">(기본)</span>' : '') + '</div>'
+      + '<button class="btn btn-primary" style="font-size:12px;padding:5px 10px;" onclick="editPlanContent(\'' + escapeHtml(plan.id) + '\')">✏️ 편집</button>'
+      + (!isDefault ? '<button class="btn btn-gray" style="font-size:12px;padding:5px 10px;" onclick="doRenamePlan(\'' + escapeHtml(plan.id) + '\',\'' + escapeHtml(plan.name) + '\')">이름변경</button>' : '')
+      + (!isDefault ? '<button class="btn btn-danger" style="font-size:12px;padding:5px 10px;" onclick="doDeletePlan(\'' + escapeHtml(plan.id) + '\')">삭제</button>' : '')
+      + '</div>';
+  }).join('');
+}
+
+function _reloadPlans(callback) {
+  google.script.run
+    .withSuccessHandler(function(pRes) {
+      plansCache = (pRes.success ? pRes.plans : plansCache) || plansCache;
+      if (callback) callback();
+    })
+    .withFailureHandler(function() { if (callback) callback(); })
+    .getPlanList();
+}
+
+function doCreatePlan() {
+  var name = document.getElementById('newPlanName').value.trim();
+  if (!name) return alert('계획 이름을 입력하세요.');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+      document.getElementById('newPlanName').value = '';
+      _reloadPlans(renderPlanManageList);
+    })
+    .createPlan({ name: name });
+}
+
+function doRenamePlan(planId, currentName) {
+  var newName = prompt('새 이름을 입력하세요:', currentName);
+  if (!newName || newName.trim() === currentName) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+      _reloadPlans(renderPlanManageList);
+    })
+    .renamePlan(planId, newName.trim());
+}
+
+function doDeletePlan(planId) {
+  var plan = plansCache.find(function(p){ return p.id === planId; });
+  if (!confirm('"' + (plan ? plan.name : planId) + '" 계획을 삭제할까요?\n이 계획을 사용하는 그룹이 없어야 합니다.')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+      _reloadPlans(renderPlanManageList);
+    })
+    .deletePlan(planId);
+}
+
+function editPlanContent(planId) {
+  _editingPlanId = planId;
+  var plan = plansCache.find(function(p){ return p.id === planId; });
+  var planName = plan ? plan.name : planId;
+  document.getElementById('planManageModal').classList.remove('open');
+  document.getElementById('planEditTitle').textContent = '✏️ 계획 편집: ' + planName;
+  document.getElementById('planEditSubtitle').textContent = '계획 ID: ' + planId;
+  var rows = document.getElementById('planEditRows');
+  rows.innerHTML = '<div class="loading" style="padding:20px;">불러오는 중...</div>';
+  document.getElementById('planEditModal').classList.add('open');
+  google.script.run
+    .withSuccessHandler(function(res) {
+      rows.innerHTML = '';
+      var data = (res.success && res.plans && res.plans.length > 0) ? res.plans
+        : Array.from({length: 11}, function(_,i){ return {lessonNo:i+1,content:'',memo:''}; });
+      data.forEach(function(p) { addPlanRow(p); });
+    })
+    .withFailureHandler(function(e) {
+      rows.innerHTML = '<div style="color:#ef4444;padding:16px;">오류: ' + e.message + '</div>';
+    })
+    .getSyllabusPlanById(planId);
 }
 
 function deleteCurrentGroup() {
