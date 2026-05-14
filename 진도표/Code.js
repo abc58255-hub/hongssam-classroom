@@ -314,11 +314,6 @@ function generateSchedule(groupId, semesterName) {
     var ttEntries = ttList.entries.filter(function(e) { return e.semester === semesterName; });
     if (ttEntries.length === 0) return { success: false, message: '"' + semesterName + '" 학기 시간표가 없습니다.\n시간표 탭에서 먼저 등록해주세요.' };
 
-    // 차시 수 조회
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var planSh = ss.getSheetByName(_sn('진도계획', gid));
-    var totalLessons = planSh && planSh.getLastRow() >= 2 ? planSh.getLastRow() - 1 : 999;
-
     // 공휴일 Set
     var holidaySet = {};
     (sem.holidays || []).forEach(function(d) { holidaySet[d] = true; });
@@ -348,7 +343,7 @@ function generateSchedule(groupId, semesterName) {
 
       var lessonDates = [];
       var cur = new Date(startDt);
-      while (cur <= endDt && lessonDates.length < totalLessons) {
+      while (cur <= endDt) {
         var dow = cur.getDay();
         var dateStr = Utilities.formatDate(cur, 'Asia/Seoul', 'yyyy-MM-dd');
         if (scheduledDow.indexOf(dow) >= 0 && !holidaySet[dateStr]) {
