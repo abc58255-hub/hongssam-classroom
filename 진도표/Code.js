@@ -418,13 +418,14 @@ function applySchedule(groupId, items) {
       return d !== 0 ? d : String(a[1]).localeCompare(String(b[1]));
     });
 
-    // 기존 데이터 지우고 한 번에 일괄 쓰기
-    if (sh.getLastRow() > 1) {
-      sh.getRange(2, 1, sh.getLastRow() - 1, 5).clearContent();
+    // 기존 데이터 행 완전 삭제 후 일괄 쓰기 (clearContent는 getLastRow에 반영 안 되는 경우 있음)
+    if (sh.getLastRow() >= 2) {
+      sh.deleteRows(2, sh.getLastRow() - 1);
     }
     if (newRows.length > 0) {
       sh.getRange(2, 1, newRows.length, 5).setValues(newRows);
     }
+    SpreadsheetApp.flush();
 
     return { success: true, count: items.length };
   } catch(e) { return { success: false, message: e.toString() }; }

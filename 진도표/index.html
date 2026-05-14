@@ -394,7 +394,7 @@ function loadData() {
   loadSyllabusData();
 }
 
-function loadSyllabusData() {
+function loadSyllabusData(forceTab) {
   var wrap = document.getElementById('sylTableWrap');
   if (wrap) wrap.innerHTML = '<div class="loading">불러오는 중...</div>';
   google.script.run
@@ -407,12 +407,11 @@ function loadSyllabusData() {
       sylCheckCache  = res.checks     || {};
       sylClassList   = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
       examRangeCache = res.examRanges || [];
-      var activeTab = [1,2,3,4].find(function(i) {
+      var targetTab = forceTab || [1,2,3,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
         return el && el.style.display !== 'none';
       }) || 1;
-      if (activeTab !== 4) switchTab(activeTab);
-      else renderSylTable();
+      switchTab(targetTab);
     })
     .getSyllabusData(currentGroupId);
 }
@@ -948,7 +947,7 @@ function saveAndGenerateSchedule() {
       statusEl.textContent = '✅ 완료! ' + parts.join(', ');
       cancelTtEdit();
       loadTimetableTab();
-      loadSyllabusData();
+      loadSyllabusData(1);
       if (res.warnings && res.warnings.length > 0) {
         setTimeout(function(){ alert('⚠️ ' + res.warnings.join('\n')); }, 400);
       }
@@ -1018,7 +1017,7 @@ function regenerateTimetable(semName) {
       var parts = [];
       Object.keys(res.summary||{}).forEach(function(cls){ parts.push(cls+' '+res.summary[cls]+'차시'); });
       alert('✅ 재생성 완료!\n' + parts.join('\n'));
-      loadSyllabusData();
+      loadSyllabusData(1);
     })
     .withFailureHandler(function(e){ alert('오류: ' + e.message); })
     .generateAndApplySchedule(currentGroupId, { name: sem.name, start: sem.start, end: sem.end, holidays: sem.holidays||[] }, entries);
