@@ -380,36 +380,89 @@ function applySchedule(groupId, items) {
     var shName = _sn('진도체크', gid);
     var sh = _ensureSh(ss, shName, ['차시','반','날짜','메모','예상날짜'], '#10b981');
 
-    // 기존 행 읽기
-    var existing = {}; // 'ln_cls' -> { rowIdx, hasDate }
+    // 기존 데이터 전체 읽기 (실제 수업일+메모 보존용)
+    var existingMap = {};
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
-      rows.forEach(function(r, i) {
+      var oldRows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      oldRows.forEach(function(r) {
         if (!r[0] || !r[1]) return;
-        existing[String(r[0]) + '_' + String(r[1]).trim()] = { rowIdx: i + 2, hasDate: !!r[2] };
+        existingMap[String(r[0]) + '_' + String(r[1]).trim()] = r.slice();
       });
     }
 
+    // 새 행 목록 구성
     var newRows = [];
+    var processed = {};
     items.forEach(function(item) {
       var key = String(item.lessonNo) + '_' + String(item.cls).trim();
-      if (existing[key]) {
-        // 실제 수업일이 있으면 예상날짜만 덮어쓰지 않음 (이미 수업한 차시 보호)
-        if (!existing[key].hasDate) {
-          sh.getRange(existing[key].rowIdx, 5).setValue(item.plannedDate);
-        }
+      processed[key] = true;
+      var ex = existingMap[key];
+      if (ex && ex[2]) {
+        // 실제 수업일 있음: 날짜+메모 보존, 예상날짜만 갱신
+        newRows.push([item.lessonNo, item.cls, ex[2], ex[3]||'', item.plannedDate]);
       } else {
-        newRows.push([item.lessonNo, item.cls, '', '', item.plannedDate]);
-        existing[key] = { rowIdx: sh.getLastRow() + newRows.length, hasDate: false };
+        newRows.push([item.lessonNo, item.cls, '', ex ? (ex[3]||'') : '', item.plannedDate]);
       }
     });
 
+    // 이 items에 없지만 실제 수업일이 있는 행은 보존
+    Object.keys(existingMap).forEach(function(key) {
+      if (!processed[key] && existingMap[key][2]) {
+        newRows.push(existingMap[key].slice());
+      }
+    });
+
+    // 차시·반 순서 정렬
+    newRows.sort(function(a, b) {
+      var d = (parseInt(a[0])||0) - (parseInt(b[0])||0);
+      return d !== 0 ? d : String(a[1]).localeCompare(String(b[1]));
+    });
+
+    // 기존 데이터 지우고 한 번에 일괄 쓰기
+    if (sh.getLastRow() > 1) {
+      sh.getRange(2, 1, sh.getLastRow() - 1, 5).clearContent();
+    }
     if (newRows.length > 0) {
-      var lastRow = sh.getLastRow() + 1;
-      sh.getRange(lastRow, 1, newRows.length, 5).setValues(newRows);
+      sh.getRange(2, 1, newRows.length, 5).setValues(newRows);
     }
 
     return { success: true, count: items.length };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+function generateAndApplySchedule(groupId, semData, ttEntries) {
+  try {
+    var gid = groupId || '기본';
+    if (!semData || !semData.name) return { success: false, message: '학기명을 입력하세요.' };
+    if (!semData.start || !semData.end) return { success: false, message: '시작일과 종료일을 입력하세요.' };
+    var entries = (ttEntries || []).filter(function(e) {
+      return e.cls && (e.mon||e.tue||e.wed||e.thu||e.fri);
+    });
+    if (entries.length === 0) return { success: false, message: '수업 요일이 있는 반을 최소 1개 입력하세요.' };
+
+    // 학기 저장
+    var r1 = saveSemester(gid, semData);
+    if (!r1.success) return r1;
+
+    // 시간표 저장
+    for (var i = 0; i < entries.length; i++) {
+      var r2 = saveTimetable(gid, {
+        cls: entries[i].cls, semester: semData.name,
+        mon: entries[i].mon||0, tue: entries[i].tue||0,
+        wed: entries[i].wed||0, thu: entries[i].thu||0, fri: entries[i].fri||0
+      });
+      if (!r2.success) return r2;
+    }
+
+    // 일정 생성 + 적용
+    var gen = generateSchedule(gid, semData.name);
+    if (!gen.success) return gen;
+    var apply = applySchedule(gid, gen.items);
+    if (!apply.success) return apply;
+
+    var summary = {};
+    Object.keys(gen.preview).forEach(function(cls) { summary[cls] = gen.preview[cls].length; });
+    return { success: true, count: apply.count, summary: summary, warnings: gen.warnings || [] };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
