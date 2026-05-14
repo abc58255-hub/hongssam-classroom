@@ -32,12 +32,25 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .btn-amber { background: #fef3c7; color: #d97706; }
 .btn-gray { background: #e2e8f0; color: #374151; }
 .btn-danger { background: #fee2e2; color: #dc2626; }
+.btn-green { background: #dcfce7; color: #16a34a; }
+.btn-purple { background: #f5f3ff; color: #7c3aed; }
+
+/* Group selector bar */
+.group-bar { background: white; border-bottom: 1px solid #e2e8f0; padding: 10px 16px; display: flex; align-items: center; gap: 8px; overflow-x: auto; flex-shrink: 0; }
+.group-bar::-webkit-scrollbar { height: 4px; }
+.group-bar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+.group-pill { flex-shrink: 0; padding: 6px 14px; border-radius: 50px; border: 2px solid #e2e8f0; background: white; color: #475569; font-size: 13px; font-weight: 700; cursor: pointer; transition: all 0.15s; white-space: nowrap; display: flex; align-items: center; gap: 5px; }
+.group-pill:hover { border-color: #3b82f6; color: #3b82f6; }
+.group-pill.active { background: #1e3a8a; border-color: #1e3a8a; color: white; }
+.group-pill-add { flex-shrink: 0; padding: 6px 12px; border-radius: 50px; border: 2px dashed #cbd5e1; background: white; color: #94a3b8; font-size: 13px; font-weight: 700; cursor: pointer; }
+.group-pill-add:hover { border-color: #3b82f6; color: #3b82f6; }
+.group-edit-btn { font-size: 11px; opacity: 0.7; margin-left: 2px; }
 
 .main { padding: 16px; max-width: 1400px; margin: 0 auto; }
 
 /* Tabs */
 .tabs { display: flex; background: #f1f5f9; padding: 5px; border-radius: 12px; margin-bottom: 16px; gap: 4px; }
-.tab-btn { flex: 1; padding: 9px 0; border: none; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer; background: transparent; color: #64748b; transition: all 0.2s; }
+.tab-btn { flex: 1; padding: 9px 0; border: none; border-radius: 8px; font-weight: 800; font-size: 13px; cursor: pointer; background: transparent; color: #64748b; transition: all 0.2s; white-space: nowrap; }
 .tab-btn.active { background: white; color: #3b82f6; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
 
 /* Table */
@@ -65,6 +78,23 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .form-input:focus { border-color: #3b82f6; }
 
 .loading { text-align: center; padding: 30px; color: #94a3b8; }
+
+/* Section card for tab 4 */
+.section-card { background: white; border-radius: 14px; border: 1px solid #e2e8f0; padding: 18px; margin-bottom: 16px; }
+.section-title { font-size: 15px; font-weight: 800; color: #0f172a; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+.section-title span { font-size: 13px; font-weight: 600; color: #64748b; }
+
+/* Timetable grid */
+.tt-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+.tt-day-label { text-align: center; font-size: 12px; font-weight: 800; color: #475569; padding: 4px 0; }
+.tt-period-input { width: 100%; padding: 7px 6px; border: 1px solid #e2e8f0; border-radius: 7px; font-size: 14px; text-align: center; outline: none; font-weight: 700; }
+.tt-period-input:focus { border-color: #3b82f6; }
+.tt-period-input.has-val { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+
+/* Preview table */
+.preview-table { border-collapse: collapse; font-size: 12px; }
+.preview-table th { background: #f1f5f9; color: #475569; padding: 6px 10px; border: 1px solid #e2e8f0; font-weight: 700; }
+.preview-table td { padding: 5px 10px; border: 1px solid #e2e8f0; }
 </style>
 </head>
 <body>
@@ -92,12 +122,18 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     </div>
   </div>
 
+  <!-- 커리큘럼 그룹 선택 바 -->
+  <div class="group-bar" id="groupBar">
+    <div class="loading" style="padding:4px 8px;font-size:12px;">불러오는 중...</div>
+  </div>
+
   <div class="main">
     <!-- 탭 -->
     <div class="tabs">
       <button id="tab-1" class="tab-btn active" onclick="switchTab(1)">📋 진도표</button>
       <button id="tab-2" class="tab-btn" onclick="switchTab(2)">📊 반별 현황</button>
       <button id="tab-3" class="tab-btn" onclick="switchTab(3)">🎯 시험 범위</button>
+      <button id="tab-4" class="tab-btn" onclick="switchTab(4)">⏰ 시간표</button>
     </div>
 
     <!-- 탭1: 진도표 -->
@@ -123,6 +159,77 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
         <div id="examLessonCheckboxes" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
       </div>
       <div id="examRangeList"></div>
+    </div>
+
+    <!-- 탭4: 시간표 설정 -->
+    <div id="tab-content-4" style="display:none;">
+
+      <!-- 학기 설정 섹션 -->
+      <div class="section-card">
+        <div class="section-title">📅 학기 설정 <span id="semGroupLabel"></span></div>
+        <div id="semesterList" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px;"></div>
+        <button class="btn btn-primary" onclick="openSemesterForm()" id="addSemBtn">+ 학기 추가</button>
+
+        <!-- 학기 추가/수정 폼 (inline, initially hidden) -->
+        <div id="semesterForm" style="display:none;margin-top:14px;padding:14px;background:#f8fafc;border-radius:10px;border:1px solid #e2e8f0;">
+          <div style="font-size:13px;font-weight:800;color:#1e3a8a;margin-bottom:10px;" id="semFormTitle">학기 추가</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">학기명</div>
+              <input type="text" id="semName" class="form-input" placeholder="예: 1학기">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">시작일</div>
+              <input type="date" id="semStart" class="form-input">
+            </div>
+            <div>
+              <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">종료일</div>
+              <input type="date" id="semEnd" class="form-input">
+            </div>
+          </div>
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">공휴일 (날짜를 쉼표로 구분, 예: 2026-03-01, 2026-05-05)</div>
+            <textarea id="semHolidays" class="form-input" rows="2" placeholder="2026-03-01, 2026-05-05, 2026-06-06" style="resize:vertical;"></textarea>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-gray" onclick="closeSemesterForm()">취소</button>
+            <button class="btn btn-primary" onclick="saveSemesterForm()" id="semSaveBtn">저장</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- 시간표 등록 섹션 -->
+      <div class="section-card">
+        <div class="section-title">🗓 시간표 등록 <span id="ttGroupLabel"></span></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+          <div style="font-size:13px;font-weight:700;color:#334155;">학기 선택:</div>
+          <select id="ttSemesterSelect" class="form-input" style="width:160px;" onchange="loadTimetableForSemester()">
+            <option value="">-- 학기 선택 --</option>
+          </select>
+          <div style="font-size:12px;color:#64748b;">각 요일의 교시 번호를 입력하세요. 수업 없는 날은 0 또는 빈칸.</div>
+        </div>
+        <div id="ttTableWrap">
+          <div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px;">학기를 선택하면 시간표를 등록할 수 있습니다.</div>
+        </div>
+      </div>
+
+      <!-- 자동 일정 생성 섹션 -->
+      <div class="section-card">
+        <div class="section-title">⚡ 자동 수업 일정 생성</div>
+        <div style="background:#fef9c3;border:1px solid #fde047;border-radius:8px;padding:10px 14px;font-size:12px;color:#713f12;margin-bottom:14px;line-height:1.6;">
+          학기 기간과 시간표를 바탕으로 차시별 예상 수업일을 자동 계산합니다.<br>
+          이미 체크된 실제 수업일은 변경되지 않으며, 예상 수업일만 업데이트합니다.
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+          <div style="font-size:13px;font-weight:700;color:#334155;">학기 선택:</div>
+          <select id="genSemesterSelect" class="form-input" style="width:160px;">
+            <option value="">-- 학기 선택 --</option>
+          </select>
+          <button class="btn btn-amber" onclick="runGenerateSchedule()">🔍 미리보기</button>
+        </div>
+        <div id="genPreviewWrap"></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -204,12 +311,40 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
   </div>
 </div>
 
+<!-- 그룹 관리 모달 -->
+<div id="groupModal" class="modal-bg">
+  <div class="modal-box" style="max-width:480px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <h3 style="margin:0;font-size:17px;font-weight:800;color:#0f172a;" id="groupModalTitle">그룹 추가</h3>
+      <button onclick="document.getElementById('groupModal').classList.remove('open')" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
+    </div>
+    <input type="hidden" id="groupModalId">
+    <div style="margin-bottom:12px;">
+      <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">그룹 이름</div>
+      <input type="text" id="groupModalName" class="form-input" placeholder="예: 2학년, 자유학기제, 방과후">
+    </div>
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:8px;">포함 반 선택 <span style="font-weight:400;color:#94a3b8;">(선택 안 하면 전체 반 표시)</span></div>
+      <div id="groupModalClasses" style="display:flex;flex-wrap:wrap;gap:8px;min-height:36px;"></div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;">
+      <button class="btn btn-danger" id="groupDeleteBtn" onclick="deleteCurrentGroup()" style="display:none;">삭제</button>
+      <button class="btn btn-gray" onclick="document.getElementById('groupModal').classList.remove('open')">취소</button>
+      <button class="btn btn-primary" onclick="saveGroupModal()">저장</button>
+    </div>
+  </div>
+</div>
+
 <script>
 var sylPlanCache   = [];
 var sylCheckCache  = {};
 var sylClassList   = [];
 var examRangeCache = [];
 var allClasses     = [];
+var currentGroupId = '기본';
+var groupsCache    = [];
+var semestersCache = [];
+var timetableCache = [];
 
 // ─── 로그인 ───
 function doLogin() {
@@ -224,7 +359,7 @@ function doLogin() {
       if (res.success) {
         document.getElementById('loginScreen').style.display = 'none';
         document.getElementById('app').style.display = 'block';
-        loadData();
+        loadGroups();
       } else {
         document.getElementById('loginError').textContent = res.message || '로그인 실패';
       }
@@ -234,6 +369,45 @@ function doLogin() {
       document.getElementById('loginError').textContent = '오류: ' + e.message;
     })
     .verifyTeacher(pw);
+}
+
+// ─── 그룹 로드 ───
+function loadGroups() {
+  google.script.run
+    .withSuccessHandler(function(res) {
+      groupsCache = (res.success ? res.groups : []) || [];
+      renderGroupBar();
+      loadData();
+    })
+    .withFailureHandler(function() {
+      groupsCache = [{ id: '기본', name: '기본', isDefault: true }];
+      renderGroupBar();
+      loadData();
+    })
+    .getGroups();
+}
+
+function renderGroupBar() {
+  var bar = document.getElementById('groupBar');
+  var html = '';
+  groupsCache.forEach(function(g) {
+    var active = g.id === currentGroupId ? ' active' : '';
+    var editBtn = !g.isDefault ? '<span class="group-edit-btn" onclick="event.stopPropagation();openGroupModal(\'' + g.id + '\')">✎</span>' : '';
+    html += '<div class="group-pill' + active + '" onclick="switchGroup(\'' + g.id + '\')">'
+      + escapeHtml(g.name) + editBtn + '</div>';
+  });
+  html += '<div class="group-pill-add" onclick="openGroupModal(null)">+ 그룹 추가</div>';
+  bar.innerHTML = html;
+}
+
+function switchGroup(gid) {
+  currentGroupId = gid;
+  renderGroupBar();
+  loadData();
+  // 탭4가 열려있으면 새로고침
+  if (document.getElementById('tab-content-4').style.display !== 'none') {
+    loadTimetableTab();
+  }
 }
 
 // ─── 데이터 로드 ───
@@ -259,14 +433,19 @@ function loadSyllabusData() {
       sylCheckCache  = res.checks     || {};
       sylClassList   = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
       examRangeCache = res.examRanges || [];
-      switchTab(1);
+      var activeTab = [1,2,3,4].find(function(i) {
+        var el = document.getElementById('tab-content-'+i);
+        return el && el.style.display !== 'none';
+      }) || 1;
+      if (activeTab !== 4) switchTab(activeTab);
+      else renderSylTable();
     })
-    .getSyllabusData();
+    .getSyllabusData(currentGroupId);
 }
 
 // ─── 탭 전환 ───
 function switchTab(n) {
-  [1,2,3].forEach(function(i) {
+  [1,2,3,4].forEach(function(i) {
     var btn = document.getElementById('tab-' + i);
     var con = document.getElementById('tab-content-' + i);
     if (!btn || !con) return;
@@ -277,6 +456,7 @@ function switchTab(n) {
   if (n === 1) renderSylTable();
   if (n === 2) renderSylStatusBoard();
   if (n === 3) renderExamRangeTab();
+  if (n === 4) loadTimetableTab();
 }
 
 // ─── 주별 색상 ───
@@ -405,7 +585,7 @@ function cancelCheck() {
   document.getElementById('checkDateModal').classList.remove('open');
   delete sylCheckCache[key];
   renderSylTable();
-  google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(lessonNo, cls);
+  google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(lessonNo, cls, currentGroupId);
 }
 
 function confirmCheck() {
@@ -424,7 +604,7 @@ function confirmCheck() {
   renderSylTable();
   google.script.run
     .withSuccessHandler(function(res) { if (!res.success) alert('오류: ' + (res.message||'')); })
-    .saveSyllabusCheck({ lessonNo: lessonNo, cls: cls, date: date, memo: memo, plannedDate: plannedDate });
+    .saveSyllabusCheck({ lessonNo: lessonNo, cls: cls, date: date, memo: memo, plannedDate: plannedDate }, currentGroupId);
 }
 
 // ─── 계획 편집 ───
@@ -479,7 +659,7 @@ function savePlan() {
       document.getElementById('planEditModal').classList.remove('open');
       loadSyllabusData();
     })
-    .saveSyllabusPlan(plans);
+    .saveSyllabusPlan(plans, currentGroupId);
 }
 
 // ─── 반 설정 ───
@@ -498,7 +678,7 @@ function saveSylSettings() {
   var sel = Array.from(document.querySelectorAll('input[name="sylSettingClass"]:checked')).map(function(b){return b.value;});
   sylClassList = sel.length > 0 ? sel : allClasses.slice();
   document.getElementById('sylSettingsModal').classList.remove('open');
-  google.script.run.withSuccessHandler(function(){}).saveSylClassList(sylClassList);
+  google.script.run.withSuccessHandler(function(){}).saveSylClassList(sylClassList, currentGroupId);
   renderSylTable();
 }
 
@@ -588,7 +768,7 @@ function saveExamRange() {
       document.querySelectorAll('#examLessonCheckboxes input').forEach(function(b){b.checked=false;});
       loadSyllabusData();
     })
-    .saveExamRange({ name: name, units: units.join(',') });
+    .saveExamRange({ name: name, units: units.join(',') }, currentGroupId);
 }
 
 // ─── 예정일 일괄 ───
@@ -655,7 +835,371 @@ function applyBulkPlannedDate() {
   google.script.run
     .withSuccessHandler(function(){ alert('✅ ' + saveData.length + '개 저장 완료'); })
     .withFailureHandler(function(e){ alert('저장 오류: ' + e.message); })
-    .saveBulkPlannedDates(saveData);
+    .saveBulkPlannedDates(saveData, currentGroupId);
+}
+
+// ═══════════════════════════════════════
+// 탭4: 시간표 설정
+// ═══════════════════════════════════════
+
+function loadTimetableTab() {
+  var grp = groupsCache.find(function(g){ return g.id === currentGroupId; });
+  var gLabel = grp ? '(' + grp.name + ')' : '';
+  var el1 = document.getElementById('semGroupLabel');
+  var el2 = document.getElementById('ttGroupLabel');
+  if (el1) el1.textContent = gLabel;
+  if (el2) el2.textContent = gLabel;
+
+  // 학기 목록 로드
+  google.script.run
+    .withSuccessHandler(function(res) {
+      semestersCache = (res.success ? res.semesters : []) || [];
+      renderSemesterList();
+      populateSemesterSelects();
+    })
+    .withFailureHandler(function(e) {
+      semestersCache = [];
+      renderSemesterList();
+    })
+    .getSemesterList(currentGroupId);
+
+  // 시간표 목록 로드
+  google.script.run
+    .withSuccessHandler(function(res) {
+      timetableCache = (res.success ? res.entries : []) || [];
+    })
+    .withFailureHandler(function() { timetableCache = []; })
+    .getTimetableList(currentGroupId);
+}
+
+function renderSemesterList() {
+  var div = document.getElementById('semesterList');
+  if (!div) return;
+  if (semestersCache.length === 0) {
+    div.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:8px 0;">등록된 학기가 없어요. 아래 "학기 추가"를 눌러 시작하세요.</div>';
+    return;
+  }
+  div.innerHTML = semestersCache.map(function(s) {
+    return '<div style="display:flex;align-items:center;gap:10px;background:#f8fafc;border-radius:8px;padding:10px 14px;border:1px solid #e2e8f0;">'
+      + '<div style="flex:1;">'
+        + '<div style="font-size:13px;font-weight:800;color:#0f172a;">' + escapeHtml(s.name) + '</div>'
+        + '<div style="font-size:11px;color:#64748b;margin-top:2px;">'
+          + (s.start||'?') + ' ~ ' + (s.end||'?')
+          + (s.holidays && s.holidays.length > 0 ? ' &nbsp;·&nbsp; 공휴일 ' + s.holidays.length + '일' : '')
+        + '</div>'
+      + '</div>'
+      + '<button class="btn btn-gray" style="font-size:12px;padding:5px 10px;" onclick="openSemesterFormEdit(' + escapeHtml(JSON.stringify(s.name)) + ')">수정</button>'
+      + '<button class="btn btn-danger" style="font-size:12px;padding:5px 10px;" onclick="deleteSemester(' + escapeHtml(JSON.stringify(s.name)) + ')">삭제</button>'
+      + '</div>';
+  }).join('');
+}
+
+function populateSemesterSelects() {
+  var opts = '<option value="">-- 학기 선택 --</option>'
+    + semestersCache.map(function(s){ return '<option value="' + escapeHtml(s.name) + '">' + escapeHtml(s.name) + '</option>'; }).join('');
+  var ttSel = document.getElementById('ttSemesterSelect');
+  var genSel = document.getElementById('genSemesterSelect');
+  if (ttSel) ttSel.innerHTML = opts;
+  if (genSel) genSel.innerHTML = opts;
+}
+
+function openSemesterForm() {
+  document.getElementById('semFormTitle').textContent = '학기 추가';
+  document.getElementById('semName').value = '';
+  document.getElementById('semStart').value = '';
+  document.getElementById('semEnd').value = '';
+  document.getElementById('semHolidays').value = '';
+  document.getElementById('semesterForm').style.display = 'block';
+  document.getElementById('addSemBtn').style.display = 'none';
+}
+
+function openSemesterFormEdit(name) {
+  var s = semestersCache.find(function(x){ return x.name === name; });
+  if (!s) return;
+  document.getElementById('semFormTitle').textContent = '학기 수정: ' + name;
+  document.getElementById('semName').value = s.name;
+  document.getElementById('semStart').value = s.start || '';
+  document.getElementById('semEnd').value = s.end || '';
+  document.getElementById('semHolidays').value = (s.holidays || []).join(', ');
+  document.getElementById('semesterForm').style.display = 'block';
+  document.getElementById('addSemBtn').style.display = 'none';
+}
+
+function closeSemesterForm() {
+  document.getElementById('semesterForm').style.display = 'none';
+  document.getElementById('addSemBtn').style.display = 'inline-block';
+}
+
+function saveSemesterForm() {
+  var name     = document.getElementById('semName').value.trim();
+  var start    = document.getElementById('semStart').value;
+  var end      = document.getElementById('semEnd').value;
+  var holRaw   = document.getElementById('semHolidays').value.trim();
+  var holidays = holRaw ? holRaw.split(',').map(function(d){return d.trim();}).filter(Boolean) : [];
+  if (!name) return alert('학기명을 입력하세요.');
+  if (!start || !end) return alert('시작일과 종료일을 입력하세요.');
+  var btn = document.getElementById('semSaveBtn');
+  btn.disabled = true; btn.textContent = '저장 중...';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      btn.disabled = false; btn.textContent = '저장';
+      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+      closeSemesterForm();
+      loadTimetableTab();
+    })
+    .withFailureHandler(function(e) { btn.disabled=false; btn.textContent='저장'; alert('오류: '+e.message); })
+    .saveSemester(currentGroupId, { name: name, start: start, end: end, holidays: holidays });
+}
+
+function deleteSemester(name) {
+  if (!confirm('"' + name + '" 학기를 삭제할까요?')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+      loadTimetableTab();
+    })
+    .deleteSemester(currentGroupId, name);
+}
+
+// ─── 시간표 등록 ───
+function loadTimetableForSemester() {
+  var sem = document.getElementById('ttSemesterSelect').value;
+  var wrap = document.getElementById('ttTableWrap');
+  if (!wrap) return;
+  if (!sem) {
+    wrap.innerHTML = '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:20px;">학기를 선택하면 시간표를 등록할 수 있습니다.</div>';
+    return;
+  }
+  var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
+  if (cols.length === 0) {
+    wrap.innerHTML = '<div style="color:#94a3b8;font-size:13px;padding:10px;">반 목록이 없어요. 학생명부에 학생을 등록하거나 ⚙️ 설정에서 반을 선택하세요.</div>';
+    return;
+  }
+
+  var DAYS = ['mon','tue','wed','thu','fri'];
+  var DAY_KR = { mon:'월', tue:'화', wed:'수', thu:'목', fri:'금' };
+
+  var html = '<div style="overflow-x:auto;">'
+    + '<table style="border-collapse:collapse;min-width:400px;width:100%;">'
+    + '<thead><tr>'
+    + '<th style="padding:8px 12px;text-align:left;font-size:12px;font-weight:800;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;">반</th>';
+  DAYS.forEach(function(d) {
+    html += '<th style="padding:8px 12px;text-align:center;font-size:12px;font-weight:800;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;min-width:70px;">'
+      + DAY_KR[d] + '<div style="font-size:10px;font-weight:400;color:#94a3b8;">교시</div></th>';
+  });
+  html += '<th style="padding:8px 12px;background:#f8fafc;border:1px solid #e2e8f0;"></th>'
+    + '</tr></thead><tbody>';
+
+  cols.forEach(function(cls) {
+    var existing = timetableCache.find(function(e){ return e.cls === cls && e.semester === sem; }) || {};
+    html += '<tr data-cls="' + escapeHtml(cls) + '" data-sem="' + escapeHtml(sem) + '">';
+    html += '<td style="padding:8px 12px;font-weight:700;font-size:13px;color:#1e3a8a;border:1px solid #e2e8f0;white-space:nowrap;">' + escapeHtml(cls) + '</td>';
+    DAYS.forEach(function(d) {
+      var val = existing[d] || 0;
+      var hasVal = val > 0 ? ' has-val' : '';
+      html += '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">'
+        + '<input type="number" min="0" max="9" class="tt-period-input' + hasVal + '" data-day="' + d + '" value="' + (val||'') + '" '
+        + 'placeholder="0" oninput="this.classList.toggle(\'has-val\', parseInt(this.value)>0)">'
+        + '</td>';
+    });
+    html += '<td style="padding:6px 8px;border:1px solid #e2e8f0;text-align:center;">'
+      + '<button class="btn btn-primary" style="font-size:12px;padding:5px 10px;" onclick="saveTimetableRow(this)">저장</button>'
+      + '</td></tr>';
+  });
+  html += '</tbody></table></div>'
+    + '<div style="font-size:11px;color:#94a3b8;margin-top:8px;padding:4px;">· 수업 없는 요일은 0 또는 빈칸으로 두세요. 교시 번호는 1-9 중 입력.</div>';
+  wrap.innerHTML = html;
+}
+
+function saveTimetableRow(btn) {
+  var tr = btn.closest('tr');
+  var cls = tr.dataset.cls;
+  var sem = tr.dataset.sem;
+  var data = { cls: cls, semester: sem };
+  tr.querySelectorAll('.tt-period-input').forEach(function(inp) {
+    data[inp.dataset.day] = parseInt(inp.value) || 0;
+  });
+  btn.disabled = true; btn.textContent = '저장 중...';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      btn.disabled = false; btn.textContent = res.success ? '✓ 저장됨' : '오류';
+      if (res.success) {
+        // 캐시 업데이트
+        var idx = timetableCache.findIndex(function(e){ return e.cls===cls && e.semester===sem; });
+        if (idx >= 0) timetableCache[idx] = data;
+        else timetableCache.push(data);
+        setTimeout(function(){ btn.textContent = '저장'; }, 1500);
+      }
+    })
+    .withFailureHandler(function(e) { btn.disabled=false; btn.textContent='오류'; alert(e.message); })
+    .saveTimetable(currentGroupId, data);
+}
+
+// ─── 자동 일정 생성 ───
+function runGenerateSchedule() {
+  var sem = document.getElementById('genSemesterSelect').value;
+  if (!sem) return alert('학기를 선택하세요.');
+  var wrap = document.getElementById('genPreviewWrap');
+  wrap.innerHTML = '<div class="loading">일정 계산 중...</div>';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) {
+        wrap.innerHTML = '<div style="color:#ef4444;background:#fef2f2;border-radius:8px;padding:12px 16px;font-size:13px;white-space:pre-line;">'
+          + '❌ ' + escapeHtml(res.message) + '</div>';
+        return;
+      }
+      renderSchedulePreview(res, sem);
+    })
+    .withFailureHandler(function(e) {
+      wrap.innerHTML = '<div style="color:#ef4444;padding:12px;">오류: ' + e.message + '</div>';
+    })
+    .generateSchedule(currentGroupId, sem);
+}
+
+function renderSchedulePreview(res, semName) {
+  var wrap = document.getElementById('genPreviewWrap');
+  var html = '';
+
+  if (res.warnings && res.warnings.length > 0) {
+    html += '<div style="background:#fef3c7;border:1px solid #fde047;border-radius:8px;padding:10px 14px;font-size:12px;color:#92400e;margin-bottom:12px;">'
+      + '⚠️ ' + res.warnings.join('<br>⚠️ ') + '</div>';
+  }
+
+  // 요약 카드
+  var clsList = Object.keys(res.preview);
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:14px;">';
+  clsList.forEach(function(cls) {
+    var lessons = res.preview[cls];
+    var first = lessons.length > 0 ? lessons[0].date : '-';
+    var last  = lessons.length > 0 ? lessons[lessons.length-1].date : '-';
+    html += '<div style="background:#eff6ff;border-radius:10px;padding:12px 14px;border:1px solid #bfdbfe;">'
+      + '<div style="font-size:13px;font-weight:800;color:#1e3a8a;margin-bottom:4px;">' + escapeHtml(cls) + '</div>'
+      + '<div style="font-size:12px;color:#3b82f6;font-weight:700;">' + lessons.length + '차시</div>'
+      + '<div style="font-size:11px;color:#64748b;margin-top:3px;">' + first + ' ~ ' + last + '</div>'
+      + '</div>';
+  });
+  html += '</div>';
+
+  // 상세 미리보기 (접기 가능)
+  html += '<details style="margin-bottom:14px;">'
+    + '<summary style="cursor:pointer;font-size:13px;font-weight:700;color:#475569;padding:8px 0;">📋 차시별 상세 미리보기 펼치기</summary>'
+    + '<div style="overflow-x:auto;margin-top:10px;">'
+    + '<table class="preview-table"><thead><tr><th>차시</th>';
+  clsList.forEach(function(cls) { html += '<th>' + escapeHtml(cls) + '</th>'; });
+  html += '</tr></thead><tbody>';
+
+  var maxLessons = clsList.reduce(function(mx, cls){ return Math.max(mx, res.preview[cls].length); }, 0);
+  for (var i = 0; i < maxLessons; i++) {
+    html += '<tr><td style="text-align:center;font-weight:700;color:#1e3a8a;">' + (i+1) + '</td>';
+    clsList.forEach(function(cls) {
+      var item = res.preview[cls][i];
+      if (item) {
+        html += '<td style="white-space:nowrap;">' + item.date + ' (' + item.day + ')</td>';
+      } else {
+        html += '<td style="color:#cbd5e1;">-</td>';
+      }
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table></div></details>';
+
+  // 적용 버튼
+  var itemsJson = JSON.stringify(res.items);
+  html += '<div style="display:flex;gap:10px;align-items:center;">'
+    + '<div style="flex:1;font-size:12px;color:#64748b;">총 ' + res.total + '개 일정이 생성됩니다. 이미 체크된 실제 수업일은 변경되지 않습니다.</div>'
+    + '<button class="btn btn-green" style="font-size:14px;padding:10px 20px;" onclick="applyGeneratedSchedule()">✅ 적용하기</button>'
+    + '</div>';
+
+  wrap.innerHTML = html;
+  wrap._pendingItems = res.items;
+}
+
+function applyGeneratedSchedule() {
+  var wrap = document.getElementById('genPreviewWrap');
+  var items = wrap._pendingItems;
+  if (!items || items.length === 0) return alert('먼저 미리보기를 실행하세요.');
+  if (!confirm(items.length + '개 예상 수업일을 저장할까요?\n(이미 실제 수업일이 체크된 차시는 변경되지 않습니다)')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+      alert('✅ ' + res.count + '개 일정이 저장되었습니다.');
+      loadSyllabusData();
+      wrap._pendingItems = null;
+      wrap.innerHTML = '<div style="color:#16a34a;font-size:13px;padding:10px;">✅ 적용 완료! 진도표 탭에서 예상 날짜를 확인하세요.</div>';
+    })
+    .withFailureHandler(function(e) { alert('오류: ' + e.message); })
+    .applySchedule(currentGroupId, items);
+}
+
+// ═══════════════════════════════════════
+// 그룹 관리 모달
+// ═══════════════════════════════════════
+
+function openGroupModal(gid) {
+  var isEdit = !!gid && gid !== '기본';
+  document.getElementById('groupModalId').value = gid || '';
+  document.getElementById('groupModalTitle').textContent = isEdit ? '그룹 수정' : '그룹 추가';
+  document.getElementById('groupDeleteBtn').style.display = isEdit ? 'inline-block' : 'none';
+
+  if (isEdit) {
+    var grp = groupsCache.find(function(g){ return g.id === gid; });
+    document.getElementById('groupModalName').value = grp ? grp.name : '';
+    renderGroupClassCheckboxes(grp ? grp.classes : []);
+  } else {
+    document.getElementById('groupModalName').value = '';
+    renderGroupClassCheckboxes([]);
+  }
+  document.getElementById('groupModal').classList.add('open');
+}
+
+function renderGroupClassCheckboxes(selected) {
+  var box = document.getElementById('groupModalClasses');
+  var cols = allClasses.length > 0 ? allClasses : [];
+  if (cols.length === 0) {
+    box.innerHTML = '<div style="color:#94a3b8;font-size:12px;">반 목록을 불러오는 중...</div>';
+    return;
+  }
+  box.innerHTML = cols.map(function(c) {
+    var checked = selected && selected.indexOf(c) >= 0 ? 'checked' : '';
+    return '<label style="display:flex;align-items:center;gap:5px;background:#f8fafc;padding:6px 11px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid #e2e8f0;">'
+      + '<input type="checkbox" value="' + escapeHtml(c) + '" name="groupCls" ' + checked + ' style="accent-color:#7c3aed;"> ' + escapeHtml(c) + '</label>';
+  }).join('');
+}
+
+function saveGroupModal() {
+  var gid  = document.getElementById('groupModalId').value;
+  var name = document.getElementById('groupModalName').value.trim();
+  if (!name) return alert('그룹 이름을 입력하세요.');
+  var classes = Array.from(document.querySelectorAll('input[name="groupCls"]:checked')).map(function(b){return b.value;});
+  var isEdit = !!gid;
+
+  var handler = function(res) {
+    if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+    document.getElementById('groupModal').classList.remove('open');
+    if (!isEdit && res.id) currentGroupId = res.id;
+    loadGroups();
+  };
+
+  if (isEdit) {
+    google.script.run.withSuccessHandler(handler).updateGroup({ id: gid, name: name, classes: classes });
+  } else {
+    google.script.run.withSuccessHandler(handler).createGroup({ name: name, classes: classes });
+  }
+}
+
+function deleteCurrentGroup() {
+  var gid = document.getElementById('groupModalId').value;
+  if (!gid) return;
+  var grp = groupsCache.find(function(g){ return g.id === gid; });
+  if (!confirm('"' + (grp ? grp.name : gid) + '" 그룹을 삭제할까요?\n이 그룹의 진도계획, 진도체크, 시험범위 시트도 모두 삭제됩니다.')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+      document.getElementById('groupModal').classList.remove('open');
+      currentGroupId = '기본';
+      loadGroups();
+    })
+    .deleteGroup(gid);
 }
 </script>
 </body>
