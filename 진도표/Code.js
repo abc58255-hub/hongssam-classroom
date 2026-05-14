@@ -108,7 +108,7 @@ function createGroup(data) {
 
     // 데이터 시트 생성
     _ensureSh(ss, '진도계획_' + id, ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
-    _ensureSh(ss, '진도체크_' + id, ['날짜','반','차시번호','메모'], '#10b981');
+    _ensureSh(ss, '진도체크_' + id, ['날짜','반','차시번호','메모','상태'], '#10b981');
     _ensureSh(ss, '시험범위_' + id, ['시험명','차시목록'], '#f59e0b');
 
     return { success: true, id: id };
@@ -488,21 +488,23 @@ function getSyllabusData(groupId) {
       plans.sort(function(a,b){ return a.lessonNo - b.lessonNo; });
     }
 
-    // 진도체크 (새 스키마: 날짜, 반, 차시번호, 메모)
-    // key = 'yyyy-MM-dd_반이름'
-    var checkSh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','차시번호','메모'], '#10b981');
+    // 진도체크 (스키마: 날짜, 반, 차시번호, 메모, 상태)
+    // key = 'yyyy-MM-dd_반이름', 상태: ''=정상, '취소'=수업없음
+    var checkSh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','차시번호','메모','상태'], '#10b981');
     var checks = {};
     if (checkSh.getLastRow() >= 2) {
-      var cd = checkSh.getRange(2, 1, checkSh.getLastRow() - 1, 4).getValues();
+      var cd = checkSh.getRange(2, 1, checkSh.getLastRow() - 1, 5).getValues();
       cd.forEach(function(r) {
         if (!r[0] || !r[1]) return;
         var dateStr = r[0] instanceof Date
           ? Utilities.formatDate(r[0], 'Asia/Seoul', 'yyyy-MM-dd')
           : String(r[0]).trim();
+        if (!dateStr) return;
+        var status = String(r[4]||'').trim();
         var ln = parseInt(r[2]) || 0;
-        if (!dateStr || !ln) return;
+        if (!ln && status !== '취소') return; // 빈 행 무시
         var key = dateStr + '_' + String(r[1]).trim();
-        checks[key] = { lessonNo: ln, memo: String(r[3]||'').trim() };
+        checks[key] = { lessonNo: ln, memo: String(r[3]||'').trim(), status: status };
       });
     }
 
@@ -558,12 +560,14 @@ function saveSyllabusPlan(plans, groupId) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-// data = { date: 'yyyy-MM-dd', cls, lessonNo, memo }
+// data = { date: 'yyyy-MM-dd', cls, lessonNo, memo, status }
+// status: '' = 정상 수업, '취소' = 수업 없음
 function saveSyllabusCheck(data, groupId) {
   try {
     var gid = groupId || '기본';
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','차시번호','메모'], '#10b981');
+    var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','차시번호','메모','상태'], '#10b981');
+    var status = String(data.status||'').trim();
     var found = false;
     if (sh.getLastRow() >= 2) {
       var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
@@ -572,12 +576,12 @@ function saveSyllabusCheck(data, groupId) {
           ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
           : String(rows[i][0]).trim();
         if (rowDate === String(data.date).trim() && String(rows[i][1]).trim() === String(data.cls).trim()) {
-          sh.getRange(i + 2, 1, 1, 4).setValues([[data.date, data.cls, data.lessonNo||0, data.memo||'']]);
+          sh.getRange(i + 2, 1, 1, 5).setValues([[data.date, data.cls, data.lessonNo||0, data.memo||'', status]]);
           found = true; break;
         }
       }
     }
-    if (!found) sh.appendRow([data.date, data.cls, data.lessonNo||0, data.memo||'']);
+    if (!found) sh.appendRow([data.date, data.cls, data.lessonNo||0, data.memo||'', status]);
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
