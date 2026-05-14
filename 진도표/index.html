@@ -95,6 +95,13 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .preview-table { border-collapse: collapse; font-size: 12px; }
 .preview-table th { background: #f1f5f9; color: #475569; padding: 6px 10px; border: 1px solid #e2e8f0; font-weight: 700; }
 .preview-table td { padding: 5px 10px; border: 1px solid #e2e8f0; }
+
+/* Action buttons in check modal */
+.action-btn { padding: 7px 13px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; background: #f1f5f9; color: #64748b; transition: all 0.15s; }
+.action-btn:hover { border-color: #94a3b8; }
+.action-btn.active-normal { background: #dcfce7; border-color: #86efac; color: #16a34a; }
+.action-btn.active-cancel { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+.action-btn.active-move { background: #f5f3ff; border-color: #c4b5fd; color: #7c3aed; }
 </style>
 </head>
 <body>
@@ -237,28 +244,36 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
 <!-- 수업 기록 모달 -->
 <div id="checkDateModal" class="modal-bg">
-  <div class="modal-box" style="max-width:360px;">
+  <div class="modal-box" style="max-width:380px;">
     <h3 style="margin:0 0 14px;font-size:16px;font-weight:800;color:#0f172a;" id="checkDateTitle">수업 기록</h3>
     <input type="hidden" id="checkDate">
     <input type="hidden" id="checkCls">
 
-    <!-- 임시 수업 추가 모드에서만 날짜 선택 -->
+    <!-- 임시 수업 추가 모드: 날짜 선택 -->
     <div id="extraDateRow" style="display:none;margin-bottom:12px;">
       <div style="font-size:12px;font-weight:700;color:#0284c7;margin-bottom:5px;">수업 날짜</div>
       <input type="date" id="extraDateInput" class="form-input">
     </div>
 
-    <!-- 수업 취소 토글 (시간표 예정일 셀에서만 표시) -->
-    <div id="cancelToggleRow" style="display:none;margin-bottom:14px;background:#fff1f2;border-radius:8px;padding:10px 12px;border:1px solid #fecdd3;">
-      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-        <input type="checkbox" id="checkIsCancelled" onchange="toggleCancelMode()" style="accent-color:#dc2626;width:16px;height:16px;">
-        <span style="font-size:13px;color:#dc2626;font-weight:700;">이 날 수업 없음 (취소로 기록)</span>
-      </label>
+    <!-- 수업 상태 선택 (시간표 예정일에서만 표시) -->
+    <div id="scheduleActionRow" style="display:none;margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:7px;">이 날 수업 상태</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button id="actionBtnNormal" class="action-btn" onclick="setScheduleAction('normal')">✅ 정상 수업</button>
+        <button id="actionBtnCancel" class="action-btn" onclick="setScheduleAction('cancel')">🚫 수업 취소</button>
+        <button id="actionBtnMove" class="action-btn" onclick="setScheduleAction('move')">🔄 날짜 이동</button>
+      </div>
     </div>
 
-    <!-- 차시 입력 (취소 체크 시 숨김) -->
+    <!-- 날짜 이동 대상 날짜 -->
+    <div id="moveDateRow" style="display:none;margin-bottom:12px;background:#f5f3ff;border-radius:8px;padding:10px 12px;border:1px solid #c4b5fd;">
+      <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:5px;">이동할 날짜 선택</div>
+      <input type="date" id="moveDateInput" class="form-input">
+    </div>
+
+    <!-- 차시 입력 -->
     <div id="lessonInputSection" style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:5px;">수업한 차시 번호</div>
+      <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:5px;" id="lessonInputLabel">수업한 차시 번호</div>
       <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시 번호 입력 (예: 3)" oninput="previewLesson(this.value)">
       <div id="checkLessonPreview" style="font-size:12px;color:#64748b;margin-top:4px;min-height:18px;padding:2px 0;"></div>
     </div>
@@ -317,18 +332,19 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 </div>
 
 <script>
-var sylPlanCache    = [];
-var sylCheckCache   = {};
-var sylScheduleCache= {};
-var sylClassList    = [];
-var examRangeCache  = [];
-var allClasses      = [];
-var currentGroupId  = '기본';
-var groupsCache     = [];
-var plansCache      = [];
-var _editingPlanId  = null;
-var semestersCache  = [];
-var timetableCache  = [];
+var sylPlanCache     = [];
+var sylCheckCache    = {};
+var sylScheduleCache = {};
+var sylClassList     = [];
+var examRangeCache   = [];
+var allClasses       = [];
+var currentGroupId   = '기본';
+var groupsCache      = [];
+var plansCache       = [];
+var _editingPlanId   = null;
+var _scheduleAction  = 'normal'; // 'normal' | 'cancel' | 'move'
+var semestersCache   = [];
+var timetableCache   = [];
 
 // ─── 로그인 ───
 function doLogin() {
@@ -478,19 +494,34 @@ function renderSylTable() {
     return;
   }
 
-  // 표시 반들의 일정 날짜 합집합 (시간표 예정일 + 임시 추가된 날)
+  // 이동 대상 날짜 맵: '날짜_반' → true (어느 이동 기록의 target인지)
+  var moveTargetSet = {};
+  Object.keys(sylCheckCache).forEach(function(key) {
+    var check = sylCheckCache[key];
+    if (!check || !check.status || check.status.indexOf('이동:') !== 0) return;
+    var targetDate = check.status.substring(3);
+    if (targetDate.length !== 10) return;
+    var keyCls = key.substring(11);
+    moveTargetSet[targetDate + '_' + keyCls] = true;
+  });
+
+  // 표시할 날짜 합집합: 시간표 예정일 + 임시/이동됨 기록 날짜 + 이동 대상 날짜
   var allDates = {};
   cols.forEach(function(cls) {
     (sylScheduleCache[cls]||[]).forEach(function(d){ allDates[d] = true; });
   });
-  // 임시 수업 (시간표에 없지만 기록된 날짜) 추가
   Object.keys(sylCheckCache).forEach(function(key) {
     if (key.length < 11) return;
-    var date = key.substring(0, 10);
-    var cls  = key.substring(11);
+    var date  = key.substring(0, 10);
+    var cls   = key.substring(11);
     var check = sylCheckCache[key];
-    if (cols.indexOf(cls) >= 0 && check && check.lessonNo && (sylScheduleCache[cls]||[]).indexOf(date) < 0) {
-      allDates[date] = true;
+    if (cols.indexOf(cls) < 0) return;
+    // 임시 수업 또는 이동됨 대상
+    if (check && check.lessonNo && (sylScheduleCache[cls]||[]).indexOf(date) < 0) allDates[date] = true;
+    // 이동 대상 날짜
+    if (check && check.status && check.status.indexOf('이동:') === 0) {
+      var td = check.status.substring(3);
+      if (td.length === 10) allDates[td] = true;
     }
   });
   var sortedDates = Object.keys(allDates).sort();
@@ -503,12 +534,12 @@ function renderSylTable() {
     var yearMatch = cls.match(/\d+학년/);
     var yearPart  = yearMatch ? yearMatch[0] : '';
     var shortCls  = cls.replace(yearPart + ' ', '');
-    html += '<th style="min-width:110px;">'
+    html += '<th style="min-width:120px;">'
       + (yearPart ? '<div style="font-size:10px;opacity:0.7;font-weight:500;margin-bottom:2px;">' + yearPart + '</div>' : '')
       + '<div style="display:flex;align-items:center;justify-content:center;gap:4px;">'
         + escapeHtml(shortCls)
         + '<span data-cls="' + escapeHtml(cls) + '" onclick="event.stopPropagation();openAddExtra(this.dataset.cls)" '
-          + 'style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:10px;cursor:pointer;font-weight:800;flex-shrink:0;" title="임시 수업 추가">+</span>'
+          + 'style="font-size:10px;background:#dbeafe;color:#1d4ed8;padding:1px 6px;border-radius:10px;cursor:pointer;font-weight:800;flex-shrink:0;" title="수업 추가">+</span>'
       + '</div></th>';
   });
   html += '</tr></thead><tbody>';
@@ -523,44 +554,65 @@ function renderSylTable() {
     }
 
     var dow = d.getDay();
-    var dayLabel = DAY_KR[dow];
     var dayColor = dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : '#334155';
-    html += '<tr>';
-    html += '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;">'
-      + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + dayLabel + ')</span></td>';
+    html += '<tr><td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;">'
+      + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')</span></td>';
 
     cols.forEach(function(cls) {
       var scheduled = (sylScheduleCache[cls]||[]).indexOf(dateStr) >= 0;
-      if (!scheduled) {
-        html += '<td style="background:#f8fafc;"></td>';
-        return;
-      }
-      var key = dateStr + '_' + cls;
+      var key   = dateStr + '_' + cls;
       var check = sylCheckCache[key];
+
+      // 시간표에 없고 기록도 없으면 회색 빈 셀
+      if (!scheduled && (!check || (!check.lessonNo && !check.status))) {
+        html += '<td style="background:#f8fafc;"></td>'; return;
+      }
+
       var cellAttrs = 'data-date="' + escapeHtml(dateStr) + '" data-cls="' + escapeHtml(cls) + '" onclick="openCheckDate(this.dataset.date,this.dataset.cls)"';
-      if (check && check.status === '취소') {
-        // 수업 취소된 날
+      var status = check ? (check.status || '') : '';
+
+      if (status === '취소') {
         html += '<td style="text-align:center;padding:6px 4px;background:#fff1f2;cursor:pointer;" ' + cellAttrs + ' title="수업 취소 (클릭하여 수정)">'
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
             + '<span style="font-size:17px;">🚫</span>'
             + '<span style="font-size:9px;color:#dc2626;font-weight:700;">취소</span>'
-            + (check.memo ? '<span style="font-size:9px;color:#94a3b8;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(check.memo) + '</span>' : '')
+            + (check.memo ? '<span style="font-size:9px;color:#94a3b8;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(check.memo) + '</span>' : '')
           + '</div></td>';
+
+      } else if (status.indexOf('이동:') === 0) {
+        var targetDate = status.substring(3);
+        var tD = new Date(targetDate + 'T09:00:00');
+        var tLabel = (tD.getMonth()+1) + '/' + tD.getDate() + ' (' + DAY_KR[tD.getDay()] + ')';
+        html += '<td style="text-align:center;padding:6px 4px;background:#fdf4ff;cursor:pointer;" ' + cellAttrs + ' title="수업 이동됨 (클릭하여 수정)">'
+          + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
+            + '<span style="font-size:17px;">🔄</span>'
+            + '<span style="font-size:9px;color:#7c3aed;font-weight:700;">' + tLabel + '</span>'
+            + '<span style="font-size:9px;color:#a78bfa;">로 이동</span>'
+          + '</div></td>';
+
       } else if (check && check.lessonNo) {
         var plan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
-        var isExtra = (sylScheduleCache[cls]||[]).indexOf(dateStr) < 0;
-        html += '<td style="padding:5px 8px;background:' + (isExtra ? '#fefce8' : '#f0fdf4') + ';cursor:pointer;" ' + cellAttrs + ' title="클릭하여 수정">'
+        var isExtra  = !scheduled;
+        var isMoved  = moveTargetSet[key] === true;
+        var bgColor  = isMoved ? '#faf5ff' : isExtra ? '#fefce8' : '#f0fdf4';
+        var numColor = isMoved ? '#7c3aed'  : isExtra ? '#92400e' : '#065f46';
+        var badge    = isMoved
+          ? '<span style="font-size:9px;background:#e9d5ff;color:#7c3aed;padding:1px 4px;border-radius:4px;margin-left:3px;">이동됨</span>'
+          : isExtra
+            ? '<span style="font-size:9px;background:#fcd34d;color:#78350f;padding:1px 4px;border-radius:4px;margin-left:3px;">추가</span>'
+            : '';
+        html += '<td style="padding:5px 8px;background:' + bgColor + ';cursor:pointer;" ' + cellAttrs + ' title="클릭하여 수정">'
           + '<div style="display:flex;align-items:center;gap:5px;">'
             + '<span style="font-size:16px;">✅</span>'
             + '<div style="font-size:12px;min-width:0;">'
-              + '<div style="font-weight:800;color:' + (isExtra ? '#92400e' : '#065f46') + ';">' + check.lessonNo + '차시'
-                + (isExtra ? '<span style="font-size:9px;background:#fcd34d;color:#78350f;padding:1px 4px;border-radius:4px;margin-left:3px;">임시</span>' : '')
-              + '</div>'
-              + (plan && plan.content ? '<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;">' + escapeHtml(plan.content) + '</div>' : '')
-              + (check.memo ? '<div style="font-size:9px;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80px;">' + escapeHtml(check.memo) + '</div>' : '')
+              + '<div style="font-weight:800;color:' + numColor + ';">' + check.lessonNo + '차시' + badge + '</div>'
+              + (plan && plan.content ? '<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(plan.content) + '</div>' : '')
+              + (check.memo ? '<div style="font-size:9px;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(check.memo) + '</div>' : '')
             + '</div>'
           + '</div></td>';
+
       } else {
+        // 예정된 날이지만 미기록
         html += '<td style="text-align:center;padding:8px;cursor:pointer;" ' + cellAttrs + ' title="클릭하여 수업 기록">'
           + '<span style="display:inline-block;width:22px;height:22px;border:2px solid #d1d5db;border-radius:4px;background:white;"></span>'
           + '</td>';
@@ -570,12 +622,14 @@ function renderSylTable() {
   });
 
   html += '</tbody></table>';
-  html += '<div style="display:flex;gap:14px;padding:10px 4px;font-size:12px;color:#64748b;flex-wrap:wrap;">'
+  html += '<div style="display:flex;gap:12px;padding:10px 4px;font-size:12px;color:#64748b;flex-wrap:wrap;">'
     + '<span>✅ = 수업 기록</span>'
-    + '<span style="background:#fefce8;padding:1px 5px;border-radius:4px;">✅<span style="font-size:9px;background:#fcd34d;color:#78350f;padding:1px 4px;border-radius:3px;margin-left:2px;">임시</span> = 보충/수업교체</span>'
+    + '<span style="background:#faf5ff;padding:1px 5px;border-radius:4px;color:#7c3aed;">✅ 이동됨 = 이동된 수업</span>'
+    + '<span style="background:#fefce8;padding:1px 5px;border-radius:4px;color:#92400e;">✅ 추가 = 임시/보충</span>'
+    + '<span>🔄 = 날짜 이동됨</span>'
     + '<span>🚫 = 수업 취소</span>'
     + '<span>☐ = 미기록</span>'
-    + '<span style="color:#94a3b8;">· 셀 클릭 → 기록 &nbsp;·&nbsp; 열 [+] → 임시 수업 추가</span></div>';
+    + '<span style="color:#94a3b8;">&nbsp;셀 클릭 → 기록 · 열 [+] → 수업 추가</span></div>';
   wrap.innerHTML = html;
 }
 
@@ -588,38 +642,53 @@ function openCheckDate(date, cls) {
   document.getElementById('checkDateTitle').textContent =
     (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[d.getDay()] + ') — ' + cls;
 
-  // 임시 추가 모드 아님 — 날짜 고정
   document.getElementById('extraDateRow').style.display = 'none';
 
-  // 취소 토글: 시간표 예정일에서만 표시
   var isScheduled = (sylScheduleCache[cls]||[]).indexOf(date) >= 0;
-  document.getElementById('cancelToggleRow').style.display = isScheduled ? 'block' : 'none';
-
-  var key = date + '_' + cls;
+  var key      = date + '_' + cls;
   var existing = sylCheckCache[key] || {};
-  var isCancelled = existing.status === '취소';
-  document.getElementById('checkIsCancelled').checked = isCancelled;
-  document.getElementById('lessonInputSection').style.display = isCancelled ? 'none' : 'block';
+  var status   = existing.status || '';
+
+  if (isScheduled) {
+    // 예정된 날: 3-way 액션 선택 표시
+    document.getElementById('scheduleActionRow').style.display = 'block';
+    var initAction = 'normal';
+    if (status === '취소') initAction = 'cancel';
+    else if (status.indexOf('이동:') === 0) initAction = 'move';
+    setScheduleAction(initAction);
+    document.getElementById('moveDateInput').value = (initAction === 'move') ? status.substring(3) : '';
+  } else {
+    // 임시/이동됨 날: 액션 선택 없이 차시 편집만
+    document.getElementById('scheduleActionRow').style.display = 'none';
+    document.getElementById('moveDateRow').style.display = 'none';
+    document.getElementById('lessonInputSection').style.display = 'block';
+    document.getElementById('lessonInputLabel').textContent = '수업한 차시 번호';
+    _scheduleAction = 'normal';
+  }
 
   var lnInput = document.getElementById('checkLessonNo');
   lnInput.value = existing.lessonNo ? String(existing.lessonNo) : '';
   previewLesson(lnInput.value);
   document.getElementById('checkMemo').value = existing.memo || '';
-  document.getElementById('checkCancelBtn').style.display = (existing.lessonNo || isCancelled) ? 'inline-block' : 'none';
+
+  var hasRecord = !!(existing.lessonNo || status === '취소' || status.indexOf('이동:') === 0);
+  document.getElementById('checkCancelBtn').style.display = hasRecord ? 'inline-block' : 'none';
   document.getElementById('checkDateModal').classList.add('open');
-  if (!isCancelled) setTimeout(function(){ lnInput.focus(); lnInput.select(); }, 80);
+  if (_scheduleAction === 'normal') setTimeout(function(){ lnInput.focus(); lnInput.select(); }, 80);
 }
 
-// 임시 수업 추가 (시간표에 없는 날)
+// 수업 추가 (시간표에 없는 날 신규 입력)
 function openAddExtra(cls) {
   document.getElementById('checkDate').value = '';
   document.getElementById('checkCls').value = cls;
-  document.getElementById('checkDateTitle').textContent = '임시 수업 추가 — ' + cls;
+  document.getElementById('checkDateTitle').textContent = '수업 추가 — ' + cls;
   document.getElementById('extraDateRow').style.display = 'block';
   document.getElementById('extraDateInput').value = '';
-  document.getElementById('cancelToggleRow').style.display = 'none';
-  document.getElementById('checkIsCancelled').checked = false;
+  document.getElementById('scheduleActionRow').style.display = 'none';
+  document.getElementById('moveDateRow').style.display = 'none';
   document.getElementById('lessonInputSection').style.display = 'block';
+  document.getElementById('lessonInputLabel').textContent = '수업한 차시 번호';
+  _scheduleAction = 'normal';
   var lnInput = document.getElementById('checkLessonNo');
   lnInput.value = '';
   previewLesson('');
@@ -629,9 +698,21 @@ function openAddExtra(cls) {
   setTimeout(function(){ document.getElementById('extraDateInput').focus(); }, 80);
 }
 
-function toggleCancelMode() {
-  var cancelled = document.getElementById('checkIsCancelled').checked;
-  document.getElementById('lessonInputSection').style.display = cancelled ? 'none' : 'block';
+// 3-way 액션 선택
+function setScheduleAction(action) {
+  _scheduleAction = action;
+  ['Normal','Cancel','Move'].forEach(function(a) {
+    var btn = document.getElementById('actionBtn' + a);
+    if (!btn) return;
+    btn.className = 'action-btn' + (action === a.toLowerCase() ? ' active-' + a.toLowerCase() : '');
+  });
+  document.getElementById('moveDateRow').style.display = action === 'move' ? 'block' : 'none';
+  document.getElementById('lessonInputSection').style.display = action === 'cancel' ? 'none' : 'block';
+  if (action === 'move') {
+    document.getElementById('lessonInputLabel').textContent = '이동 후 수업한 차시 번호';
+  } else {
+    document.getElementById('lessonInputLabel').textContent = '수업한 차시 번호';
+  }
 }
 
 function previewLesson(val) {
@@ -648,36 +729,77 @@ function cancelCheck() {
   var cls  = document.getElementById('checkCls').value;
   var key  = date + '_' + cls;
   var existing = sylCheckCache[key];
-  if (!existing || (!existing.lessonNo && existing.status !== '취소')) {
-    document.getElementById('checkDateModal').classList.remove('open'); return;
+  if (!existing) { document.getElementById('checkDateModal').classList.remove('open'); return; }
+
+  var status = existing.status || '';
+  var isMove = status.indexOf('이동:') === 0;
+  var msg = date + ' ' + cls + ' 수업 기록을 삭제할까요?';
+  if (isMove) {
+    var targetDate = status.substring(3);
+    msg += '\n\n이동 대상(' + targetDate + ')의 기록도 함께 삭제할까요?\n확인 → 둘 다 삭제 / 취소 → 이 날만 삭제';
   }
-  if (!confirm(date + ' ' + cls + ' 수업 기록을 삭제할까요?')) return;
+  if (!confirm(msg)) return;
+
   document.getElementById('checkDateModal').classList.remove('open');
   delete sylCheckCache[key];
+
+  if (isMove) {
+    var targetDate = status.substring(3);
+    var tKey = targetDate + '_' + cls;
+    // 확인 → 이동 대상도 삭제 (confirm이 true이므로 항상 삭제)
+    delete sylCheckCache[tKey];
+    google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(targetDate, cls, currentGroupId);
+  }
+
   renderSylTable();
   google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(date, cls, currentGroupId);
 }
 
 function confirmCheck() {
-  var cls      = document.getElementById('checkCls').value;
-  // 임시 추가 모드면 extraDateInput에서 날짜 읽기
+  var cls  = document.getElementById('checkCls').value;
   var date = document.getElementById('checkDate').value || document.getElementById('extraDateInput').value;
   if (!date) return alert('날짜를 선택하세요.');
-  document.getElementById('checkDate').value = date;
 
-  var isCancelled = document.getElementById('checkIsCancelled').checked;
+  var isScheduled = (sylScheduleCache[cls]||[]).indexOf(date) >= 0;
+  var action = isScheduled ? _scheduleAction : 'normal';
+  var memo = document.getElementById('checkMemo').value.trim();
+
+  if (action === 'cancel') {
+    document.getElementById('checkDateModal').classList.remove('open');
+    sylCheckCache[date + '_' + cls] = { lessonNo: 0, memo: memo, status: '취소' };
+    renderSylTable();
+    google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, memo: memo, status: '취소' }, currentGroupId);
+    return;
+  }
+
+  if (action === 'move') {
+    var targetDate = document.getElementById('moveDateInput').value;
+    if (!targetDate) return alert('이동할 날짜를 선택하세요.');
+    if (targetDate === date) return alert('같은 날짜로는 이동할 수 없습니다.');
+    var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
+    if (!lessonNo) return alert('이동 후 수업한 차시 번호를 입력하세요.');
+    document.getElementById('checkDateModal').classList.remove('open');
+    // 원래 날: 이동 표시
+    sylCheckCache[date + '_' + cls] = { lessonNo: 0, memo: '', status: '이동:' + targetDate };
+    // 이동된 날: 정상 기록
+    sylCheckCache[targetDate + '_' + cls] = { lessonNo: lessonNo, memo: memo, status: '' };
+    renderSylTable();
+    google.script.run.withSuccessHandler(function(){})
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, memo: '', status: '이동:' + targetDate }, currentGroupId);
+    google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
+      .saveSyllabusCheck({ date: targetDate, cls: cls, lessonNo: lessonNo, memo: memo, status: '' }, currentGroupId);
+    return;
+  }
+
+  // 정상 수업
   var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
-  var memo     = document.getElementById('checkMemo').value.trim();
-  if (!isCancelled && !lessonNo) return alert('수업한 차시 번호를 입력하세요.');
-
+  if (!lessonNo) return alert('수업한 차시 번호를 입력하세요.');
   document.getElementById('checkDateModal').classList.remove('open');
-  var key = date + '_' + cls;
-  var status = isCancelled ? '취소' : '';
-  sylCheckCache[key] = { lessonNo: isCancelled ? 0 : lessonNo, memo: memo, status: status };
+  sylCheckCache[date + '_' + cls] = { lessonNo: lessonNo, memo: memo, status: '' };
   renderSylTable();
-  google.script.run
-    .withSuccessHandler(function(res) { if (!res.success) alert('오류: ' + (res.message||'')); })
-    .saveSyllabusCheck({ date: date, cls: cls, lessonNo: isCancelled ? 0 : lessonNo, memo: memo, status: status }, currentGroupId);
+  google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
+    .saveSyllabusCheck({ date: date, cls: cls, lessonNo: lessonNo, memo: memo, status: '' }, currentGroupId);
 }
 
 // ─── 계획 편집 ───
@@ -787,7 +909,8 @@ function renderSylStatusBoard() {
     scheduledDates.forEach(function(d) {
       var ch = sylCheckCache[d + '_' + cls];
       if (!ch) return;
-      if (ch.status === '취소') { cancelled++; }
+      var st = ch.status || '';
+      if (st === '취소' || st.indexOf('이동:') === 0) { cancelled++; }
       else if (ch.lessonNo) { done++; lastDoneDate = d; lastLessonNo = ch.lessonNo; }
     });
     // 임시 추가 수업도 done에 포함
