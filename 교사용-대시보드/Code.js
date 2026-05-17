@@ -249,8 +249,13 @@ var TEACHER_SESSION_DURATION = 4 * 60 * 60; // 4시간
 function teacherLogin(pw) {
   try {
     const ss = SpreadsheetApp.openById(SHEET_ID);
-    const stored = _getSys(ss, '교사비밀번호');
-    if (!stored) return { success: false, message: "교사 비밀번호가 설정되지 않았습니다." };
+    // 시스템설정 '교사비밀번호' 키 우선, 없으면 학생명부 F2 폴백 (마이그레이션 전 호환)
+    let stored = _getSys(ss, '교사비밀번호');
+    if (!stored) {
+      const roster = ss.getSheetByName('학생명부');
+      if (roster) stored = String(roster.getRange('F2').getValue() || '').trim();
+    }
+    if (!stored) return { success: false, message: "교사 비밀번호가 설정되지 않았습니다. 시스템설정 시트를 확인하세요." };
     if (pw !== stored) return { success: false, message: "비밀번호가 일치하지 않습니다." };
 
     // 세션 토큰 생성 및 저장
@@ -2721,10 +2726,6 @@ function migrateSysSheet() {
   // 헤더 고정
   sh.setFrozenRows(1);
 
-  // 학생명부 F2 비우기 (교사비번 이전 완료)
-  try {
-    ss.getSheetByName('학생명부').getRange('F2').clearContent();
-  } catch(e) {}
-
-  Logger.log('migrateSysSheet 완료: ' + rows.length + '행 작성. 로그 확인 후 스프레드시트를 열어 시스템설정 탭을 확인하세요.');
+  Logger.log('migrateSysSheet 완료: ' + rows.length + '행 작성. 스프레드시트를 열어 시스템설정 탭을 확인하세요.');
+  Logger.log('※ 시스템설정에서 교사비밀번호 값이 맞게 이전됐는지 확인 후, 학생명부 F2는 직접 지워주세요.');
 }

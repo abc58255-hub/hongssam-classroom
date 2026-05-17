@@ -6,12 +6,27 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+function _getSysSetting(key) {
+  try {
+    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+    if (!sh || sh.getLastRow() < 2) return '';
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+    }
+    return '';
+  } catch(e) { return ''; }
+}
+
 function verifyTeacher(password) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
-    if (!sheet) return { success: false, message: '시트를 찾을 수 없습니다.' };
-    const pw = String(sheet.getRange('F2').getValue() || '').trim();
-    if (!pw) return { success: false, message: '비밀번호가 설정되어 있지 않습니다.' };
+    // 시스템설정 '교사비밀번호' 키 우선, 없으면 학생명부 F2 폴백
+    var pw = _getSysSetting('교사비밀번호');
+    if (!pw) {
+      var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
+      if (sheet) pw = String(sheet.getRange('F2').getValue() || '').trim();
+    }
+    if (!pw) return { success: false, message: '비밀번호가 설정되어 있지 않습니다. 시스템설정 시트를 확인하세요.' };
     if (String(password).trim() === pw) return { success: true };
     return { success: false, message: '비밀번호가 틀렸습니다.' };
   } catch(e) { return { success: false, message: e.toString() }; }
