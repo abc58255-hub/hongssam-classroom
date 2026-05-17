@@ -26,48 +26,13 @@ function _setSys(ss, key, value) {
 
 // =====================================================
 // ✅ FCM 푸시 알림 (HTTP v1 API + 서비스 계정)
-// 최초 1회: GAS 스크립트 편집기에서 setupFCMCredentials() 실행
+// 시스템설정 시트에 FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY 항목 입력 필요
 // =====================================================
 
-function debugFCM() {
-  var props = PropertiesService.getScriptProperties();
-  var projectId = props.getProperty('FCM_PROJECT_ID');
-  var email = props.getProperty('FCM_CLIENT_EMAIL');
-  var key = props.getProperty('FCM_PRIVATE_KEY');
-  Logger.log('PROJECT_ID: ' + projectId);
-  Logger.log('KEY_LENGTH: ' + (key || '').length);
-  try {
-    var accessToken = getFCMAccessToken_();
-    Logger.log('ACCESS_TOKEN OK: ' + accessToken.substring(0, 30));
-    // 스프레드시트에서 첫 번째 FCM 토큰 찾아서 테스트 발송
-    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
-    var data = sheet.getDataRange().getValues();
-    for (var i = 1; i < data.length; i++) {
-      var token = String(data[i][4] || '').trim();
-      if (token) {
-        Logger.log('첫 번째 토큰 발견 (학번 ' + data[i][1] + '): ' + token.substring(0, 30) + '...');
-        var res = sendFcmToToken_(token, '테스트 알림', '테스트입니다', '', 'test');
-        Logger.log('발송 결과: ' + res);
-        break;
-      }
-    }
-  } catch(e) {
-    Logger.log('오류: ' + e.toString());
-  }
-}
-
-function setupFCMCredentials() {
-  var props = PropertiesService.getScriptProperties();
-  props.setProperty('FCM_PROJECT_ID',   'send-alarm-220c3');
-  props.setProperty('FCM_CLIENT_EMAIL', 'firebase-adminsdk-fbsvc@send-alarm-220c3.iam.gserviceaccount.com');
-  props.setProperty('FCM_PRIVATE_KEY',  '-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC5xXXlzic2Ykf5\naMW9BoMD1VFLvO4ShawVjtyUFwnf5Swufq6fLNxGsXdVfpt2sXDBGgXD97EwoUTQ\nMmJ/UPWw2ulG23cbbA4mK9Xu+Jh3Z9bYC3wutW3NNOpb0G/ivdcbeMu6XoDtuAMt\ndgKESakK3Ta05KuU3JFSBqTAlwIIRrtEeiXFERV6fv7jUvua/0ncTKDqOymSRuph\nYOK5TAHlTBHitqojoJ0KGK6TWAgGUGnshtXwlcyxyqAcdN6Mq75G8/LRbc6hMMIY\n5BMzsrhJt5MLcXV7Kr+iPb1yJmb1Px7vjmnsT5IAQZHkGYRDEWvKJQNSHsTJ0MW6\nEDtcknQ9AgMBAAECggEAA2cg4v+cdCKjAN+wxW9uGb3O6CXJVuDZr+h44gZb4IvW\n/BNPthRyN/drB5PQuZqZRYrpN/3vt25kRuVbxkK4Hnicm5CqPru++QD1OPqF91/U\n9ht54h9IQa31DuSOEbaYYC3ZRX9oMZSuC9IikLvGSJYx9KzYKrCgbEtbQmuXCb15\nYJ00GD1R0WUkCjoJGCWKoZmuuqOj/o/LvkTOywHw3Wx0w50V/SldpgGT0aJ1ZRjj\n2+MC7Yd+06RQ2aDcLxqIn4YM73MKd0kkUGWZ84JyfHdVxOA4kQoz52b7VIjDLx9C\n6qji9+Dddy+ULmgQFgHLsPE9I9sdszianbIK2O2evQKBgQDx083+eShG9H4iZAIj\npNpWSpj/hTzx50D+W1nuYiYM+v7AoiZgAqflsDqFcyeXcTE1WCH1Jt9HqMka3G0k\n3BomzFKXoQqPTLxEbLu7sPONzuGETUqfEC53Rm7SlZW7Zf7nSi+qHEuGNryr+IKp\nVC0Ry/yjGzU8aVT6LJ9xFOh7xwKBgQDEqKIqFolxb7+y4LZlZJm0IefgrOv4Y5m9\nLhJivnX7MT72DSyAhqUQI+jyHmjqmX8px6ieFOZs0sRtDQ3V/Rm7b16CzckoDwE8\neTy5tdA9uCJO9Q8Hn4XQDk8cCnN45tSIKGBSRCUVWBpkx2mgXBZUqRmWTZNufMuV\n5EclvgDn2wKBgQCl5GSlszucIVD+CpklFovpMlduwloioD+HvecdjxsHQI/OWe31\nYx0GhjQ/I9X/H9lf/Muev0HgiLscwCXnaU5PW081UXZLA5sLXYQTp7oMh+VQuyz7\nnUAi9qBDufXzjm6k/9Fe4vY0Zgxb9Ki9vE8GrGbtBVcp0CBJVp8yFeO+NQKBgEur\nW2J4c4A7cHaismwHLoE6Pp+bydw0btZ1IMvv3zO9Oi2w2fvGU0MHnj1zaAlE8MIh\nugbBofwjiUMwr680CS+u5Z3NEuagB2i+eZg3lh35ePIKpzLWtcVdjCENAGt33jVZ\n294rrF0vHlDCzijO5iTDQD4uMVllGWzefmXOW0jbAoGBALcUbVtH59FaHCZThuKS\nom659DWn4LePqDFal8bfEcgTko+zBZv7lZIZ9unps3GdtccR5XZCKfn9MchNKfT1\nVzqB3CPuh21vHJcMegn9WzzYwP2ezCKgjNBqbUJve7YUYuvQpZ/QFEGJEbte56pC\np2Grlq/5dEOE81GOHW8TeRAv\n-----END PRIVATE KEY-----\n');
-  return '✅ FCM 자격증명 저장 완료';
-}
-
 function getFCMAccessToken_() {
-  var props = PropertiesService.getScriptProperties();
-  var privateKey  = props.getProperty('FCM_PRIVATE_KEY').replace(/\\n/g, '\n');
-  var clientEmail = props.getProperty('FCM_CLIENT_EMAIL');
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var privateKey  = _getSys(ss, 'FCM_PRIVATE_KEY').replace(/\\n/g, '\n');
+  var clientEmail = _getSys(ss, 'FCM_CLIENT_EMAIL');
   var now = Math.floor(Date.now() / 1000);
   var header  = Utilities.base64EncodeWebSafe(JSON.stringify({alg:'RS256',typ:'JWT'})).replace(/=+$/,'');
   var payload = Utilities.base64EncodeWebSafe(JSON.stringify({
@@ -92,7 +57,7 @@ function getFCMAccessToken_() {
 
 function sendFcmToToken_(token, title, body, clickUrl, tag) {
   try {
-    var projectId   = PropertiesService.getScriptProperties().getProperty('FCM_PROJECT_ID');
+    var projectId   = _getSys(SpreadsheetApp.openById(SHEET_ID), 'FCM_PROJECT_ID');
     var accessToken = getFCMAccessToken_();
     var message = {
       message: {
