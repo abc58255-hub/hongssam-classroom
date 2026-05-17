@@ -1755,7 +1755,7 @@ function analyzeTaskText(text, fileAttachment) {
 
     const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy년 MM월 dd일 (E)');
 
-    const systemPrompt = '너는 한국 교사의 업무를 도와주는 AI야. 공문, 메시지, 첨부파일을 분석해서 반드시 유효한 JSON만 반환해. 다른 텍스트, 마크다운 코드블록, 설명은 절대 포함하지 마.';
+    const systemPrompt = '너는 한국 교사의 업무를 도와주는 AI야. 공문, 메시지, 일정이 적힌 사진, 첨부파일을 분석해서 반드시 유효한 JSON만 반환해. 사진이 첨부되면 사진 속 텍스트를 꼼꼼히 읽어서 날짜·시간·할 일을 모두 추출해. 다른 텍스트, 마크다운 코드블록, 설명은 절대 포함하지 마.';
 
     const userPrompt = '오늘 날짜: ' + today + '\n\n'
       + '아래 공문/메시지를 분석하고 정확히 다음 JSON 형식으로 반환해.\n\n'
@@ -1790,24 +1790,23 @@ function analyzeTaskText(text, fileAttachment) {
       + '}\n\n'
       + '[분석할 내용]\n' + text;
 
-    // 파일 첨부 처리
+    // 파일 첨부 처리 (OpenRouter OpenAI 호환 형식 사용)
     let userContent;
     if (fileAttachment && fileAttachment.data) {
       const ext = String(fileAttachment.name || '').split('.').pop().toLowerCase();
-      const isImage = ['png','jpg','jpeg','gif','webp'].includes(ext);
+      const isImage = ['png','jpg','jpeg','gif','webp','heic','heif'].includes(ext);
       const isPdf   = ext === 'pdf';
       if (isImage) {
+        const mimeType = fileAttachment.mimeType && fileAttachment.mimeType.startsWith('image/')
+          ? fileAttachment.mimeType : 'image/jpeg';
         userContent = [
-          { type: 'image', source: { type: 'base64', media_type: fileAttachment.mimeType, data: fileAttachment.data } },
-          { type: 'text',  text: userPrompt + (text ? '\n\n[추가 텍스트]\n' + text : '') }
-        ];
-      } else if (isPdf) {
-        userContent = [
-          { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileAttachment.data } },
+          { type: 'image_url', image_url: { url: 'data:' + mimeType + ';base64,' + fileAttachment.data } },
           { type: 'text', text: userPrompt + (text ? '\n\n[추가 텍스트]\n' + text : '') }
         ];
+      } else if (isPdf) {
+        // PDF는 URL 방식으로 전달 불가능 → 텍스트 추출 시도 후 실패 시 안내
+        userContent = userPrompt + '\n\n[PDF 첨부: ' + fileAttachment.name + ' - 텍스트 내용을 직접 붙여넣어 주세요]';
       } else {
-        // txt, docx 등 - base64 디코딩해서 텍스트로
         try {
           const decoded = Utilities.newBlob(Utilities.base64Decode(fileAttachment.data)).getDataAsString('UTF-8');
           userContent = userPrompt + '\n\n[첨부 파일: ' + fileAttachment.name + ']\n' + decoded.substring(0, 8000);

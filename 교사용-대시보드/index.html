@@ -893,15 +893,18 @@
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
         <div style="font-size:13px;font-weight:800;color:#0f172a;">📋 공문 / 메시지 붙여넣기</div>
         <label style="display:flex;align-items:center;gap:6px;background:#e0e7ff;color:#4338ca;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">
-          📎 파일 첨부
-          <input type="file" id="aiFileInput" accept=".pdf,.docx,.doc,.txt,.hwp,.xlsx,.xls,.png,.jpg,.jpeg" style="display:none;" onchange="handleAiFile(this)">
+          📷 사진/파일 첨부
+          <input type="file" id="aiFileInput" accept="image/*,.pdf,.docx,.doc,.txt,.xlsx,.xls" style="display:none;" onchange="handleAiFile(this)">
         </label>
       </div>
-      <div id="aiFilePreview" style="display:none;background:#f0f4ff;border-radius:8px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:#3730a3;display:flex;align-items:center;gap:8px;">
-        <span id="aiFileNameDisplay"></span>
-        <button onclick="clearAiFile()" style="background:none;border:none;color:#6366f1;cursor:pointer;font-size:14px;margin-left:auto;">✕</button>
+      <div id="aiFilePreview" style="display:none;background:#f0f4ff;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span id="aiFileNameDisplay" style="font-size:12px;color:#3730a3;font-weight:700;"></span>
+          <button onclick="clearAiFile()" style="background:none;border:none;color:#6366f1;cursor:pointer;font-size:14px;margin-left:auto;">✕</button>
+        </div>
+        <img id="aiImagePreview" src="" style="display:none;max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;border:1px solid #c7d2fe;">
       </div>
-      <textarea id="aiTaskInput" class="form-input" rows="8" style="resize:vertical;font-size:14px;line-height:1.7;" placeholder="공문, 이메일, 메시지 내용을 여기 붙여넣으세요.&#10;&#10;예시) 4월 수행평가 채점 기준 작성, 학부모 상담 일정 정리, 교육청 공문 처리, 가정통신문 작성, 학급 일지 정리, 체험학습 계획서 작성..."></textarea>
+      <textarea id="aiTaskInput" class="form-input" rows="5" style="resize:vertical;font-size:14px;line-height:1.7;" placeholder="일정이 적힌 사진을 첨부하거나, 공문/메시지를 여기 붙여넣으세요.&#10;&#10;사진만 첨부해도 AI가 일정을 자동으로 추출해요."></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:10px;gap:8px;">
         <button onclick="document.getElementById('aiTaskInput').value=''" style="background:#f1f5f9;color:#64748b;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🗑️ 초기화</button>
         <button id="aiAnalyzeBtn" onclick="runAiAnalysis()" style="background:#6366f1;color:white;border:none;padding:10px 22px;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer;">🤖 AI 분석 시작</button>
@@ -6953,11 +6956,21 @@
     _aiFileType = file.type || 'application/octet-stream';
     var reader = new FileReader();
     reader.onload = function(e) {
-      _aiFileData = e.target.result.split(',')[1]; // base64
-      var preview = document.getElementById('aiFilePreview');
-      var nameEl  = document.getElementById('aiFileNameDisplay');
-      if (preview) preview.style.display = 'flex';
-      if (nameEl)  nameEl.textContent = '📎 ' + _aiFileName;
+      var dataUrl = e.target.result;
+      _aiFileData = dataUrl.split(',')[1]; // base64
+      var preview  = document.getElementById('aiFilePreview');
+      var nameEl   = document.getElementById('aiFileNameDisplay');
+      var imgEl    = document.getElementById('aiImagePreview');
+      if (preview) preview.style.display = 'block';
+      if (nameEl)  nameEl.textContent = (file.type.startsWith('image/') ? '📷 ' : '📎 ') + _aiFileName;
+      if (imgEl) {
+        if (file.type.startsWith('image/')) {
+          imgEl.src = dataUrl;
+          imgEl.style.display = 'block';
+        } else {
+          imgEl.style.display = 'none';
+        }
+      }
     };
     reader.readAsDataURL(file);
   }
@@ -6967,6 +6980,8 @@
     if (inp) inp.value = '';
     var preview = document.getElementById('aiFilePreview');
     if (preview) preview.style.display = 'none';
+    var imgEl = document.getElementById('aiImagePreview');
+    if (imgEl) { imgEl.src = ''; imgEl.style.display = 'none'; }
   }
   function runAiAnalysis() {
     var text = document.getElementById('aiTaskInput').value.trim();
