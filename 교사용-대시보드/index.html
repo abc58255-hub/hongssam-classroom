@@ -174,13 +174,6 @@
     .completion-bar { height:6px; border-radius:3px; background:#e2e8f0; margin-top:6px; overflow:hidden; }
     .completion-bar-fill { height:100%; border-radius:3px; transition:width 0.5s; }
 
-    /* ✅ 피드백 템플릿 */
-    .template-area { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
-    .tpl-chip { background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; padding:5px 10px; border-radius:20px; font-size:12px; font-weight:700; cursor:pointer; transition:0.15s; white-space:nowrap; }
-    .tpl-chip:active { background:#dbeafe; transform:scale(0.97); }
-    .tpl-del { background:#fee2e2; color:#dc2626; border-color:#fecaca; }
-    .tpl-add { background:#f0fdf4; color:#16a34a; border-color:#bbf7d0; }
-
     /* ✅ 평가 척도 미리보기 뱃지 */
     .eval-preview { display:inline-flex; gap:4px; flex-wrap:wrap; margin-bottom:6px; }
     .eval-option-pill { background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700; }
@@ -355,7 +348,6 @@
       </div>
       <div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">
         <span style="font-size:13px; color:#64748b; font-weight:600; white-space:nowrap;" id="totalCount"></span>
-        <button onclick="openTemplateManager()" style="background:#e0f2fe; color:#0284c7; border:1px solid #bae6fd; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; white-space:nowrap;">💬 템플릿</button>
       </div>
     </div>
     <div id="submissionsList"></div>
@@ -1270,22 +1262,6 @@
   </div>
 </div></div>
 
-<!-- ✅ 피드백 템플릿 관리 모달 -->
-<div id="templateModal" class="setup-modal">
-  <div class="setup-box" style="max-width:500px;">
-    <h3 style="margin-top:0; color:#0284c7;">💬 피드백 템플릿 관리</h3>
-    <p style="font-size:13px; color:#64748b; margin-top:0;">자주 쓰는 피드백을 저장해두고 채점 시 한 번에 입력하세요. 브라우저에 저장됩니다.</p>
-    <div id="templateList" style="margin-bottom:15px;"></div>
-    <div style="display:flex; gap:8px;">
-      <input type="text" id="newTemplateInput" class="form-input" placeholder="새 템플릿 내용 입력..." style="flex:1;">
-      <button onclick="addTemplate()" style="background:#0284c7; color:white; border:none; padding:10px 16px; border-radius:8px; font-weight:bold; cursor:pointer; white-space:nowrap;">추가</button>
-    </div>
-    <div style="display:flex; gap:10px; margin-top:20px;">
-      <button style="flex:1; padding:12px; border-radius:8px; border:none; background:#e2e8f0; font-weight:bold; cursor:pointer;" onclick="document.getElementById('templateModal').style.display='none'">닫기</button>
-    </div>
-  </div>
-</div>
-
 <!-- ✅ 학생 비밀번호 초기화 모달 -->
 <div id="pwResetModal" class="setup-modal">
   <div class="setup-box" style="max-width:400px;">
@@ -1404,9 +1380,6 @@
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
              <span style="font-size:14px; font-weight:900; color:#0f172a;" id="feedbackLabel">📝 교사 피드백</span>
              <button onclick="openObserveFromDraw()" style="background:#e0e7ff; color:#4338ca; border:none; padding:4px 10px; border-radius:6px; font-size:11px; font-weight:800; cursor:pointer; box-shadow:0 1px 2px rgba(0,0,0,0.05);">📓 관찰기록 작성</button>
-          </div>
-          <div id="modalTemplateArea" style="margin-bottom:8px; display:flex; align-items:center; gap:8px;">
-             <div id="modalTemplateChips" style="display:flex; flex-wrap:wrap; gap:6px; max-height:70px; overflow-y:auto;"></div>
           </div>
           <textarea id="modalFeedbackInput" placeholder="학생에게 보낼 피드백을 입력하세요..." style="flex:1; width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:12px; font-size:14px; line-height:1.6; resize:none; font-family:inherit; min-height:100px; box-sizing:border-box; box-shadow:inset 0 1px 3px rgba(0,0,0,0.02);"></textarea>
        </div>
@@ -1914,7 +1887,6 @@
         if (visiblePages.indexOf('page-homeroom') >= 0) renderHomeroom();
         if (visiblePages.indexOf('page-survey') >= 0 || visiblePages.indexOf('page-survey-build') >= 0) { renderSurveyList(); }
         if (visiblePages.indexOf('page-survey-result') >= 0) { renderSurveyList(); if (document.getElementById('surveyResultFilter').value) renderSurveyStats(); }
-        loadTemplates(function() { renderModalTemplateChips(); });
       } catch(e) { console.error('loadData 오류:', e); }
     }).getDashboardData();
   }
@@ -2269,16 +2241,6 @@
         '<input type="text" id="cardBestComment_' + item.rowIdx + '" class="form-input" placeholder="추천 이유 (선택)" value="' + escapeHtml(item.bestComment || '') + '" style="font-size:12px; padding:8px;">' +
         '</div>';
 
-      let tpls = getTemplates();
-      let tplHtml = '';
-      if (tpls && tpls.length > 0) {
-        tplHtml = '<div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:4px; margin-bottom:4px;">';
-        tpls.forEach(function(t) {
-          tplHtml += '<span class="tpl-chip" onclick="var ta=document.getElementById(\'fb_' + item.rowIdx + '\'); ta.value=ta.value?(ta.value+\'\\n\'+\'' + t.replace(/'/g, "\\'") + '\'):(\'' + t.replace(/'/g, "\\'") + '\');">' + t + '</span>';
-        });
-        tplHtml += '</div>';
-      }
-
       let rejectArea = '';
       if (item.status === '반려검토') {
         rejectArea = '<div style="margin-top:8px; background:#fef2f2; border-radius:8px; padding:12px; border:1px solid #fecaca;">' +
@@ -2347,7 +2309,6 @@
             qStatusBadges + 
             msgBox + 
             (aiRes ? aiResultBox : '') +
-            tplHtml +
             '<div style="display:flex; gap:10px; align-items:center; background:#f8fafc; padding:10px 12px; border-radius:10px; border:1px solid #e2e8f0; flex-wrap:wrap;">' + 
               scUI + 
               '<label class="' + pCls + '" style="padding:6px 10px; font-size:12px; margin:0; height:fit-content;"><input type="checkbox" id="pub_' + item.rowIdx + '" ' + (item.isPublic ? 'checked' : '') + ' onchange="toggleCardPub(\'pub_' + item.rowIdx + '\')"> ' + pTxt + '</label>' + 
@@ -6420,70 +6381,6 @@
     };
     return map[type] || type;
   }
-  var gTemplates = []; // 메모리 캐시
-  function loadTemplates(callback) {
-    google.script.run.withSuccessHandler(function(res) {
-      gTemplates = res.templates || [];
-      if (callback) callback();
-    }).getFeedbackTemplates();
-  }
-  function getTemplates() { return gTemplates || []; }
-  function openTemplateManager() {
-    loadTemplates(function() {
-      renderTemplateList();
-      document.getElementById('templateModal').style.display = 'flex';
-    });
-  }
-  function renderTemplateList() {
-    var arr = gTemplates;
-    var div = document.getElementById('templateList');
-    if (arr.length === 0) {
-      div.innerHTML = '<div style="color:#94a3b8; font-size:13px; text-align:center; padding:20px;">저장된 템플릿이 없습니다.<br>아래에서 추가해보세요!</div>';
-      return;
-    }
-    div.innerHTML = arr.map(function(t, i) {
-      return '<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; background:#f8fafc; padding:10px 14px; border-radius:8px; border:1px solid #e2e8f0;">' +
-        '<span style="flex:1; font-size:14px; color:#1e293b;">' + t + '</span>' +
-        '<button onclick="deleteTemplate(' + i + ')" style="background:#fee2e2; color:#dc2626; border:none; padding:4px 10px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer;">삭제</button>' +
-        '</div>';
-    }).join('');
-  }
-  function addTemplate() {
-    var input = document.getElementById('newTemplateInput');
-    var text = input.value.trim();
-    if (!text) return alert('내용을 입력해주세요.');
-    gTemplates.push(text);
-    google.script.run.withSuccessHandler(function() {
-      input.value = '';
-      renderTemplateList();
-      renderModalTemplateChips();
-    }).saveFeedbackTemplates(gTemplates);
-  }
-  function deleteTemplate(idx) {
-    gTemplates.splice(idx, 1);
-    google.script.run.withSuccessHandler(function() {
-      renderTemplateList();
-      renderModalTemplateChips();
-    }).saveFeedbackTemplates(gTemplates);
-  }
-  function renderModalTemplateChips() {
-    var arr = gTemplates;
-    var chipsDiv = document.getElementById('modalTemplateChips');
-    if (!chipsDiv) return;
-    if (arr.length === 0) {
-      chipsDiv.innerHTML = '<span style="font-size:12px; color:#94a3b8;">템플릿 없음 — 상단 [💬 피드백 템플릿] 버튼으로 추가하세요</span>';
-      return;
-    }
-    chipsDiv.innerHTML = arr.map(function(t) {
-      return '<span class="tpl-chip" onclick="applyTemplate(\'' + t.replace(/'/g, "\\'") + '\')">' + t + '</span>';
-    }).join('');
-  }
-  function applyTemplate(text) {
-    var fb = document.getElementById('modalFeedbackInput');
-    if (!fb) return;
-    fb.value = fb.value ? fb.value + '\n' + text : text;
-    fb.focus();
-  }
   function renderPrevRecords(studentId, currentRowIdx, taskBaseName) {
     var prevDiv = document.getElementById('modalPrevRecords');
     if (!prevDiv) return;
@@ -6680,7 +6577,6 @@
     if (item) {
       renderPrevRecords(item.id, rowIdx, String(item.task).split(' (')[0]);
     }
-    renderModalTemplateChips();
   };
     function renderPortfolio() {
     var sid = document.getElementById('portStudentFilter').value;

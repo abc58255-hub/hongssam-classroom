@@ -166,51 +166,6 @@ function sendPushToUnsubmitted(taskName, title, body) {
 // =====================================================
 // ✅ 피드백 템플릿 (시스템설정 시트 '피드백_N' 키 행에 저장)
 // =====================================================
-function getFeedbackTemplates() {
-  try {
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = ss.getSheetByName('시스템설정');
-    if (!sh || sh.getLastRow() < 2) return { success: true, templates: [] };
-    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
-    var templates = [];
-    rows.forEach(function(r) {
-      if (String(r[0]).trim().indexOf('피드백_') === 0 && String(r[1] || '').trim()) {
-        templates.push(String(r[1]).trim());
-      }
-    });
-    return { success: true, templates: templates };
-  } catch(e) { return { success: false, templates: [], message: e.toString() }; }
-}
-
-function saveFeedbackTemplates(templates) {
-  try {
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = ss.getSheetByName('시스템설정');
-    if (!sh) return { success: false, message: '시스템설정 시트 없음' };
-    var lastRow = sh.getLastRow();
-    if (lastRow >= 2) {
-      var rows = sh.getRange(2, 1, lastRow - 1, 3).getValues();
-      // 뒤에서 앞으로 삭제 (행 번호 밀림 방지)
-      for (var i = rows.length - 1; i >= 0; i--) {
-        var key = String(rows[i][0]).trim();
-        if (key.indexOf('피드백_') === 0) {
-          sh.deleteRow(i + 2);
-        } else if (String(rows[i][2] || '').trim()) {
-          sh.getRange(i + 2, 3).clearContent(); // 구 C열 데이터 정리
-        }
-      }
-    }
-    // 새 피드백_ 행 추가
-    var idx = 1;
-    templates.forEach(function(t) {
-      if (t && t.trim()) {
-        sh.appendRow(['피드백_' + idx, t.trim()]);
-        idx++;
-      }
-    });
-    return { success: true };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
 
 // =====================================================
 // ✅ 학생 비밀번호 초기화
