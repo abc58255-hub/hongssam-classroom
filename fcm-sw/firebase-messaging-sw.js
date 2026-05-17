@@ -1,14 +1,8 @@
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js');
+importScripts('./config.js');
 
-firebase.initializeApp({
-  apiKey: "AIzaSyD7292UEKSrbWmBnnDVuC9n9VXOBFQkmb4",
-  authDomain: "send-alarm-220c3.firebaseapp.com",
-  projectId: "send-alarm-220c3",
-  storageBucket: "send-alarm-220c3.firebasestorage.app",
-  messagingSenderId: "235927215728",
-  appId: "1:235927215728:web:23705e0a3f6ac393e81eb5"
-});
+firebase.initializeApp(FIREBASE_CONFIG);
 
 const messaging = firebase.messaging();
 

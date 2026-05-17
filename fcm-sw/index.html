@@ -75,16 +75,8 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+<script src="./config.js"></script>
 <script>
-  var FIREBASE_CONFIG = {
-    apiKey: "AIzaSyD7292UEKSrbWmBnnDVuC9n9VXOBFQkmb4",
-    authDomain: "send-alarm-220c3.firebaseapp.com",
-    projectId: "send-alarm-220c3",
-    storageBucket: "send-alarm-220c3.firebasestorage.app",
-    messagingSenderId: "235927215728",
-    appId: "1:235927215728:web:23705e0a3f6ac393e81eb5"
-  };
-  var VAPID_KEY = "BLRJLeOqmEKv6R3-gV9tsKSV-EgqDosMKwUXIf9iWddMCRIp7cMcbtVMhpDJCUHGN2concQbSOJbvTNsciapJNo";
   var urlParams = new URLSearchParams(window.location.search);
   var GAS_URL = urlParams.get('gas') || '';
   var MATH_APP_URL = GAS_URL;
