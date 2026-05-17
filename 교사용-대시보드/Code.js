@@ -2726,6 +2726,5 @@ function migrateSysSheet() {
     ss.getSheetByName('학생명부').getRange('F2').clearContent();
   } catch(e) {}
 
-  Logger.log('migrateSysSheet 완료: ' + rows.length + '행 작성');
-  SpreadsheetApp.getUi().alert('시스템설정 시트 재구성 완료!\n\n' + rows.length + '개 항목이 설정됐습니다.\n교사 비밀번호도 시스템설정으로 이전했습니다.');
+  Logger.log('migrateSysSheet 완료: ' + rows.length + '행 작성. 로그 확인 후 스프레드시트를 열어 시스템설정 탭을 확인하세요.');
 }
