@@ -273,6 +273,12 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <input type="date" id="extraDateInput" class="form-input">
     </div>
 
+    <!-- 이 날로 이동된 수업 목록 (이동받은 날에만 표시) -->
+    <div id="movedInSection" style="display:none;margin-bottom:14px;background:#f5f3ff;border-radius:10px;padding:10px 12px;border:1px solid #ddd6fe;">
+      <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:8px;">📍 이 날로 이동된 수업</div>
+      <div id="movedInList"></div>
+    </div>
+
     <!-- 수업 상태 선택 (시간표 예정일에서만 표시) -->
     <div id="scheduleActionRow" style="display:none;margin-bottom:14px;">
       <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:7px;">이 날 수업 상태</div>
@@ -407,6 +413,7 @@ var sylPlanCache     = [];
 var sylCheckCache    = {};
 var sylScheduleCache = {};
 var sylHolidayCache  = {};
+var sylMovedInCache  = {};
 var sylClassList     = [];
 var examRangeCache   = [];
 var allClasses       = [];
@@ -555,6 +562,7 @@ function loadSyllabusData(forceTab) {
       if (!res.success) return;
       sylPlanCache    = res.plans      || [];
       sylCheckCache   = res.checks     || {};
+      sylMovedInCache = res.movedIn    || {};
       sylScheduleCache= res.schedule   || {};
       sylHolidayCache = res.holidays   || {};
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
@@ -626,6 +634,12 @@ function renderSylTable() {
   });
   // 공휴일도 표에 포함
   Object.keys(sylHolidayCache).forEach(function(d){ allDates[d] = true; });
+  // 이동받은 수업이 있는 날짜도 표에 포함
+  Object.keys(sylMovedInCache).forEach(function(key) {
+    if (key.length < 11) return;
+    var d = key.substring(0, 10); var c = key.substring(11);
+    if (cols.indexOf(c) >= 0) allDates[d] = true;
+  });
   Object.keys(sylCheckCache).forEach(function(key) {
     if (key.length < 11) return;
     var date  = key.substring(0, 10);
@@ -735,12 +749,58 @@ function renderSylTable() {
         var targetDate = status.substring(3);
         var tD = new Date(targetDate + 'T09:00:00');
         var tLabel = (tD.getMonth()+1) + '/' + tD.getDate() + ' (' + DAY_KR[tD.getDay()] + ')';
-        html += '<td style="text-align:center;padding:6px 4px;background:#fdf4ff;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="수업 이동됨 (클릭하여 수정)">'
-          + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
-            + '<span style="font-size:17px;">🔄</span>'
-            + '<span style="font-size:9px;color:#7c3aed;font-weight:700;">' + tLabel + '</span>'
-            + '<span style="font-size:9px;color:#a78bfa;">로 이동</span>'
+        var movedLn = check ? (check.lessonNo || 0) : 0;
+        var movedPlan = movedLn ? sylPlanCache.find(function(p){ return p.lessonNo === movedLn; }) : null;
+        html += '<td style="padding:5px 8px;background:#fdf4ff;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="수업 이동됨 (클릭하여 수정)">'
+          + '<div style="display:flex;align-items:center;gap:5px;">'
+            + '<span style="font-size:16px;">🔄</span>'
+            + '<div style="font-size:11px;min-width:0;">'
+              + (movedLn ? '<div style="font-weight:800;color:#7c3aed;">' + movedLn + '차시</div>' : '')
+              + (movedPlan && movedPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(movedPlan.content) + '</div>' : '')
+              + '<div style="color:#a78bfa;font-size:9px;">→ ' + tLabel + '</div>'
+            + '</div>'
           + '</div></td>';
+
+      } else if (sylMovedInCache[key] && sylMovedInCache[key].length > 0) {
+        // 이동받은 수업이 있는 날 — 이동된 수업 카드 + 기존 수업 카드 함께 표시
+        var miList = sylMovedInCache[key];
+        html += '<td style="padding:4px 6px;cursor:pointer;vertical-align:top;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수업 기록">';
+        // 이동받은 수업 카드들
+        miList.forEach(function(mi) {
+          var fromD = new Date(mi.sourceDate + 'T09:00:00');
+          var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + '(' + DAY_KR[fromD.getDay()] + ')';
+          var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === mi.lessonNo; });
+          html += '<div style="background:#faf5ff;border:1px solid #ddd6fe;border-radius:6px;padding:3px 6px;margin-bottom:3px;">'
+            + '<div style="display:flex;align-items:center;gap:3px;">'
+              + '<span style="font-size:12px;">🔀</span>'
+              + '<span style="font-size:11px;font-weight:800;color:#7c3aed;">' + mi.lessonNo + '차시</span>'
+              + '<span style="font-size:8px;background:#e9d5ff;color:#7c3aed;padding:1px 3px;border-radius:3px;margin-left:2px;">이동</span>'
+            + '</div>'
+            + '<div style="font-size:9px;color:#a78bfa;">📍 ' + fromLabel + ' 수업</div>'
+            + (miPlan && miPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(miPlan.content) + '</div>' : '')
+          + '</div>';
+        });
+        // 이 날 자체의 수업 카드
+        if (check && check.lessonNo) {
+          var ownPlan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
+          html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:3px 6px;">'
+            + '<div style="display:flex;align-items:center;gap:3px;">'
+              + '<span style="font-size:12px;">✅</span>'
+              + '<span style="font-size:11px;font-weight:800;color:#065f46;">' + check.lessonNo + '차시</span>'
+            + '</div>'
+            + (ownPlan && ownPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(ownPlan.content) + '</div>' : '')
+          + '</div>';
+        } else if (check && check.plannedLessonNo) {
+          html += '<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;padding:3px 6px;">'
+            + '<div style="font-size:9px;color:#6366f1;">📋 ' + check.plannedLessonNo + '차시 예정</div>'
+          + '</div>';
+        } else if (scheduled) {
+          html += '<div style="text-align:center;padding:2px 0;">'
+            + '<span style="display:inline-block;width:16px;height:16px;border:2px solid #d1d5db;border-radius:3px;background:white;"></span>'
+            + '<div style="font-size:8px;color:#94a3b8;">정규 미기록</div>'
+          + '</div>';
+        }
+        html += '</td>';
 
       } else if (check && check.plannedLessonNo && !check.lessonNo) {
         // 예상 차시만 기록됨 — 아직 수업 전
@@ -793,7 +853,8 @@ function renderSylTable() {
   html += '<div style="display:flex;gap:12px;padding:10px 4px;font-size:12px;color:#64748b;flex-wrap:wrap;">'
     + '<span>✅ = 수업 기록</span>'
     + '<span style="background:#eef2ff;padding:1px 5px;border-radius:4px;color:#6366f1;">📋 = 예정 (수업 전)</span>'
-    + '<span style="background:#faf5ff;padding:1px 5px;border-radius:4px;color:#7c3aed;">✅ 이동됨 = 이동된 수업</span>'
+    + '<span style="background:#faf5ff;padding:1px 5px;border-radius:4px;color:#7c3aed;">🔀 이동 = 다른 날 수업이 이동됨</span>'
+    + '<span>🔄 = 이 날 수업이 이동됨</span>'
     + '<span style="background:#fefce8;padding:1px 5px;border-radius:4px;color:#92400e;">✅ 추가 = 임시/보충</span>'
     + '<span>🔄 = 날짜 이동됨</span>'
     + '<span style="background:#fef2f2;padding:1px 5px;border-radius:4px;color:#dc2626;">🏖️ = 공휴일</span>'
@@ -813,6 +874,33 @@ function openCheckDate(date, cls) {
     (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[d.getDay()] + ') — ' + cls;
 
   document.getElementById('extraDateRow').style.display = 'none';
+
+  // 이동받은 수업 섹션
+  var miKey = date + '_' + cls;
+  var miList = sylMovedInCache[miKey] || [];
+  var miSection = document.getElementById('movedInSection');
+  var miListDiv = document.getElementById('movedInList');
+  var DAY_KR_MI = ['일','월','화','수','목','금','토'];
+  if (miList.length > 0) {
+    miSection.style.display = 'block';
+    miListDiv.innerHTML = miList.map(function(mi) {
+      var fromD = new Date(mi.sourceDate + 'T09:00:00');
+      var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + ' (' + DAY_KR_MI[fromD.getDay()] + ')';
+      var plan = sylPlanCache.find(function(p){ return p.lessonNo === mi.lessonNo; });
+      return '<div style="background:white;border:1px solid #ddd6fe;border-radius:8px;padding:8px 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;">'
+        + '<div style="min-width:0;">'
+          + '<div><span style="font-weight:800;color:#7c3aed;">' + mi.lessonNo + '차시</span>'
+            + ' <span style="font-size:11px;color:#a78bfa;">(' + fromLabel + ' 수업)</span></div>'
+          + (plan && plan.content ? '<div style="font-size:11px;color:#374151;word-break:keep-all;">' + escapeHtml(plan.content) + '</div>' : '')
+          + (mi.memo ? '<div style="font-size:11px;color:#94a3b8;">' + escapeHtml(mi.memo) + '</div>' : '')
+        + '</div>'
+        + '<button onclick="removeMovedIn(\'' + escapeHtml(date) + '\',\'' + escapeHtml(cls) + '\',\'' + escapeHtml(mi.sourceDate) + '\')" '
+          + 'style="flex-shrink:0;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:12px;font-weight:700;white-space:nowrap;">삭제</button>'
+      + '</div>';
+    }).join('');
+  } else {
+    miSection.style.display = 'none';
+  }
 
   var isScheduled = (sylScheduleCache[cls]||[]).indexOf(date) >= 0;
   var key      = date + '_' + cls;
@@ -880,9 +968,9 @@ function setScheduleAction(action) {
   if (action === 'cancel') {
     lessonSection.style.display = 'none';
   } else if (action === 'move') {
-    // 이동: simpleUI로 이동 후 수업 차시 입력
-    var moveLn = _openingExistingCheck.lessonNo || 0;
-    _showSimpleUI('이동 후 수업한 차시', moveLn);
+    // 이동: simpleUI로 이동할 차시 입력 (기존 예상 or 실제 차시 자동 채움)
+    var moveLn = _openingExistingCheck.plannedLessonNo || _openingExistingCheck.lessonNo || 0;
+    _showSimpleUI('이동할 차시 번호 (이 날 수업할 예정이었던 차시)', moveLn);
   } else { // 'normal'
     var plannedLn = _openingExistingCheck.plannedLessonNo || 0;
     var actualLn  = _openingExistingCheck.lessonNo || 0;
@@ -1069,7 +1157,7 @@ function cancelCheck() {
   var msg = date + ' ' + cls + ' 수업 기록을 삭제할까요?';
   if (isMove) {
     var targetDate = status.substring(3);
-    msg += '\n\n이동 대상(' + targetDate + ')의 기록도 함께 삭제할까요?\n확인 → 둘 다 삭제 / 취소 → 이 날만 삭제';
+    msg += '\n이동 대상(' + targetDate + ')의 이동 기록도 함께 삭제됩니다.';
   }
   if (!confirm(msg)) return;
 
@@ -1079,13 +1167,40 @@ function cancelCheck() {
   if (isMove) {
     var targetDate = status.substring(3);
     var tKey = targetDate + '_' + cls;
-    // 확인 → 이동 대상도 삭제 (confirm이 true이므로 항상 삭제)
-    delete sylCheckCache[tKey];
-    google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(targetDate, cls, currentGroupId);
+    // 도착 날짜의 이동받은 수업 목록에서 이 날 기록 제거
+    if (sylMovedInCache[tKey]) {
+      sylMovedInCache[tKey] = sylMovedInCache[tKey].filter(function(r){ return r.sourceDate !== date; });
+      if (sylMovedInCache[tKey].length === 0) delete sylMovedInCache[tKey];
+    }
+    google.script.run.withSuccessHandler(function(){}).deleteMovedInLesson(targetDate, cls, date, currentGroupId);
   }
 
   renderSylTable();
   google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(date, cls, currentGroupId);
+}
+
+// 이동받은 수업 개별 삭제 (모달에서 삭제 버튼 클릭)
+function removeMovedIn(targetDate, cls, sourceDate) {
+  var d1 = new Date(sourceDate + 'T09:00:00');
+  var DAY_KR_R = ['일','월','화','수','목','금','토'];
+  var fromLabel = (d1.getMonth()+1) + '/' + d1.getDate() + '(' + DAY_KR_R[d1.getDay()] + ')';
+  if (!confirm(fromLabel + ' 수업의 이동 기록을 삭제할까요?\n(원본 날짜의 이동됨 표시도 함께 삭제됩니다)')) return;
+
+  var tKey = targetDate + '_' + cls;
+  if (sylMovedInCache[tKey]) {
+    sylMovedInCache[tKey] = sylMovedInCache[tKey].filter(function(r){ return r.sourceDate !== sourceDate; });
+    if (sylMovedInCache[tKey].length === 0) delete sylMovedInCache[tKey];
+  }
+  // 원본 날짜의 '이동:targetDate' 기록도 삭제
+  var srcKey = sourceDate + '_' + cls;
+  if (sylCheckCache[srcKey] && (sylCheckCache[srcKey].status || '').indexOf('이동:') === 0) {
+    delete sylCheckCache[srcKey];
+    google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(sourceDate, cls, currentGroupId);
+  }
+
+  document.getElementById('checkDateModal').classList.remove('open');
+  renderSylTable();
+  google.script.run.withSuccessHandler(function(){}).deleteMovedInLesson(targetDate, cls, sourceDate, currentGroupId);
 }
 
 function confirmCheck() {
@@ -1112,15 +1227,23 @@ function confirmCheck() {
     if (!targetDate) return alert('이동할 날짜를 선택하세요.');
     if (targetDate === date) return alert('같은 날짜로는 이동할 수 없습니다.');
     var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
-    if (!lessonNo) return alert('이동 후 수업한 차시 번호를 입력하세요.');
+    if (!lessonNo) return alert('이동할 차시 번호를 입력하세요.');
     document.getElementById('checkDateModal').classList.remove('open');
-    sylCheckCache[date + '_' + cls] = { lessonNo: 0, plannedLessonNo: 0, memo: '', status: '이동:' + targetDate };
-    sylCheckCache[targetDate + '_' + cls] = { lessonNo: lessonNo, plannedLessonNo: 0, memo: memo, status: '' };
+
+    // 출발 날짜: 이동됨 표시 (차시 번호 보존)
+    sylCheckCache[date + '_' + cls] = { lessonNo: lessonNo, plannedLessonNo: 0, memo: '', status: '이동:' + targetDate };
+
+    // 도착 날짜: 이동받은 수업 추가 (기존 기록 유지)
+    var tKey = targetDate + '_' + cls;
+    if (!sylMovedInCache[tKey]) sylMovedInCache[tKey] = [];
+    sylMovedInCache[tKey] = sylMovedInCache[tKey].filter(function(r){ return r.sourceDate !== date; });
+    sylMovedInCache[tKey].push({ lessonNo: lessonNo, sourceDate: date, memo: memo });
+
     renderSylTable();
     google.script.run.withSuccessHandler(function(){})
-      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, plannedLessonNo: 0, memo: '', status: '이동:' + targetDate }, currentGroupId);
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: lessonNo, plannedLessonNo: 0, memo: '', status: '이동:' + targetDate }, currentGroupId);
     google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
-      .saveSyllabusCheck({ date: targetDate, cls: cls, lessonNo: lessonNo, plannedLessonNo: 0, memo: memo, status: '' }, currentGroupId);
+      .saveMovedInLesson({ date: targetDate, cls: cls, lessonNo: lessonNo, sourceDate: date, memo: memo }, currentGroupId);
     return;
   }
 

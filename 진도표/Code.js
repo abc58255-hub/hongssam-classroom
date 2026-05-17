@@ -629,8 +629,10 @@ function getSyllabusData(groupId) {
 
     // 진도체크 (스키마: 날짜, 반, 실제차시, 메모, 상태, 예상차시)
     // key = 'yyyy-MM-dd_반이름'
+    // status = '' | '취소[:사유]' | '이동:targetDate' | '받음:sourceDate'(이동받은 수업)
     var checkSh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
     var checks = {};
+    var movedIn = {}; // key → [{ lessonNo, sourceDate, memo }]
     if (checkSh.getLastRow() >= 2) {
       var cd = checkSh.getRange(2, 1, checkSh.getLastRow() - 1, 6).getValues();
       cd.forEach(function(r) {
@@ -642,8 +644,15 @@ function getSyllabusData(groupId) {
         var status = String(r[4]||'').trim();
         var ln  = parseInt(r[2]) || 0;
         var pln = parseInt(r[5]) || 0;
-        if (!ln && !pln && status !== '취소' && status.indexOf('이동:') !== 0) return;
         var key = dateStr + '_' + String(r[1]).trim();
+        // 이동받은 수업 (다른 날에서 이 날로 이동됨)
+        if (status.indexOf('받음:') === 0) {
+          var srcDate = status.substring(3);
+          if (!movedIn[key]) movedIn[key] = [];
+          movedIn[key].push({ lessonNo: ln, sourceDate: srcDate, memo: String(r[3]||'').trim() });
+          return;
+        }
+        if (!ln && !pln && status.indexOf('취소') !== 0 && status.indexOf('이동:') !== 0) return;
         checks[key] = { lessonNo: ln, plannedLessonNo: pln, memo: String(r[3]||'').trim(), status: status };
       });
     }
@@ -698,7 +707,7 @@ function getSyllabusData(groupId) {
       });
     }
 
-    return { success: true, plans: plans, checks: checks, classes: classes, examRanges: examRanges, schedule: schedule, holidays: holidayDates };
+    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, examRanges: examRanges, schedule: schedule, holidays: holidayDates };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -791,6 +800,55 @@ function deleteExamRange(name, groupId) {
     var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
     for (var i = rows.length - 1; i >= 0; i--) {
       if (String(rows[i][0]).trim() === String(name).trim()) sh.deleteRow(i + 2);
+    }
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 이동받은 수업 저장 — status='받음:sourceDate' 행 추가/갱신
+// data: { date, cls, lessonNo, sourceDate, memo }
+function saveMovedInLesson(data, groupId) {
+  try {
+    var gid = groupId || '기본';
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
+    var status = '받음:' + String(data.sourceDate || '');
+    var ln = data.lessonNo || 0;
+    var found = false;
+    if (sh.getLastRow() >= 2) {
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        var rowDate = rows[i][0] instanceof Date
+          ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
+          : String(rows[i][0]).trim();
+        if (rowDate === String(data.date).trim() && String(rows[i][1]).trim() === String(data.cls).trim()
+            && String(rows[i][4]||'').trim() === status) {
+          sh.getRange(i + 2, 1, 1, 6).setValues([[data.date, data.cls, ln, data.memo||'', status, 0]]);
+          found = true; break;
+        }
+      }
+    }
+    if (!found) sh.appendRow([data.date, data.cls, ln, data.memo||'', status, 0]);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 이동받은 수업 삭제 — status='받음:sourceDate' 행 제거
+function deleteMovedInLesson(date, cls, sourceDate, groupId) {
+  try {
+    var gid = groupId || '기본';
+    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(_sn('진도체크', gid));
+    if (!sh || sh.getLastRow() < 2) return { success: true };
+    var status = '받음:' + String(sourceDate);
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+    for (var i = rows.length - 1; i >= 0; i--) {
+      var rowDate = rows[i][0] instanceof Date
+        ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
+        : String(rows[i][0]).trim();
+      if (rowDate === String(date).trim() && String(rows[i][1]).trim() === String(cls).trim()
+          && String(rows[i][4]||'').trim() === status) {
+        sh.deleteRow(i + 2);
+      }
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
