@@ -2709,10 +2709,15 @@ function migrateSysSheet() {
   var ttToken       = get(2, 20);  // T2 액세스토큰
   var ttRefresh     = get(2, 21);  // U2 갱신토큰
 
-  // 교사 비밀번호 (학생명부 F2)
+  // 교사 비밀번호 (학생명부 F2), 가입코드 (학생명부 E2)
   var teacherPw = '';
+  var joinCode  = '';
   try {
-    teacherPw = String(ss.getSheetByName('학생명부').getRange('F2').getValue() || '').trim();
+    const rSh = ss.getSheetByName('학생명부');
+    if (rSh) {
+      teacherPw = String(rSh.getRange('F2').getValue() || '').trim();
+      joinCode  = String(rSh.getRange('E2').getValue() || '').trim();
+    }
   } catch(e) {}
 
   // 피드백 템플릿 (C2:C50)
@@ -2727,6 +2732,7 @@ function migrateSysSheet() {
     ['항목', '값', '안내 (이 열은 참고용입니다)'],
     ['담임반',           homeroomClass, '학생-담임 앱 접근 가능 반 (예: 2학년 1반)'],
     ['교사비밀번호',     teacherPw,     '교사 대시보드 로그인 비밀번호'],
+    ['가입코드',         joinCode,      '학생 회원가입 시 입력하는 코드 (변경하면 이전 코드 무효)'],
     ['기본슬라이드URL',  defaultSlide,  '교실 알림판 기본 슬라이드 주소'],
     ['알림판시트ID',     boardSheetId,  '교실 알림판 스프레드시트 ID'],
     ['── 바로가기 ──',  '',            '아래 항목에 각 앱의 URL을 붙여넣으세요'],
