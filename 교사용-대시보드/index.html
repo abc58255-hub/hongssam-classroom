@@ -1925,7 +1925,7 @@
       '점수제 (직접 입력)': null, // 숫자 입력이라 미리보기 불필요
       '코멘트만 남김': null,
       '점수제 (10점 단위 선택)': ['100','90','80','70','60','50','40','30','20','10','0'],
-      'A-B-C-D 등급제': ['A','B','C','D'],
+      'A-B-C-D 등급제': ['A','B','C','D','미제출'],
       '상-중-하 등급제': ['상','중','하'],
       '통과/미통과 (P/F)': ['Pass','Fail']
     };
@@ -6139,6 +6139,7 @@
     // Submission rate per task
     allTasks.forEach(function(t) {
       var ts = tStats[t.name];
+      ts.submitted = ts.graded + ts.resub + ts.pending;
       var totalStu = roster.length;
       ts.submissionRate = totalStu > 0 ? Math.round(ts.submitted / totalStu * 100) : 0;
       ts.gradingRate    = ts.submitted > 0 ? Math.round(ts.graded / ts.submitted * 100) : 0;
@@ -6412,7 +6413,7 @@
     var map = {
       '점수제 (직접 입력)': '숫자 직접 입력',
       '점수제 (10점 단위 선택)': '100 · 90 · 80 · 70 · 60 · ...',
-      'A-B-C-D 등급제': 'A · B · C · D',
+      'A-B-C-D 등급제': 'A · B · C · D · 미제출',
       '상-중-하 등급제': '상 · 중 · 하',
       '통과/미통과 (P/F)': 'Pass · Fail',
       '코멘트만 남김': '점수 없음'

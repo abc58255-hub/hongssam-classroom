@@ -22,10 +22,6 @@ function verifyTeacher(password) {
   try {
     // 시스템설정 '교사비밀번호' 키 우선, 없으면 학생명부 F2 폴백
     var pw = _getSysSetting('교사비밀번호');
-    if (!pw) {
-      var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
-      if (sheet) pw = String(sheet.getRange('F2').getValue() || '').trim();
-    }
     if (!pw) return { success: false, message: '비밀번호가 설정되어 있지 않습니다. 시스템설정 시트를 확인하세요.' };
     if (String(password).trim() === pw) return { success: true };
     return { success: false, message: '비밀번호가 틀렸습니다.' };
@@ -77,15 +73,17 @@ function _ensureSh(ss, name, headers, bg) {
 function getGroups() {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, '커리큘럼그룹', ['그룹ID','그룹명','반목록','생성일','계획ID'], '#7c3aed');
-    var groups = [{ id: '기본', name: '기본', classes: _getDefaultClasses_(ss), isDefault: true, planId: '기본' }];
+    var sh = _ensureSh(ss, '커리큘럼그룹', ['그룹ID','그룹명','반목록','생성일','계획ID','계획명'], '#7c3aed');
+    var groups = [{ id: '기본', name: '기본', classes: _getDefaultClasses_(ss), isDefault: true, planId: '기본', planName: '기본 계획' }];
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
       rows.forEach(function(r) {
         if (!r[0]) return;
+        if (String(r[0]).indexOf('_plan_') === 0) return; // 계획 전용 행 건너뜀
         var cls = r[2] ? String(r[2]).split(',').map(function(c){return c.trim();}).filter(Boolean) : [];
         var pid = String(r[4]||'').trim() || String(r[0]).trim();
-        groups.push({ id: String(r[0]).trim(), name: String(r[1]||r[0]).trim(), classes: cls, planId: pid });
+        var pname = String(r[5]||'').trim() || pid;
+        groups.push({ id: String(r[0]).trim(), name: String(r[1]||r[0]).trim(), classes: cls, planId: pid, planName: pname });
       });
     }
     return { success: true, groups: groups };
@@ -93,12 +91,15 @@ function getGroups() {
 }
 
 function _getDefaultClasses_(ss) {
-  var clsSh = ss.getSheetByName('진도반설정');
-  if (clsSh && clsSh.getLastRow() >= 2) {
-    var cv = clsSh.getRange(2, 1).getValue();
-    if (cv) return String(cv).split(',').map(function(c){return c.trim();}).filter(Boolean);
-  }
-  return [];
+  var rosterSheet = ss.getSheetByName('학생명부');
+  if (!rosterSheet || rosterSheet.getLastRow() < 2) return [];
+  var data = rosterSheet.getRange(2, 1, rosterSheet.getLastRow() - 1, 3).getValues();
+  var clsSet = {};
+  data.forEach(function(r) {
+    var id = String(r[1] || '').trim();
+    if (id.length >= 2) clsSet[id.substring(0,1) + '학년 ' + id.substring(1,2) + '반'] = true;
+  });
+  return Object.keys(clsSet).sort();
 }
 
 // 그룹이 사용하는 계획ID 반환 (E열이 비어있으면 그룹ID 자체를 fallback으로 사용)
@@ -116,22 +117,25 @@ function _getGroupPlanId_(gid, ss) {
 }
 
 // =====================================================
-// 진도 계획 관리
-// 시트: 진도계획목록 — A=계획ID, B=계획명, C=생성일
+// 진도 계획 관리 — 커리큘럼그룹 시트에 통합
+// 계획 전용 행: A='_plan_'+planId, B=계획명, C='', D=생성일, E=planId, F=계획명
 // =====================================================
 
 function getPlanList() {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, '진도계획목록', ['계획ID','계획명','생성일'], '#1e3a8a');
-    var plans = [{ id: '기본', name: '기본 계획', isDefault: true }];
-    if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 3).getValues();
+    var sh = ss.getSheetByName('커리큘럼그룹');
+    var planMap = {};
+    if (sh && sh.getLastRow() >= 2) {
+      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 6).getValues();
       rows.forEach(function(r) {
-        if (!r[0]) return;
-        plans.push({ id: String(r[0]).trim(), name: String(r[1]||r[0]).trim() });
+        var pid = String(r[4]||'').trim();
+        if (!pid || pid === '기본') return;
+        if (!planMap[pid]) planMap[pid] = String(r[5]||r[1]||'').trim() || pid;
       });
     }
+    var plans = [{ id: '기본', name: '기본 계획', isDefault: true }];
+    Object.keys(planMap).forEach(function(pid) { plans.push({ id: pid, name: planMap[pid] }); });
     return { success: true, plans: plans };
   } catch(e) { return { success: false, plans: [], message: e.toString() }; }
 }
@@ -142,15 +146,15 @@ function createPlan(data) {
     var id = (data.id || data.name).replace(/[\s\/\\]/g,'').substring(0, 20);
     if (!id || id === '기본') return { success: false, message: '유효하지 않은 이름입니다.' };
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, '진도계획목록', ['계획ID','계획명','생성일'], '#1e3a8a');
+    var sh = _ensureSh(ss, '커리큘럼그룹', ['그룹ID','그룹명','반목록','생성일','계획ID','계획명'], '#7c3aed');
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues();
+      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 5).getValues();
       for (var i = 0; i < rows.length; i++) {
-        if (String(rows[i][0]).trim() === id) return { success: false, message: '이미 존재하는 계획입니다.' };
+        if (String(rows[i][4]||'').trim() === id) return { success: false, message: '이미 존재하는 계획입니다.' };
       }
     }
     var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
-    sh.appendRow([id, data.name, today]);
+    sh.appendRow(['_plan_' + id, data.name, '', today, id, data.name]);
     _ensureSh(ss, '진도계획_' + id, ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
     return { success: true, id: id };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -161,16 +165,18 @@ function renamePlan(planId, newName) {
     if (!planId || planId === '기본') return { success: false, message: '기본 계획은 이름을 변경할 수 없습니다.' };
     if (!newName) return { success: false, message: '이름을 입력하세요.' };
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = ss.getSheetByName('진도계획목록');
+    var sh = ss.getSheetByName('커리큘럼그룹');
     if (!sh || sh.getLastRow() < 2) return { success: false, message: '계획을 찾을 수 없습니다.' };
-    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues();
+    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 5).getValues();
+    var found = false;
     for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() === planId) {
-        sh.getRange(i+2, 2).setValue(newName);
-        return { success: true };
+      if (String(rows[i][4]||'').trim() === planId) {
+        sh.getRange(i+2, 6).setValue(newName);
+        if (String(rows[i][0]).trim() === '_plan_' + planId) sh.getRange(i+2, 2).setValue(newName);
+        found = true;
       }
     }
-    return { success: false, message: '계획을 찾을 수 없습니다.' };
+    return found ? { success: true } : { success: false, message: '계획을 찾을 수 없습니다.' };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -178,21 +184,17 @@ function deletePlan(planId) {
   try {
     if (!planId || planId === '기본') return { success: false, message: '기본 계획은 삭제할 수 없습니다.' };
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    // 사용 중인 그룹 확인
     var grpSh = ss.getSheetByName('커리큘럼그룹');
     if (grpSh && grpSh.getLastRow() >= 2) {
       var grpRows = grpSh.getRange(2, 1, grpSh.getLastRow()-1, 5).getValues();
       for (var i = 0; i < grpRows.length; i++) {
+        if (String(grpRows[i][0]).indexOf('_plan_') === 0) continue;
         if (String(grpRows[i][4]||'').trim() === planId) {
           return { success: false, message: '"' + planId + '" 계획을 사용하는 그룹이 있습니다.\n먼저 그룹에서 다른 계획을 선택하세요.' };
         }
       }
-    }
-    var sh = ss.getSheetByName('진도계획목록');
-    if (sh && sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues();
-      for (var j = rows.length-1; j >= 0; j--) {
-        if (String(rows[j][0]).trim() === planId) sh.deleteRow(j+2);
+      for (var j = grpRows.length-1; j >= 0; j--) {
+        if (String(grpRows[j][0]).trim() === '_plan_' + planId) grpSh.deleteRow(j+2);
       }
     }
     var planSh = ss.getSheetByName('진도계획_' + planId);
@@ -239,7 +241,7 @@ function createGroup(data) {
     if (!id) return { success: false, message: '유효하지 않은 그룹명입니다.' };
 
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, '커리큘럼그룹', ['그룹ID','그룹명','반목록','생성일'], '#7c3aed');
+    var sh = _ensureSh(ss, '커리큘럼그룹', ['그룹ID','그룹명','반목록','생성일','계획ID','계획명'], '#7c3aed');
 
     // 중복 확인
     if (sh.getLastRow() >= 2) {
@@ -251,7 +253,8 @@ function createGroup(data) {
 
     var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
     var planId = String(data.planId || '기본').trim();
-    sh.appendRow([id, data.name, (data.classes || []).join(','), today, planId]);
+    var planName = String(data.planName || '').trim();
+    sh.appendRow([id, data.name, (data.classes || []).join(','), today, planId, planName]);
 
     _ensureSh(ss, '진도체크_' + id, ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
 
@@ -671,10 +674,6 @@ function getSyllabusData(groupId) {
     var classes = [];
     if (gid === '기본') {
       classes = _getDefaultClasses_(ss);
-      if (classes.length === 0) {
-        var res = getClassList();
-        classes = res.classes || [];
-      }
     } else {
       var grpSh = ss.getSheetByName('커리큘럼그룹');
       if (grpSh && grpSh.getLastRow() >= 2) {
@@ -770,12 +769,10 @@ function deleteSyllabusCheck(date, cls, groupId) {
 function saveSylClassList(classes, groupId) {
   try {
     var gid = groupId || '기본';
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    if (gid === '기본') {
-      var sh = _ensureSh(ss, '진도반설정', ['반목록'], '#334155');
-      sh.getRange(2, 1).setValue(classes.join(','));
-    } else {
-      updateGroup({ id: gid, name: gid, classes: classes }); // classes만 업데이트
+    // 기본 그룹은 학생명부에서 자동 감지 — 저장 불필요
+    if (gid !== '기본') {
+      var ss = SpreadsheetApp.openById(SHEET_ID);
+      updateGroup({ id: gid, name: gid, classes: classes });
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }

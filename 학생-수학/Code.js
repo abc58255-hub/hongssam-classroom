@@ -25,7 +25,7 @@ function saveFcmToken(studentId, token, pwHash) {
             return { success: false, message: "미가입 학생입니다. 먼저 회원가입을 해주세요." };
           }
         }
-        sheet.getRange(i + 1, 7).setValue(token); // G열
+        sheet.getRange(i + 1, 5).setValue(token); // E열 (FCM토큰)
         return { success: true };
       }
     }
@@ -43,7 +43,7 @@ function sendPushToStudent(studentId, title, body, tag) {
     let token = "";
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][1] || "").trim() === String(studentId || "").trim()) {
-        token = String(data[i][6] || "").trim(); // G열에서 FCM 토큰 읽기
+        token = String(data[i][4] || "").trim(); // E열에서 FCM 토큰 읽기
         break;
       }
     }
@@ -358,7 +358,7 @@ function getDashboardData(studentId, studentName) {
         }
 
         if (st === "재제출요청") {
-          let resubDl = dMap.resub;
+          let resubDl = dMap.resub || dMap.main;
           let resubExpired = resubDl && new Date(resubDl) < now;
           if (!resubExpired) {
             let rejectionFeedback = taskStatusMap[t].feedback || "";

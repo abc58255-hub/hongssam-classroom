@@ -30,10 +30,6 @@ function registerStudent(studentId, studentName, password, inputCode) {
       if (String(rows[i][0]).trim() === '가입코드') { currentSecretCode = String(rows[i][1] || '').trim(); break; }
     }
   }
-  if (!currentSecretCode) {
-    const rosterSheet = ss.getSheetByName('학생명부');
-    if (rosterSheet) currentSecretCode = String(rosterSheet.getRange('E2').getValue() || '').trim();
-  }
 
   if (!currentSecretCode || String(inputCode).trim() !== currentSecretCode) {
     return { success: false, message: "🚨 가입 코드가 틀렸거나, 현재 가입 기간이 아닙니다." };

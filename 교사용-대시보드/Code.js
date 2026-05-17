@@ -43,7 +43,7 @@ function debugFCM() {
     var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
     var data = sheet.getDataRange().getValues();
     for (var i = 1; i < data.length; i++) {
-      var token = String(data[i][6] || '').trim();
+      var token = String(data[i][4] || '').trim();
       if (token) {
         Logger.log('첫 번째 토큰 발견 (학번 ' + data[i][1] + '): ' + token.substring(0, 30) + '...');
         var res = sendFcmToToken_(token, '테스트 알림', '테스트입니다', '', 'test');
@@ -124,7 +124,7 @@ function sendPushToStudents(studentIds, title, body, tag, filterClass) {
     var idSet = studentIds ? new Set(studentIds.map(String)) : null;
     for (var i = 1; i < data.length; i++) {
       var sid   = String(data[i][1] || '').trim();
-      var token = String(data[i][6] || '').trim();
+      var token = String(data[i][4] || '').trim();
       if (!sid || !token) { skipped++; continue; }
       if (idSet && !idSet.has(sid)) continue;
       if (filterClass) {
@@ -173,18 +173,11 @@ function getFeedbackTemplates() {
     if (!sh || sh.getLastRow() < 2) return { success: true, templates: [] };
     var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
     var templates = [];
-    // 새 구조: A열이 '피드백_N'인 행의 B열
     rows.forEach(function(r) {
       if (String(r[0]).trim().indexOf('피드백_') === 0 && String(r[1] || '').trim()) {
         templates.push(String(r[1]).trim());
       }
     });
-    // 구 구조 폴백: C열(인덱스 2)에 값이 있으면 사용
-    if (templates.length === 0) {
-      rows.forEach(function(r) {
-        if (String(r[2] || '').trim()) templates.push(String(r[2]).trim());
-      });
-    }
     return { success: true, templates: templates };
   } catch(e) { return { success: false, templates: [], message: e.toString() }; }
 }
@@ -196,11 +189,14 @@ function saveFeedbackTemplates(templates) {
     if (!sh) return { success: false, message: '시스템설정 시트 없음' };
     var lastRow = sh.getLastRow();
     if (lastRow < 2) return { success: false };
-    var rows = sh.getRange(2, 1, lastRow - 1, 2).getValues();
-    // 기존 피드백_ 행 B열 클리어
+    var rows = sh.getRange(2, 1, lastRow - 1, 3).getValues();
+    // 기존 피드백_ 행 B열 클리어 + 구 구조 C열도 클리어
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0]).trim().indexOf('피드백_') === 0) {
         sh.getRange(i + 2, 2).clearContent();
+      }
+      if (String(rows[i][2] || '').trim()) {
+        sh.getRange(i + 2, 3).clearContent();
       }
     }
     // 다시 저장 (피드백_1, 피드백_2, ... 순서로)
@@ -258,10 +254,6 @@ function teacherLogin(pw) {
     const ss = SpreadsheetApp.openById(SHEET_ID);
     // 시스템설정 '교사비밀번호' 키 우선, 없으면 학생명부 F2 폴백 (마이그레이션 전 호환)
     let stored = _getSys(ss, '교사비밀번호');
-    if (!stored) {
-      const roster = ss.getSheetByName('학생명부');
-      if (roster) stored = String(roster.getRange('F2').getValue() || '').trim();
-    }
     if (!stored) return { success: false, message: "교사 비밀번호가 설정되지 않았습니다. 시스템설정 시트를 확인하세요." };
     if (pw !== stored) return { success: false, message: "비밀번호가 일치하지 않습니다." };
 
@@ -2680,108 +2672,3 @@ function approveResubmitRequest(rowIdx) {
 // ✅ 시스템설정 시트 마이그레이션 (GAS 에디터에서 1회 직접 실행)
 // 기존 셀 주소 기반 → 행 기반 키-값 구조로 변환
 // =====================================================
-function migrateSysSheet() {
-  var ss = SpreadsheetApp.openById(SHEET_ID);
-  var sh = ss.getSheetByName('시스템설정');
-  if (!sh) { Logger.log('시스템설정 시트 없음'); return; }
-
-  // 기존 데이터 읽기
-  var oldData = sh.getDataRange().getValues();
-  var get = function(r, c) {
-    if (r < 1 || r > oldData.length) return '';
-    var row = oldData[r - 1];
-    if (c < 1 || c > row.length) return '';
-    return String(row[c - 1] || '').trim();
-  };
-
-  var homeroomClass = get(3, 2);   // B3 담임반
-  var defaultSlide  = get(4, 2);   // B4 기본슬라이드URL
-  var boardSheetId  = get(2, 7);   // G2 알림판시트ID
-  var shortcutH     = get(2, 8);   // H2 수학교실
-  var shortcutI     = get(2, 9);   // I2 우리반교실
-  var shortcutJ     = get(2, 10);  // J2 교실알림판
-  var shortcutK     = get(2, 11);  // K2 회원가입
-  var shortcutL     = get(2, 12);  // L2 포털
-  var openrouterKey = get(2, 16);  // P2 OpenRouter키
-  var aiModel       = get(2, 17);  // Q2 AI모델명
-  var ttClientId    = get(2, 18);  // R2 TickTick클라이언트ID
-  var ttSecret      = get(2, 19);  // S2 TickTick시크릿
-  var ttToken       = get(2, 20);  // T2 액세스토큰
-  var ttRefresh     = get(2, 21);  // U2 갱신토큰
-
-  // 교사 비밀번호 (학생명부 F2), 가입코드 (학생명부 E2)
-  var teacherPw = '';
-  var joinCode  = '';
-  try {
-    const rSh = ss.getSheetByName('학생명부');
-    if (rSh) {
-      teacherPw = String(rSh.getRange('F2').getValue() || '').trim();
-      joinCode  = String(rSh.getRange('E2').getValue() || '').trim();
-    }
-  } catch(e) {}
-
-  // 피드백 템플릿 (C2:C50)
-  var feedbacks = [];
-  for (var r = 2; r <= Math.min(oldData.length, 51); r++) {
-    var v = get(r, 3);
-    if (v) feedbacks.push(v);
-  }
-
-  // 새 구조 데이터
-  var rows = [
-    ['항목', '값', '안내 (이 열은 참고용입니다)'],
-    ['담임반',           homeroomClass, '학생-담임 앱 접근 가능 반 (예: 2학년 1반)'],
-    ['교사비밀번호',     teacherPw,     '교사 대시보드 로그인 비밀번호'],
-    ['가입코드',         joinCode,      '학생 회원가입 시 입력하는 코드 (변경하면 이전 코드 무효)'],
-    ['기본슬라이드URL',  defaultSlide,  '교실 알림판 기본 슬라이드 주소'],
-    ['알림판시트ID',     boardSheetId,  '교실 알림판 스프레드시트 ID'],
-    ['── 바로가기 ──',  '',            '아래 항목에 각 앱의 URL을 붙여넣으세요'],
-    ['바로가기_수학교실',   shortcutH, '수학 과제 제출 앱 URL'],
-    ['바로가기_우리반교실', shortcutI, '학생-담임 앱 URL'],
-    ['바로가기_교실알림판', shortcutJ, '교실 알림판 URL'],
-    ['바로가기_회원가입',   shortcutK, '회원가입 앱 URL'],
-    ['바로가기_포털',       shortcutL, '스마트 포털 URL'],
-    ['── AI / API ──',   '',           '아래 항목에 API 키를 입력하세요'],
-    ['OpenRouter키',         openrouterKey, 'AI 기능용 API 키 (openrouter.ai에서 발급)'],
-    ['AI모델명',             aiModel,       '사용 모델 (예: anthropic/claude-3.5-sonnet)'],
-    ['TickTick클라이언트ID', ttClientId,    'TickTick 앱 연동 (설정 화면에서 입력)'],
-    ['TickTick시크릿',       ttSecret,      'TickTick 앱 연동 (설정 화면에서 입력)'],
-    ['TickTick액세스토큰',   ttToken,       '자동 저장됨 — 건드리지 마세요'],
-    ['TickTick갱신토큰',     ttRefresh,     '자동 저장됨 — 건드리지 마세요'],
-    ['── 피드백 템플릿 ──', '', '채점 시 사용할 피드백 문구 (B열에 입력)'],
-  ];
-  for (var i = 0; i < 30; i++) {
-    rows.push(['피드백_' + (i + 1), feedbacks[i] || '', '']);
-  }
-
-  // 시트 초기화 후 새 데이터 쓰기
-  sh.clearContents();
-  sh.clearFormats();
-  sh.getRange(1, 1, rows.length, 3).setValues(rows);
-
-  // 헤더 행 스타일
-  sh.getRange(1, 1, 1, 3)
-    .setBackground('#1e3a8a').setFontColor('white').setFontWeight('bold').setFontSize(12);
-
-  // 구분선 행 스타일 (회색)
-  [6, 12, 19].forEach(function(r) {
-    sh.getRange(r, 1, 1, 3)
-      .setBackground('#f1f5f9').setFontColor('#94a3b8').setFontWeight('bold').setFontStyle('italic');
-  });
-
-  // 자동저장 행 (건드리면 안됨) 연노랑 배경
-  [17, 18].forEach(function(r) {
-    sh.getRange(r, 2).setBackground('#fef9c3');
-  });
-
-  // 열 너비
-  sh.setColumnWidth(1, 200);
-  sh.setColumnWidth(2, 320);
-  sh.setColumnWidth(3, 260);
-
-  // 헤더 고정
-  sh.setFrozenRows(1);
-
-  Logger.log('migrateSysSheet 완료: ' + rows.length + '행 작성. 스프레드시트를 열어 시스템설정 탭을 확인하세요.');
-  Logger.log('※ 시스템설정에서 교사비밀번호 값이 맞게 이전됐는지 확인 후, 학생명부 F2는 직접 지워주세요.');
-}

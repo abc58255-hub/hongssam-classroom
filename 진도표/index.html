@@ -237,7 +237,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 <div id="sylSettingsModal" class="modal-bg">
   <div class="modal-box" style="max-width:420px;">
     <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#0f172a;">⚙️ 진도표 설정</h3>
-    <div style="font-size:12px;color:#64748b;margin-bottom:14px;">진도표에 표시할 반을 선택하세요.</div>
+    <div style="font-size:12px;color:#64748b;margin-bottom:14px;">진도표에 표시할 반을 선택하세요. (반 목록은 학생명부에서 자동 감지됩니다.)</div>
     <div id="sylClassCheckSetting" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;">
       <button class="btn btn-gray" onclick="document.getElementById('sylSettingsModal').classList.remove('open')">취소</button>
@@ -588,7 +588,7 @@ function renderSylTable() {
   var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
 
   if (cols.length === 0) {
-    wrap.innerHTML = '<div class="empty-state"><div class="emoji">⚙️</div><h3>반 설정이 필요해요</h3><p>상단 "⚙️ 설정"에서 표시할 반을 선택하거나, 학생명부에 학생을 등록하세요.</p></div>';
+    wrap.innerHTML = '<div class="empty-state"><div class="emoji">📋</div><h3>학생명부에 학생을 등록하세요</h3><p>학생명부에 학생을 입력하면 반이 자동으로 감지됩니다.</p></div>';
     return;
   }
 
