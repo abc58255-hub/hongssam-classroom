@@ -105,8 +105,16 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
 /* 차시 선택 카드 */
 .lesson-card { display:inline-block; padding: 5px 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; background: #f8fafc; color: #475569; transition: all 0.15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
-.lesson-card:hover { border-color: #34d399; background: #ecfdf5; color: #065f46; }
-.lesson-card.selected { border-color: #10b981; background: #d1fae5; color: #065f46; font-weight: 800; box-shadow: 0 0 0 1px #10b981; }
+.lesson-card:hover { border-color: #818cf8; background: #eef2ff; color: #4338ca; }
+.lesson-card.selected-planned { border-color: #6366f1; background: #e0e7ff; color: #3730a3; font-weight: 800; box-shadow: 0 0 0 1px #6366f1; }
+.lesson-card.selected-actual { border-color: #10b981; background: #d1fae5; color: #065f46; font-weight: 800; box-shadow: 0 0 0 1px #10b981; }
+
+/* 실제 수업 모드 버튼 */
+.actual-btn { padding: 7px 12px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; background: #f8fafc; color: #64748b; transition: all 0.15s; white-space: nowrap; }
+.actual-btn:hover { border-color: #94a3b8; }
+.actual-btn.active-none { background: #fefce8; border-color: #fde68a; color: #92400e; }
+.actual-btn.active-same { background: #dcfce7; border-color: #86efac; color: #065f46; }
+.actual-btn.active-diff { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
 </style>
 </head>
 <body>
@@ -276,15 +284,51 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <input type="date" id="moveDateInput" class="form-input">
     </div>
 
-    <!-- 차시 선택 (카드 + 직접 입력) -->
+    <!-- 차시 선택 -->
     <div id="lessonInputSection" style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px;" id="lessonInputLabel">수업한 차시 선택</div>
-      <div id="lessonCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow-y:auto;padding:2px 0;margin-bottom:8px;"></div>
-      <div style="display:flex;align-items:center;gap:8px;">
-        <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
-        <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="previewLesson(this.value)" style="max-width:110px;">
+
+      <!-- Mode A: 예상 + 실제 (시간표 정상 수업일) -->
+      <div id="plannedActualUI">
+        <!-- 예상 차시 -->
+        <div id="plannedSection" style="margin-bottom:10px;background:#f5f3ff;border-radius:10px;padding:10px 12px;border:1px solid #ddd6fe;">
+          <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;">📋 예상 차시 <span style="font-weight:400;color:#a78bfa;">(이 날 수업할 차시 미리 설정)</span></div>
+          <div id="plannedCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:120px;overflow-y:auto;padding:2px 0;margin-bottom:6px;"></div>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
+            <input type="number" id="plannedLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="onPlannedInput(this.value)" style="max-width:110px;">
+          </div>
+          <div id="plannedPreview" style="font-size:11px;color:#7c3aed;margin-top:4px;min-height:16px;"></div>
+        </div>
+        <!-- 실제 수업 -->
+        <div id="actualSection" style="margin-bottom:2px;">
+          <div style="font-size:11px;font-weight:700;color:#10b981;margin-bottom:6px;">✅ 실제 수업</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+            <button id="actualBtnNone" class="actual-btn" onclick="setActualMode('none')">📌 수업 전</button>
+            <button id="actualBtnSame" class="actual-btn" onclick="setActualMode('same')">✅ 예상대로</button>
+            <button id="actualBtnDiff" class="actual-btn" onclick="setActualMode('diff')">✏️ 다른 차시</button>
+          </div>
+          <div id="actualDiffSection" style="display:none;">
+            <div id="actualCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:120px;overflow-y:auto;padding:2px 0;margin-bottom:6px;"></div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
+              <input type="number" id="actualLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="onActualInput(this.value)" style="max-width:110px;">
+            </div>
+            <div id="actualPreview" style="font-size:11px;color:#10b981;margin-top:4px;min-height:16px;"></div>
+          </div>
+        </div>
       </div>
-      <div id="checkLessonPreview" style="font-size:12px;color:#64748b;margin-top:4px;min-height:18px;padding:2px 0;"></div>
+
+      <!-- Mode B: 단순 (날짜 이동 / 임시 추가) -->
+      <div id="simpleUI" style="display:none;">
+        <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px;" id="lessonInputLabel">수업한 차시 선택</div>
+        <div id="lessonCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow-y:auto;padding:2px 0;margin-bottom:8px;"></div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
+          <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="previewLesson(this.value)" style="max-width:110px;">
+        </div>
+        <div id="checkLessonPreview" style="font-size:12px;color:#64748b;margin-top:4px;min-height:18px;padding:2px 0;"></div>
+      </div>
+
     </div>
 
     <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">메모 (선택)</div>
@@ -352,6 +396,8 @@ var groupsCache      = [];
 var plansCache       = [];
 var _editingPlanId   = null;
 var _scheduleAction  = 'normal'; // 'normal' | 'cancel' | 'move'
+var _actualMode      = 'none';  // 'none' | 'same' | 'diff'
+var _openingExistingCheck = {}; // 모달 열 때의 기존 기록 (setScheduleAction에서 참조)
 var semestersCache   = [];
 var timetableCache   = [];
 
@@ -542,8 +588,8 @@ function renderSylTable() {
     var cls   = key.substring(11);
     var check = sylCheckCache[key];
     if (cols.indexOf(cls) < 0) return;
-    // 임시 수업 또는 이동됨 대상
-    if (check && check.lessonNo && (sylScheduleCache[cls]||[]).indexOf(date) < 0) allDates[date] = true;
+    // 임시 수업 또는 이동됨 대상 (lessonNo 또는 plannedLessonNo 있으면 포함)
+    if (check && (check.lessonNo || check.plannedLessonNo) && (sylScheduleCache[cls]||[]).indexOf(date) < 0) allDates[date] = true;
     // 이동 대상 날짜
     if (check && check.status && check.status.indexOf('이동:') === 0) {
       var td = check.status.substring(3);
@@ -638,6 +684,18 @@ function renderSylTable() {
             + '<span style="font-size:9px;color:#a78bfa;">로 이동</span>'
           + '</div></td>';
 
+      } else if (check && check.plannedLessonNo && !check.lessonNo) {
+        // 예상 차시만 기록됨 — 아직 수업 전
+        var pPlan = sylPlanCache.find(function(p){ return p.lessonNo === check.plannedLessonNo; });
+        html += '<td style="padding:5px 8px;background:#eef2ff;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수업 기록">'
+          + '<div style="display:flex;align-items:center;gap:5px;">'
+            + '<span style="font-size:16px;">📋</span>'
+            + '<div style="font-size:12px;min-width:0;">'
+              + '<div style="font-weight:800;color:#6366f1;">' + check.plannedLessonNo + '차시 예정</div>'
+              + (pPlan && pPlan.content ? '<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(pPlan.content) + '</div>' : '')
+            + '</div>'
+          + '</div></td>';
+
       } else if (check && check.lessonNo) {
         var plan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
         var isExtra  = !scheduled;
@@ -649,12 +707,16 @@ function renderSylTable() {
           : isExtra
             ? '<span style="font-size:9px;background:#fcd34d;color:#78350f;padding:1px 4px;border-radius:4px;margin-left:3px;">추가</span>'
             : '';
+        // 예상과 실제가 다르면 표시
+        var plannedDiff = (check.plannedLessonNo && check.plannedLessonNo !== check.lessonNo)
+          ? '<div style="font-size:9px;color:#818cf8;">계획: ' + check.plannedLessonNo + '차시</div>' : '';
         html += '<td style="padding:5px 8px;background:' + bgColor + ';cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수정">'
           + '<div style="display:flex;align-items:center;gap:5px;">'
             + '<span style="font-size:16px;">✅</span>'
             + '<div style="font-size:12px;min-width:0;">'
               + '<div style="font-weight:800;color:' + numColor + ';">' + check.lessonNo + '차시' + badge + '</div>'
               + (plan && plan.content ? '<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(plan.content) + '</div>' : '')
+              + plannedDiff
               + (check.memo ? '<div style="font-size:9px;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(check.memo) + '</div>' : '')
             + '</div>'
           + '</div></td>';
@@ -672,6 +734,7 @@ function renderSylTable() {
   html += '</tbody></table>';
   html += '<div style="display:flex;gap:12px;padding:10px 4px;font-size:12px;color:#64748b;flex-wrap:wrap;">'
     + '<span>✅ = 수업 기록</span>'
+    + '<span style="background:#eef2ff;padding:1px 5px;border-radius:4px;color:#6366f1;">📋 = 예정 (수업 전)</span>'
     + '<span style="background:#faf5ff;padding:1px 5px;border-radius:4px;color:#7c3aed;">✅ 이동됨 = 이동된 수업</span>'
     + '<span style="background:#fefce8;padding:1px 5px;border-radius:4px;color:#92400e;">✅ 추가 = 임시/보충</span>'
     + '<span>🔄 = 날짜 이동됨</span>'
@@ -695,10 +758,10 @@ function openCheckDate(date, cls) {
   var isScheduled = (sylScheduleCache[cls]||[]).indexOf(date) >= 0;
   var key      = date + '_' + cls;
   var existing = sylCheckCache[key] || {};
+  _openingExistingCheck = existing; // setScheduleAction에서 참조
   var status   = existing.status || '';
 
   if (isScheduled) {
-    // 예정된 날: 3-way 액션 선택 표시
     document.getElementById('scheduleActionRow').style.display = 'block';
     var initAction = 'normal';
     if (status === '취소') initAction = 'cancel';
@@ -706,25 +769,17 @@ function openCheckDate(date, cls) {
     setScheduleAction(initAction);
     document.getElementById('moveDateInput').value = (initAction === 'move') ? status.substring(3) : '';
   } else {
-    // 임시/이동됨 날: 액션 선택 없이 차시 편집만
+    // 임시/이동됨 날: simpleUI로 실제 차시만 편집
     document.getElementById('scheduleActionRow').style.display = 'none';
     document.getElementById('moveDateRow').style.display = 'none';
-    document.getElementById('lessonInputSection').style.display = 'block';
-    document.getElementById('lessonInputLabel').textContent = '수업한 차시 번호';
     _scheduleAction = 'normal';
+    _showSimpleUI('수업한 차시 번호', existing.lessonNo || 0);
   }
 
-  var lnInput = document.getElementById('checkLessonNo');
-  var existingLn = existing.lessonNo || 0;
-  lnInput.value = existingLn ? String(existingLn) : '';
-  renderLessonCards(existingLn);
-  previewLesson(lnInput.value);
   document.getElementById('checkMemo').value = existing.memo || '';
-
-  var hasRecord = !!(existing.lessonNo || status === '취소' || status.indexOf('이동:') === 0);
+  var hasRecord = !!(existing.lessonNo || existing.plannedLessonNo || status === '취소' || status.indexOf('이동:') === 0);
   document.getElementById('checkCancelBtn').style.display = hasRecord ? 'inline-block' : 'none';
   document.getElementById('checkDateModal').classList.add('open');
-  if (_scheduleAction === 'normal') setTimeout(function(){ lnInput.focus(); }, 80);
 }
 
 // 수업 추가 (시간표에 없는 날 신규 입력)
@@ -736,13 +791,9 @@ function openAddExtra(cls) {
   document.getElementById('extraDateInput').value = '';
   document.getElementById('scheduleActionRow').style.display = 'none';
   document.getElementById('moveDateRow').style.display = 'none';
-  document.getElementById('lessonInputSection').style.display = 'block';
-  document.getElementById('lessonInputLabel').textContent = '수업한 차시 번호';
   _scheduleAction = 'normal';
-  var lnInput = document.getElementById('checkLessonNo');
-  lnInput.value = '';
-  renderLessonCards(0);
-  previewLesson('');
+  _openingExistingCheck = {};
+  _showSimpleUI('수업한 차시 번호', 0);
   document.getElementById('checkMemo').value = '';
   document.getElementById('checkCancelBtn').style.display = 'none';
   document.getElementById('checkDateModal').classList.add('open');
@@ -758,15 +809,22 @@ function setScheduleAction(action) {
     btn.className = 'action-btn' + (action === a.toLowerCase() ? ' active-' + a.toLowerCase() : '');
   });
   document.getElementById('moveDateRow').style.display = action === 'move' ? 'block' : 'none';
-  document.getElementById('lessonInputSection').style.display = action === 'cancel' ? 'none' : 'block';
-  if (action === 'move') {
-    document.getElementById('lessonInputLabel').textContent = '이동 후 수업한 차시 번호';
-  } else {
-    document.getElementById('lessonInputLabel').textContent = '수업한 차시 번호';
+
+  var lessonSection = document.getElementById('lessonInputSection');
+  if (action === 'cancel') {
+    lessonSection.style.display = 'none';
+  } else if (action === 'move') {
+    // 이동: simpleUI로 이동 후 수업 차시 입력
+    var moveLn = _openingExistingCheck.lessonNo || 0;
+    _showSimpleUI('이동 후 수업한 차시', moveLn);
+  } else { // 'normal'
+    var plannedLn = _openingExistingCheck.plannedLessonNo || 0;
+    var actualLn  = _openingExistingCheck.lessonNo || 0;
+    _showPlannedActualUI(plannedLn, actualLn);
   }
 }
 
-// 차시 카드 렌더
+// ── 기존 simpleUI 카드 렌더 (날짜 이동·임시 추가 모드) ──
 function renderLessonCards(selectedLessonNo) {
   var container = document.getElementById('lessonCards');
   if (!container) return;
@@ -778,12 +836,12 @@ function renderLessonCards(selectedLessonNo) {
     var isSelected = p.lessonNo === selectedLessonNo;
     var label = p.lessonNo + '차시' + (p.content ? ' · ' + p.content.substring(0, 16) : '');
     var title = p.lessonNo + '차시' + (p.content ? ': ' + p.content : '') + (p.memo ? ' (' + p.memo + ')' : '');
-    return '<div class="lesson-card' + (isSelected ? ' selected' : '') + '" '
+    return '<div class="lesson-card' + (isSelected ? ' selected-actual' : '') + '" '
       + 'onclick="selectLesson(' + p.lessonNo + ')" data-lesson="' + p.lessonNo + '" title="' + escapeHtml(title) + '">'
       + escapeHtml(label) + '</div>';
   }).join('');
   if (selectedLessonNo) {
-    var sel = container.querySelector('.lesson-card.selected');
+    var sel = container.querySelector('.lesson-card.selected-actual');
     if (sel) setTimeout(function(){ sel.scrollIntoView({ block: 'nearest' }); }, 50);
   }
 }
@@ -792,7 +850,7 @@ function selectLesson(lessonNo) {
   var lnInput = document.getElementById('checkLessonNo');
   if (lnInput) lnInput.value = lessonNo;
   document.querySelectorAll('#lessonCards .lesson-card').forEach(function(card) {
-    card.classList.toggle('selected', parseInt(card.dataset.lesson) === lessonNo);
+    card.classList.toggle('selected-actual', parseInt(card.dataset.lesson) === lessonNo);
   });
   var plan = sylPlanCache.find(function(p){ return p.lessonNo === lessonNo; });
   var el = document.getElementById('checkLessonPreview');
@@ -802,13 +860,135 @@ function selectLesson(lessonNo) {
 function previewLesson(val) {
   var ln = parseInt(val);
   document.querySelectorAll('#lessonCards .lesson-card').forEach(function(card) {
-    card.classList.toggle('selected', ln > 0 && parseInt(card.dataset.lesson) === ln);
+    card.classList.toggle('selected-actual', ln > 0 && parseInt(card.dataset.lesson) === ln);
   });
   var el = document.getElementById('checkLessonPreview');
   if (!el) return;
   if (!ln) { el.textContent = ''; return; }
   var plan = sylPlanCache.find(function(p){ return p.lessonNo === ln; });
   el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
+}
+
+// ── 새 plannedActualUI 카드 렌더 ──
+function renderLessonCardsIn(containerId, selectedLessonNo, clickFn, selClass) {
+  var container = document.getElementById(containerId);
+  if (!container) return;
+  if (!sylPlanCache || sylPlanCache.length === 0) {
+    container.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:4px 0;">계획된 차시가 없어요. 먼저 "계획 편집"에서 차시를 입력하세요.</div>';
+    return;
+  }
+  container.innerHTML = sylPlanCache.map(function(p) {
+    var isSel = p.lessonNo === selectedLessonNo;
+    var label = p.lessonNo + '차시' + (p.content ? ' · ' + p.content.substring(0, 14) : '');
+    var title = p.lessonNo + '차시' + (p.content ? ': ' + p.content : '') + (p.memo ? ' (' + p.memo + ')' : '');
+    return '<div class="lesson-card' + (isSel ? ' ' + selClass : '') + '" '
+      + 'onclick="' + clickFn + '(' + p.lessonNo + ')" data-lesson="' + p.lessonNo + '" title="' + escapeHtml(title) + '">'
+      + escapeHtml(label) + '</div>';
+  }).join('');
+  if (selectedLessonNo) {
+    var sel = container.querySelector('.lesson-card.' + selClass);
+    if (sel) setTimeout(function(){ sel.scrollIntoView({ block: 'nearest' }); }, 50);
+  }
+}
+
+function selectPlannedLesson(lessonNo) {
+  document.getElementById('plannedLessonNo').value = lessonNo || '';
+  document.querySelectorAll('#plannedCards .lesson-card').forEach(function(c) {
+    c.className = 'lesson-card' + (parseInt(c.dataset.lesson) === lessonNo ? ' selected-planned' : '');
+  });
+  var plan = sylPlanCache.find(function(p){ return p.lessonNo === lessonNo; });
+  var el = document.getElementById('plannedPreview');
+  if (el) el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
+}
+
+function selectActualLesson(lessonNo) {
+  document.getElementById('actualLessonNo').value = lessonNo || '';
+  document.querySelectorAll('#actualCards .lesson-card').forEach(function(c) {
+    c.className = 'lesson-card' + (parseInt(c.dataset.lesson) === lessonNo ? ' selected-actual' : '');
+  });
+  var plan = sylPlanCache.find(function(p){ return p.lessonNo === lessonNo; });
+  var el = document.getElementById('actualPreview');
+  if (el) el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
+}
+
+function onPlannedInput(val) {
+  var ln = parseInt(val);
+  document.querySelectorAll('#plannedCards .lesson-card').forEach(function(c) {
+    c.className = 'lesson-card' + (ln > 0 && parseInt(c.dataset.lesson) === ln ? ' selected-planned' : '');
+  });
+  var plan = ln ? sylPlanCache.find(function(p){ return p.lessonNo === ln; }) : null;
+  var el = document.getElementById('plannedPreview');
+  if (el) el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
+}
+
+function onActualInput(val) {
+  var ln = parseInt(val);
+  document.querySelectorAll('#actualCards .lesson-card').forEach(function(c) {
+    c.className = 'lesson-card' + (ln > 0 && parseInt(c.dataset.lesson) === ln ? ' selected-actual' : '');
+  });
+  var plan = ln ? sylPlanCache.find(function(p){ return p.lessonNo === ln; }) : null;
+  var el = document.getElementById('actualPreview');
+  if (el) el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
+}
+
+function setActualMode(mode) {
+  _actualMode = mode;
+  ['None','Same','Diff'].forEach(function(m) {
+    var btn = document.getElementById('actualBtn' + m);
+    if (btn) btn.className = 'actual-btn' + (mode === m.toLowerCase() ? ' active-' + m.toLowerCase() : '');
+  });
+  var diffSection = document.getElementById('actualDiffSection');
+  if (!diffSection) return;
+  if (mode === 'diff') {
+    diffSection.style.display = 'block';
+    var existingActual = parseInt(document.getElementById('actualLessonNo').value) || 0;
+    renderLessonCardsIn('actualCards', existingActual, 'selectActualLesson', 'selected-actual');
+  } else {
+    diffSection.style.display = 'none';
+  }
+}
+
+// plannedActualUI 표시 + 데이터 초기화
+function _showPlannedActualUI(plannedLn, actualLn) {
+  var ls = document.getElementById('lessonInputSection');
+  if (ls) ls.style.display = 'block';
+  var pui = document.getElementById('plannedActualUI');
+  var sui = document.getElementById('simpleUI');
+  if (pui) pui.style.display = 'block';
+  if (sui) sui.style.display = 'none';
+
+  var pInput = document.getElementById('plannedLessonNo');
+  if (pInput) pInput.value = plannedLn || '';
+  renderLessonCardsIn('plannedCards', plannedLn, 'selectPlannedLesson', 'selected-planned');
+  var pPlan = plannedLn ? sylPlanCache.find(function(p){ return p.lessonNo === plannedLn; }) : null;
+  var pPrev = document.getElementById('plannedPreview');
+  if (pPrev) pPrev.textContent = pPlan && pPlan.content ? '📚 ' + pPlan.content : '';
+
+  var mode = 'none';
+  if (actualLn > 0) mode = (actualLn === plannedLn) ? 'same' : 'diff';
+  var aInput = document.getElementById('actualLessonNo');
+  if (aInput) aInput.value = (mode === 'diff' && actualLn) ? actualLn : '';
+  setActualMode(mode);
+  if (mode === 'diff') {
+    var aPlan = sylPlanCache.find(function(p){ return p.lessonNo === actualLn; });
+    var aPrev = document.getElementById('actualPreview');
+    if (aPrev) aPrev.textContent = aPlan && aPlan.content ? '📚 ' + aPlan.content : '';
+  }
+}
+
+// simpleUI 표시 + 데이터 초기화
+function _showSimpleUI(label, selectedLn) {
+  var ls = document.getElementById('lessonInputSection');
+  if (ls) ls.style.display = 'block';
+  var pui = document.getElementById('plannedActualUI');
+  var sui = document.getElementById('simpleUI');
+  if (pui) pui.style.display = 'none';
+  if (sui) sui.style.display = 'block';
+  document.getElementById('lessonInputLabel').textContent = label;
+  var lnInput = document.getElementById('checkLessonNo');
+  if (lnInput) lnInput.value = selectedLn || '';
+  renderLessonCards(selectedLn || 0);
+  previewLesson(selectedLn ? String(selectedLn) : '');
 }
 
 function cancelCheck() {
@@ -853,10 +1033,10 @@ function confirmCheck() {
 
   if (action === 'cancel') {
     document.getElementById('checkDateModal').classList.remove('open');
-    sylCheckCache[date + '_' + cls] = { lessonNo: 0, memo: memo, status: '취소' };
+    sylCheckCache[date + '_' + cls] = { lessonNo: 0, plannedLessonNo: 0, memo: memo, status: '취소' };
     renderSylTable();
     google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
-      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, memo: memo, status: '취소' }, currentGroupId);
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, plannedLessonNo: 0, memo: memo, status: '취소' }, currentGroupId);
     return;
   }
 
@@ -867,26 +1047,48 @@ function confirmCheck() {
     var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
     if (!lessonNo) return alert('이동 후 수업한 차시 번호를 입력하세요.');
     document.getElementById('checkDateModal').classList.remove('open');
-    // 원래 날: 이동 표시
-    sylCheckCache[date + '_' + cls] = { lessonNo: 0, memo: '', status: '이동:' + targetDate };
-    // 이동된 날: 정상 기록
-    sylCheckCache[targetDate + '_' + cls] = { lessonNo: lessonNo, memo: memo, status: '' };
+    sylCheckCache[date + '_' + cls] = { lessonNo: 0, plannedLessonNo: 0, memo: '', status: '이동:' + targetDate };
+    sylCheckCache[targetDate + '_' + cls] = { lessonNo: lessonNo, plannedLessonNo: 0, memo: memo, status: '' };
     renderSylTable();
     google.script.run.withSuccessHandler(function(){})
-      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, memo: '', status: '이동:' + targetDate }, currentGroupId);
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, plannedLessonNo: 0, memo: '', status: '이동:' + targetDate }, currentGroupId);
     google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
-      .saveSyllabusCheck({ date: targetDate, cls: cls, lessonNo: lessonNo, memo: memo, status: '' }, currentGroupId);
+      .saveSyllabusCheck({ date: targetDate, cls: cls, lessonNo: lessonNo, plannedLessonNo: 0, memo: memo, status: '' }, currentGroupId);
     return;
   }
 
-  // 정상 수업
-  var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
-  if (!lessonNo) return alert('수업한 차시 번호를 입력하세요.');
-  document.getElementById('checkDateModal').classList.remove('open');
-  sylCheckCache[date + '_' + cls] = { lessonNo: lessonNo, memo: memo, status: '' };
-  renderSylTable();
-  google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
-    .saveSyllabusCheck({ date: date, cls: cls, lessonNo: lessonNo, memo: memo, status: '' }, currentGroupId);
+  // 정상 수업 — plannedActualUI(시간표 정상일) vs simpleUI(임시/추가)
+  var pui = document.getElementById('plannedActualUI');
+  var isPlannedActualMode = pui && pui.style.display !== 'none';
+
+  if (isPlannedActualMode) {
+    var plannedLn = parseInt(document.getElementById('plannedLessonNo').value) || 0;
+    var actualLn  = 0;
+    if (_actualMode === 'none') {
+      if (!plannedLn) return alert('예상 차시를 선택하거나 입력하세요.');
+      actualLn = 0;
+    } else if (_actualMode === 'same') {
+      if (!plannedLn) return alert('예상 차시를 선택하거나 입력하세요.');
+      actualLn = plannedLn;
+    } else { // 'diff'
+      actualLn = parseInt(document.getElementById('actualLessonNo').value) || 0;
+      if (!actualLn) return alert('실제 수업한 차시를 선택하거나 입력하세요.');
+    }
+    document.getElementById('checkDateModal').classList.remove('open');
+    sylCheckCache[date + '_' + cls] = { lessonNo: actualLn, plannedLessonNo: plannedLn, memo: memo, status: '' };
+    renderSylTable();
+    google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: actualLn, plannedLessonNo: plannedLn, memo: memo, status: '' }, currentGroupId);
+  } else {
+    // simpleUI: 임시 수업 또는 이동됨 날
+    var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
+    if (!lessonNo) return alert('수업한 차시 번호를 입력하세요.');
+    document.getElementById('checkDateModal').classList.remove('open');
+    sylCheckCache[date + '_' + cls] = { lessonNo: lessonNo, plannedLessonNo: 0, memo: memo, status: '' };
+    renderSylTable();
+    google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: lessonNo, plannedLessonNo: 0, memo: memo, status: '' }, currentGroupId);
+  }
 }
 
 // ─── 계획 편집 ───
