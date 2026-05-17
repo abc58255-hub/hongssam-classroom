@@ -6017,10 +6017,10 @@
     var isAllClass = (classF === 'all' || !classF);
     var isAllTask  = (taskF  === 'all' || !taskF);
 
+    // 과제가 선택됐을 때만 채점 탭에 compact 현황 박스 표시
     if (isAllTask) {
-      div.style.display = 'block';
+      div.style.display = 'none';
       div.className = '';
-      isAllClass ? _renderOverallDashboard(div) : _renderClassDashboard(div, classF);
     } else {
       div.style.display = 'flex';
       div.className = 'completion-summary';
@@ -6758,8 +6758,21 @@
   function renderStats() {
     var t = document.getElementById('statsTaskFilter').value;
     var c = document.getElementById('statsClassFilter').value;
-    var result = document.getElementById('statsResult');
-    if (!t) { result.innerHTML = '<div style="text-align:center; color:#94a3b8; padding:40px;">과제를 선택하면 분석 결과가 나타납니다.</div>'; return; }
+    var div = document.getElementById('statsResult');
+    if (!div) return;
+    var isAllClass = (c === 'all' || !c);
+    var isAllTask  = !t;
+    div.style.display = 'block'; div.className = '';
+    if (isAllTask) {
+      isAllClass ? _renderOverallDashboard(div) : _renderClassDashboard(div, c);
+    } else {
+      _renderStatsTaskDetail(div, t, isAllClass ? null : c);
+    }
+  }
+
+  function _renderStatsTaskDetail(div, taskName, classF) {
+    var t = taskName;
+    var c = classF || 'all';
     var s = allSubmissions.filter(function(x) {
       if (String(x.task).split(' (')[0] !== t) return false;
       if (c !== 'all') {
@@ -6811,6 +6824,7 @@
     var replyCount = latest.filter(function(x) { return x.reply && x.reply.trim() !== ''; }).length;
     var resubmitCount = s.filter(function(x) { return String(x.task).includes('(재제출)'); }).length;
     var h = '';
+    h += '<div style="font-size:14px; font-weight:800; color:#334155; margin-bottom:14px;">📖 ' + t + (c !== 'all' ? ' · ' + c : '') + '</div>';
     h += '<div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:12px; margin-bottom:20px;">';
     var summaryCards = [
       { label: '제출률', val: submitRate + '%', sub: latest.length + '/' + totalStudents + '명', color: '#0284c7' },
@@ -6904,7 +6918,7 @@
         '</div>';
     });
     h += '</div></div>';
-    result.innerHTML = h;
+    div.innerHTML = h;
   }
   var aiAnalysisResult = null; // 마지막 분석 결과 저장
   function initAiTaskPage() {
