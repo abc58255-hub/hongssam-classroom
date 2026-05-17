@@ -171,13 +171,20 @@ function getFeedbackTemplates() {
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var sh = ss.getSheetByName('시스템설정');
     if (!sh || sh.getLastRow() < 2) return { success: true, templates: [] };
-    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 3).getValues();
     var templates = [];
+    // 새 구조: A열이 '피드백_N'인 행의 B열
     rows.forEach(function(r) {
       if (String(r[0]).trim().indexOf('피드백_') === 0 && String(r[1] || '').trim()) {
         templates.push(String(r[1]).trim());
       }
     });
+    // 구 구조 폴백: C열(인덱스 2)에 값이 있으면 사용
+    if (templates.length === 0) {
+      rows.forEach(function(r) {
+        if (String(r[2] || '').trim()) templates.push(String(r[2]).trim());
+      });
+    }
     return { success: true, templates: templates };
   } catch(e) { return { success: false, templates: [], message: e.toString() }; }
 }
@@ -761,10 +768,14 @@ function getDashboardData() {
     const cache = CacheService.getScriptCache();
 
     let hrStr = "";
-    let defaultSlideUrl = ""; // ✅ 기본슬라이드URL
+    let defaultSlideUrl = "";
     try {
       hrStr = _getSys(ss, '담임반');
       defaultSlideUrl = _getSys(ss, '기본슬라이드URL');
+      // 구 구조 폴백 (B3, B4)
+      const sysSheet = ss.getSheetByName('시스템설정');
+      if (!hrStr && sysSheet) hrStr = String(sysSheet.getRange('B3').getValue() || '').trim();
+      if (!defaultSlideUrl && sysSheet) defaultSlideUrl = String(sysSheet.getRange('B4').getValue() || '').trim();
     } catch(e) {}
 
     let roster, classList;
@@ -1390,6 +1401,11 @@ function getBoardSheetId() {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var val = _getSys(ss, '알림판시트ID');
+    // 구 구조 폴백 (G2)
+    if (!val) {
+      var sh = ss.getSheetByName('시스템설정');
+      if (sh) val = String(sh.getRange('G2').getValue() || '').trim();
+    }
     return val || null;
   } catch(e) { return null; }
 }
@@ -1591,10 +1607,24 @@ function markReportDone(rowIdx) {
 // ✅ 바로가기 URL 저장/조회 (시스템설정 키-값 구조)
 // 키: 바로가기_수학교실, 바로가기_우리반교실, 바로가기_교실알림판, 바로가기_회원가입, 바로가기_포털
 // =====================================================
+// 구 셀 주소 매핑 (마이그레이션 전 폴백용)
+var _OLD_LINK_CELLS = {
+  '바로가기_수학교실':   'H2',
+  '바로가기_우리반교실': 'I2',
+  '바로가기_교실알림판': 'J2',
+  '바로가기_회원가입':   'K2',
+  '바로가기_포털':       'L2'
+};
 function getAppLinkUrl(key) {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    return { url: _getSys(ss, key) };
+    var url = _getSys(ss, key);
+    // 구 구조 폴백
+    if (!url && _OLD_LINK_CELLS[key]) {
+      var sh = ss.getSheetByName('시스템설정');
+      if (sh) url = String(sh.getRange(_OLD_LINK_CELLS[key]).getValue() || '').trim();
+    }
+    return { url: url };
   } catch(e) { return { url: '' }; }
 }
 
@@ -1740,20 +1770,40 @@ function deleteCalendarMemo(rowIdx) {
 // ✅ AI 업무 분석 + TickTick 연동
 // =====================================================
 
-// 시스템설정에서 API 설정값 읽기
+// 시스템설정에서 API 설정값 읽기 (새 키 기반 우선, 구 셀 주소 폴백)
 function getApiSettings() {
   var ss = SpreadsheetApp.openById(SHEET_ID);
-  var m  = _getSys(ss, 'AI모델명');
-  // 구 모델명 자동 교정
+  var sh = ss.getSheetByName('시스템설정');
+
+  var orKey     = _getSys(ss, 'OpenRouter키');
+  var m         = _getSys(ss, 'AI모델명');
+  var ttClient  = _getSys(ss, 'TickTick클라이언트ID');
+  var ttSecret  = _getSys(ss, 'TickTick시크릿');
+  var ttToken   = _getSys(ss, 'TickTick액세스토큰');
+  var ttRefresh = _getSys(ss, 'TickTick갱신토큰');
+
+  // 구 구조 폴백 (P2:U2) — migrateSysSheet 실행 전이거나 이전 실패 시
+  if (!orKey && sh) {
+    try {
+      var old = sh.getRange('P2:U2').getValues()[0];
+      if (!orKey)    orKey    = String(old[0] || '').trim();
+      if (!m)        m        = String(old[1] || '').trim();
+      if (!ttClient) ttClient = String(old[2] || '').trim();
+      if (!ttSecret) ttSecret = String(old[3] || '').trim();
+      if (!ttToken)  ttToken  = String(old[4] || '').trim();
+      if (!ttRefresh)ttRefresh= String(old[5] || '').trim();
+    } catch(e) {}
+  }
+
   if (m === 'google/gemini-2.5-flash-preview') m = 'google/gemini-2.5-flash';
   if (m === 'google/gemini-2.5-pro-preview')   m = 'google/gemini-2.5-pro';
   return {
-    openrouterKey: _getSys(ss, 'OpenRouter키'),
+    openrouterKey: orKey,
     model:         m || 'anthropic/claude-3.5-sonnet',
-    ttClientId:    _getSys(ss, 'TickTick클라이언트ID'),
-    ttSecret:      _getSys(ss, 'TickTick시크릿'),
-    ttToken:       _getSys(ss, 'TickTick액세스토큰'),
-    ttRefresh:     _getSys(ss, 'TickTick갱신토큰')
+    ttClientId:    ttClient,
+    ttSecret:      ttSecret,
+    ttToken:       ttToken,
+    ttRefresh:     ttRefresh
   };
 }
 

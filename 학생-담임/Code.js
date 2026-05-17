@@ -11,7 +11,8 @@ function _getSysHr(ss) {
   for (var i = 0; i < rows.length; i++) {
     if (String(rows[i][0]).trim() === '담임반') return String(rows[i][1] || '').trim();
   }
-  return '';
+  // 구 구조 폴백 (B3)
+  try { return String(sh.getRange('B3').getValue() || '').trim(); } catch(e) { return ''; }
 }
 
 function verifyHomeroomLogin(studentId, studentName, password) {

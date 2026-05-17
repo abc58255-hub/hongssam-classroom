@@ -625,11 +625,23 @@ function _getSysStudent(key) {
 }
 
 function _getApiSettingsForStudent() {
-  let model = _getSysStudent('AI모델명');
+  var orKey = _getSysStudent('OpenRouter키');
+  var model = _getSysStudent('AI모델명');
+  // 구 구조 폴백 (P2:Q2)
+  if (!orKey) {
+    try {
+      var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+      if (sh) {
+        var old = sh.getRange('P2:Q2').getValues()[0];
+        if (!orKey) orKey = String(old[0] || '').trim();
+        if (!model) model = String(old[1] || '').trim();
+      }
+    } catch(e) {}
+  }
   if (model === 'google/gemini-2.5-flash-preview') model = 'google/gemini-2.5-flash';
   if (model === 'google/gemini-2.5-pro-preview')   model = 'google/gemini-2.5-pro';
   return {
-    openrouterKey: _getSysStudent('OpenRouter키'),
+    openrouterKey: orKey,
     model: model || 'google/gemini-2.5-flash'
   };
 }
