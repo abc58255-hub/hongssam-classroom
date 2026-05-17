@@ -85,14 +85,13 @@
     appId: "1:235927215728:web:23705e0a3f6ac393e81eb5"
   };
   var VAPID_KEY = "BLRJLeOqmEKv6R3-gV9tsKSV-EgqDosMKwUXIf9iWddMCRIp7cMcbtVMhpDJCUHGN2concQbSOJbvTNsciapJNo";
-  var GAS_URL = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
-  var MATH_APP_URL = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+  var urlParams = new URLSearchParams(window.location.search);
+  var GAS_URL = urlParams.get('gas') || '';
+  var MATH_APP_URL = GAS_URL;
+  var prefilledId = urlParams.get('sid') || '';
 
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-
-  var urlParams = new URLSearchParams(window.location.search);
-  var prefilledId = urlParams.get('sid') || '';
 
   if (isIOS && !isStandalone) {
     document.getElementById('iosGuide').classList.remove('hidden');

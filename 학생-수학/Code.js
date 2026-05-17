@@ -1,15 +1,7 @@
 const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ"; 
 const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
 
-// ✅ Firebase 서버 키 — Firebase 콘솔 → 프로젝트 설정 → 클라우드 메시징 → 서버 키
-const FCM_SERVER_KEY = "여기에_FCM_SERVER_KEY_입력";
-
-// =====================================================
-// FCM 푸시 알림 발송 함수들
-// =====================================================
-
 // FCM 토큰 저장 (학생 앱에서 로그인 시 호출)
-// pwHash 파라미터가 있으면 비밀번호 검증 후 저장
 function saveFcmToken(studentId, token, pwHash) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
@@ -35,61 +27,6 @@ function saveFcmToken(studentId, token, pwHash) {
   }
 }
 
-// 특정 학생에게 푸시 알림 발송
-function sendPushToStudent(studentId, title, body, tag) {
-  try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
-    const data = sheet.getDataRange().getValues();
-    let token = "";
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1] || "").trim() === String(studentId || "").trim()) {
-        token = String(data[i][4] || "").trim(); // E열에서 FCM 토큰 읽기
-        break;
-      }
-    }
-    if (!token) return { success: false, message: "FCM 토큰 없음 (앱 미설치)" };
-    return sendFcmMessage(token, title, body, tag);
-  } catch(e) {
-    return { success: false, message: e.toString() };
-  }
-}
-
-// 실제 FCM API 호출
-function sendFcmMessage(token, title, body, tag) {
-  try {
-    const payload = {
-      to: token,
-      notification: {
-        title: title,
-        body: body,
-        icon: "icon-192x192.png",
-        click_action: "FLUTTER_NOTIFICATION_CLICK"
-      },
-      data: {
-        tag: tag || "default"
-      }
-    };
-
-    const response = UrlFetchApp.fetch("https://fcm.googleapis.com/fcm/send", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": "key=" + FCM_SERVER_KEY
-      },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const result = JSON.parse(response.getContentText());
-    if (result.success === 1) {
-      return { success: true };
-    } else {
-      return { success: false, message: JSON.stringify(result) };
-    }
-  } catch(e) {
-    return { success: false, message: e.toString() };
-  }
-}
 
 
 function doGet(e) {
@@ -388,7 +325,8 @@ function getDashboardData(studentId, studentName) {
       resubmitTasks: resubmitTasks,
       unreadFeedbacks: unreadFeedbacks,
       bestWorksMap: bestWorksMap,
-      fcmRegisterUrl: _getSysStudent('FCM_REGISTER_URL')
+      fcmRegisterUrl: _getSysStudent('FCM_REGISTER_URL'),
+      mathAppUrl: _getSysStudent('바로가기_수학교실')
     };
 
   } catch(e) {

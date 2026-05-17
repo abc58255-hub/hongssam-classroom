@@ -28,8 +28,7 @@ messaging.onBackgroundMessage(function(payload) {
 // 알림 클릭 시 앱 열기
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
-  var url = (event.notification.data && event.notification.data.url)
-    || 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+  var url = (event.notification.data && event.notification.data.url) || '/';
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(list) {

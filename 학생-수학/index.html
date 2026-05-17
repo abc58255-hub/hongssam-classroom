@@ -522,6 +522,7 @@
 
   function renderDashboard(data) {
     if (data.fcmRegisterUrl) FCM_REGISTER_URL = data.fcmRegisterUrl;
+    if (data.mathAppUrl) FCM_MATH_APP_URL = data.mathAppUrl;
     gMissingTasks = data.missingTasks;
     gResubmitTasks = data.resubmitTasks;
 
@@ -1319,6 +1320,7 @@
   // =====================================================
   // ✅ FCM 푸시 알림 — GitHub Pages iframe 방식
   var FCM_REGISTER_URL = ''; // 시스템설정 FCM_REGISTER_URL에서 로드
+  var FCM_MATH_APP_URL = ''; // 시스템설정 바로가기_수학교실에서 로드
   var fcmFrame = null;
   var fcmFrameReady = false;
   var pendingFcmStudentId = null;
@@ -1326,7 +1328,8 @@
   function setupFcmIframe() {
     if (fcmFrame) return;
     fcmFrame = document.createElement('iframe');
-    fcmFrame.src = FCM_REGISTER_URL;
+    var sep = FCM_REGISTER_URL.indexOf('?') >= 0 ? '&' : '?';
+    fcmFrame.src = FCM_REGISTER_URL + (FCM_MATH_APP_URL ? sep + 'gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
     fcmFrame.style.cssText = 'display:none;width:0;height:0;border:none;position:absolute;';
     fcmFrame.setAttribute('allow', 'notifications');
     document.body.appendChild(fcmFrame);
@@ -1373,7 +1376,7 @@
   function showIosFcmBanner(studentId) {
     if (document.getElementById('iosFcmBanner')) return;
     var pwaBase = FCM_REGISTER_URL.replace('/register.html', '');
-    var pwaUrl = pwaBase + '/?sid=' + encodeURIComponent(studentId);
+    var pwaUrl = pwaBase + '/?sid=' + encodeURIComponent(studentId) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
     var banner = document.createElement('div');
     banner.id = 'iosFcmBanner';
     banner.style.cssText = 'position:fixed;bottom:70px;left:12px;right:12px;background:#1e3a8a;color:white;border-radius:14px;padding:14px 16px;z-index:9000;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
