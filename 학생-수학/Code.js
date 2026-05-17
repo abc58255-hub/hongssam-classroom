@@ -614,14 +614,22 @@ function checkNeedsPwSetup(studentId, studentName) {
 // ✅ AI 자동 채점 (학생 제출 직후 자동 실행)
 // =====================================================
 
+function _getSysStudent(key) {
+  var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+  if (!sh || sh.getLastRow() < 2) return '';
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+  }
+  return '';
+}
+
 function _getApiSettingsForStudent() {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-  const vals = sheet.getRange('P2:Q2').getValues()[0];
-  let model = String(vals[1] || '').trim();
+  let model = _getSysStudent('AI모델명');
   if (model === 'google/gemini-2.5-flash-preview') model = 'google/gemini-2.5-flash';
   if (model === 'google/gemini-2.5-pro-preview')   model = 'google/gemini-2.5-pro';
   return {
-    openrouterKey: String(vals[0] || '').trim(),
+    openrouterKey: _getSysStudent('OpenRouter키'),
     model: model || 'google/gemini-2.5-flash'
   };
 }
@@ -792,7 +800,7 @@ function testAutoGrade() {
   Logger.log('📌 모델: ' + cfg.model);
   
   if (!cfg.openrouterKey) {
-    Logger.log('❌ OpenRouter API 키가 없습니다! 시스템설정 P2 확인!');
+    Logger.log('❌ OpenRouter API 키가 없습니다! 시스템설정 OpenRouter키 항목 확인!');
     return;
   }
   

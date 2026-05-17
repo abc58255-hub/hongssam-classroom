@@ -4,10 +4,19 @@ const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
 function doGet() { return HtmlService.createHtmlOutputFromFile('index').setTitle('우리 반 교실').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).addMetaTag('viewport', 'width=device-width, initial-scale=1'); }
 function getHash(text) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text).map(e => (e < 0 ? e + 256 : e).toString(16).padStart(2, '0')).join(''); }
 
+function _getSysHr(ss) {
+  var sh = ss.getSheetByName('시스템설정');
+  if (!sh || sh.getLastRow() < 2) return '';
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === '담임반') return String(rows[i][1] || '').trim();
+  }
+  return '';
+}
+
 function verifyHomeroomLogin(studentId, studentName, password) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
-  const sysSheet = ss.getSheetByName("시스템설정");
-  let hrStr = sysSheet ? String(sysSheet.getRange("B3").getValue()).trim() : "";
+  let hrStr = _getSysHr(ss);
   let studentHr = `${String(studentId).substring(0,1)}학년 ${String(studentId).substring(1,2)}반`;
   if (hrStr !== "" && hrStr !== studentHr) return { success: false, message: `🚨 ${hrStr} 학생 전용입니다.` };
 
@@ -50,7 +59,7 @@ function getHomeroomData(studentId) {
   let myRecords = []; const subSheet = ss.getSheetByName("창체제출현황");
   if (subSheet) { let subData = subSheet.getDataRange().getValues(); for (let i = 1; i < subData.length; i++) { if (String(subData[i][1]).trim() === String(studentId).trim()) { myRecords.push({ date: Utilities.formatDate(new Date(subData[i][0]), "Asia/Seoul", "MM/dd HH:mm"), activity: subData[i][3], role: subData[i][4], reflection: subData[i][5], url: subData[i][6] }); } } }
   
-  let roster = []; const sysSheet = ss.getSheetByName("시스템설정"); let hrStr = sysSheet ? String(sysSheet.getRange("B3").getValue()).trim() : "";
+  let roster = []; let hrStr = _getSysHr(ss);
   const rosterData = ss.getSheetByName("학생명부").getDataRange().getValues();
   for(let i=1; i<rosterData.length; i++) {
     let sid = String(rosterData[i][1]).trim();

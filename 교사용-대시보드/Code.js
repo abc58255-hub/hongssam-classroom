@@ -1,6 +1,29 @@
 const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ";
 const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
 
+// ── 시스템설정 키-값 헬퍼 ──────────────────────────────
+function _getSys(ss, key) {
+  var sh = ss.getSheetByName('시스템설정');
+  if (!sh || sh.getLastRow() < 2) return '';
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+  }
+  return '';
+}
+
+function _setSys(ss, key, value) {
+  var sh = ss.getSheetByName('시스템설정');
+  if (!sh || sh.getLastRow() < 2) return;
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === key) {
+      sh.getRange(i + 2, 2).setValue(value);
+      return;
+    }
+  }
+}
+
 // =====================================================
 // ✅ FCM 푸시 알림 (HTTP v1 API + 서비스 계정)
 // 최초 1회: GAS 스크립트 편집기에서 setupFCMCredentials() 실행
@@ -141,17 +164,19 @@ function sendPushToUnsubmitted(taskName, title, body) {
 }
 
 // =====================================================
-// ✅ 피드백 템플릿 (시스템설정 시트 C열 저장)
+// ✅ 피드백 템플릿 (시스템설정 시트 '피드백_N' 키 행에 저장)
 // =====================================================
 function getFeedbackTemplates() {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("시스템설정");
-    if (!sheet) return { success: true, templates: [] };
-    // C열부터 템플릿 저장 (C2~C열 계속)
-    const data = sheet.getRange("C2:C50").getValues();
-    let templates = [];
-    data.forEach(function(row) {
-      if (row[0] && String(row[0]).trim()) templates.push(String(row[0]).trim());
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = ss.getSheetByName('시스템설정');
+    if (!sh || sh.getLastRow() < 2) return { success: true, templates: [] };
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+    var templates = [];
+    rows.forEach(function(r) {
+      if (String(r[0]).trim().indexOf('피드백_') === 0 && String(r[1] || '').trim()) {
+        templates.push(String(r[1]).trim());
+      }
     });
     return { success: true, templates: templates };
   } catch(e) { return { success: false, templates: [], message: e.toString() }; }
@@ -159,13 +184,25 @@ function getFeedbackTemplates() {
 
 function saveFeedbackTemplates(templates) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("시스템설정");
-    if (!sheet) return { success: false, message: "시스템설정 시트 없음" };
-    // C열 기존 내용 지우기
-    sheet.getRange("C2:C50").clearContent();
-    // 새 템플릿 저장
-    templates.forEach(function(t, i) {
-      sheet.getRange(i + 2, 3).setValue(t);
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = ss.getSheetByName('시스템설정');
+    if (!sh) return { success: false, message: '시스템설정 시트 없음' };
+    var lastRow = sh.getLastRow();
+    if (lastRow < 2) return { success: false };
+    var rows = sh.getRange(2, 1, lastRow - 1, 2).getValues();
+    // 기존 피드백_ 행 B열 클리어
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim().indexOf('피드백_') === 0) {
+        sh.getRange(i + 2, 2).clearContent();
+      }
+    }
+    // 다시 저장 (피드백_1, 피드백_2, ... 순서로)
+    var idx = 1;
+    templates.forEach(function(t) {
+      if (t && t.trim()) {
+        _setSys(ss, '피드백_' + idx, t.trim());
+        idx++;
+      }
     });
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -211,8 +248,8 @@ var TEACHER_SESSION_DURATION = 4 * 60 * 60; // 4시간
 
 function teacherLogin(pw) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
-    const stored = String(sheet.getRange("F2").getValue()).trim();
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const stored = _getSys(ss, '교사비밀번호');
     if (!stored) return { success: false, message: "교사 비밀번호가 설정되지 않았습니다." };
     if (pw !== stored) return { success: false, message: "비밀번호가 일치하지 않습니다." };
 
@@ -490,8 +527,7 @@ function getSurveyData() {
     const { roster } = parseRosterAndClasses(ss);
     let hrStr = "";
     try {
-      const sysSheet = ss.getSheetByName("시스템설정");
-      if (sysSheet) hrStr = String(sysSheet.getRange("B3").getValue() || "").trim();
+      hrStr = _getSys(ss, '담임반');
     } catch(e) {}
     return { surveys: surveys.reverse(), surveyRes, roster, homeroom: hrStr };
   } catch(e) { throw new Error("설문 데이터 오류: " + e.message); }
@@ -720,13 +756,10 @@ function getDashboardData() {
     const cache = CacheService.getScriptCache();
 
     let hrStr = "";
-    let defaultSlideUrl = ""; // ✅ B4 셀 기본 URL
+    let defaultSlideUrl = ""; // ✅ 기본슬라이드URL
     try {
-      const sysSheet = ss.getSheetByName("시스템설정");
-      if (sysSheet) {
-        hrStr = String(sysSheet.getRange("B3").getValue() || "").trim();
-        defaultSlideUrl = String(sysSheet.getRange("B4").getValue() || "").trim();
-      }
+      hrStr = _getSys(ss, '담임반');
+      defaultSlideUrl = _getSys(ss, '기본슬라이드URL');
     } catch(e) {}
 
     let roster, classList;
@@ -1344,15 +1377,14 @@ function deleteNoticeData(rowIdx) {
 
 // =====================================================
 // ✅ 교실 알림판 관리 (교실 알림판 앱 스프레드시트 공지사항 시트 연동)
-// 시트 ID: 시스템설정 G2 셀
+// 시트 ID: 시스템설정 '알림판시트ID' 키
 // 시트 구조: A=날짜, B=조회공지, C=조회전달, D=종례공지, E=종례전달, F=슬라이드URL, G=유튜브URL, H=영상모드
 // 교실 알림판 앱은 13시 기준으로 조회/종례 자동 전환
 // =====================================================
 function getBoardSheetId() {
   try {
-    const s = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-    if (!s) return null;
-    const val = String(s.getRange('G2').getValue() || '').trim();
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var val = _getSys(ss, '알림판시트ID');
     return val || null;
   } catch(e) { return null; }
 }
@@ -1360,7 +1392,7 @@ function getBoardSheetId() {
 function getBoardNotices() {
   try {
     const boardId = getBoardSheetId();
-    if (!boardId) return { success: false, message: '시스템설정 시트 G2 셀에 교실 알림판 스프레드시트 ID를 입력해주세요.' };
+    if (!boardId) return { success: false, message: '시스템설정 시트 알림판시트ID 항목에 교실 알림판 스프레드시트 ID를 입력해주세요.' };
     const sheet = SpreadsheetApp.openById(boardId).getSheetByName('공지사항');
     if (!sheet) return { success: false, message: '교실 알림판 스프레드시트에 "공지사항" 시트가 없습니다.' };
     const lastRow = sheet.getLastRow();
@@ -1390,7 +1422,7 @@ function getBoardNotices() {
 function saveBoardData(data) {
   try {
     const boardId = getBoardSheetId();
-    if (!boardId) return { success: false, message: '시스템설정 G2에 스프레드시트 ID가 없습니다.' };
+    if (!boardId) return { success: false, message: '시스템설정 알림판시트ID 항목에 스프레드시트 ID가 없습니다.' };
     const sheet = SpreadsheetApp.openById(boardId).getSheetByName('공지사항');
     if (!sheet) return { success: false, message: '"공지사항" 시트를 찾을 수 없습니다.' };
     const row = [
@@ -1551,19 +1583,20 @@ function markReportDone(rowIdx) {
 }
 
 // =====================================================
-// ✅ 바로가기 URL 저장/조회 (시스템설정 시트 H2~L2)
-// H2=수학교실, I2=우리반교실, J2=교실알림판, K2=회원가입, L2=포털
+// ✅ 바로가기 URL 저장/조회 (시스템설정 키-값 구조)
+// 키: 바로가기_수학교실, 바로가기_우리반교실, 바로가기_교실알림판, 바로가기_회원가입, 바로가기_포털
 // =====================================================
-function getAppLinkUrl(cell) {
+function getAppLinkUrl(key) {
   try {
-    var val = String(SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정').getRange(cell).getValue() || '').trim();
-    return { url: val };
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    return { url: _getSys(ss, key) };
   } catch(e) { return { url: '' }; }
 }
 
-function saveAppLinkUrl(cell, url) {
+function saveAppLinkUrl(key, url) {
   try {
-    SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정').getRange(cell).setValue(url);
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    _setSys(ss, key, url);
     return { success: true };
   } catch(e) { return { success: false }; }
 }
@@ -1704,38 +1737,36 @@ function deleteCalendarMemo(rowIdx) {
 
 // 시스템설정에서 API 설정값 읽기
 function getApiSettings() {
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-  const vals  = sheet.getRange('P2:U2').getValues()[0];
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var m  = _getSys(ss, 'AI모델명');
+  // 구 모델명 자동 교정
+  if (m === 'google/gemini-2.5-flash-preview') m = 'google/gemini-2.5-flash';
+  if (m === 'google/gemini-2.5-pro-preview')   m = 'google/gemini-2.5-pro';
   return {
-    openrouterKey: String(vals[0] || '').trim(),
-    model:         (function() {
-      var m = String(vals[1] || '').trim();
-      // 구 모델명 자동 교정
-      if (m === 'google/gemini-2.5-flash-preview') m = 'google/gemini-2.5-flash';
-      if (m === 'google/gemini-2.5-pro-preview')   m = 'google/gemini-2.5-pro';
-      return m || 'anthropic/claude-3.5-sonnet';
-    })(),
-    ttClientId:    String(vals[2] || '').trim(),
-    ttSecret:      String(vals[3] || '').trim(),
-    ttToken:       String(vals[4] || '').trim(),
-    ttRefresh:     String(vals[5] || '').trim()
+    openrouterKey: _getSys(ss, 'OpenRouter키'),
+    model:         m || 'anthropic/claude-3.5-sonnet',
+    ttClientId:    _getSys(ss, 'TickTick클라이언트ID'),
+    ttSecret:      _getSys(ss, 'TickTick시크릿'),
+    ttToken:       _getSys(ss, 'TickTick액세스토큰'),
+    ttRefresh:     _getSys(ss, 'TickTick갱신토큰')
   };
 }
 
-// API 설정값 저장
-function saveApiSetting(cell, value) {
+// AI 모델 설정값 저장 (키 이름 기반)
+function saveApiSetting(key, value) {
   try {
-    SpreadsheetApp.openById(SHEET_ID)
-      .getSheetByName('시스템설정')
-      .getRange(cell).setValue(value);
+    // 하위 호환: 'Q2' 셀 주소로 들어오면 AI모델명 키로 변환
+    var resolvedKey = key;
+    if (key === 'Q2') resolvedKey = 'AI모델명';
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    _setSys(ss, resolvedKey, value);
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 function getOpenRouterBalance() {
   try {
-    const key = String(SpreadsheetApp.openById(SHEET_ID)
-      .getSheetByName('시스템설정').getRange('P2').getValue() || '').trim();
+    const key = _getSys(SpreadsheetApp.openById(SHEET_ID), 'OpenRouter키');
     if (!key) return { success: false, message: 'API 키 없음' };
     const res = UrlFetchApp.fetch('https://openrouter.ai/api/v1/auth/key', {
       headers: { 'Authorization': 'Bearer ' + key },
@@ -1751,7 +1782,7 @@ function getOpenRouterBalance() {
 function analyzeTaskText(text, fileAttachment) {
   try {
     const cfg = getApiSettings();
-    if (!cfg.openrouterKey) return { success: false, message: '시스템설정 P2에 OpenRouter API 키를 입력해주세요.' };
+    if (!cfg.openrouterKey) return { success: false, message: '시스템설정 OpenRouter키 항목에 API 키를 입력해주세요.' };
 
     const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy년 MM월 dd일 (E)');
 
@@ -1867,7 +1898,7 @@ const TT_REDIRECT_URI = 'https://example.com';
 function getTickTickAuthUrl() {
   try {
     const cfg = getApiSettings();
-    if (!cfg.ttClientId) return { success: false, message: '시스템설정 R2에 TickTick Client ID를 입력해주세요.' };
+    if (!cfg.ttClientId) return { success: false, message: '시스템설정 TickTick클라이언트ID 항목에 Client ID를 입력해주세요.' };
 
     const authUrl = 'https://ticktick.com/oauth/authorize'
       + '?client_id='    + encodeURIComponent(cfg.ttClientId)
@@ -1902,9 +1933,9 @@ function exchangeTickTickCode(code) {
       return { success: false, message: '코드가 잘못됐거나 만료됐어요: ' + res.getContentText() };
     }
 
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-    sheet.getRange('T2').setValue(token.access_token);
-    if (token.refresh_token) sheet.getRange('U2').setValue(token.refresh_token);
+    const _ttSs = SpreadsheetApp.openById(SHEET_ID);
+    _setSys(_ttSs, 'TickTick액세스토큰', token.access_token);
+    if (token.refresh_token) _setSys(_ttSs, 'TickTick갱신토큰', token.refresh_token);
 
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -1929,9 +1960,9 @@ function refreshTickTickToken() {
     const token = JSON.parse(res.getContentText());
     if (!token.access_token) return { success: false, message: '갱신 실패. 재인증 필요.' };
 
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-    sheet.getRange('T2').setValue(token.access_token);
-    if (token.refresh_token) sheet.getRange('U2').setValue(token.refresh_token);
+    const _ttSs2 = SpreadsheetApp.openById(SHEET_ID);
+    _setSys(_ttSs2, 'TickTick액세스토큰', token.access_token);
+    if (token.refresh_token) _setSys(_ttSs2, 'TickTick갱신토큰', token.refresh_token);
 
     return { success: true, token: token.access_token };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -1943,7 +1974,7 @@ function addToTickTick(taskData) {
     let cfg   = getApiSettings();
     let token = cfg.ttToken;
     if (!token)          return { success: false, message: 'TickTick 미연동. 설정에서 먼저 연동해주세요.' };
-    if (!cfg.ttClientId) return { success: false, message: '시스템설정 R2에 Client ID를 입력해주세요.' };
+    if (!cfg.ttClientId) return { success: false, message: '시스템설정 TickTick클라이언트ID 항목에 Client ID를 입력해주세요.' };
 
     function postTask(accessToken) {
       const body = {
@@ -2363,9 +2394,8 @@ function deleteSurvey(svId) {
 // 교실 알림판 오늘 항목 조회
 function getClassroomBoardToday() {
   try {
-    const sysSheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-    if (!sysSheet) return { success: false, items: [] };
-    const boardId = String(sysSheet.getRange('G2').getValue() || '').trim();
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const boardId = _getSys(ss, '알림판시트ID');
     if (!boardId) return { success: true, items: [], message: '교실 알림판 시트 ID 미설정' };
     
     const boardSS = SpreadsheetApp.openById(boardId);
@@ -2395,7 +2425,7 @@ function getClassroomBoardToday() {
 function saveBoardNotice(data) {
   try {
     const boardId = getBoardSheetId();
-    if (!boardId) return { success: false, message: '시스템설정 G2 셀에 교실 알림판 스프레드시트 ID를 입력해주세요.' };
+    if (!boardId) return { success: false, message: '시스템설정 알림판시트ID 항목에 교실 알림판 스프레드시트 ID를 입력해주세요.' };
     const sheet = SpreadsheetApp.openById(boardId).getSheetByName('공지사항');
     if (!sheet) return { success: false, message: '교실 알림판 스프레드시트에 "공지사항" 시트가 없습니다.' };
 
@@ -2589,4 +2619,113 @@ function approveResubmitRequest(rowIdx) {
     sheet.getRange(rowIdx, 16).setValue('');           // P열 = 답글 초기화
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// =====================================================
+// ✅ 시스템설정 시트 마이그레이션 (GAS 에디터에서 1회 직접 실행)
+// 기존 셀 주소 기반 → 행 기반 키-값 구조로 변환
+// =====================================================
+function migrateSysSheet() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sh = ss.getSheetByName('시스템설정');
+  if (!sh) { Logger.log('시스템설정 시트 없음'); return; }
+
+  // 기존 데이터 읽기
+  var oldData = sh.getDataRange().getValues();
+  var get = function(r, c) {
+    if (r < 1 || r > oldData.length) return '';
+    var row = oldData[r - 1];
+    if (c < 1 || c > row.length) return '';
+    return String(row[c - 1] || '').trim();
+  };
+
+  var homeroomClass = get(3, 2);   // B3 담임반
+  var defaultSlide  = get(4, 2);   // B4 기본슬라이드URL
+  var boardSheetId  = get(2, 7);   // G2 알림판시트ID
+  var shortcutH     = get(2, 8);   // H2 수학교실
+  var shortcutI     = get(2, 9);   // I2 우리반교실
+  var shortcutJ     = get(2, 10);  // J2 교실알림판
+  var shortcutK     = get(2, 11);  // K2 회원가입
+  var shortcutL     = get(2, 12);  // L2 포털
+  var openrouterKey = get(2, 16);  // P2 OpenRouter키
+  var aiModel       = get(2, 17);  // Q2 AI모델명
+  var ttClientId    = get(2, 18);  // R2 TickTick클라이언트ID
+  var ttSecret      = get(2, 19);  // S2 TickTick시크릿
+  var ttToken       = get(2, 20);  // T2 액세스토큰
+  var ttRefresh     = get(2, 21);  // U2 갱신토큰
+
+  // 교사 비밀번호 (학생명부 F2)
+  var teacherPw = '';
+  try {
+    teacherPw = String(ss.getSheetByName('학생명부').getRange('F2').getValue() || '').trim();
+  } catch(e) {}
+
+  // 피드백 템플릿 (C2:C50)
+  var feedbacks = [];
+  for (var r = 2; r <= Math.min(oldData.length, 51); r++) {
+    var v = get(r, 3);
+    if (v) feedbacks.push(v);
+  }
+
+  // 새 구조 데이터
+  var rows = [
+    ['항목', '값', '안내 (이 열은 참고용입니다)'],
+    ['담임반',           homeroomClass, '학생-담임 앱 접근 가능 반 (예: 2학년 1반)'],
+    ['교사비밀번호',     teacherPw,     '교사 대시보드 로그인 비밀번호'],
+    ['기본슬라이드URL',  defaultSlide,  '교실 알림판 기본 슬라이드 주소'],
+    ['알림판시트ID',     boardSheetId,  '교실 알림판 스프레드시트 ID'],
+    ['── 바로가기 ──',  '',            '아래 항목에 각 앱의 URL을 붙여넣으세요'],
+    ['바로가기_수학교실',   shortcutH, '수학 과제 제출 앱 URL'],
+    ['바로가기_우리반교실', shortcutI, '학생-담임 앱 URL'],
+    ['바로가기_교실알림판', shortcutJ, '교실 알림판 URL'],
+    ['바로가기_회원가입',   shortcutK, '회원가입 앱 URL'],
+    ['바로가기_포털',       shortcutL, '스마트 포털 URL'],
+    ['── AI / API ──',   '',           '아래 항목에 API 키를 입력하세요'],
+    ['OpenRouter키',         openrouterKey, 'AI 기능용 API 키 (openrouter.ai에서 발급)'],
+    ['AI모델명',             aiModel,       '사용 모델 (예: anthropic/claude-3.5-sonnet)'],
+    ['TickTick클라이언트ID', ttClientId,    'TickTick 앱 연동 (설정 화면에서 입력)'],
+    ['TickTick시크릿',       ttSecret,      'TickTick 앱 연동 (설정 화면에서 입력)'],
+    ['TickTick액세스토큰',   ttToken,       '자동 저장됨 — 건드리지 마세요'],
+    ['TickTick갱신토큰',     ttRefresh,     '자동 저장됨 — 건드리지 마세요'],
+    ['── 피드백 템플릿 ──', '', '채점 시 사용할 피드백 문구 (B열에 입력)'],
+  ];
+  for (var i = 0; i < 30; i++) {
+    rows.push(['피드백_' + (i + 1), feedbacks[i] || '', '']);
+  }
+
+  // 시트 초기화 후 새 데이터 쓰기
+  sh.clearContents();
+  sh.clearFormats();
+  sh.getRange(1, 1, rows.length, 3).setValues(rows);
+
+  // 헤더 행 스타일
+  sh.getRange(1, 1, 1, 3)
+    .setBackground('#1e3a8a').setFontColor('white').setFontWeight('bold').setFontSize(12);
+
+  // 구분선 행 스타일 (회색)
+  [6, 12, 19].forEach(function(r) {
+    sh.getRange(r, 1, 1, 3)
+      .setBackground('#f1f5f9').setFontColor('#94a3b8').setFontWeight('bold').setFontStyle('italic');
+  });
+
+  // 자동저장 행 (건드리면 안됨) 연노랑 배경
+  [17, 18].forEach(function(r) {
+    sh.getRange(r, 2).setBackground('#fef9c3');
+  });
+
+  // 열 너비
+  sh.setColumnWidth(1, 200);
+  sh.setColumnWidth(2, 320);
+  sh.setColumnWidth(3, 260);
+
+  // 헤더 고정
+  sh.setFrozenRows(1);
+
+  // 학생명부 F2 비우기 (교사비번 이전 완료)
+  try {
+    ss.getSheetByName('학생명부').getRange('F2').clearContent();
+  } catch(e) {}
+
+  Logger.log('migrateSysSheet 완료: ' + rows.length + '행 작성');
+  SpreadsheetApp.getUi().alert('시스템설정 시트 재구성 완료!\n\n' + rows.length + '개 항목이 설정됐습니다.\n교사 비밀번호도 시스템설정으로 이전했습니다.');
 }
