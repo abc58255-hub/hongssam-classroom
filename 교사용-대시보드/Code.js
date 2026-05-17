@@ -188,22 +188,23 @@ function saveFeedbackTemplates(templates) {
     var sh = ss.getSheetByName('시스템설정');
     if (!sh) return { success: false, message: '시스템설정 시트 없음' };
     var lastRow = sh.getLastRow();
-    if (lastRow < 2) return { success: false };
-    var rows = sh.getRange(2, 1, lastRow - 1, 3).getValues();
-    // 기존 피드백_ 행 B열 클리어 + 구 구조 C열도 클리어
-    for (var i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim().indexOf('피드백_') === 0) {
-        sh.getRange(i + 2, 2).clearContent();
-      }
-      if (String(rows[i][2] || '').trim()) {
-        sh.getRange(i + 2, 3).clearContent();
+    if (lastRow >= 2) {
+      var rows = sh.getRange(2, 1, lastRow - 1, 3).getValues();
+      // 뒤에서 앞으로 삭제 (행 번호 밀림 방지)
+      for (var i = rows.length - 1; i >= 0; i--) {
+        var key = String(rows[i][0]).trim();
+        if (key.indexOf('피드백_') === 0) {
+          sh.deleteRow(i + 2);
+        } else if (String(rows[i][2] || '').trim()) {
+          sh.getRange(i + 2, 3).clearContent(); // 구 C열 데이터 정리
+        }
       }
     }
-    // 다시 저장 (피드백_1, 피드백_2, ... 순서로)
+    // 새 피드백_ 행 추가
     var idx = 1;
     templates.forEach(function(t) {
       if (t && t.trim()) {
-        _setSys(ss, '피드백_' + idx, t.trim());
+        sh.appendRow(['피드백_' + idx, t.trim()]);
         idx++;
       }
     });
