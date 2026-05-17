@@ -102,6 +102,11 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .action-btn.active-normal { background: #dcfce7; border-color: #86efac; color: #16a34a; }
 .action-btn.active-cancel { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
 .action-btn.active-move { background: #f5f3ff; border-color: #c4b5fd; color: #7c3aed; }
+
+/* 차시 선택 카드 */
+.lesson-card { display:inline-block; padding: 5px 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; background: #f8fafc; color: #475569; transition: all 0.15s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 190px; }
+.lesson-card:hover { border-color: #34d399; background: #ecfdf5; color: #065f46; }
+.lesson-card.selected { border-color: #10b981; background: #d1fae5; color: #065f46; font-weight: 800; box-shadow: 0 0 0 1px #10b981; }
 </style>
 </head>
 <body>
@@ -244,7 +249,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
 <!-- 수업 기록 모달 -->
 <div id="checkDateModal" class="modal-bg">
-  <div class="modal-box" style="max-width:380px;">
+  <div class="modal-box" style="max-width:440px;">
     <h3 style="margin:0 0 14px;font-size:16px;font-weight:800;color:#0f172a;" id="checkDateTitle">수업 기록</h3>
     <input type="hidden" id="checkDate">
     <input type="hidden" id="checkCls">
@@ -271,10 +276,14 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <input type="date" id="moveDateInput" class="form-input">
     </div>
 
-    <!-- 차시 입력 -->
+    <!-- 차시 선택 (카드 + 직접 입력) -->
     <div id="lessonInputSection" style="margin-bottom:12px;">
-      <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:5px;" id="lessonInputLabel">수업한 차시 번호</div>
-      <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시 번호 입력 (예: 3)" oninput="previewLesson(this.value)">
+      <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px;" id="lessonInputLabel">수업한 차시 선택</div>
+      <div id="lessonCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow-y:auto;padding:2px 0;margin-bottom:8px;"></div>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
+        <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="previewLesson(this.value)" style="max-width:110px;">
+      </div>
       <div id="checkLessonPreview" style="font-size:12px;color:#64748b;margin-top:4px;min-height:18px;padding:2px 0;"></div>
     </div>
 
@@ -345,6 +354,23 @@ var _editingPlanId   = null;
 var _scheduleAction  = 'normal'; // 'normal' | 'cancel' | 'move'
 var semestersCache   = [];
 var timetableCache   = [];
+
+// 주차별 파스텔 색상 팔레트 (date=날짜셀 강조, empty=빈 셀 연한 틴트)
+var WEEK_COLORS = [
+  { date: '#bfdbfe', empty: '#eff6ff' },  // 파랑
+  { date: '#fde68a', empty: '#fffbeb' },  // 노랑
+  { date: '#d9f99d', empty: '#f7fee7' },  // 연두
+  { date: '#f5d0fe', empty: '#fdf4ff' },  // 보라
+  { date: '#99f6e4', empty: '#f0fdfa' },  // 청록
+  { date: '#fed7aa', empty: '#fff7ed' },  // 주황
+];
+
+function getMondayStr(dateStr) {
+  var d = new Date(dateStr + 'T09:00:00');
+  var day = d.getDay();
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d.getFullYear() + '-' + ('0' + (d.getMonth()+1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
 
 // ─── 로그인 ───
 function doLogin() {
@@ -526,6 +552,17 @@ function renderSylTable() {
   });
   var sortedDates = Object.keys(allDates).sort();
 
+  // 주차별 색상 맵 (월요일 기준)
+  var weekColorMap = {};
+  var weekIdx = 0;
+  sortedDates.forEach(function(ds) {
+    var mon = getMondayStr(ds);
+    if (!weekColorMap[mon]) {
+      weekColorMap[mon] = WEEK_COLORS[weekIdx % WEEK_COLORS.length];
+      weekIdx++;
+    }
+  });
+
   var DAY_KR = ['일','월','화','수','목','금','토'];
 
   var html = '<table class="syl-table" style="min-width:' + (140 + cols.length*120) + 'px;"><thead><tr>';
@@ -545,34 +582,45 @@ function renderSylTable() {
   html += '</tr></thead><tbody>';
 
   var lastMonth = '';
+  var prevMonday = '';
   sortedDates.forEach(function(dateStr) {
     var d = new Date(dateStr + 'T09:00:00');
     var monthLabel = d.getFullYear() + '년 ' + (d.getMonth()+1) + '월';
     if (monthLabel !== lastMonth) {
       lastMonth = monthLabel;
       html += '<tr><td colspan="' + (cols.length+1) + '" style="background:#1e3a8a;color:white;font-weight:800;padding:6px 16px;font-size:13px;">' + monthLabel + '</td></tr>';
+      prevMonday = ''; // 월 헤더 뒤엔 주차 구분선 생략
     }
 
+    var curMonday = getMondayStr(dateStr);
+    var wc = weekColorMap[curMonday];
+    var isNewWeek = curMonday !== prevMonday;
+    var weekBorder = (isNewWeek && prevMonday !== '') ? 'border-top:2px solid rgba(0,0,0,0.1);' : '';
+    prevMonday = curMonday;
+
     var dow = d.getDay();
-    var dayColor = dow === 0 ? '#ef4444' : dow === 6 ? '#3b82f6' : '#334155';
-    html += '<tr><td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;">'
-      + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')</span></td>';
+    var dayColor = dow === 0 ? '#dc2626' : dow === 6 ? '#2563eb' : '#1e293b';
+    html += '<tr>'
+      + '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;background:' + wc.date + ';' + weekBorder + '">'
+        + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')</span>'
+      + '</td>';
 
     cols.forEach(function(cls) {
       var scheduled = (sylScheduleCache[cls]||[]).indexOf(dateStr) >= 0;
       var key   = dateStr + '_' + cls;
       var check = sylCheckCache[key];
 
-      // 시간표에 없고 기록도 없으면 회색 빈 셀
+      // 시간표에 없고 기록도 없으면 주차 틴트 빈 셀
       if (!scheduled && (!check || (!check.lessonNo && !check.status))) {
-        html += '<td style="background:#f8fafc;"></td>'; return;
+        html += '<td style="background:' + wc.empty + ';' + weekBorder + '"></td>'; return;
       }
 
       var cellAttrs = 'data-date="' + escapeHtml(dateStr) + '" data-cls="' + escapeHtml(cls) + '" onclick="openCheckDate(this.dataset.date,this.dataset.cls)"';
       var status = check ? (check.status || '') : '';
 
+      var wbStyle = weekBorder ? 'border-top:2px solid rgba(0,0,0,0.1);' : '';
       if (status === '취소') {
-        html += '<td style="text-align:center;padding:6px 4px;background:#fff1f2;cursor:pointer;" ' + cellAttrs + ' title="수업 취소 (클릭하여 수정)">'
+        html += '<td style="text-align:center;padding:6px 4px;background:#fff1f2;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="수업 취소 (클릭하여 수정)">'
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
             + '<span style="font-size:17px;">🚫</span>'
             + '<span style="font-size:9px;color:#dc2626;font-weight:700;">취소</span>'
@@ -583,7 +631,7 @@ function renderSylTable() {
         var targetDate = status.substring(3);
         var tD = new Date(targetDate + 'T09:00:00');
         var tLabel = (tD.getMonth()+1) + '/' + tD.getDate() + ' (' + DAY_KR[tD.getDay()] + ')';
-        html += '<td style="text-align:center;padding:6px 4px;background:#fdf4ff;cursor:pointer;" ' + cellAttrs + ' title="수업 이동됨 (클릭하여 수정)">'
+        html += '<td style="text-align:center;padding:6px 4px;background:#fdf4ff;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="수업 이동됨 (클릭하여 수정)">'
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
             + '<span style="font-size:17px;">🔄</span>'
             + '<span style="font-size:9px;color:#7c3aed;font-weight:700;">' + tLabel + '</span>'
@@ -601,7 +649,7 @@ function renderSylTable() {
           : isExtra
             ? '<span style="font-size:9px;background:#fcd34d;color:#78350f;padding:1px 4px;border-radius:4px;margin-left:3px;">추가</span>'
             : '';
-        html += '<td style="padding:5px 8px;background:' + bgColor + ';cursor:pointer;" ' + cellAttrs + ' title="클릭하여 수정">'
+        html += '<td style="padding:5px 8px;background:' + bgColor + ';cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수정">'
           + '<div style="display:flex;align-items:center;gap:5px;">'
             + '<span style="font-size:16px;">✅</span>'
             + '<div style="font-size:12px;min-width:0;">'
@@ -613,7 +661,7 @@ function renderSylTable() {
 
       } else {
         // 예정된 날이지만 미기록
-        html += '<td style="text-align:center;padding:8px;cursor:pointer;" ' + cellAttrs + ' title="클릭하여 수업 기록">'
+        html += '<td style="text-align:center;padding:8px;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수업 기록">'
           + '<span style="display:inline-block;width:22px;height:22px;border:2px solid #d1d5db;border-radius:4px;background:white;"></span>'
           + '</td>';
       }
@@ -667,14 +715,16 @@ function openCheckDate(date, cls) {
   }
 
   var lnInput = document.getElementById('checkLessonNo');
-  lnInput.value = existing.lessonNo ? String(existing.lessonNo) : '';
+  var existingLn = existing.lessonNo || 0;
+  lnInput.value = existingLn ? String(existingLn) : '';
+  renderLessonCards(existingLn);
   previewLesson(lnInput.value);
   document.getElementById('checkMemo').value = existing.memo || '';
 
   var hasRecord = !!(existing.lessonNo || status === '취소' || status.indexOf('이동:') === 0);
   document.getElementById('checkCancelBtn').style.display = hasRecord ? 'inline-block' : 'none';
   document.getElementById('checkDateModal').classList.add('open');
-  if (_scheduleAction === 'normal') setTimeout(function(){ lnInput.focus(); lnInput.select(); }, 80);
+  if (_scheduleAction === 'normal') setTimeout(function(){ lnInput.focus(); }, 80);
 }
 
 // 수업 추가 (시간표에 없는 날 신규 입력)
@@ -691,6 +741,7 @@ function openAddExtra(cls) {
   _scheduleAction = 'normal';
   var lnInput = document.getElementById('checkLessonNo');
   lnInput.value = '';
+  renderLessonCards(0);
   previewLesson('');
   document.getElementById('checkMemo').value = '';
   document.getElementById('checkCancelBtn').style.display = 'none';
@@ -715,8 +766,44 @@ function setScheduleAction(action) {
   }
 }
 
+// 차시 카드 렌더
+function renderLessonCards(selectedLessonNo) {
+  var container = document.getElementById('lessonCards');
+  if (!container) return;
+  if (!sylPlanCache || sylPlanCache.length === 0) {
+    container.innerHTML = '<div style="color:#94a3b8;font-size:12px;padding:4px 0;">계획된 차시가 없어요. 먼저 "계획 편집"에서 차시를 입력하세요.</div>';
+    return;
+  }
+  container.innerHTML = sylPlanCache.map(function(p) {
+    var isSelected = p.lessonNo === selectedLessonNo;
+    var label = p.lessonNo + '차시' + (p.content ? ' · ' + p.content.substring(0, 16) : '');
+    var title = p.lessonNo + '차시' + (p.content ? ': ' + p.content : '') + (p.memo ? ' (' + p.memo + ')' : '');
+    return '<div class="lesson-card' + (isSelected ? ' selected' : '') + '" '
+      + 'onclick="selectLesson(' + p.lessonNo + ')" data-lesson="' + p.lessonNo + '" title="' + escapeHtml(title) + '">'
+      + escapeHtml(label) + '</div>';
+  }).join('');
+  if (selectedLessonNo) {
+    var sel = container.querySelector('.lesson-card.selected');
+    if (sel) setTimeout(function(){ sel.scrollIntoView({ block: 'nearest' }); }, 50);
+  }
+}
+
+function selectLesson(lessonNo) {
+  var lnInput = document.getElementById('checkLessonNo');
+  if (lnInput) lnInput.value = lessonNo;
+  document.querySelectorAll('#lessonCards .lesson-card').forEach(function(card) {
+    card.classList.toggle('selected', parseInt(card.dataset.lesson) === lessonNo);
+  });
+  var plan = sylPlanCache.find(function(p){ return p.lessonNo === lessonNo; });
+  var el = document.getElementById('checkLessonPreview');
+  if (el) el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
+}
+
 function previewLesson(val) {
   var ln = parseInt(val);
+  document.querySelectorAll('#lessonCards .lesson-card').forEach(function(card) {
+    card.classList.toggle('selected', ln > 0 && parseInt(card.dataset.lesson) === ln);
+  });
   var el = document.getElementById('checkLessonPreview');
   if (!el) return;
   if (!ln) { el.textContent = ''; return; }
