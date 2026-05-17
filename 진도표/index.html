@@ -762,42 +762,57 @@ function renderSylTable() {
           + '</div></td>';
 
       } else if (sylMovedInCache[key] && sylMovedInCache[key].length > 0) {
-        // 이동받은 수업이 있는 날 — 이동된 수업 카드 + 기존 수업 카드 함께 표시
+        // 이동받은 수업이 있는 날 — 이동된 수업 카드 + 자체 수업 카드 동일 비중 표시
+        var CARD = 'border-radius:7px;padding:4px 7px;margin-bottom:3px;font-size:11px;';
         var miList = sylMovedInCache[key];
-        html += '<td style="padding:4px 6px;cursor:pointer;vertical-align:top;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수업 기록">';
-        // 이동받은 수업 카드들
+        html += '<td style="padding:4px 5px;cursor:pointer;vertical-align:top;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수업 기록">';
+
+        // ① 이동받은 수업 카드
         miList.forEach(function(mi) {
           var fromD = new Date(mi.sourceDate + 'T09:00:00');
           var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + '(' + DAY_KR[fromD.getDay()] + ')';
           var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === mi.lessonNo; });
-          html += '<div style="background:#faf5ff;border:1px solid #ddd6fe;border-radius:6px;padding:3px 6px;margin-bottom:3px;">'
-            + '<div style="display:flex;align-items:center;gap:3px;">'
-              + '<span style="font-size:12px;">🔀</span>'
-              + '<span style="font-size:11px;font-weight:800;color:#7c3aed;">' + mi.lessonNo + '차시</span>'
-              + '<span style="font-size:8px;background:#e9d5ff;color:#7c3aed;padding:1px 3px;border-radius:3px;margin-left:2px;">이동</span>'
+          html += '<div style="background:#faf5ff;border:1px solid #ddd6fe;' + CARD + '">'
+            + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
+              + '<span>🔀</span>'
+              + '<span style="font-weight:800;color:#7c3aed;">' + mi.lessonNo + '차시</span>'
+              + '<span style="font-size:8px;background:#ede9fe;color:#7c3aed;padding:0 4px;border-radius:3px;margin-left:1px;">이동</span>'
             + '</div>'
-            + '<div style="font-size:9px;color:#a78bfa;">📍 ' + fromLabel + ' 수업</div>'
+            + '<div style="font-size:9px;color:#a78bfa;margin-bottom:1px;">📍 ' + fromLabel + ' 수업</div>'
             + (miPlan && miPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(miPlan.content) + '</div>' : '')
           + '</div>';
         });
-        // 이 날 자체의 수업 카드
+
+        // ② 이 날 자체 수업 카드 (구조 동일)
         if (check && check.lessonNo) {
           var ownPlan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
-          html += '<div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:6px;padding:3px 6px;">'
-            + '<div style="display:flex;align-items:center;gap:3px;">'
-              + '<span style="font-size:12px;">✅</span>'
-              + '<span style="font-size:11px;font-weight:800;color:#065f46;">' + check.lessonNo + '차시</span>'
+          html += '<div style="background:#f0fdf4;border:1px solid #86efac;' + CARD + '">'
+            + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
+              + '<span>✅</span>'
+              + '<span style="font-weight:800;color:#15803d;">' + check.lessonNo + '차시</span>'
+              + '<span style="font-size:8px;background:#dcfce7;color:#15803d;padding:0 4px;border-radius:3px;margin-left:1px;">정규</span>'
             + '</div>'
+            + '<div style="font-size:9px;color:#86efac;margin-bottom:1px;">📅 이 날 수업</div>'
             + (ownPlan && ownPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(ownPlan.content) + '</div>' : '')
           + '</div>';
         } else if (check && check.plannedLessonNo) {
-          html += '<div style="background:#eef2ff;border:1px solid #c7d2fe;border-radius:6px;padding:3px 6px;">'
-            + '<div style="font-size:9px;color:#6366f1;">📋 ' + check.plannedLessonNo + '차시 예정</div>'
+          var pPlan2 = sylPlanCache.find(function(p){ return p.lessonNo === check.plannedLessonNo; });
+          html += '<div style="background:#eef2ff;border:1px solid #a5b4fc;' + CARD + '">'
+            + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
+              + '<span>📋</span>'
+              + '<span style="font-weight:800;color:#4338ca;">' + check.plannedLessonNo + '차시</span>'
+              + '<span style="font-size:8px;background:#e0e7ff;color:#4338ca;padding:0 4px;border-radius:3px;margin-left:1px;">예정</span>'
+            + '</div>'
+            + '<div style="font-size:9px;color:#818cf8;margin-bottom:1px;">📅 이 날 예정</div>'
+            + (pPlan2 && pPlan2.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(pPlan2.content) + '</div>' : '')
           + '</div>';
         } else if (scheduled) {
-          html += '<div style="text-align:center;padding:2px 0;">'
-            + '<span style="display:inline-block;width:16px;height:16px;border:2px solid #d1d5db;border-radius:3px;background:white;"></span>'
-            + '<div style="font-size:8px;color:#94a3b8;">정규 미기록</div>'
+          html += '<div style="background:#f8fafc;border:1px solid #e2e8f0;' + CARD + '">'
+            + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
+              + '<span style="display:inline-block;width:14px;height:14px;border:2px solid #cbd5e1;border-radius:3px;background:white;"></span>'
+              + '<span style="font-weight:800;color:#94a3b8;">미기록</span>'
+            + '</div>'
+            + '<div style="font-size:9px;color:#cbd5e1;">📅 이 날 수업</div>'
           + '</div>';
         }
         html += '</td>';
