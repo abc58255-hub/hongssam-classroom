@@ -611,13 +611,13 @@ function renderSylTable() {
 
   var DAY_KR = ['일','월','화','수','목','금','토'];
 
-  var html = '<table class="syl-table" style="min-width:' + (140 + cols.length*120) + 'px;"><thead><tr>';
-  html += '<th style="min-width:120px;text-align:left;padding:10px 14px;">날짜</th>';
+  var html = '<table class="syl-table" style="min-width:' + (120 + cols.length*160) + 'px;"><thead><tr>';
+  html += '<th style="min-width:100px;text-align:left;padding:10px 14px;">날짜</th>';
   cols.forEach(function(cls) {
     var yearMatch = cls.match(/\d+학년/);
     var yearPart  = yearMatch ? yearMatch[0] : '';
     var shortCls  = cls.replace(yearPart + ' ', '');
-    html += '<th style="min-width:120px;">'
+    html += '<th style="min-width:160px;">'
       + (yearPart ? '<div style="font-size:10px;opacity:0.7;font-weight:500;margin-bottom:2px;">' + yearPart + '</div>' : '')
       + '<div style="display:flex;align-items:center;justify-content:center;gap:4px;">'
         + escapeHtml(shortCls)
@@ -670,7 +670,7 @@ function renderSylTable() {
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
             + '<span style="font-size:17px;">🚫</span>'
             + '<span style="font-size:9px;color:#dc2626;font-weight:700;">취소</span>'
-            + (check.memo ? '<span style="font-size:9px;color:#94a3b8;max-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHtml(check.memo) + '</span>' : '')
+            + (check.memo ? '<span style="font-size:9px;color:#94a3b8;word-break:keep-all;">' + escapeHtml(check.memo) + '</span>' : '')
           + '</div></td>';
 
       } else if (status.indexOf('이동:') === 0) {
@@ -692,7 +692,7 @@ function renderSylTable() {
             + '<span style="font-size:16px;">📋</span>'
             + '<div style="font-size:12px;min-width:0;">'
               + '<div style="font-weight:800;color:#6366f1;">' + check.plannedLessonNo + '차시 예정</div>'
-              + (pPlan && pPlan.content ? '<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(pPlan.content) + '</div>' : '')
+              + (pPlan && pPlan.content ? '<div style="font-size:10px;color:#374151;word-break:keep-all;">' + escapeHtml(pPlan.content) + '</div>' : '')
             + '</div>'
           + '</div></td>';
 
@@ -715,9 +715,9 @@ function renderSylTable() {
             + '<span style="font-size:16px;">✅</span>'
             + '<div style="font-size:12px;min-width:0;">'
               + '<div style="font-weight:800;color:' + numColor + ';">' + check.lessonNo + '차시' + badge + '</div>'
-              + (plan && plan.content ? '<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(plan.content) + '</div>' : '')
+              + (plan && plan.content ? '<div style="font-size:10px;color:#374151;word-break:keep-all;">' + escapeHtml(plan.content) + '</div>' : '')
               + plannedDiff
-              + (check.memo ? '<div style="font-size:9px;color:#6366f1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:85px;">' + escapeHtml(check.memo) + '</div>' : '')
+              + (check.memo ? '<div style="font-size:9px;color:#6366f1;word-break:keep-all;">' + escapeHtml(check.memo) + '</div>' : '')
             + '</div>'
           + '</div></td>';
 
