@@ -65,7 +65,7 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
         notification: { title: title, body: body },
         data: { url: clickUrl || '', tag: tag || 'default' },
         webpush: {
-          fcm_options: { link: clickUrl || 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec' }
+          fcm_options: { link: clickUrl || _getSys(SpreadsheetApp.openById(SHEET_ID), '바로가기_수학교실') || '' }
         }
       }
     };
@@ -84,7 +84,7 @@ function sendPushToStudents(studentIds, title, body, tag, filterClass) {
   try {
     var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
     var data  = sheet.getDataRange().getValues();
-    var clickUrl = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+    var clickUrl = _getSys(SpreadsheetApp.openById(SHEET_ID), '바로가기_수학교실') || '';
     var sent = 0, skipped = 0;
     var idSet = studentIds ? new Set(studentIds.map(String)) : null;
     for (var i = 1; i < data.length; i++) {

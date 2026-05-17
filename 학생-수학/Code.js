@@ -382,12 +382,13 @@ function getDashboardData(studentId, studentName) {
       }
     });
 
-    return { 
-      history: history.reverse(), 
-      missingTasks: missingTasks, 
-      resubmitTasks: resubmitTasks, 
-      unreadFeedbacks: unreadFeedbacks, 
-      bestWorksMap: bestWorksMap
+    return {
+      history: history.reverse(),
+      missingTasks: missingTasks,
+      resubmitTasks: resubmitTasks,
+      unreadFeedbacks: unreadFeedbacks,
+      bestWorksMap: bestWorksMap,
+      fcmRegisterUrl: _getSysStudent('FCM_REGISTER_URL')
     };
 
   } catch(e) {
