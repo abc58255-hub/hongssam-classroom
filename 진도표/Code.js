@@ -684,7 +684,21 @@ function getSyllabusData(groupId) {
     // 수업 일정 계산 (시트 기록 없이 시간표+학기 설정으로 매번 계산)
     var schedule = _computeSchedule_(gid, ss);
 
-    return { success: true, plans: plans, checks: checks, classes: classes, examRanges: examRanges, schedule: schedule };
+    // 공휴일 날짜 수집 (학기설정 E열)
+    var holidayDates = {};
+    var holSemSh = ss.getSheetByName('학기설정');
+    if (holSemSh && holSemSh.getLastRow() >= 2) {
+      var holRows = holSemSh.getRange(2, 1, holSemSh.getLastRow() - 1, 5).getValues();
+      holRows.forEach(function(r) {
+        if (String(r[0]).trim() !== gid || !r[4]) return;
+        String(r[4]).split(',').forEach(function(d) {
+          var dt = d.trim();
+          if (dt) holidayDates[dt] = true;
+        });
+      });
+    }
+
+    return { success: true, plans: plans, checks: checks, classes: classes, examRanges: examRanges, schedule: schedule, holidays: holidayDates };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

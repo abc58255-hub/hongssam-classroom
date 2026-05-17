@@ -288,6 +288,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:7px;">취소 사유 <span style="font-weight:400;color:#f87171;">(선택)</span></div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="cr-btn" data-reason="" onclick="selectCancelReason('')">🚫 사유 없음</button>
+        <button class="cr-btn" data-reason="공휴일" onclick="selectCancelReason('공휴일')">🏖️ 공휴일</button>
         <button class="cr-btn" data-reason="학교행사" onclick="selectCancelReason('학교행사')">🎉 학교 행사</button>
         <button class="cr-btn" data-reason="체험학습" onclick="selectCancelReason('체험학습')">🏕️ 체험학습</button>
         <button class="cr-btn" data-reason="시험" onclick="selectCancelReason('시험')">📝 시험 기간</button>
@@ -405,6 +406,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 var sylPlanCache     = [];
 var sylCheckCache    = {};
 var sylScheduleCache = {};
+var sylHolidayCache  = {};
 var sylClassList     = [];
 var examRangeCache   = [];
 var allClasses       = [];
@@ -418,6 +420,7 @@ var _cancelReason    = '';      // '' | '학교행사' | '체험학습' | '시�
 var _openingExistingCheck = {}; // 모달 열 때의 기존 기록 (setScheduleAction에서 참조)
 
 var CANCEL_REASONS = {
+  '공휴일':  { emoji: '🏖️', label: '공휴일',    bg: '#fef2f2', color: '#dc2626' },
   '학교행사': { emoji: '🎉', label: '학교 행사',  bg: '#fef3c7', color: '#d97706' },
   '체험학습': { emoji: '🏕️', label: '체험학습',   bg: '#dcfce7', color: '#15803d' },
   '시험':    { emoji: '📝', label: '시험 기간',  bg: '#eff6ff', color: '#1d4ed8' },
@@ -553,6 +556,7 @@ function loadSyllabusData(forceTab) {
       sylPlanCache    = res.plans      || [];
       sylCheckCache   = res.checks     || {};
       sylScheduleCache= res.schedule   || {};
+      sylHolidayCache = res.holidays   || {};
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
       examRangeCache  = res.examRanges || [];
       var targetTab = forceTab || [1,2,3,4].find(function(i) {
@@ -615,11 +619,13 @@ function renderSylTable() {
     moveTargetSet[targetDate + '_' + keyCls] = true;
   });
 
-  // 표시할 날짜 합집합: 시간표 예정일 + 임시/이동됨 기록 날짜 + 이동 대상 날짜
+  // 표시할 날짜 합집합: 시간표 예정일 + 공휴일 + 임시/이동됨 기록 날짜 + 이동 대상 날짜
   var allDates = {};
   cols.forEach(function(cls) {
     (sylScheduleCache[cls]||[]).forEach(function(d){ allDates[d] = true; });
   });
+  // 공휴일도 표에 포함
+  Object.keys(sylHolidayCache).forEach(function(d){ allDates[d] = true; });
   Object.keys(sylCheckCache).forEach(function(key) {
     if (key.length < 11) return;
     var date  = key.substring(0, 10);
@@ -683,16 +689,29 @@ function renderSylTable() {
     prevMonday = curMonday;
 
     var dow = d.getDay();
-    var dayColor = dow === 0 ? '#dc2626' : dow === 6 ? '#2563eb' : '#1e293b';
+    var isHoliday = !!sylHolidayCache[dateStr];
+    var dayColor = (dow === 0 || isHoliday) ? '#dc2626' : dow === 6 ? '#2563eb' : '#1e293b';
+    var dateCellBg = isHoliday ? '#fef2f2' : wc.date;
     html += '<tr>'
-      + '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;background:' + wc.date + ';' + weekBorder + '">'
-        + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')</span>'
+      + '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;background:' + dateCellBg + ';' + weekBorder + '">'
+        + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')'
+        + (isHoliday ? ' <span style="font-size:11px;">🏖️</span>' : '') + '</span>'
       + '</td>';
 
     cols.forEach(function(cls) {
       var scheduled = (sylScheduleCache[cls]||[]).indexOf(dateStr) >= 0;
       var key   = dateStr + '_' + cls;
       var check = sylCheckCache[key];
+
+      // 공휴일: 학기설정에 등록된 날 (기록 없을 때만)
+      if (isHoliday && !scheduled && (!check || (!check.lessonNo && !check.status))) {
+        html += '<td style="text-align:center;padding:6px 4px;background:#fef2f2;' + weekBorder + '">'
+          + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
+            + '<span style="font-size:16px;">🏖️</span>'
+            + '<span style="font-size:9px;color:#dc2626;font-weight:700;">공휴일</span>'
+          + '</div></td>';
+        return;
+      }
 
       // 시간표에 없고 기록도 없으면 주차 틴트 빈 셀
       if (!scheduled && (!check || (!check.lessonNo && !check.status))) {
@@ -777,6 +796,7 @@ function renderSylTable() {
     + '<span style="background:#faf5ff;padding:1px 5px;border-radius:4px;color:#7c3aed;">✅ 이동됨 = 이동된 수업</span>'
     + '<span style="background:#fefce8;padding:1px 5px;border-radius:4px;color:#92400e;">✅ 추가 = 임시/보충</span>'
     + '<span>🔄 = 날짜 이동됨</span>'
+    + '<span style="background:#fef2f2;padding:1px 5px;border-radius:4px;color:#dc2626;">🏖️ = 공휴일</span>'
     + '<span>🚫 = 취소 &nbsp; 🎉=학교행사 &nbsp; 🏕️=체험학습 &nbsp; 📝=시험 &nbsp; 🤒=휴교</span>'
     + '<span>☐ = 미기록</span>'
     + '<span style="color:#94a3b8;">&nbsp;셀 클릭 → 기록 · 열 [+] → 수업 추가</span></div>';
