@@ -238,9 +238,7 @@ function createGroup(data) {
     var planId = String(data.planId || '기본').trim();
     sh.appendRow([id, data.name, (data.classes || []).join(','), today, planId]);
 
-    // 진도체크·시험범위 시트 생성 (진도계획은 공유 계획 시트를 참조)
     _ensureSh(ss, '진도체크_' + id, ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
-    _ensureSh(ss, '시험범위_' + id, ['시험명','차시목록'], '#f59e0b');
 
     return { success: true, id: id };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -275,11 +273,8 @@ function deleteGroup(id) {
         if (String(rows[i][0]).trim() === String(id).trim()) sh.deleteRow(i + 2);
       }
     }
-    // 진도체크·시험범위 시트 삭제 (이 그룹 전용)
-    ['진도체크_'+id, '시험범위_'+id].forEach(function(nm) {
-      var s = ss.getSheetByName(nm);
-      if (s) ss.deleteSheet(s);
-    });
+    var ckSh = ss.getSheetByName('진도체크_' + id);
+    if (ckSh) ss.deleteSheet(ckSh);
     // 진도계획 시트는 그룹 자체 계획인 경우만 삭제 (공유 계획은 유지)
     if (planId === id) {
       var ps = ss.getSheetByName('진도계획_' + id);
@@ -679,17 +674,6 @@ function getSyllabusData(groupId) {
       }
     }
 
-    // 시험범위
-    var examSh = _ensureSh(ss, _sn('시험범위', gid), ['시험명','차시목록'], '#f59e0b');
-    var examRanges = [];
-    if (examSh.getLastRow() >= 2) {
-      var ed = examSh.getRange(2, 1, examSh.getLastRow() - 1, 2).getValues();
-      ed.forEach(function(r) {
-        if (!r[0]) return;
-        examRanges.push({ name: String(r[0]).trim(), units: String(r[1]||'').trim() });
-      });
-    }
-
     // 수업 일정 계산 (시트 기록 없이 시간표+학기 설정으로 매번 계산)
     var schedule = _computeSchedule_(gid, ss);
 
@@ -707,7 +691,7 @@ function getSyllabusData(groupId) {
       });
     }
 
-    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, examRanges: examRanges, schedule: schedule, holidays: holidayDates };
+    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -777,29 +761,6 @@ function saveSylClassList(classes, groupId) {
       sh.getRange(2, 1).setValue(classes.join(','));
     } else {
       updateGroup({ id: gid, name: gid, classes: classes }); // classes만 업데이트
-    }
-    return { success: true };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
-
-function saveExamRange(data, groupId) {
-  try {
-    var gid = groupId || '기본';
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, _sn('시험범위', gid), ['시험명','차시목록'], '#f59e0b');
-    sh.appendRow([data.name, data.units]);
-    return { success: true };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
-
-function deleteExamRange(name, groupId) {
-  try {
-    var gid = groupId || '기본';
-    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(_sn('시험범위', gid));
-    if (!sh || sh.getLastRow() < 2) return { success: true };
-    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
-    for (var i = rows.length - 1; i >= 0; i--) {
-      if (String(rows[i][0]).trim() === String(name).trim()) sh.deleteRow(i + 2);
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }

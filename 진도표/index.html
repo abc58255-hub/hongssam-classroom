@@ -157,7 +157,6 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     <div class="tabs">
       <button id="tab-1" class="tab-btn active" onclick="switchTab(1)">📋 진도표</button>
       <button id="tab-2" class="tab-btn" onclick="switchTab(2)">📊 반별 현황</button>
-      <button id="tab-3" class="tab-btn" onclick="switchTab(3)">🎯 시험 범위</button>
       <button id="tab-4" class="tab-btn" onclick="switchTab(4)">📅 시간표 생성</button>
     </div>
 
@@ -171,19 +170,6 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     <!-- 탭2: 반별 현황 -->
     <div id="tab-content-2" style="display:none;">
       <div id="sylStatusBoard"></div>
-    </div>
-
-    <!-- 탭3: 시험 범위 -->
-    <div id="tab-content-3" style="display:none;">
-      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
-        <input type="text" id="examName" class="form-input" placeholder="시험명 (예: 1학기 중간고사)" style="flex:1;min-width:180px;">
-        <button class="btn btn-primary" onclick="saveExamRange()" style="padding:10px 16px;">저장</button>
-      </div>
-      <div style="background:white;border-radius:12px;padding:16px;border:1px solid #e2e8f0;margin-bottom:16px;">
-        <div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:10px;">시험 범위에 포함할 차시를 선택하세요</div>
-        <div id="examLessonCheckboxes" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
-      </div>
-      <div id="examRangeList"></div>
     </div>
 
     <!-- 탭4: 시간표 생성 -->
@@ -415,7 +401,6 @@ var sylScheduleCache = {};
 var sylHolidayCache  = {};
 var sylMovedInCache  = {};
 var sylClassList     = [];
-var examRangeCache   = [];
 var allClasses       = [];
 var currentGroupId   = '기본';
 var groupsCache      = [];
@@ -566,8 +551,7 @@ function loadSyllabusData(forceTab) {
       sylScheduleCache= res.schedule   || {};
       sylHolidayCache = res.holidays   || {};
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
-      examRangeCache  = res.examRanges || [];
-      var targetTab = forceTab || [1,2,3,4].find(function(i) {
+      var targetTab = forceTab || [1,2,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
         return el && el.style.display !== 'none';
       }) || 1;
@@ -578,7 +562,7 @@ function loadSyllabusData(forceTab) {
 
 // ─── 탭 전환 ───
 function switchTab(n) {
-  [1,2,3,4].forEach(function(i) {
+  [1,2,4].forEach(function(i) {
     var btn = document.getElementById('tab-' + i);
     var con = document.getElementById('tab-content-' + i);
     if (!btn || !con) return;
@@ -588,7 +572,6 @@ function switchTab(n) {
   });
   if (n === 1) renderSylTable();
   if (n === 2) renderSylStatusBoard();
-  if (n === 3) renderExamRangeTab();
   if (n === 4) loadTimetableTab();
 }
 
@@ -1439,58 +1422,6 @@ function renderSylStatusBoard() {
   board.innerHTML = html;
 }
 
-// ─── 시험 범위 ───
-function renderExamRangeTab() {
-  var box = document.getElementById('examLessonCheckboxes');
-  if (box) {
-    box.innerHTML = sylPlanCache.map(function(p) {
-      return '<label style="display:flex;align-items:center;gap:5px;background:#f8fafc;padding:5px 10px;border-radius:8px;font-size:12px;cursor:pointer;border:1px solid #e2e8f0;">' +
-        '<input type="checkbox" value="' + p.lessonNo + '" style="accent-color:#7c3aed;"> ' +
-        p.lessonNo + '차시' + (p.content ? ' · ' + escapeHtml(p.content.substring(0,14)) : '') + '</label>';
-    }).join('');
-  }
-  var listDiv = document.getElementById('examRangeList');
-  if (!listDiv) return;
-  if (!examRangeCache || examRangeCache.length === 0) {
-    listDiv.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">등록된 시험 범위가 없어요.</div>';
-    return;
-  }
-  listDiv.innerHTML = '<div style="font-size:13px;font-weight:700;color:#334155;margin-bottom:10px;">저장된 시험 범위</div>' +
-    examRangeCache.map(function(e) {
-      var lessons = e.units ? e.units.split(',').map(function(n){return parseInt(n.trim());}).filter(Boolean) : [];
-      var done = lessons.filter(function(no) {
-        var cls2 = sylClassList.length > 0 ? sylClassList : allClasses;
-        return cls2.some(function(c){ return sylCheckCache[no+'_'+c] && sylCheckCache[no+'_'+c].date; });
-      }).length;
-      return '<div style="background:white;border-radius:12px;padding:14px 16px;margin-bottom:8px;border:1px solid #e2e8f0;">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
-          '<div style="font-size:14px;font-weight:800;color:#7c3aed;">🎯 ' + escapeHtml(e.name) + '</div>' +
-          '<div style="font-size:11px;color:#64748b;">' + lessons.length + '차시 · 완료 ' + done + '차시</div>' +
-        '</div>' +
-        '<div style="display:flex;flex-wrap:wrap;gap:5px;">' +
-          lessons.map(function(no) {
-            var p = sylPlanCache.find(function(x){return x.lessonNo===no;});
-            return '<span style="background:#f5f3ff;color:#7c3aed;padding:3px 9px;border-radius:7px;font-size:12px;font-weight:600;">' +
-              no + '차시' + (p&&p.content?' · '+escapeHtml(p.content.substring(0,10)):'') + '</span>';
-          }).join('') +
-        '</div></div>';
-    }).join('');
-}
-
-function saveExamRange() {
-  var name = document.getElementById('examName').value.trim();
-  if (!name) return alert('시험명을 입력하세요.');
-  var units = Array.from(document.querySelectorAll('#examLessonCheckboxes input:checked')).map(function(b){return b.value;});
-  if (units.length === 0) return alert('차시를 선택하세요.');
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
-      document.getElementById('examName').value = '';
-      document.querySelectorAll('#examLessonCheckboxes input').forEach(function(b){b.checked=false;});
-      loadSyllabusData();
-    })
-    .saveExamRange({ name: name, units: units.join(',') }, currentGroupId);
-}
 
 
 // ═══════════════════════════════════════
@@ -1862,7 +1793,7 @@ function deleteCurrentGroup() {
   var gid = document.getElementById('groupModalId').value;
   if (!gid) return;
   var grp = groupsCache.find(function(g){ return g.id === gid; });
-  if (!confirm('"' + (grp ? grp.name : gid) + '" 그룹을 삭제할까요?\n이 그룹의 진도계획, 진도체크, 시험범위 시트도 모두 삭제됩니다.')) return;
+  if (!confirm('"' + (grp ? grp.name : gid) + '" 그룹을 삭제할까요?\n이 그룹의 진도계획, 진도체크 시트도 모두 삭제됩니다.')) return;
   google.script.run
     .withSuccessHandler(function(res) {
       if (!res.success) { alert('오류: ' + (res.message||'')); return; }
