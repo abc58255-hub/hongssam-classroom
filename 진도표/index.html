@@ -115,6 +115,11 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .actual-btn.active-none { background: #fefce8; border-color: #fde68a; color: #92400e; }
 .actual-btn.active-same { background: #dcfce7; border-color: #86efac; color: #065f46; }
 .actual-btn.active-diff { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+
+/* 취소 사유 칩 */
+.cr-btn { padding: 6px 11px; border: 2px solid #fecaca; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; background: #fff1f2; color: #b91c1c; transition: all 0.15s; white-space: nowrap; }
+.cr-btn:hover { border-color: #f87171; background: #fee2e2; }
+.cr-btn.active { background: #dc2626; border-color: #dc2626; color: white; }
 </style>
 </head>
 <body>
@@ -278,6 +283,18 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       </div>
     </div>
 
+    <!-- 취소 사유 (수업 취소 선택 시) -->
+    <div id="cancelReasonRow" style="display:none;margin-bottom:10px;background:#fff1f2;border-radius:10px;padding:10px 12px;border:1px solid #fecaca;">
+      <div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:7px;">취소 사유 <span style="font-weight:400;color:#f87171;">(선택)</span></div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="cr-btn" data-reason="" onclick="selectCancelReason('')">🚫 사유 없음</button>
+        <button class="cr-btn" data-reason="학교행사" onclick="selectCancelReason('학교행사')">🎉 학교 행사</button>
+        <button class="cr-btn" data-reason="체험학습" onclick="selectCancelReason('체험학습')">🏕️ 체험학습</button>
+        <button class="cr-btn" data-reason="시험" onclick="selectCancelReason('시험')">📝 시험 기간</button>
+        <button class="cr-btn" data-reason="휴교" onclick="selectCancelReason('휴교')">🤒 임시 휴교</button>
+      </div>
+    </div>
+
     <!-- 날짜 이동 대상 날짜 -->
     <div id="moveDateRow" style="display:none;margin-bottom:12px;background:#f5f3ff;border-radius:8px;padding:10px 12px;border:1px solid #c4b5fd;">
       <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:5px;">이동할 날짜 선택</div>
@@ -397,7 +414,28 @@ var plansCache       = [];
 var _editingPlanId   = null;
 var _scheduleAction  = 'normal'; // 'normal' | 'cancel' | 'move'
 var _actualMode      = 'none';  // 'none' | 'same' | 'diff'
+var _cancelReason    = '';      // '' | '학교행사' | '체험학습' | '시험' | '휴교'
 var _openingExistingCheck = {}; // 모달 열 때의 기존 기록 (setScheduleAction에서 참조)
+
+var CANCEL_REASONS = {
+  '학교행사': { emoji: '🎉', label: '학교 행사',  bg: '#fef3c7', color: '#d97706' },
+  '체험학습': { emoji: '🏕️', label: '체험학습',   bg: '#dcfce7', color: '#15803d' },
+  '시험':    { emoji: '📝', label: '시험 기간',  bg: '#eff6ff', color: '#1d4ed8' },
+  '휴교':    { emoji: '🤒', label: '임시 휴교',  bg: '#fdf4ff', color: '#7c3aed' },
+};
+
+function _cancelStatusInfo(status) {
+  if (!status || status.indexOf('취소') !== 0) return null;
+  var code = status.indexOf(':') > 0 ? status.substring(status.indexOf(':') + 1) : '';
+  return CANCEL_REASONS[code] || { emoji: '🚫', label: '취소', bg: '#fff1f2', color: '#dc2626' };
+}
+
+function selectCancelReason(code) {
+  _cancelReason = code;
+  document.querySelectorAll('#cancelReasonRow .cr-btn').forEach(function(btn) {
+    btn.className = 'cr-btn' + (btn.dataset.reason === code ? ' active' : '');
+  });
+}
 var semestersCache   = [];
 var timetableCache   = [];
 
@@ -665,11 +703,12 @@ function renderSylTable() {
       var status = check ? (check.status || '') : '';
 
       var wbStyle = weekBorder ? 'border-top:2px solid rgba(0,0,0,0.1);' : '';
-      if (status === '취소') {
-        html += '<td style="text-align:center;padding:6px 4px;background:#fff1f2;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="수업 취소 (클릭하여 수정)">'
+      if (status.indexOf('취소') === 0) {
+        var cInfo = _cancelStatusInfo(status);
+        html += '<td style="text-align:center;padding:6px 4px;background:' + cInfo.bg + ';cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="' + cInfo.label + ' (클릭하여 수정)">'
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
-            + '<span style="font-size:17px;">🚫</span>'
-            + '<span style="font-size:9px;color:#dc2626;font-weight:700;">취소</span>'
+            + '<span style="font-size:17px;">' + cInfo.emoji + '</span>'
+            + '<span style="font-size:9px;color:' + cInfo.color + ';font-weight:700;">' + escapeHtml(cInfo.label) + '</span>'
             + (check.memo ? '<span style="font-size:9px;color:#94a3b8;word-break:keep-all;">' + escapeHtml(check.memo) + '</span>' : '')
           + '</div></td>';
 
@@ -738,7 +777,7 @@ function renderSylTable() {
     + '<span style="background:#faf5ff;padding:1px 5px;border-radius:4px;color:#7c3aed;">✅ 이동됨 = 이동된 수업</span>'
     + '<span style="background:#fefce8;padding:1px 5px;border-radius:4px;color:#92400e;">✅ 추가 = 임시/보충</span>'
     + '<span>🔄 = 날짜 이동됨</span>'
-    + '<span>🚫 = 수업 취소</span>'
+    + '<span>🚫 = 취소 &nbsp; 🎉=학교행사 &nbsp; 🏕️=체험학습 &nbsp; 📝=시험 &nbsp; 🤒=휴교</span>'
     + '<span>☐ = 미기록</span>'
     + '<span style="color:#94a3b8;">&nbsp;셀 클릭 → 기록 · 열 [+] → 수업 추가</span></div>';
   wrap.innerHTML = html;
@@ -764,8 +803,10 @@ function openCheckDate(date, cls) {
   if (isScheduled) {
     document.getElementById('scheduleActionRow').style.display = 'block';
     var initAction = 'normal';
-    if (status === '취소') initAction = 'cancel';
+    if (status.indexOf('취소') === 0) initAction = 'cancel';
     else if (status.indexOf('이동:') === 0) initAction = 'move';
+    // 취소 사유 복원
+    _cancelReason = (initAction === 'cancel' && status.indexOf(':') > 0) ? status.substring(status.indexOf(':') + 1) : '';
     setScheduleAction(initAction);
     document.getElementById('moveDateInput').value = (initAction === 'move') ? status.substring(3) : '';
   } else {
@@ -777,7 +818,7 @@ function openCheckDate(date, cls) {
   }
 
   document.getElementById('checkMemo').value = existing.memo || '';
-  var hasRecord = !!(existing.lessonNo || existing.plannedLessonNo || status === '취소' || status.indexOf('이동:') === 0);
+  var hasRecord = !!(existing.lessonNo || existing.plannedLessonNo || status.indexOf('취소') === 0 || status.indexOf('이동:') === 0);
   document.getElementById('checkCancelBtn').style.display = hasRecord ? 'inline-block' : 'none';
   document.getElementById('checkDateModal').classList.add('open');
 }
@@ -790,8 +831,10 @@ function openAddExtra(cls) {
   document.getElementById('extraDateRow').style.display = 'block';
   document.getElementById('extraDateInput').value = '';
   document.getElementById('scheduleActionRow').style.display = 'none';
+  document.getElementById('cancelReasonRow').style.display = 'none';
   document.getElementById('moveDateRow').style.display = 'none';
   _scheduleAction = 'normal';
+  _cancelReason = '';
   _openingExistingCheck = {};
   _showSimpleUI('수업한 차시 번호', 0);
   document.getElementById('checkMemo').value = '';
@@ -809,6 +852,9 @@ function setScheduleAction(action) {
     btn.className = 'action-btn' + (action === a.toLowerCase() ? ' active-' + a.toLowerCase() : '');
   });
   document.getElementById('moveDateRow').style.display = action === 'move' ? 'block' : 'none';
+
+  document.getElementById('cancelReasonRow').style.display = action === 'cancel' ? 'block' : 'none';
+  if (action === 'cancel') selectCancelReason(_cancelReason);
 
   var lessonSection = document.getElementById('lessonInputSection');
   if (action === 'cancel') {
@@ -1032,11 +1078,12 @@ function confirmCheck() {
   var memo = document.getElementById('checkMemo').value.trim();
 
   if (action === 'cancel') {
+    var cancelStatus = _cancelReason ? '취소:' + _cancelReason : '취소';
     document.getElementById('checkDateModal').classList.remove('open');
-    sylCheckCache[date + '_' + cls] = { lessonNo: 0, plannedLessonNo: 0, memo: memo, status: '취소' };
+    sylCheckCache[date + '_' + cls] = { lessonNo: 0, plannedLessonNo: 0, memo: memo, status: cancelStatus };
     renderSylTable();
     google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
-      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, plannedLessonNo: 0, memo: memo, status: '취소' }, currentGroupId);
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, plannedLessonNo: 0, memo: memo, status: cancelStatus }, currentGroupId);
     return;
   }
 
@@ -1199,7 +1246,7 @@ function renderSylStatusBoard() {
       var ch = sylCheckCache[d + '_' + cls];
       if (!ch) return;
       var st = ch.status || '';
-      if (st === '취소' || st.indexOf('이동:') === 0) { cancelled++; }
+      if (st.indexOf('취소') === 0 || st.indexOf('이동:') === 0) { cancelled++; }
       else if (ch.lessonNo) { done++; lastDoneDate = d; lastLessonNo = ch.lessonNo; }
     });
     // 임시 추가 수업도 done에 포함
