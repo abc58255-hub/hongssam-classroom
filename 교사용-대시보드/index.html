@@ -6005,102 +6005,369 @@
     });
     document.getElementById('svViewContent').innerHTML = cHtml;
   }
+  // ══════════════════════════════════════════════════════
+  // 통계 대시보드 — 3가지 모드
+  // ══════════════════════════════════════════════════════
   function renderCompletionSummary() {
     var classF = document.getElementById('classFilter').value;
-    var taskF = document.getElementById('taskFilter').value;
-    var summaryDiv = document.getElementById('completionSummary');
-    
-    if (taskF === 'all' || !taskF) { 
-      summaryDiv.style.display = 'none'; 
-      return; 
+    var taskF  = document.getElementById('taskFilter').value;
+    var div = document.getElementById('completionSummary');
+    if (!div) return;
+
+    var isAllClass = (classF === 'all' || !classF);
+    var isAllTask  = (taskF  === 'all' || !taskF);
+
+    if (isAllTask) {
+      div.style.display = 'block';
+      div.className = '';
+      isAllClass ? _renderOverallDashboard(div) : _renderClassDashboard(div, classF);
+    } else {
+      div.style.display = 'flex';
+      div.className = 'completion-summary';
+      _renderTaskDashboard(div, taskF, isAllClass ? null : classF);
     }
-    
-    // 1. 선택된 반의 전체 학생 명단 가져오기 (총 인원의 기준)
+  }
+
+  // ── 공통 헬퍼 ──
+  function _idToCls(id) {
+    var s = String(id || '');
+    return s.length >= 2 ? s.substring(0,1) + '학년 ' + s.substring(1,2) + '반' : '';
+  }
+  function _cleanTask(t) { return String(t || '').split(' (')[0]; }
+  function _avg(nums) {
+    if (!nums.length) return null;
+    return (nums.reduce(function(a,b){return a+b;},0) / nums.length).toFixed(1);
+  }
+  function _bar(pct, color, h) {
+    h = h || 6;
+    return '<div style="height:' + h + 'px;border-radius:3px;background:#e2e8f0;overflow:hidden;margin-top:4px;">'
+      + '<div style="height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px;transition:width 0.4s;"></div></div>';
+  }
+  function _kpi(num, label, color, sub, clickFn) {
+    var base = 'background:white;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;'
+      + 'border-left:4px solid ' + color + ';' + (clickFn ? 'cursor:pointer;' : '');
+    return '<div style="' + base + '"' + (clickFn ? ' onclick="' + clickFn + '"' : '') + '>'
+      + '<div style="font-size:24px;font-weight:900;color:' + color + ';">' + num + '</div>'
+      + '<div style="font-size:11px;color:#64748b;font-weight:600;margin-top:2px;">' + label + '</div>'
+      + (sub ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">' + sub + '</div>' : '')
+      + '</div>';
+  }
+  function _secTitle(txt) {
+    return '<div style="font-size:13px;font-weight:800;color:#0f172a;margin:14px 0 8px;display:flex;align-items:center;gap:6px;">' + txt + '</div>';
+  }
+
+  // ── 통합 데이터 계산 ──
+  function _computeAllStats(filterCls) {
+    // taskStudentMap[taskName][studentId] = latest submission
+    var tsm = {};
+    allSubmissions.forEach(function(s) {
+      if (s.status === '이전기록채점완료') return;
+      var tn = _cleanTask(s.task);
+      var sc = _idToCls(s.id);
+      if (filterCls && sc !== filterCls) return;
+      if (!tsm[tn]) tsm[tn] = {};
+      if (!tsm[tn][s.id] || s.rowIdx > tsm[tn][s.id].rowIdx) tsm[tn][s.id] = s;
+    });
+
+    var roster = filterCls ? allRoster.filter(function(s){return s.cls===filterCls;}) : allRoster;
+    var clsList = filterCls ? [filterCls] : (classList.length ? classList : []);
+
+    // Per-class stats
+    var clsStats = {};
+    clsList.forEach(function(cls) {
+      var studs = allRoster.filter(function(s){return s.cls===cls;});
+      clsStats[cls] = { total: studs.length, submitted:0, graded:0, pending:0, resub:0, noSub:0, scores:[], students: studs };
+    });
+
+    // Per-task stats
+    var tStats = {};
+    allTasks.forEach(function(t) {
+      tStats[t.name] = { submitted:0, graded:0, pending:0, resub:0, scores:[], noSubList:[], evalType: t.evalType };
+    });
+
+    // Global counters
+    var gTotal=0, gGraded=0, gPending=0, gResub=0, gNoSub=0;
+    var waitMap={}, resubMap={}, noSubMap={};
+
+    // Process submissions
+    Object.keys(tsm).forEach(function(tn) {
+      var subs = tsm[tn];
+      Object.keys(subs).forEach(function(sid) {
+        var sub = subs[sid];
+        var cls = _idToCls(sid);
+        var st  = sub.status || '';
+        var sc  = parseFloat(sub.score);
+        var label = sid + ' ' + sub.name;
+        gTotal++;
+        if (st === '채점완료') { gGraded++; if (clsStats[cls]) { clsStats[cls].graded++; clsStats[cls].submitted++; } if (tStats[tn]) tStats[tn].graded++; }
+        else if (st === '재제출요청') { gResub++; if (clsStats[cls]) { clsStats[cls].resub++; clsStats[cls].submitted++; } if (tStats[tn]) tStats[tn].resub++;
+          if (!resubMap[label]) resubMap[label] = []; resubMap[label].push(tn); }
+        else { gPending++; if (clsStats[cls]) { clsStats[cls].pending++; clsStats[cls].submitted++; } if (tStats[tn]) tStats[tn].pending++;
+          if (!waitMap[label]) waitMap[label] = []; waitMap[label].push(tn); }
+        if (!isNaN(sc)) { if (clsStats[cls]) clsStats[cls].scores.push(sc); if (tStats[tn]) tStats[tn].scores.push(sc); }
+      });
+    });
+
+    // No-submission: roster × tasks
+    roster.forEach(function(stu) {
+      allTasks.forEach(function(t) {
+        var tn = t.name;
+        var sub = (tsm[tn] || {})[stu.id];
+        if (!sub) {
+          gNoSub++;
+          var cls = stu.cls;
+          if (clsStats[cls]) clsStats[cls].noSub++;
+          if (tStats[tn]) tStats[tn].noSubList.push(stu.id + ' ' + stu.name);
+          var key = stu.id + ' ' + stu.name;
+          if (!noSubMap[key]) noSubMap[key] = []; noSubMap[key].push(tn);
+        }
+      });
+    });
+
+    // Submission rate per class (across all tasks)
+    clsList.forEach(function(cls) {
+      var st = clsStats[cls];
+      var expected = st.total * allTasks.length;
+      st.submissionRate = expected > 0 ? Math.round(st.submitted / expected * 100) : 0;
+      st.gradingRate    = st.submitted > 0 ? Math.round(st.graded / st.submitted * 100) : 0;
+      st.avgScore = _avg(st.scores);
+    });
+
+    // Submission rate per task
+    allTasks.forEach(function(t) {
+      var ts = tStats[t.name];
+      var totalStu = roster.length;
+      ts.submissionRate = totalStu > 0 ? Math.round(ts.submitted / totalStu * 100) : 0;
+      ts.gradingRate    = ts.submitted > 0 ? Math.round(ts.graded / ts.submitted * 100) : 0;
+      ts.avgScore = _avg(ts.scores);
+    });
+
+    return { clsStats:clsStats, tStats:tStats, clsList:clsList, roster:roster,
+             gTotal:gTotal, gGraded:gGraded, gPending:gPending, gResub:gResub, gNoSub:gNoSub,
+             waitMap:waitMap, resubMap:resubMap, noSubMap:noSubMap };
+  }
+
+  // ── MODE 1: 전체 현황 대시보드 ──
+  function _renderOverallDashboard(div) {
+    if (!allTasks || !allTasks.length || !allRoster || !allRoster.length) {
+      div.innerHTML = '<div style="text-align:center;padding:24px;color:#94a3b8;font-size:13px;">데이터를 불러오는 중이거나 과제/학생명부가 없습니다.</div>';
+      return;
+    }
+    var s = _computeAllStats(null);
+    var gradePct = s.gTotal > 0 ? Math.round(s.gGraded / s.gTotal * 100) : 0;
+
+    // ① KPI Row
+    var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-bottom:18px;">'
+      + _kpi(s.gTotal, '총 제출 건수', '#6366f1', '전체 과제 합산')
+      + _kpi(gradePct + '%', '채점 완료율', '#10b981', s.gGraded + '/' + s.gTotal + '건',
+          '_csClick("채점 완료 건수 합계","all","all")')
+      + _kpi(s.gPending, '채점 대기', '#3b82f6', '빠른 채점 필요',
+          '_csClickMap("채점 대기",_lastStats.waitMap)')
+      + _kpi(s.gResub, '재제출 대기', '#f59e0b', '학생 재제출 완료',
+          '_csClickMap("재제출 대기",_lastStats.resubMap)')
+      + _kpi(s.gNoSub, '미제출 (과제×학생)', '#ef4444', '전체 과제 기준',
+          '_csClickMap("미제출",_lastStats.noSubMap)')
+      + '</div>';
+
+    // ② 반별 현황 (bar table)
+    var clsRows = s.clsList.map(function(cls) {
+      var cs = s.clsStats[cls];
+      var avgTxt = cs.avgScore !== null ? ' · 평균 <b style="color:#6366f1;">' + cs.avgScore + '점</b>' : '';
+      var pendBadge = cs.pending > 0 ? '<span style="background:#dbeafe;color:#1d4ed8;border-radius:6px;padding:1px 6px;font-size:10px;margin-left:4px;">' + cs.pending + '건 대기</span>' : '';
+      var resubBadge = cs.resub > 0 ? '<span style="background:#fef3c7;color:#b45309;border-radius:6px;padding:1px 6px;font-size:10px;margin-left:4px;">' + cs.resub + '건 재제출</span>' : '';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;">'
+          + '<span style="font-weight:700;color:#0f172a;min-width:80px;">' + cls + '</span>'
+          + '<span style="color:#64748b;">' + cs.total + '명 · 제출률 <b>' + cs.submissionRate + '%</b> · 완료 <b style="color:#10b981;">' + cs.gradingRate + '%</b>' + avgTxt + pendBadge + resubBadge + '</span>'
+        + '</div>'
+        + _bar(cs.submissionRate, '#6366f1', 5) + '</div>';
+    }).join('');
+
+    // ③ 과제별 현황
+    var taskRows = allTasks.map(function(t) {
+      var ts = s.tStats[t.name] || {};
+      var avgTxt = ts.avgScore !== null && ts.avgScore !== undefined ? ' · 평균 <b style="color:#6366f1;">' + ts.avgScore + '점</b>' : '';
+      var noSubCount = (ts.noSubList || []).length;
+      var noSubBadge = noSubCount > 0 ? '<span style="background:#fee2e2;color:#dc2626;border-radius:6px;padding:1px 6px;font-size:10px;margin-left:4px;">' + noSubCount + '명 미제출</span>' : '';
+      var pendBadge = ts.pending > 0 ? '<span style="background:#dbeafe;color:#1d4ed8;border-radius:6px;padding:1px 6px;font-size:10px;margin-left:4px;">' + ts.pending + '건 대기</span>' : '';
+      return '<div style="padding:8px 0;border-bottom:1px solid #f1f5f9;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;">'
+          + '<span style="font-weight:700;color:#0f172a;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + t.name + '">' + t.name + '</span>'
+          + '<span style="color:#64748b;text-align:right;">제출 <b>' + ts.submissionRate + '%</b> · 완료 <b style="color:#10b981;">' + ts.gradingRate + '%</b>' + avgTxt + noSubBadge + pendBadge + '</span>'
+        + '</div>'
+        + _bar(ts.gradingRate, '#10b981', 5) + '</div>';
+    }).join('');
+
+    // ④ 분석 인사이트
+    var insights = [];
+    // 제출률 낮은 반
+    var sortedCls = s.clsList.slice().sort(function(a,b){ return s.clsStats[a].submissionRate - s.clsStats[b].submissionRate; });
+    if (sortedCls.length) {
+      var lowest = sortedCls[0]; var lRate = s.clsStats[lowest].submissionRate;
+      var highest = sortedCls[sortedCls.length-1]; var hRate = s.clsStats[highest].submissionRate;
+      if (lRate < 80) insights.push('📉 <b>' + lowest + '</b> 제출률이 <b style="color:#ef4444;">' + lRate + '%</b>로 가장 낮습니다. 미제출 학생 확인이 필요합니다.');
+      if (hRate >= 95) insights.push('🏆 <b>' + highest + '</b>이 제출률 <b style="color:#10b981;">' + hRate + '%</b>로 가장 우수합니다.');
+    }
+    // 채점 대기 많은 과제
+    var pendingTasks = allTasks.filter(function(t){ return (s.tStats[t.name]||{}).pending > 0; });
+    pendingTasks.sort(function(a,b){ return (s.tStats[b.name].pending||0)-(s.tStats[a.name].pending||0); });
+    if (pendingTasks.length) insights.push('⏰ <b>' + pendingTasks[0].name + '</b>의 채점 대기가 <b style="color:#3b82f6;">' + s.tStats[pendingTasks[0].name].pending + '건</b>으로 가장 많습니다.');
+    // 재제출
+    if (s.gResub > 0) insights.push('🔁 재제출 대기 <b style="color:#f59e0b;">' + s.gResub + '건</b>이 있습니다. 확인 후 채점하세요.');
+    // 모든 채점 완료
+    if (s.gPending === 0 && s.gResub === 0 && s.gTotal > 0) insights.push('✅ 현재 채점 대기 제출물이 없습니다. 모두 처리 완료!');
+    if (!insights.length) insights.push('📊 데이터가 충분히 쌓이면 분석 결과가 표시됩니다.');
+
+    var insightHtml = insights.map(function(txt){
+      return '<div style="font-size:12px;color:#374151;padding:5px 8px;background:#f8fafc;border-radius:6px;border-left:3px solid #6366f1;">' + txt + '</div>';
+    }).join('');
+
+    div.innerHTML = '<div style="background:white;border-radius:16px;padding:20px;border:1px solid #e2e8f0;margin-bottom:16px;">'
+      + '<div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:16px;">📊 전체 현황 요약</div>'
+      + kpiHtml
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">'
+        + '<div>' + _secTitle('📋 반별 현황') + clsRows + '</div>'
+        + '<div>' + _secTitle('📌 과제별 현황') + taskRows + '</div>'
+      + '</div>'
+      + '<div style="margin-top:16px;padding-top:14px;border-top:1px solid #f1f5f9;">'
+        + _secTitle('💡 분석 결과')
+        + '<div style="display:flex;flex-direction:column;gap:6px;">' + insightHtml + '</div>'
+      + '</div>'
+      + '</div>';
+
+    window._lastStats = s;
+  }
+
+  // ── MODE 2: 반별 대시보드 ──
+  function _renderClassDashboard(div, cls) {
+    if (!allTasks || !allRoster) { div.innerHTML = ''; return; }
+    var s = _computeAllStats(cls);
+    var cs = s.clsStats[cls] || {};
+    var gradePct = cs.submitted > 0 ? Math.round(cs.graded / cs.submitted * 100) : 0;
+    var avgTxt = cs.avgScore !== null && cs.avgScore !== undefined ? cs.avgScore + '점' : '-';
+
+    var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px;">'
+      + _kpi(cs.total || 0, '총 학생 수', '#6366f1')
+      + _kpi((cs.submissionRate||0) + '%', '과제 제출률', '#10b981', cs.submitted + '/' + (cs.total * allTasks.length) + '건')
+      + _kpi(gradePct + '%', '채점 완료율', '#3b82f6', cs.graded + '/' + cs.submitted + '건')
+      + _kpi(avgTxt, '평균 점수', '#f59e0b', '점수제 과제 기준')
+      + _kpi(cs.pending||0, '채점 대기', '#ef4444', '', '_csClickMap("채점 대기",_lastStats.waitMap)')
+      + '</div>';
+
+    // 과제별 세부 현황
+    var taskRows = allTasks.map(function(t) {
+      var ts = s.tStats[t.name] || {};
+      var studs = cs.students || [];
+      var tn = t.name;
+      var noSubStuds = studs.filter(function(stu){ return !(window._lastStats && window._lastStats.noSubMap) ? false : (s.noSubMap[stu.id + ' ' + stu.name] || []).indexOf(tn) >= 0; });
+      var noSub = (ts.noSubList || []).length;
+      return '<div style="padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:12px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+          + '<span style="font-weight:700;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + t.name + '">' + t.name + '</span>'
+          + '<span style="color:#64748b;">제출 <b>' + ts.submissionRate + '%</b> · 완료 <b style="color:#10b981;">' + ts.gradingRate + '%</b>'
+            + (ts.avgScore ? ' · 평균 <b style="color:#6366f1;">' + ts.avgScore + '점</b>' : '')
+            + (noSub > 0 ? ' · <span style="color:#dc2626;font-weight:700;cursor:pointer;" onclick=\'showStatDetail("미제출",' + JSON.stringify(ts.noSubList || []) + ')\'>' + noSub + '명 미제출</span>' : '')
+          + '</span>'
+        + '</div>'
+        + _bar(ts.gradingRate, '#10b981', 5) + '</div>';
+    }).join('');
+
+    // 미제출 학생 목록 (가장 많이 미제출인 순)
+    var noSubStudents = (cs.students || []).map(function(stu) {
+      var key = stu.id + ' ' + stu.name;
+      var missing = (s.noSubMap[key] || []);
+      return { label: key, count: missing.length, tasks: missing };
+    }).filter(function(x){ return x.count > 0; }).sort(function(a,b){ return b.count - a.count; });
+
+    var noSubHtml = noSubStudents.length === 0
+      ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">모든 학생이 모든 과제를 제출했습니다! ✅</div>'
+      : noSubStudents.map(function(x){
+          return '<div style="display:inline-flex;align-items:center;gap:4px;background:#f1f5f9;border-radius:8px;padding:4px 10px;margin:3px;font-size:12px;">'
+            + '<span style="font-weight:700;">' + x.label + '</span>'
+            + '<span style="color:#ef4444;font-weight:800;">' + x.count + '개 미제출</span></div>';
+        }).join('');
+
+    div.innerHTML = '<div style="background:white;border-radius:16px;padding:20px;border:1px solid #e2e8f0;margin-bottom:16px;">'
+      + '<div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:14px;">📋 ' + cls + ' 현황</div>'
+      + kpiHtml
+      + _secTitle('📌 과제별 세부 현황')
+      + taskRows
+      + _secTitle('🚨 미제출 학생')
+      + '<div style="flex-wrap:wrap;display:flex;">' + noSubHtml + '</div>'
+      + '</div>';
+
+    window._lastStats = s;
+  }
+
+  // ── MODE 3: 과제+반 대시보드 (기존 뷰 개선) ──
+  function _renderTaskDashboard(div, taskF, classF) {
     var rosterBase = allRoster.filter(function(s) {
-      if (classF !== 'all' && s.cls !== classF) return false;
-      return true;
+      return !classF || s.cls === classF;
     });
     var total = rosterBase.length;
-
-    // 2. 해당 과제와 일치하는 제출물 필터링
     var baseSubs = allSubmissions.filter(function(i) {
-      var tName = String(i.task).split(' (')[0];
-      var safeId = String(i.id || "");
-      var sCls = safeId.length >= 2 ? (safeId.substring(0,1) + '학년 ' + safeId.substring(1,2) + '반') : '';
-      return tName === taskF && (classF === 'all' || sCls === classF);
+      var tn = _cleanTask(i.task);
+      var sc = _idToCls(i.id);
+      return tn === taskF && (!classF || sc === classF);
     });
-
-    // 3. 학생별로 가장 "최근" 제출물 딱 1개만 추려내기 (중복 카운트 방지)
-    var latestSubsMap = {};
-    baseSubs.forEach(function(sub) {
-      var sid = sub.id;
-      // 최신 제출물(rowIdx가 더 큰 것)로 덮어쓰기
-      if (!latestSubsMap[sid] || sub.rowIdx > latestSubsMap[sid].rowIdx) {
-        latestSubsMap[sid] = sub;
-      }
+    var latestMap = {};
+    baseSubs.forEach(function(s) {
+      if (!latestMap[s.id] || s.rowIdx > latestMap[s.id].rowIdx) latestMap[s.id] = s;
     });
-
-    // 4. 학생 1명당 정확히 1개의 상태로 분류하기 (명단 저장용)
-    var doneList = [];
-    var waitList = [];
-    var resubList = [];
-    var noSubList = [];
-
+    var doneList=[], waitList=[], resubList=[], noSubList=[], scores=[];
     rosterBase.forEach(function(stu) {
-      var latestSub = latestSubsMap[stu.id];
+      var sub = latestMap[stu.id];
       var label = stu.id + ' ' + stu.name;
-
-      if (!latestSub) {
-        // 아예 제출한 적이 없는 경우 -> 완벽한 미제출
-        noSubList.push(label);
-      } else {
-        var st = latestSub.status;
-        if (st === '채점완료' || st === '이전기록채점완료') {
-          doneList.push(label);
-        } else if (st === '재제출요청') {
-          resubList.push(label);
-        } else {
-          // 대기중, 채점중, 반려검토 등은 모두 채점 대기로 분류
-          waitList.push(label);
-        }
-      }
+      if (!sub) { noSubList.push(label); return; }
+      var st = sub.status;
+      var sc = parseFloat(sub.score);
+      if (!isNaN(sc)) scores.push(sc);
+      if (st === '채점완료' || st === '이전기록채점완료') doneList.push(label);
+      else if (st === '재제출요청') resubList.push(label);
+      else waitList.push(label);
     });
+    var done=doneList.length, wait=waitList.length, resub=resubList.length, noSub=noSubList.length;
+    var pct = total > 0 ? Math.round(done/total*100) : 0;
+    var avg = _avg(scores);
 
-    // 5. 계산된 정확한 사람 인원수 적용
-    var done = doneList.length;
-    var submitted = waitList.length;
-    var resubmit = resubList.length;
-    var notSubmitted = noSubList.length;
+    div.innerHTML =
+      '<div class="completion-box" style="flex:2; border-left:4px solid #10b981;">'
+        + '<div class="cb-num" style="color:#10b981;">' + pct + '%</div>'
+        + '<div class="cb-label">채점 완료율 (' + done + '/' + total + '명)</div>'
+        + '<div class="completion-bar"><div class="completion-bar-fill" style="width:' + pct + '%;background:#10b981;"></div></div>'
+      + '</div>'
+      + (avg !== null ? '<div class="completion-box" style="border-left:4px solid #6366f1;">'
+          + '<div class="cb-num" style="color:#6366f1;">' + avg + '</div>'
+          + '<div class="cb-label">평균 점수</div>'
+        + '</div>' : '')
+      + '<div id="cbWait" class="completion-box" style="border-left:4px solid #3b82f6;cursor:pointer;">'
+        + '<div class="cb-num" style="color:#3b82f6;">' + wait + '</div>'
+        + '<div class="cb-label">채점 대기 <span style="font-size:10px;">▾</span></div>'
+      + '</div>'
+      + '<div id="cbResub" class="completion-box" style="border-left:4px solid #f59e0b;cursor:pointer;">'
+        + '<div class="cb-num" style="color:#f59e0b;">' + resub + '</div>'
+        + '<div class="cb-label">재제출 대기 <span style="font-size:10px;">▾</span></div>'
+      + '</div>'
+      + '<div id="cbNoSub" class="completion-box" style="border-left:4px solid #ef4444;cursor:pointer;">'
+        + '<div class="cb-num" style="color:#ef4444;">' + noSub + '</div>'
+        + '<div class="cb-label">미제출 <span style="font-size:10px;">▾</span></div>'
+      + '</div>';
 
-    var pct = total > 0 ? Math.round((done / total) * 100) : 0;
-
-    // UI 렌더링
-    summaryDiv.style.display = 'flex';
-    summaryDiv.innerHTML =
-      '<div class="completion-box" style="flex:2; border-left:4px solid #10b981;">' +
-        '<div class="cb-num" style="color:#10b981;">' + pct + '%</div>' +
-        '<div class="cb-label">채점 완료율 (' + done + '/' + total + '명)</div>' +
-        '<div class="completion-bar"><div class="completion-bar-fill" style="width:' + pct + '%; background:#10b981;"></div></div>' +
-      '</div>' +
-      '<div id="cbWait" class="completion-box" style="border-left:4px solid #3b82f6; cursor:pointer;">' +
-        '<div class="cb-num" style="color:#3b82f6;">' + submitted + '</div>' +
-        '<div class="cb-label">채점 대기 <span style="font-size:10px;">▾</span></div>' +
-      '</div>' +
-      '<div id="cbResub" class="completion-box" style="border-left:4px solid #f59e0b; cursor:pointer;">' +
-        '<div class="cb-num" style="color:#f59e0b;">' + resubmit + '</div>' +
-        '<div class="cb-label">재제출 대기 <span style="font-size:10px;">▾</span></div>' +
-      '</div>' +
-      '<div id="cbNoSub" class="completion-box" style="border-left:4px solid #ef4444; cursor:pointer;">' +
-        '<div class="cb-num" style="color:#ef4444;">' + notSubmitted + '</div>' +
-        '<div class="cb-label">미제출 <span style="font-size:10px;">▾</span></div>' +
-      '</div>';
-
-    // 팝업 클릭 이벤트 (DOM 렌더링 후 작동하도록 지연 실행)
     setTimeout(function(){
-      var w = document.getElementById('cbWait');   if(w) w.onclick = function(){ showStatDetail('채점 대기', waitList); };
-      var r = document.getElementById('cbResub');  if(r) r.onclick = function(){ showStatDetail('재제출 대기', resubList); };
-      var n = document.getElementById('cbNoSub');  if(n) n.onclick = function(){ showStatDetail('미제출', noSubList); };
+      var w=document.getElementById('cbWait');   if(w) w.onclick=function(){showStatDetail('채점 대기',waitList);};
+      var r=document.getElementById('cbResub');  if(r) r.onclick=function(){showStatDetail('재제출 대기',resubList);};
+      var n=document.getElementById('cbNoSub');  if(n) n.onclick=function(){showStatDetail('미제출',noSubList);};
     }, 50);
+  }
+
+  // ── 통계 팝업 클릭 헬퍼 ──
+  function _csClickMap(title, map) {
+    if (!map) return;
+    var list = Object.keys(map).map(function(k){ return k + ' (' + map[k].join(', ') + ')'; });
+    showStatDetail(title, list);
+  }
+  function _csClick(title) {
+    alert(title + ': 클릭 시 세부 목록을 확인하세요.');
   }
   function closeStatPopup() {
     var p = document.getElementById('statDetailPopup');
