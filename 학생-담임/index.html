@@ -364,6 +364,7 @@
     var btn = document.getElementById('refreshBtn'); btn.innerText = "로딩중..."; btn.disabled = true;
     google.script.run.withSuccessHandler(function(data) {
       gActivities = data.activities; gRoster = data.roster; activeSurvey = data.activeSurvey;
+      if (data.fcmRegisterUrl) FCM_REGISTER_URL = data.fcmRegisterUrl;
 
       // 활동 목록
       var o = '<option value="">어떤 활동을 했나요?</option>';
@@ -610,7 +611,7 @@
   }
 
   // ✅ FCM 푸시 알림 — GitHub Pages iframe 방식
-  var FCM_REGISTER_URL = 'https://abc58255-hub.github.io/fcm-sw/register.html';
+  var FCM_REGISTER_URL = ''; // 시스템설정 FCM_REGISTER_URL에서 로드
   var fcmFrame = null;
   var fcmFrameReady = false;
   var pendingFcmStudentId = null;
@@ -651,7 +652,9 @@
     var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     if (isIOS) {
       if (localStorage.getItem('fcm_registered_ios_' + studentId)) return;
-      var pwaUrl = 'https://abc58255-hub.github.io/fcm-sw/?sid=' + encodeURIComponent(studentId);
+      var pwaBase = FCM_REGISTER_URL ? FCM_REGISTER_URL.replace('/register.html', '') : '';
+      if (!pwaBase) return;
+      var pwaUrl = pwaBase + '/?sid=' + encodeURIComponent(studentId);
       var banner = document.createElement('div');
       banner.id = 'fcmBanner';
       banner.style.cssText = 'position:fixed;bottom:70px;left:12px;right:12px;background:#1e3a8a;color:white;border-radius:14px;padding:14px 16px;z-index:9000;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';

@@ -11,8 +11,8 @@ messaging.onBackgroundMessage(function(payload) {
   const title   = (payload.notification && payload.notification.title) || '홍쌤 교실';
   const options = {
     body:  (payload.notification && payload.notification.body) || '',
-    icon:  'https://abc58255-hub.github.io/fcm-sw/icon-192.png',
-    badge: 'https://abc58255-hub.github.io/fcm-sw/badge.png',
+    icon:  self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '') + 'icon-192.png',
+    badge: self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '') + 'badge.png',
     tag:   (payload.data && payload.data.tag) || 'hongssam',
     data:  payload.data || {}
   };

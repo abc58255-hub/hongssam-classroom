@@ -1,8 +1,22 @@
-const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ"; 
-const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
+const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
+  || '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
 
 function doGet() { return HtmlService.createHtmlOutputFromFile('index').setTitle('우리 반 교실').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).addMetaTag('viewport', 'width=device-width, initial-scale=1'); }
 function getHash(text) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text).map(e => (e < 0 ? e + 256 : e).toString(16).padStart(2, '0')).join(''); }
+
+function _getSysHrKey_(key) {
+  var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+  if (!sh || sh.getLastRow() < 2) return '';
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+  }
+  return '';
+}
+
+function _getParentFolderId_() {
+  return _getSysHrKey_('드라이브폴더ID') || '1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H';
+}
 
 function _getSysHr(ss) {
   var sh = ss.getSheetByName('시스템설정');
@@ -119,7 +133,7 @@ function getHomeroomData(studentId) {
     }
   } catch(e) {}
 
-  return { activities: activities.reverse(), myRecords: myRecords.reverse(), roster: roster.sort((a,b)=>a.id.localeCompare(b.id)), activeSurvey: activeSurvey, hasSubmittedSurvey: hasSubmittedSurvey, notices: notices };
+  return { activities: activities.reverse(), myRecords: myRecords.reverse(), roster: roster.sort((a,b)=>a.id.localeCompare(b.id)), activeSurvey: activeSurvey, hasSubmittedSurvey: hasSubmittedSurvey, notices: notices, fcmRegisterUrl: _getSysHrKey_('FCM_REGISTER_URL') };
 }
 
 // 설문 중복 제출 방지
@@ -141,7 +155,7 @@ function submitSurveyResponse(payload) {
 
 function processHomeroomForm(data) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("창체제출현황"); const parentFolder = DriveApp.getFolderById(PARENT_FOLDER_ID);
+    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("창체제출현황"); const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     const records = sheet.getDataRange().getValues(); for (let i = records.length - 1; i >= 1; i--) { if (String(records[i][1]).trim() === String(data.studentId).trim() && String(records[i][3]).trim() === String(data.activity).trim()) { return { success: false, message: "이미 제출 완료!" }; } }
     let fileUrl = "첨부파일 없음";
     if (data.fileData) { let hrFolder = parentFolder.getFoldersByName("학급기록").hasNext() ? parentFolder.getFoldersByName("학급기록").next() : parentFolder.createFolder("학급기록"); let actFolder = hrFolder.getFoldersByName(data.activity).hasNext() ? hrFolder.getFoldersByName(data.activity).next() : hrFolder.createFolder(data.activity); const blob = Utilities.newBlob(Utilities.base64Decode(data.fileData), data.fileMimeType, `[${data.studentId}] ${data.studentName}_${data.activity}.${data.fileName.split('.').pop()}`); fileUrl = actFolder.createFile(blob).getUrl(); }

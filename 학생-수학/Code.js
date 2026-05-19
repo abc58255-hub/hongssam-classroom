@@ -1,5 +1,5 @@
-const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ"; 
-const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
+const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
+  || '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
 
 // FCM 토큰 저장 (학생 앱에서 로그인 시 호출)
 function saveFcmToken(studentId, token, pwHash) {
@@ -439,7 +439,7 @@ function processForm(formData) {
     let finalTaskName = isResubmit ? `${baseTaskName} (재제출)` : baseTaskName; 
     let className = inputId.length >= 2 ? `${inputId.substring(0, 1)}학년 ${inputId.substring(1, 2)}반` : "기타"; 
     
-    const parentFolder = DriveApp.getFolderById(PARENT_FOLDER_ID);
+    const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     let taskFolder = parentFolder.getFoldersByName(baseTaskName).hasNext() 
       ? parentFolder.getFoldersByName(baseTaskName).next() 
       : parentFolder.createFolder(baseTaskName);
@@ -552,6 +552,10 @@ function checkNeedsPwSetup(studentId, studentName) {
 // =====================================================
 // ✅ AI 자동 채점 (학생 제출 직후 자동 실행)
 // =====================================================
+
+function _getParentFolderId_() {
+  return _getSysStudent('드라이브폴더ID') || '1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H';
+}
 
 function _getSysStudent(key) {
   var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');

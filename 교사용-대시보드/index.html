@@ -1862,7 +1862,8 @@
         allTasks.forEach(function(t) { taskEvalMap[t.name] = t.evalType; });
         hrStr = data.homeroom || ""; hrActivities = data.hrActivities || []; hrSubmissions = data.hrSubmissions || []; gSurveys = data.surveys || []; gSurveyRes = data.surveyRes || [];
         if (hrStr) { let el = document.getElementById('hrTitle'); if (el) el.innerText = "🏫 " + hrStr + " 활동 모아보기"; }
-        globalDefaultSlideUrl = data.defaultSlideUrl || ""; // ✅ B4 슬라이드 URL 저장
+        globalDefaultSlideUrl = data.defaultSlideUrl || "";
+        if (data.alarmRegisterUrl) ALARM_REGISTER_URL = data.alarmRegisterUrl;
         populateFilters();
         if (curClass && document.getElementById('classFilter')) document.getElementById('classFilter').value = curClass;
         if (curTask && document.getElementById('taskFilter')) document.getElementById('taskFilter').value = curTask;
@@ -6436,7 +6437,7 @@
       })
       .resetStudentPassword(studentId);
   }
-  var ALARM_REGISTER_URL = 'https://abc58255-hub.github.io/fcm-sw/';
+  var ALARM_REGISTER_URL = ''; // 시스템설정 FCM_REGISTER_URL에서 로드
   function copyAlarmUrl() {
     navigator.clipboard.writeText(ALARM_REGISTER_URL).catch(function(){});
     var btn = document.getElementById('alarmUrlCopyBtn');
@@ -6655,6 +6656,44 @@
     }
     document.getElementById('portfolioResult').innerHTML = h;
   }
+  var _statTooltipOpen = null;
+  function showStatTooltip(el, event) {
+    if (_statTooltipOpen === el) return;
+    var names = el.getAttribute('data-names');
+    if (!names) return;
+    var tip = document.getElementById('_statTip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = '_statTip';
+      tip.style.cssText = 'position:fixed;background:#1e293b;color:white;border-radius:8px;padding:8px 12px;font-size:12px;line-height:1.8;z-index:99999;pointer-events:none;max-width:200px;box-shadow:0 4px 16px rgba(0,0,0,0.25);word-break:keep-all;';
+      document.body.appendChild(tip);
+    }
+    tip.textContent = names;
+    tip.style.display = 'block';
+    var rect = el.getBoundingClientRect();
+    var left = Math.min(rect.left, window.innerWidth - 220);
+    var top = rect.bottom + 6;
+    if (top + 100 > window.innerHeight) top = rect.top - tip.offsetHeight - 6;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+  function hideStatTooltip() {
+    _statTooltipOpen = null;
+    var tip = document.getElementById('_statTip');
+    if (tip) tip.style.display = 'none';
+  }
+  function toggleStatTooltip(el, event) {
+    if (event) event.stopPropagation();
+    if (_statTooltipOpen === el) { hideStatTooltip(); return; }
+    _statTooltipOpen = el;
+    showStatTooltip(el, event);
+    var tip = document.getElementById('_statTip');
+    if (tip) tip.style.pointerEvents = 'none';
+  }
+  document.addEventListener('click', function(e) {
+    if (_statTooltipOpen && !_statTooltipOpen.contains(e.target)) hideStatTooltip();
+  });
+
   function renderStats() {
     var t = document.getElementById('statsTaskFilter').value;
     var c = document.getElementById('statsClassFilter').value;
@@ -6696,6 +6735,14 @@
     var waiting = latest.filter(function(x) { return x.status !== '채점완료' && x.status !== '이전기록채점완료'; });
     var resubmit = latest.filter(function(x) { return x.status === '재제출요청'; });
     var notSubmitted = Math.max(0, totalStudents - latest.length);
+    var submittedIds = Object.keys(latestMap);
+    var notSubmittedNames = rosterBase.filter(function(st) {
+      return submittedIds.indexOf(st.id) === -1;
+    }).map(function(st) { return st.name; });
+    var resubmitNames = resubmit.map(function(x) {
+      var match = rosterBase.filter(function(r) { return r.id === x.id; });
+      return match.length ? match[0].name : (x.name || x.id);
+    });
     var submitRate = totalStudents > 0 ? Math.round((latest.length / totalStudents) * 100) : 0;
     var gradeRate = totalStudents > 0 ? Math.round((done.length / totalStudents) * 100) : 0;
     var scored = done.filter(function(x) { return x.score && !isNaN(parseFloat(x.score)); });
@@ -6729,15 +6776,21 @@
     var summaryCards = [
       { label: '제출률', val: submitRate + '%', sub: latest.length + '/' + totalStudents + '명', color: '#0284c7' },
       { label: '채점 완료율', val: gradeRate + '%', sub: done.length + '명 완료', color: '#10b981' },
-      { label: '미제출', val: notSubmitted + '명', sub: '제출 안 함', color: '#ef4444' },
-      { label: '재제출 요청', val: resubmit.length + '명', sub: '보충 필요', color: '#f59e0b' },
+      { label: '미제출', val: notSubmitted + '명', sub: '제출 안 함', color: '#ef4444', names: notSubmittedNames },
+      { label: '재제출 요청', val: resubmit.length + '명', sub: '보충 필요', color: '#f59e0b', names: resubmitNames },
       { label: '🌟 우수작 선정', val: bestCount + '건', sub: '선생님 Pick', color: '#b45309' },
       { label: '💬 질문한 학생', val: msgCount + '명', sub: Math.round(msgCount / (totalStudents||1)*100) + '%', color: '#8b5cf6' },
       { label: '💡 오답노트 작성', val: replyCount + '명', sub: Math.round(replyCount / (totalStudents||1)*100) + '%', color: '#0891b2' },
       { label: '🔄 재제출 횟수', val: resubmitCount + '회', sub: '누적', color: '#64748b' },
     ];
     summaryCards.forEach(function(card) {
-      h += '<div style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:14px; border-top:3px solid ' + card.color + ';">' +
+      var hasNames = card.names && card.names.length > 0;
+      var namesAttr = hasNames ? ' data-names="' + card.names.join(', ').replace(/"/g, '&quot;') + '"' : '';
+      var interactStyle = hasNames ? 'cursor:pointer; position:relative;' : '';
+      var interactEvents = hasNames ? ' onmouseenter="showStatTooltip(this,event)" onmouseleave="hideStatTooltip()" onclick="toggleStatTooltip(this,event)"' : '';
+      var hintDot = hasNames ? '<span style="position:absolute;top:8px;right:8px;width:6px;height:6px;background:' + card.color + ';border-radius:50%;opacity:0.5;"></span>' : '';
+      h += '<div' + namesAttr + interactEvents + ' style="background:white; border:1px solid #e2e8f0; border-radius:12px; padding:14px; border-top:3px solid ' + card.color + '; ' + interactStyle + '">' +
+        hintDot +
         '<div style="font-size:11px; color:#64748b; font-weight:700; margin-bottom:4px;">' + card.label + '</div>' +
         '<div style="font-size:22px; font-weight:900; color:' + card.color + ';">' + card.val + '</div>' +
         '<div style="font-size:11px; color:#94a3b8; margin-top:2px;">' + card.sub + '</div>' +

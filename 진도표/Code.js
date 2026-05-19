@@ -1,4 +1,5 @@
-const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ";
+const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
+  || '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
 
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index')

@@ -1,5 +1,10 @@
-const SHEET_ID = "1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ";
-const PARENT_FOLDER_ID = "1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H";
+const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
+  || '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
+
+function _getParentFolderId_() {
+  return _getSys(SpreadsheetApp.openById(SHEET_ID), '드라이브폴더ID')
+    || '1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H';
+}
 
 // ── 시스템설정 키-값 헬퍼 ──────────────────────────────
 function _getSys(ss, key) {
@@ -14,14 +19,17 @@ function _getSys(ss, key) {
 
 function _setSys(ss, key, value) {
   var sh = ss.getSheetByName('시스템설정');
-  if (!sh || sh.getLastRow() < 2) return;
-  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
-  for (var i = 0; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === key) {
-      sh.getRange(i + 2, 2).setValue(value);
-      return;
+  if (!sh) return;
+  if (sh.getLastRow() >= 2) {
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === key) {
+        sh.getRange(i + 2, 2).setValue(value);
+        return;
+      }
     }
   }
+  sh.appendRow([key, value]);
 }
 
 // =====================================================
@@ -718,7 +726,8 @@ function getDashboardData() {
     return {
       roster, classList, tasks, submissions,
       homeroom: hrStr,
-      defaultSlideUrl: defaultSlideUrl, // ✅ 클라이언트로 전달
+      defaultSlideUrl: defaultSlideUrl,
+      alarmRegisterUrl: _getSys(ss, 'FCM_REGISTER_URL'),
       hrActivities: [], hrSubmissions: [], surveys: [], surveyRes: []
     };
   } catch(e) { throw new Error("전체 데이터 로딩 오류: " + e.message); }
@@ -732,7 +741,7 @@ function saveNewTask(taskData) {
     const existing = sheet.getRange("B:B").getValues().flat();
     if (existing.includes(taskData.name)) return { success: false, message: "이미 같은 이름의 과제가 존재합니다." };
     sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList]);
-    const parentFolder = DriveApp.getFolderById(PARENT_FOLDER_ID);
+    const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     let taskFolder = parentFolder.createFolder(taskData.name);
     let deadlineObj = JSON.parse(taskData.deadlines);
     for (let cls in deadlineObj) taskFolder.createFolder(cls);
@@ -885,7 +894,7 @@ function getSecureFileBase64(url) {
 function saveMultiAnnotatedImages(rowIdx, payloadArray, studentId, studentName, taskName, feedbackText, statusAction, score, isPublic, memo, bestType, isAnon, bestComment, bestKey, perQuestionJson) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황");
-    const parentFolder = DriveApp.getFolderById(PARENT_FOLDER_ID);
+    const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     let baseTask = String(taskName || "").split(' (')[0];
     let safeStudentId = String(studentId || "");
     let className = safeStudentId.length >= 2
@@ -2105,12 +2114,12 @@ function uploadRubricFile(fileName, mimeType, base64Data, taskName) {
     
     // PARENT_FOLDER_ID 안에 'AI채점기준' 폴더 생성/조회
     let rubricFolder;
-    const folders = DriveApp.getFolderById(PARENT_FOLDER_ID)
+    const folders = DriveApp.getFolderById(_getParentFolderId_())
                              .getFoldersByName('AI채점기준');
     if (folders.hasNext()) {
       rubricFolder = folders.next();
     } else {
-      rubricFolder = DriveApp.getFolderById(PARENT_FOLDER_ID)
+      rubricFolder = DriveApp.getFolderById(_getParentFolderId_())
                              .createFolder('AI채점기준');
     }
     
@@ -2506,7 +2515,7 @@ function processHomeroomForm(p) {
     if (p.fileData && p.fileName) {
       try {
         const blob    = Utilities.newBlob(Utilities.base64Decode(p.fileData), p.fileMimeType || 'image/jpeg', p.fileName);
-        const folder  = DriveApp.getFolderById(PARENT_FOLDER_ID);
+        const folder  = DriveApp.getFolderById(_getParentFolderId_());
         let   hrFolder;
         const folderIt = folder.getFoldersByName('창체활동사진');
         hrFolder = folderIt.hasNext() ? folderIt.next() : folder.createFolder('창체활동사진');
