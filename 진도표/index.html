@@ -726,7 +726,7 @@ function renderSylTable() {
       var rateInfo = sylTaskRates[dateStr] && sylTaskRates[dateStr][cls];
       if (rateInfo && rateInfo.total > 0) {
         var rColor = rateInfo.rate >= 80 ? '#10b981' : rateInfo.rate >= 50 ? '#f59e0b' : '#ef4444';
-        var rShort = rateInfo.taskName.length > 9 ? rateInfo.taskName.substring(0,9)+'…' : rateInfo.taskName;
+        var rShort = rateInfo.taskName.length > 14 ? rateInfo.taskName.substring(0,14)+'…' : rateInfo.taskName;
         rateHtml = '<div style="margin-top:3px;border-top:1px solid rgba(0,0,0,0.08);padding-top:2px;" onclick="event.stopPropagation()" title="' + escapeHtml(rateInfo.taskName) + ' ' + rateInfo.rate + '% (' + rateInfo.submitted + '/' + rateInfo.total + '명)">'
           + '<div style="font-size:8px;color:#64748b;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📋 ' + escapeHtml(rShort) + '</div>'
           + '<div style="display:flex;align-items:center;gap:3px;">'
