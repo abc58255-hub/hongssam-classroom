@@ -623,6 +623,77 @@ function generateAndApplySchedule(groupId, semData, ttEntries) {
 // 진도표 데이터 (그룹 지원)
 // =====================================================
 
+// 과제 마감일 기준 반별 제출률 계산
+// 반환: { 'yyyy-MM-dd': { className: { taskName, submitted, total, rate } } }
+function _getTaskRatesForGroup_(ss, classes) {
+  var byDate = {};
+  var classCounts = {};
+  var rosterSh = ss.getSheetByName('학생명부');
+  if (rosterSh && rosterSh.getLastRow() >= 2) {
+    var rData = rosterSh.getRange(2, 1, rosterSh.getLastRow()-1, 3).getValues();
+    rData.forEach(function(r) {
+      var sid = String(r[1]||'').trim();
+      if (sid.length < 2) return;
+      var cls = sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반';
+      classCounts[cls] = (classCounts[cls]||0) + 1;
+    });
+  }
+  var taskSh = ss.getSheetByName('과제설정');
+  if (!taskSh || taskSh.getLastRow() < 2) return byDate;
+  var taskData = taskSh.getRange(2, 1, taskSh.getLastRow()-1, 4).getValues();
+  var taskDeadlineByClass = {}; // { taskName: { cls: 'yyyy-MM-dd' } }
+  taskData.forEach(function(r) {
+    var tName = String(r[1]||'').trim();
+    if (!tName) return;
+    var dStr = String(r[3]||'').trim();
+    if (!dStr || !dStr.startsWith('{')) return;
+    var deadlines; try { deadlines = JSON.parse(dStr); } catch(e) { return; }
+    var assigned = deadlines['_classes'];
+    var targetClasses = (Array.isArray(assigned) && assigned.length > 0) ? assigned : classes;
+    taskDeadlineByClass[tName] = {};
+    targetClasses.forEach(function(cls) {
+      var dl = deadlines[cls] || deadlines['all'];
+      if (!dl) return;
+      try {
+        var dlDate = Utilities.formatDate(new Date(dl), 'Asia/Seoul', 'yyyy-MM-dd');
+        taskDeadlineByClass[tName][cls] = dlDate;
+        if (!byDate[dlDate]) byDate[dlDate] = {};
+        if (!byDate[dlDate][cls]) {
+          byDate[dlDate][cls] = { taskName: tName, submitted: 0, total: classCounts[cls]||0, rate: 0 };
+        }
+      } catch(e) {}
+    });
+  });
+  var subSh = ss.getSheetByName('제출현황');
+  if (!subSh || subSh.getLastRow() < 2) return byDate;
+  var subData = subSh.getRange(2, 1, subSh.getLastRow()-1, 11).getValues();
+  var submittedSet = {};
+  subData.forEach(function(r) {
+    var sid = String(r[1]||'').trim();
+    if (!sid) return;
+    var tName = String(r[3]||'').trim().split(' (')[0];
+    var status = String(r[10]||'').trim();
+    if (status === '재제출요청' || status === '이전기록채점완료') return;
+    var cls = sid.length >= 2 ? sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반' : '';
+    if (!cls || !taskDeadlineByClass[tName]) return;
+    if (!submittedSet[tName]) submittedSet[tName] = {};
+    if (!submittedSet[tName][cls]) submittedSet[tName][cls] = {};
+    submittedSet[tName][cls][sid] = true;
+  });
+  Object.keys(taskDeadlineByClass).forEach(function(tName) {
+    Object.keys(taskDeadlineByClass[tName]).forEach(function(cls) {
+      var dlDate = taskDeadlineByClass[tName][cls];
+      if (!byDate[dlDate] || !byDate[dlDate][cls]) return;
+      var submitted = (submittedSet[tName] && submittedSet[tName][cls]) ? Object.keys(submittedSet[tName][cls]).length : 0;
+      var total = classCounts[cls] || 0;
+      byDate[dlDate][cls].submitted = submitted;
+      byDate[dlDate][cls].total = total;
+      byDate[dlDate][cls].rate = total > 0 ? Math.round(submitted / total * 100) : 0;
+    });
+  });
+  return byDate;
+}
+
 function getSyllabusData(groupId) {
   try {
     var gid = groupId || '기본';
@@ -706,7 +777,8 @@ function getSyllabusData(groupId) {
       });
     }
 
-    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates };
+    var taskRates = _getTaskRatesForGroup_(ss, classes);
+    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates, taskRates: taskRates };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

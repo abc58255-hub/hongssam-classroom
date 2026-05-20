@@ -117,15 +117,27 @@ function getDashboardData(studentId, studentName) {
     let taskDeadlineMap = {};
 
     for (let i = 1; i < taskData.length; i++) {
-      let tName = String(taskData[i][1] || "").trim(); 
+      let tName = String(taskData[i][1] || "").trim();
       if (!tName) continue;
-      allBaseTasks.push(tName); 
+
+      let dStr = String(taskData[i][3] || "").trim();
+
+      // ✅ 반 배정 필터링: _classes 키가 있으면 해당 반에만 과제 표시
+      if (dStr && dStr.startsWith("{")) {
+        try {
+          let dlCheck = JSON.parse(dStr);
+          if (Array.isArray(dlCheck['_classes']) && dlCheck['_classes'].length > 0) {
+            if (dlCheck['_classes'].indexOf(className) < 0) continue;
+          }
+        } catch(e) {}
+      }
+
+      allBaseTasks.push(tName);
       let choices = String(taskData[i][7] || "").trim();
       let choiceArray = choices ? choices.split(',').map(s => s.trim()).filter(s => s) : [];
       taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray };
 
-      let dStr = String(taskData[i][3] || "").trim(); 
-      let isExpired = false; 
+      let isExpired = false;
       let hasDeadline = false;
       let myDeadline = null;
       let resubDeadline = null;
@@ -135,7 +147,7 @@ function getDashboardData(studentId, studentName) {
         try {
           let deadlines = JSON.parse(dStr);
           let dl = deadlines[className] || deadlines["all"];
-          const hasClassSpecificKeys = Object.keys(deadlines).some(k => k !== "all" && !k.startsWith("resub_"));
+          const hasClassSpecificKeys = Object.keys(deadlines).some(k => k !== "all" && !k.startsWith("resub_") && !k.startsWith("open_") && k !== "_classes");
           if (dl) {
             hasDeadline = true;
             myDeadline = dl;

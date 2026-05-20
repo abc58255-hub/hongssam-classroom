@@ -379,6 +379,12 @@
         <div id="deadlineContainer"></div>
         <button type="button" onclick="addDeadlineRow()" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button>
       </div>
+      <div class="form-group">
+        <label class="form-label">🏫 반 배정 <span style="font-size:12px; color:#64748b; font-weight:normal;">(미선택 시 전체 반에 출제)</span></label>
+        <div id="newClassAssignment" style="display:flex; flex-wrap:wrap; gap:8px; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; min-height:38px;">
+          <span style="font-size:12px; color:#94a3b8;">로딩 중...</span>
+        </div>
+      </div>
       <button type="button" id="btnCreateTask" onclick="createNewTask()" style="width:100%; margin-top:10px; background:#0284c7; color:white; border:none; padding:14px; border-radius:10px; font-size:16px; font-weight:800; cursor:pointer;">과제 생성하기 🚀</button>
     </div>
     <div id="taskGrid" class="task-grid"></div>
@@ -1220,7 +1226,7 @@
       </div>
     </div>
   </div>
-<div id="editTaskModal" class="setup-modal"><div class="setup-box"><h3 style="margin-top:0; color:#0284c7;">✏️ 과제 수정</h3><div class="form-group"><label class="form-label">과제명</label><input type="text" id="editTaskName" class="form-input" readonly style="background:#e2e8f0;"></div><div class="form-group"><label class="form-label">평가 척도 변경</label><select id="editEvalType" class="form-input"><option value="점수제 (직접 입력)">점수제 (직접 입력)</option><option value="A-B-C-D 등급제">A-B-C-D 등급제</option><option value="코멘트만 남김">코멘트만 남김</option></select></div><div class="form-group"><label class="form-label">설명</label><input type="text" id="editTaskDesc" class="form-input"></div><div class="form-group"><label class="form-label">마감일 <span style="font-size:12px; color:#64748b; font-weight:normal;">(날짜만 입력 시 23:59 자동 적용)</span></label><div id="editDeadlineContainer"></div><button type="button" onclick="addEditDeadlineRow('all', '', '23:59')" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button></div><div style="display:flex; gap:10px; margin-top:25px;"><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#e2e8f0; font-weight:bold; cursor:pointer;" onclick="document.getElementById('editTaskModal').style.display='none'">취소</button><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#0284c7; color:white; font-weight:bold; cursor:pointer;" id="btnSaveEdit" onclick="submitTaskEdit()">저장</button></div></div></div>
+<div id="editTaskModal" class="setup-modal"><div class="setup-box"><h3 style="margin-top:0; color:#0284c7;">✏️ 과제 수정</h3><div class="form-group"><label class="form-label">과제명</label><input type="text" id="editTaskName" class="form-input" readonly style="background:#e2e8f0;"></div><div class="form-group"><label class="form-label">평가 척도 변경</label><select id="editEvalType" class="form-input"><option value="점수제 (직접 입력)">점수제 (직접 입력)</option><option value="A-B-C-D 등급제">A-B-C-D 등급제</option><option value="코멘트만 남김">코멘트만 남김</option></select></div><div class="form-group"><label class="form-label">설명</label><input type="text" id="editTaskDesc" class="form-input"></div><div class="form-group"><label class="form-label">마감일 <span style="font-size:12px; color:#64748b; font-weight:normal;">(날짜만 입력 시 23:59 자동 적용)</span></label><div id="editDeadlineContainer"></div><button type="button" onclick="addEditDeadlineRow('all', '', '23:59')" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button></div><div class="form-group"><label class="form-label">🏫 반 배정 <span style="font-size:12px; color:#64748b; font-weight:normal;">(미선택 시 전체 반)</span></label><div id="editClassAssignment" style="display:flex; flex-wrap:wrap; gap:8px; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; min-height:38px;"></div></div><div style="display:flex; gap:10px; margin-top:25px;"><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#e2e8f0; font-weight:bold; cursor:pointer;" onclick="document.getElementById('editTaskModal').style.display='none'">취소</button><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#0284c7; color:white; font-weight:bold; cursor:pointer;" id="btnSaveEdit" onclick="submitTaskEdit()">저장</button></div></div></div>
 <div id="bulkPublishModal" class="setup-modal"><div class="setup-box"><h3 style="margin-top:0; color:#10b981;">📢 일괄 배포 설정</h3><div style="margin-bottom:15px;"><label>대상 반</label><select id="bulkClass" class="filter-select" style="width:100%;"></select></div><div style="margin-bottom:15px;"><label>대상 과제</label><select id="bulkTask" class="filter-select" style="width:100%;"></select></div><div style="display:flex; gap:10px; margin-top:25px;"><button style="flex:1; padding:12px; background:#e2e8f0; border:none; border-radius:8px; cursor:pointer; font-weight:bold;" onclick="document.getElementById('bulkPublishModal').style.display='none'">취소</button><button style="flex:1; padding:12px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;" id="bulkExecuteBtn" onclick="confirmBulkPublish()">배포 실행</button></div></div></div>
 <div id="smartSetupModal" class="setup-modal"><div class="setup-box" style="max-width:480px;">
   <h3 style="margin-top:0; color:#ea580c;">🚀 스마트 연속 채점</h3>
@@ -1861,6 +1867,7 @@
       try {
         allRoster = data.roster || []; classList = data.classList || []; allTasks = data.tasks || []; allSubmissions = (data.submissions || []).map(normalizeSubmission).filter(Boolean); taskEvalMap = {};
         allTasks.forEach(function(t) { taskEvalMap[t.name] = t.evalType; });
+        buildClassCheckboxes('newClassAssignment', []); // ✅ 전체 선택 상태로 초기화
         hrStr = data.homeroom || ""; hrActivities = data.hrActivities || []; hrSubmissions = data.hrSubmissions || []; gSurveys = data.surveys || []; gSurveyRes = data.surveyRes || [];
         if (hrStr) { let el = document.getElementById('hrTitle'); if (el) el.innerText = "🏫 " + hrStr + " 활동 모아보기"; }
         globalDefaultSlideUrl = data.defaultSlideUrl || "";
@@ -2487,15 +2494,24 @@
         }
       }
       
+      let assignedClasses = dO['_classes'];
+      let classesTag = '';
+      if (assignedClasses && assignedClasses.length > 0) {
+        classesTag = '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">'
+          + '<span style="font-size:10px;color:#7c3aed;font-weight:700;">🏫</span>'
+          + assignedClasses.map(function(c){ return '<span style="font-size:10px;background:#ede9fe;color:#7c3aed;padding:2px 6px;border-radius:4px;font-weight:700;">' + c + '</span>'; }).join('')
+          + '</div>';
+      }
+
       let tag = t.choiceList ? '<span class="choice-tag">🎯 선택형 과제</span>' : '';
-      
-      // ✅ 버튼 디자인 1줄 통일 (비공개 버튼 삭제)
+
       let editBtn = '<button style="flex:1; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:10px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer;" onclick="openEditTaskModal(\'' + t.name + '\')">✏️ 수정</button>';
       let cheatBtn = '<button style="flex:1; background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer;" onclick="runCheatCheck(\'' + t.name.replace(/'/g, "\\'") + '\')">🕵️ 부정 검사</button>';
-      
+
       h += '<div class="task-card">' +
            '<div class="task-card-header"><div class="task-title-area"><div>' + t.name + '</div>' + tag + '<span class="pic-badge">📸 필수 ' + (t.reqPics || 1) + '개</span></div><span class="task-badge">' + t.evalType + '</span></div>' +
            '<div class="task-desc" style="margin-bottom:10px;">' + (t.desc || '-') + '</div>' +
+           (classesTag ? '<div style="margin-bottom:8px;">' + classesTag + '</div>' : '') +
            '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">' + dH + '</div>' +
            '<div style="display:flex; gap:8px; margin-top:14px; width:100%;">' + editBtn + cheatBtn + '</div>' +
            '</div>';
@@ -2542,7 +2558,24 @@
     document.getElementById('editDeadlineContainer').appendChild(createDeadlineElement(c, d, t, isResub, openD, openT));
   }
 
-  function extractDeadlinesJSON(containerId) {
+  // ✅ 반 배정 체크박스 빌더
+  function buildClassCheckboxes(containerId, selectedClasses) {
+    var el = document.getElementById(containerId);
+    if (!el) return;
+    var classes = classList || [];
+    if (classes.length === 0) {
+      el.innerHTML = '<span style="font-size:12px; color:#94a3b8;">반 목록 없음 (학생명부 확인)</span>';
+      return;
+    }
+    el.innerHTML = classes.map(function(cls) {
+      var checked = (!selectedClasses || selectedClasses.length === 0 || selectedClasses.indexOf(cls) >= 0) ? 'checked' : '';
+      return '<label style="display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;background:white;padding:5px 10px;border-radius:6px;border:1px solid #e2e8f0;user-select:none;">'
+        + '<input type="checkbox" class="cls-assign-chk" value="' + cls + '" ' + checked + '> ' + cls
+        + '</label>';
+    }).join('');
+  }
+
+  function extractDeadlinesJSON(containerId, classesContainerId) {
     var d = {};
     document.querySelectorAll('#' + containerId + ' .deadline-row').forEach(function(row) {
       var cls = row.querySelector('.dl-class').value;
@@ -2559,13 +2592,21 @@
         }
       }
     });
+    // ✅ 반 배정: 일부 반만 선택된 경우 _classes 키 저장
+    if (classesContainerId) {
+      var allChks = document.querySelectorAll('#' + classesContainerId + ' .cls-assign-chk');
+      var checkedClasses = Array.prototype.slice.call(document.querySelectorAll('#' + classesContainerId + ' .cls-assign-chk:checked')).map(function(c){ return c.value; });
+      if (allChks.length > 0 && checkedClasses.length < allChks.length) {
+        d['_classes'] = checkedClasses;
+      }
+    }
     return JSON.stringify(d);
   }
 
   function createNewTask() {
     var n = document.getElementById('newTaskName').value.trim();
     if (!n) return alert("과제명을 입력해주세요.");
-    var dJson = extractDeadlinesJSON('deadlineContainer');
+    var dJson = extractDeadlinesJSON('deadlineContainer', 'newClassAssignment');
     
     var choiceList = "";
     if (document.getElementById('checkChoiceMode').checked) {
@@ -2601,7 +2642,7 @@
 
   function submitTaskEdit() {
     var n = document.getElementById('editTaskName').value;
-    var dJson = extractDeadlinesJSON('editDeadlineContainer');
+    var dJson = extractDeadlinesJSON('editDeadlineContainer', 'editClassAssignment');
     var o = allTasks.find(function(x) { return x.name === n; });
     var td = { originalName: n, desc: document.getElementById('editTaskDesc').value, evalType: document.getElementById('editEvalType').value, deadlines: dJson, isPublic: o ? o.isPublic : false };
     var btn = document.getElementById('btnSaveEdit');
@@ -2635,12 +2676,15 @@
     var c = document.getElementById('editDeadlineContainer'); c.innerHTML = '';
     var d = {};
     try { d = JSON.parse(o.deadlines || "{}"); } catch(e) {}
-    
+
+    // ✅ 반 배정 체크박스 — _classes 키 기반
+    buildClassCheckboxes('editClassAssignment', d['_classes'] || []);
+
     if (Object.keys(d).length === 0) {
       addEditDeadlineRow('all', '', '23:59', false, '', '00:00');
     } else {
       for (var k in d) {
-        if (k.startsWith('open_')) continue;
+        if (k.startsWith('open_') || k === '_classes') continue;
         var isResub = k.startsWith('resub_');
         var realCls = isResub ? k.replace('resub_', '') : k;
         var dt = new Date(d[k]);

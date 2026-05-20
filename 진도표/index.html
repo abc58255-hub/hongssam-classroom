@@ -401,6 +401,7 @@ var sylScheduleCache = {};
 var sylHolidayCache  = {};
 var sylMovedInCache  = {};
 var sylClassList     = [];
+var sylTaskRates     = {};
 var allClasses       = [];
 var currentGroupId   = '기본';
 var groupsCache      = [];
@@ -550,6 +551,7 @@ function loadSyllabusData(forceTab) {
       sylMovedInCache = res.movedIn    || {};
       sylScheduleCache= res.schedule   || {};
       sylHolidayCache = res.holidays   || {};
+      sylTaskRates    = res.taskRates  || {};
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
       var targetTab = forceTab || [1,2,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
@@ -717,8 +719,25 @@ function renderSylTable() {
 
       var cellAttrs = 'data-date="' + escapeHtml(dateStr) + '" data-cls="' + escapeHtml(cls) + '" onclick="openCheckDate(this.dataset.date,this.dataset.cls)"';
       var status = check ? (check.status || '') : '';
-
       var wbStyle = weekBorder ? 'border-top:2px solid rgba(0,0,0,0.1);' : '';
+
+      // ✅ 과제 제출률 인디케이터
+      var rateHtml = '';
+      var rateInfo = sylTaskRates[dateStr] && sylTaskRates[dateStr][cls];
+      if (rateInfo && rateInfo.total > 0) {
+        var rColor = rateInfo.rate >= 80 ? '#10b981' : rateInfo.rate >= 50 ? '#f59e0b' : '#ef4444';
+        var rShort = rateInfo.taskName.length > 9 ? rateInfo.taskName.substring(0,9)+'…' : rateInfo.taskName;
+        rateHtml = '<div style="margin-top:3px;border-top:1px solid rgba(0,0,0,0.08);padding-top:2px;" onclick="event.stopPropagation()" title="' + escapeHtml(rateInfo.taskName) + ' ' + rateInfo.rate + '% (' + rateInfo.submitted + '/' + rateInfo.total + '명)">'
+          + '<div style="font-size:8px;color:#64748b;margin-bottom:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">📋 ' + escapeHtml(rShort) + '</div>'
+          + '<div style="display:flex;align-items:center;gap:3px;">'
+            + '<div style="flex:1;height:4px;background:#e2e8f0;border-radius:2px;overflow:hidden;">'
+              + '<div style="width:' + rateInfo.rate + '%;height:100%;background:' + rColor + ';border-radius:2px;"></div>'
+            + '</div>'
+            + '<span style="font-size:8px;font-weight:800;color:' + rColor + ';white-space:nowrap;flex-shrink:0;">' + rateInfo.submitted + '/' + rateInfo.total + '</span>'
+          + '</div>'
+        + '</div>';
+      }
+
       if (status.indexOf('취소') === 0) {
         var cInfo = _cancelStatusInfo(status);
         html += '<td style="text-align:center;padding:6px 4px;background:' + cInfo.bg + ';cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="' + cInfo.label + ' (클릭하여 수정)">'
@@ -726,7 +745,7 @@ function renderSylTable() {
             + '<span style="font-size:17px;">' + cInfo.emoji + '</span>'
             + '<span style="font-size:9px;color:' + cInfo.color + ';font-weight:700;">' + escapeHtml(cInfo.label) + '</span>'
             + (check.memo ? '<span style="font-size:9px;color:#94a3b8;word-break:keep-all;">' + escapeHtml(check.memo) + '</span>' : '')
-          + '</div></td>';
+          + '</div>' + rateHtml + '</td>';
 
       } else if (status.indexOf('이동:') === 0) {
         var targetDate = status.substring(3);
@@ -742,7 +761,7 @@ function renderSylTable() {
               + (movedPlan && movedPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(movedPlan.content) + '</div>' : '')
               + '<div style="color:#a78bfa;font-size:9px;">→ ' + tLabel + '</div>'
             + '</div>'
-          + '</div></td>';
+          + '</div>' + rateHtml + '</td>';
 
       } else if (sylMovedInCache[key] && sylMovedInCache[key].length > 0) {
         // 이동받은 수업이 있는 날 — 이동된 수업 카드 + 자체 수업 카드 동일 비중 표시
@@ -798,7 +817,7 @@ function renderSylTable() {
             + '<div style="font-size:9px;color:#cbd5e1;">📅 이 날 수업</div>'
           + '</div>';
         }
-        html += '</td>';
+        html += rateHtml + '</td>';
 
       } else if (check && check.plannedLessonNo && !check.lessonNo) {
         // 예상 차시만 기록됨 — 아직 수업 전
@@ -810,7 +829,7 @@ function renderSylTable() {
               + '<div style="font-weight:800;color:#6366f1;">' + check.plannedLessonNo + '차시 예정</div>'
               + (pPlan && pPlan.content ? '<div style="font-size:10px;color:#374151;word-break:keep-all;">' + escapeHtml(pPlan.content) + '</div>' : '')
             + '</div>'
-          + '</div></td>';
+          + '</div>' + rateHtml + '</td>';
 
       } else if (check && check.lessonNo) {
         var plan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
@@ -835,13 +854,13 @@ function renderSylTable() {
               + plannedDiff
               + (check.memo ? '<div style="font-size:9px;color:#6366f1;word-break:keep-all;">' + escapeHtml(check.memo) + '</div>' : '')
             + '</div>'
-          + '</div></td>';
+          + '</div>' + rateHtml + '</td>';
 
       } else {
         // 예정된 날이지만 미기록
         html += '<td style="text-align:center;padding:8px;cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수업 기록">'
           + '<span style="display:inline-block;width:22px;height:22px;border:2px solid #d1d5db;border-radius:4px;background:white;"></span>'
-          + '</td>';
+          + rateHtml + '</td>';
       }
     });
     html += '</tr>';
