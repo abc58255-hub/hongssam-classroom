@@ -1226,7 +1226,7 @@
       </div>
     </div>
   </div>
-<div id="editTaskModal" class="setup-modal"><div class="setup-box"><h3 style="margin-top:0; color:#0284c7;">✏️ 과제 수정</h3><div class="form-group"><label class="form-label">과제명</label><input type="text" id="editTaskName" class="form-input" readonly style="background:#e2e8f0;"></div><div class="form-group"><label class="form-label">평가 척도 변경</label><select id="editEvalType" class="form-input"><option value="점수제 (직접 입력)">점수제 (직접 입력)</option><option value="A-B-C-D 등급제">A-B-C-D 등급제</option><option value="코멘트만 남김">코멘트만 남김</option></select></div><div class="form-group"><label class="form-label">설명</label><input type="text" id="editTaskDesc" class="form-input"></div><div class="form-group"><label class="form-label">마감일 <span style="font-size:12px; color:#64748b; font-weight:normal;">(날짜만 입력 시 23:59 자동 적용)</span></label><div id="editDeadlineContainer"></div><button type="button" onclick="addEditDeadlineRow('all', '', '23:59')" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button></div><div class="form-group"><label class="form-label">🏫 반 배정 <span style="font-size:12px; color:#64748b; font-weight:normal;">(미선택 시 전체 반)</span></label><div id="editClassAssignment" style="display:flex; flex-wrap:wrap; gap:8px; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; min-height:38px;"></div></div><div style="display:flex; gap:10px; margin-top:25px;"><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#e2e8f0; font-weight:bold; cursor:pointer;" onclick="document.getElementById('editTaskModal').style.display='none'">취소</button><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#0284c7; color:white; font-weight:bold; cursor:pointer;" id="btnSaveEdit" onclick="submitTaskEdit()">저장</button></div></div></div>
+<div id="editTaskModal" class="setup-modal"><div class="setup-box"><h3 style="margin-top:0; color:#0284c7;">✏️ 과제 수정</h3><div class="form-group"><label class="form-label">과제명</label><input type="text" id="editTaskName" class="form-input" readonly style="background:#e2e8f0;"></div><div class="form-group"><label class="form-label">평가 척도 변경</label><select id="editEvalType" class="form-input"><option value="점수제 (직접 입력)">점수제 (직접 입력)</option><option value="A-B-C-D 등급제">A-B-C-D 등급제</option><option value="코멘트만 남김">코멘트만 남김</option></select></div><div class="form-group"><label class="form-label">설명</label><input type="text" id="editTaskDesc" class="form-input"></div><div class="form-group"><label class="form-label">마감일 <span style="font-size:12px; color:#64748b; font-weight:normal;">(날짜만 입력 시 23:59 자동 적용)</span></label><div id="editDeadlineContainer"></div><button type="button" onclick="addEditDeadlineRow('', '', '23:59', '', '00:00', '', '')" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:6px 14px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button></div><div class="form-group"><label class="form-label">🏫 반 배정 <span style="font-size:12px; color:#64748b; font-weight:normal;">(미선택 시 전체 반)</span></label><div id="editClassAssignment" style="display:flex; flex-wrap:wrap; gap:8px; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; min-height:38px;"></div></div><div style="display:flex; gap:10px; margin-top:25px;"><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#e2e8f0; font-weight:bold; cursor:pointer;" onclick="document.getElementById('editTaskModal').style.display='none'">취소</button><button style="flex:1; padding:12px; border-radius:8px; border:none; background:#0284c7; color:white; font-weight:bold; cursor:pointer;" id="btnSaveEdit" onclick="submitTaskEdit()">저장</button></div></div></div>
 <div id="bulkPublishModal" class="setup-modal"><div class="setup-box"><h3 style="margin-top:0; color:#10b981;">📢 일괄 배포 설정</h3><div style="margin-bottom:15px;"><label>대상 반</label><select id="bulkClass" class="filter-select" style="width:100%;"></select></div><div style="margin-bottom:15px;"><label>대상 과제</label><select id="bulkTask" class="filter-select" style="width:100%;"></select></div><div style="display:flex; gap:10px; margin-top:25px;"><button style="flex:1; padding:12px; background:#e2e8f0; border:none; border-radius:8px; cursor:pointer; font-weight:bold;" onclick="document.getElementById('bulkPublishModal').style.display='none'">취소</button><button style="flex:1; padding:12px; background:#10b981; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;" id="bulkExecuteBtn" onclick="confirmBulkPublish()">배포 실행</button></div></div></div>
 <div id="smartSetupModal" class="setup-modal"><div class="setup-box" style="max-width:480px;">
   <h3 style="margin-top:0; color:#ea580c;">🚀 스마트 연속 채점</h3>
@@ -2468,29 +2468,45 @@
       try { dO = JSON.parse(t.deadlines || "{}"); } catch(e) {}
       
       let dH = '<div style="font-size:12px; font-weight:800; color:#64748b; margin-bottom:8px;">⏰ 마감일 설정</div>';
-      if (Object.keys(dO).length === 0) {
+      let hasMainDl = Object.keys(dO).some(k => !k.startsWith('open_') && !k.startsWith('resub_') && k !== '_classes');
+      if (!hasMainDl && Object.keys(dO).length === 0) {
         dH += '<div style="font-size:13px; color:#059669; font-weight:800; background:#dcfce7; padding:6px 10px; border-radius:6px; display:inline-block;">∞ 기한 없음</div>';
       } else {
+        let seenR = {};
         for (let c in dO) {
-          if (c.startsWith('open_')) continue;
-          let dt = new Date(dO[c]);
-          if (isNaN(dt.getTime())) continue;
-          let isResub = c.startsWith('resub_');
-          let realClass = isResub ? c.replace('resub_', '') : c;
-          let clsName = (realClass === 'all') ? '전체 공통' : realClass;
-          let badge = isResub ? '<span style="background:#fef3c7;color:#d97706;padding:2px 6px;border-radius:4px;font-size:10px;margin-right:6px;">재제출</span>' : '<span style="background:#e0f2fe;color:#0284c7;padding:2px 6px;border-radius:4px;font-size:10px;margin-right:6px;">본제출</span>';
+          if (c.startsWith('open_') || c.startsWith('resub_') || c === '_classes') continue;
+          let dt = new Date(dO[c]); if (isNaN(dt.getTime())) continue;
+          let clsName = (c === 'all') ? '전체 공통' : c;
           let dtStr = (dt.getMonth()+1) + '/' + dt.getDate() + ' ' + String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0');
           let openInfo = '';
-          if (!isResub && dO['open_' + realClass]) {
-            let oDt = new Date(dO['open_' + realClass]);
+          if (dO['open_' + c]) {
+            let oDt = new Date(dO['open_' + c]);
             if (!isNaN(oDt.getTime())) {
               let oStr = (oDt.getMonth()+1) + '/' + oDt.getDate() + ' ' + String(oDt.getHours()).padStart(2,'0') + ':' + String(oDt.getMinutes()).padStart(2,'0');
-              openInfo = '<span style="font-size:11px;color:#7c3aed;margin-right:4px;">공개 ' + oStr + ' →</span>';
+              openInfo = '<span style="font-size:11px;color:#7c3aed;margin-right:6px;">🔓 ' + oStr + ' →</span>';
             }
           }
-          dH += '<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px dashed #cbd5e1; font-size:13px;">' +
-                '<div style="display:flex;align-items:center;"><span style="font-weight:800; color:#3b82f6; margin-right:8px;">' + clsName + '</span>' + badge + '</div>' +
-                '<div style="display:flex;align-items:center;">' + openInfo + '<b style="color:#1e293b;">' + dtStr + '</b></div></div>';
+          let resubInfo = '';
+          if (dO['resub_' + c]) {
+            let rDt = new Date(dO['resub_' + c]);
+            if (!isNaN(rDt.getTime())) {
+              let rStr = (rDt.getMonth()+1) + '/' + rDt.getDate() + ' ' + String(rDt.getHours()).padStart(2,'0') + ':' + String(rDt.getMinutes()).padStart(2,'0');
+              resubInfo = '<span style="font-size:11px;color:#d97706;margin-left:6px;">→ 🔁 ' + rStr + '</span>';
+              seenR['resub_' + c] = true;
+            }
+          }
+          dH += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #cbd5e1;font-size:13px;">'
+            + '<span style="font-weight:800;color:#3b82f6;">' + clsName + '</span>'
+            + '<div style="display:flex;align-items:center;flex-wrap:wrap;gap:2px;">' + openInfo + '<b style="color:#1e293b;">🔒 ' + dtStr + '</b>' + resubInfo + '</div></div>';
+        }
+        // 본 마감 없이 resub만 있는 레거시 행
+        for (let c in dO) {
+          if (!c.startsWith('resub_') || seenR[c] || c === '_classes') continue;
+          let cls = c.replace('resub_', ''); let rDt = new Date(dO[c]); if (isNaN(rDt.getTime())) continue;
+          let rStr = (rDt.getMonth()+1) + '/' + rDt.getDate() + ' ' + String(rDt.getHours()).padStart(2,'0') + ':' + String(rDt.getMinutes()).padStart(2,'0');
+          dH += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed #cbd5e1;font-size:13px;">'
+            + '<span style="font-weight:800;color:#3b82f6;">' + (cls === 'all' ? '전체 공통' : cls) + '</span>'
+            + '<span style="color:#d97706;font-weight:700;">🔁 재제출 ' + rStr + '</span></div>';
         }
       }
       
@@ -2519,43 +2535,44 @@
     g.innerHTML = h;
   }
 
-  // --- 여기서부터 복사해서 기존 과제 생성/수정/마감일 관련 함수들을 덮어쓰세요 ---
-  function createDeadlineElement(c, d, t, isResub, openD, openT) {
+  // ─── 마감일 행: 공개일 / 마감일 / 재제출마감 3열 ───
+  function createDeadlineElement(c, d, t, openD, openT, resubD, resubT) {
     var div = document.createElement('div'); div.className = 'deadline-row';
     div.style.cssText = 'margin-bottom:8px; background:white; border-radius:10px; border:1px solid #e2e8f0; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.04);';
     var o = '<option value="all">전체 공통</option>';
     classList.forEach(function(x) { o += '<option value="' + x + '" ' + (x === c ? 'selected' : '') + '>' + x + '</option>'; });
-    if (c === 'all') o = o.replace('value="all"', 'value="all" selected');
-    var resubChecked = isResub ? 'checked' : '';
+    if (c === 'all' || !c) o = o.replace('value="all"', 'value="all" selected');
     div.innerHTML =
       '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">' +
         '<select class="form-input dl-class" style="flex:1;padding:6px 8px;font-size:13px;font-weight:700;border-radius:6px;">' + o + '</select>' +
-        '<label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:#d97706;white-space:nowrap;cursor:pointer;">' +
-          '<input type="checkbox" class="dl-is-resub" ' + resubChecked + '> 재제출 마감일' +
-        '</label>' +
         '<button type="button" style="background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-weight:800;font-size:12px;flex-shrink:0;" onclick="this.closest(\'.deadline-row\').remove()">✕</button>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0;">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0;">' +
         '<div style="padding:8px 10px;border-right:1px solid #e2e8f0;">' +
           '<div style="font-size:10px;font-weight:800;color:#7c3aed;margin-bottom:4px;">🔓 공개일</div>' +
           '<input type="date" class="form-input dl-open-date" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;margin-bottom:4px;" value="' + (openD || '') + '">' +
           '<input type="time" class="form-input dl-open-time" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;" value="' + (openT || '00:00') + '">' +
         '</div>' +
-        '<div style="padding:8px 10px;">' +
+        '<div style="padding:8px 10px;border-right:1px solid #e2e8f0;">' +
           '<div style="font-size:10px;font-weight:800;color:#dc2626;margin-bottom:4px;">🔒 마감일</div>' +
           '<input type="date" class="form-input dl-date" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;margin-bottom:4px;" value="' + (d || '') + '">' +
           '<input type="time" class="form-input dl-time" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;" value="' + (t || '23:59') + '">' +
+        '</div>' +
+        '<div style="padding:8px 10px;">' +
+          '<div style="font-size:10px;font-weight:800;color:#d97706;margin-bottom:4px;">🔁 재제출 마감 <span style="font-size:9px;font-weight:400;color:#94a3b8;">(선택)</span></div>' +
+          '<input type="date" class="form-input dl-resub-date" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;margin-bottom:4px;" value="' + (resubD || '') + '">' +
+          '<input type="time" class="form-input dl-resub-time" style="width:100%;padding:5px 7px;font-size:13px;border-radius:6px;" value="' + (resubT || '23:59') + '">' +
         '</div>' +
       '</div>';
     return div;
   }
 
   function addDeadlineRow() {
-    document.getElementById('deadlineContainer').appendChild(createDeadlineElement('', '', '23:59', false, '', '00:00'));
+    document.getElementById('deadlineContainer').appendChild(createDeadlineElement('', '', '23:59', '', '00:00', '', ''));
   }
 
-  function addEditDeadlineRow(c, d, t, isResub, openD, openT) {
-    document.getElementById('editDeadlineContainer').appendChild(createDeadlineElement(c, d, t, isResub, openD, openT));
+  function addEditDeadlineRow(c, d, t, openD, openT, resubD, resubT) {
+    document.getElementById('editDeadlineContainer').appendChild(createDeadlineElement(c, d, t, openD, openT, resubD, resubT));
   }
 
   // ✅ 반 배정 체크박스 빌더
@@ -2581,15 +2598,14 @@
       var cls = row.querySelector('.dl-class').value;
       var date = row.querySelector('.dl-date').value;
       var time = row.querySelector('.dl-time').value;
-      var isResub = row.querySelector('.dl-is-resub').checked;
       var openDate = row.querySelector('.dl-open-date').value;
       var openTime = row.querySelector('.dl-open-time').value;
+      var resubDate = row.querySelector('.dl-resub-date').value;
+      var resubTime = row.querySelector('.dl-resub-time').value;
       if (cls && date) {
-        var key = isResub ? 'resub_' + cls : cls;
-        d[key] = date + 'T' + (time || '23:59');
-        if (!isResub && openDate) {
-          d['open_' + cls] = openDate + 'T' + (openTime || '00:00');
-        }
+        d[cls] = date + 'T' + (time || '23:59');
+        if (openDate) d['open_' + cls] = openDate + 'T' + (openTime || '00:00');
+        if (resubDate) d['resub_' + cls] = resubDate + 'T' + (resubTime || '23:59');
       }
     });
     // ✅ 반 배정: 일부 반만 선택된 경우 _classes 키 저장
@@ -2680,29 +2696,29 @@
     // ✅ 반 배정 체크박스 — _classes 키 기반
     buildClassCheckboxes('editClassAssignment', d['_classes'] || []);
 
-    if (Object.keys(d).length === 0) {
-      addEditDeadlineRow('all', '', '23:59', false, '', '00:00');
+    var hasMain = Object.keys(d).some(function(k){ return !k.startsWith('open_') && !k.startsWith('resub_') && k !== '_classes'; });
+    if (!hasMain && Object.keys(d).length === 0) {
+      addEditDeadlineRow('', '', '23:59', '', '00:00', '', '');
     } else {
+      function fmtDate(dt) { return dt.getFullYear() + '-' + String(dt.getMonth()+1).padStart(2,'0') + '-' + String(dt.getDate()).padStart(2,'0'); }
+      function fmtTime(dt) { return String(dt.getHours()).padStart(2,'0') + ':' + String(dt.getMinutes()).padStart(2,'0'); }
+      var seenResub = {};
+      // 본 마감일이 있는 반 먼저
       for (var k in d) {
-        if (k.startsWith('open_') || k === '_classes') continue;
-        var isResub = k.startsWith('resub_');
-        var realCls = isResub ? k.replace('resub_', '') : k;
-        var dt = new Date(d[k]);
-        if (isNaN(dt.getTime())) continue;
-        var dateStr = dt.getFullYear() + "-" + String(dt.getMonth()+1).padStart(2,'0') + "-" + String(dt.getDate()).padStart(2,'0');
-        var timeStr = String(dt.getHours()).padStart(2,'0') + ":" + String(dt.getMinutes()).padStart(2,'0');
+        if (k.startsWith('open_') || k.startsWith('resub_') || k === '_classes') continue;
+        var dt = new Date(d[k]); if (isNaN(dt.getTime())) continue;
         var openDateStr = '', openTimeStr = '';
-        if (!isResub) {
-          var openKey = 'open_' + realCls;
-          if (d[openKey]) {
-            var oDt = new Date(d[openKey]);
-            if (!isNaN(oDt.getTime())) {
-              openDateStr = oDt.getFullYear() + "-" + String(oDt.getMonth()+1).padStart(2,'0') + "-" + String(oDt.getDate()).padStart(2,'0');
-              openTimeStr = String(oDt.getHours()).padStart(2,'0') + ":" + String(oDt.getMinutes()).padStart(2,'0');
-            }
-          }
-        }
-        addEditDeadlineRow(realCls, dateStr, timeStr, isResub, openDateStr, openTimeStr);
+        if (d['open_' + k]) { var od = new Date(d['open_' + k]); if (!isNaN(od.getTime())) { openDateStr = fmtDate(od); openTimeStr = fmtTime(od); } }
+        var resubDateStr = '', resubTimeStr = '';
+        if (d['resub_' + k]) { var rd = new Date(d['resub_' + k]); if (!isNaN(rd.getTime())) { resubDateStr = fmtDate(rd); resubTimeStr = fmtTime(rd); } seenResub['resub_' + k] = true; }
+        addEditDeadlineRow(k, fmtDate(dt), fmtTime(dt), openDateStr, openTimeStr, resubDateStr, resubTimeStr);
+      }
+      // resub만 단독 존재하는 행 (이전 형식 호환)
+      for (var k in d) {
+        if (!k.startsWith('resub_') || seenResub[k] || k === '_classes') continue;
+        var cls = k.replace('resub_', '');
+        var rd = new Date(d[k]); if (isNaN(rd.getTime())) continue;
+        addEditDeadlineRow(cls, '', '', '', '', fmtDate(rd), fmtTime(rd));
       }
     }
     document.getElementById('editTaskModal').style.display = 'flex';
