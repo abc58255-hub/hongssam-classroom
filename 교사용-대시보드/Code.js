@@ -90,9 +90,10 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
 // 선택한 학생들에게 알림 발송 (클라이언트에서 호출)
 function sendPushToStudents(studentIds, title, body, tag, filterClass) {
   try {
-    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
+    var ss    = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = ss.getSheetByName('학생명부');
     var data  = sheet.getDataRange().getValues();
-    var clickUrl = _getSys(SpreadsheetApp.openById(SHEET_ID), '바로가기_수학교실') || '';
+    var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var sent = 0, skipped = 0;
     var idSet = studentIds ? new Set(studentIds.map(String)) : null;
     for (var i = 1; i < data.length; i++) {
@@ -788,10 +789,21 @@ function toggleTaskVisibility(n, p) {
     for (let i = 1; i < sd.length; i++) {
       if (String(sd[i][3]).split(' (')[0] === n) updates.push(i + 1);
     }
-    updates.forEach(function(row) { s.getRange(row, 14).setValue(val); });
+    // 배치 업데이트: setValue 다중 호출 → 연속 범위 묶어서 처리
+    let start = null, prev = null;
+    function flushRange(from, to) {
+      const numRows = to - from + 1;
+      s.getRange(from, 14, numRows, 1).setValues(Array(numRows).fill([val]));
+    }
+    updates.sort(function(a, b) { return a - b; }).forEach(function(row) {
+      if (start === null) { start = row; prev = row; }
+      else if (row === prev + 1) { prev = row; }
+      else { flushRange(start, prev); start = row; prev = row; }
+    });
+    if (start !== null) flushRange(start, prev);
     clearCache();
     return { success: true };
-  } catch(e) { return { success: false }; }
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 function bulkPublishTasks(n, c) {
@@ -809,7 +821,7 @@ function bulkPublishTasks(n, c) {
     }
     rows.forEach(function(row) { s.getRange(row, 14).setValue("공개"); });
     return { success: true };
-  } catch(e) { return { success: false }; }
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 // ✅ 과제 목록만 빠르게 로딩 (parseTasks는 5분 캐시 사용)
@@ -1101,7 +1113,7 @@ function saveMultiAnnotatedImages(rowIdx, payloadArray, studentId, studentName, 
 
 function cancelBestWork(r) {
   try { SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황").getRange(r, 17, 1, 4).clearContent(); return { success: true }; }
-  catch(e) { return { success: false }; }
+  catch(e) { return { success: false, message: e.toString() }; }
 }
 
 // ✅ 공개 범위 변경 (학급공개 ↔ 학년공개)

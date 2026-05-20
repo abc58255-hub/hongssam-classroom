@@ -4,14 +4,21 @@ const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
 function doGet() { return HtmlService.createHtmlOutputFromFile('index').setTitle('우리 반 교실').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).addMetaTag('viewport', 'width=device-width, initial-scale=1'); }
 function getHash(text) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text).map(e => (e < 0 ? e + 256 : e).toString(16).padStart(2, '0')).join(''); }
 
+var _sysHrCache_ = null;
 function _getSysHrKey_(key) {
-  var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-  if (!sh || sh.getLastRow() < 2) return '';
-  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
-  for (var i = 0; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+  if (!_sysHrCache_) {
+    _sysHrCache_ = {};
+    try {
+      var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+      if (sh && sh.getLastRow() >= 2) {
+        var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+        for (var i = 0; i < rows.length; i++) {
+          _sysHrCache_[String(rows[i][0]).trim()] = String(rows[i][1] || '').trim();
+        }
+      }
+    } catch(e) {}
   }
-  return '';
+  return _sysHrCache_[key] || '';
 }
 
 function _getParentFolderId_() {

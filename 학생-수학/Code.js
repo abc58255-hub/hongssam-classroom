@@ -360,20 +360,21 @@ function requestResubmission(rowIdx) {
 
 function processForm(formData) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황"); 
+    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const sheet = ss.getSheetByName("제출현황");
     const now = new Date();
-    let inputId = String(formData.studentId || "").trim(); 
+    let inputId = String(formData.studentId || "").trim();
     let inputName = String(formData.studentName || "").trim();
-    let isResubmit = formData.isResubmit === "true"; 
+    let isResubmit = formData.isResubmit === "true";
     let baseTaskName = formData.taskName;
-    
-    let incomingFiles = formData.filesData; 
-    let fileHashObj = {}; 
+
+    let incomingFiles = formData.filesData;
+    let fileHashObj = {};
     const records = sheet.getDataRange().getValues();
     incomingFiles.forEach(f => { fileHashObj[f.key] = getHash(Utilities.base64Decode(f.b64)); });
 
     // ✅ 마감일 서버측 검증
-    const taskSheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("과제설정");
+    const taskSheet = ss.getSheetByName("과제설정");
     if (taskSheet) {
       const taskRows = taskSheet.getDataRange().getValues();
       const className = inputId.length >= 2 ? `${inputId.substring(0,1)}학년 ${inputId.substring(1,2)}반` : "기타";
@@ -557,30 +558,26 @@ function _getParentFolderId_() {
   return _getSysStudent('드라이브폴더ID') || '1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H';
 }
 
+var _sysStudentCache_ = null;
 function _getSysStudent(key) {
-  var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-  if (!sh || sh.getLastRow() < 2) return '';
-  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
-  for (var i = 0; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+  if (!_sysStudentCache_) {
+    _sysStudentCache_ = {};
+    try {
+      var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+      if (sh && sh.getLastRow() >= 2) {
+        var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+        for (var i = 0; i < rows.length; i++) {
+          _sysStudentCache_[String(rows[i][0]).trim()] = String(rows[i][1] || '').trim();
+        }
+      }
+    } catch(e) {}
   }
-  return '';
+  return _sysStudentCache_[key] || '';
 }
 
 function _getApiSettingsForStudent() {
   var orKey = _getSysStudent('OpenRouter키');
   var model = _getSysStudent('AI모델명');
-  // 구 구조 폴백 (P2:Q2)
-  if (!orKey) {
-    try {
-      var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-      if (sh) {
-        var old = sh.getRange('P2:Q2').getValues()[0];
-        if (!orKey) orKey = String(old[0] || '').trim();
-        if (!model) model = String(old[1] || '').trim();
-      }
-    } catch(e) {}
-  }
   if (model === 'google/gemini-2.5-flash-preview') model = 'google/gemini-2.5-flash';
   if (model === 'google/gemini-2.5-pro-preview')   model = 'google/gemini-2.5-pro';
   return {

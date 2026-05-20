@@ -36,6 +36,8 @@ function registerStudent(studentId, studentName, password, inputCode) {
     return { success: false, message: "🚨 가입 코드가 틀렸거나, 현재 가입 기간이 아닙니다." };
   }
 
+  const rosterSheet = ss.getSheetByName('학생명부');
+  if (!rosterSheet) return { success: false, message: "학생 명부를 찾을 수 없습니다." };
   const data = rosterSheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][1]).trim() === String(studentId).trim() &&
