@@ -228,9 +228,10 @@
   <div class="sidebar-header">
     <div style="font-size:22px; font-weight:900; color:#38bdf8; letter-spacing:-0.5px;">✏️ 홍쌤의 교실</div>
     <div style="font-size:11px; color:#475569; margin-top:5px; font-weight:600;">수학 과제 관리 시스템</div>
+    <div id="gradingStatusBar" style="display:none; margin-top:10px; background:#1e293b; border-radius:8px; padding:8px 10px; font-size:12px; line-height:1.8;"></div>
   </div>
   <ul class="menu-list">
-    <li class="menu-item active" onclick="switchPage('page-grade', this)">✍️ 채점 / 첨삭</li>
+    <li class="menu-item active" onclick="switchPage('page-grade', this)">✍️ 채점 / 첨삭 <span id="ungradedBadge" style="display:none; margin-left:auto; background:#ef4444; color:white; font-size:11px; font-weight:900; padding:2px 7px; border-radius:10px; min-width:18px; text-align:center;"></span></li>
     <li class="menu-item" onclick="switchPage('page-manage', this)">⚙️ 수학 과제 관리</li>
     <li class="menu-item" onclick="switchPage('page-report', this)">👥 미제출자 명단</li>
     <li class="menu-item" onclick="switchPage('page-stats', this)">📈 반별 성취도 분석</li>
@@ -1864,6 +1865,7 @@
         if (hrStr) { let el = document.getElementById('hrTitle'); if (el) el.innerText = "🏫 " + hrStr + " 활동 모아보기"; }
         globalDefaultSlideUrl = data.defaultSlideUrl || "";
         if (data.alarmRegisterUrl) ALARM_REGISTER_URL = data.alarmRegisterUrl;
+        updateGradingStatus();
         populateFilters();
         if (curClass && document.getElementById('classFilter')) document.getElementById('classFilter').value = curClass;
         if (curTask && document.getElementById('taskFilter')) document.getElementById('taskFilter').value = curTask;
@@ -6656,6 +6658,41 @@
     }
     document.getElementById('portfolioResult').innerHTML = h;
   }
+  function updateGradingStatus() {
+    var ungraded = allSubmissions.filter(function(x) {
+      var s = x.status || '';
+      return s !== '채점완료' && s !== '이전기록채점완료' && s !== '재제출완료';
+    });
+    var waiting   = ungraded.filter(function(x) { return !x.status || x.status === '제출' || x.status === '채점중'; });
+    var resubReq  = ungraded.filter(function(x) { return x.status === '재제출요청'; });
+
+    var badge = document.getElementById('ungradedBadge');
+    var bar   = document.getElementById('gradingStatusBar');
+    var total = waiting.length + resubReq.length;
+
+    if (badge) {
+      if (total > 0) {
+        badge.textContent = total;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    if (bar) {
+      if (total > 0) {
+        var parts = [];
+        if (waiting.length  > 0) parts.push('<span style="color:#f87171;">✍️ 미채점 ' + waiting.length + '건</span>');
+        if (resubReq.length > 0) parts.push('<span style="color:#fbbf24;">🔄 재제출 대기 ' + resubReq.length + '건</span>');
+        bar.innerHTML = parts.join('&nbsp;&nbsp;');
+        bar.style.display = 'block';
+      } else {
+        bar.innerHTML = '<span style="color:#34d399;">✅ 모든 제출 채점 완료</span>';
+        bar.style.display = 'block';
+      }
+    }
+  }
+
   var _statTooltipOpen = null;
   function showStatTooltip(el, event) {
     if (_statTooltipOpen === el) return;
