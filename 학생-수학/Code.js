@@ -722,7 +722,9 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
     });
 
     if (res.getResponseCode() !== 200) {
-      return { success: false, message: 'API 오류 ' + res.getResponseCode() };
+      var errBody = '';
+      try { errBody = JSON.parse(res.getContentText()).error.message; } catch(e) { errBody = res.getContentText().substring(0, 200); }
+      return { success: false, message: 'API 오류 ' + res.getResponseCode() + ': ' + errBody };
     }
 
     let text = JSON.parse(res.getContentText()).choices[0].message.content.trim();
