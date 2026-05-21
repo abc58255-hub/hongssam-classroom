@@ -2348,7 +2348,9 @@ function aiGradeSubmission(params) {
     const code = res.getResponseCode();
     if (code !== 200) {
       const err = JSON.parse(res.getContentText());
-      return { success: false, message: 'API 오류(' + code + '): ' + ((err.error && err.error.message) || res.getContentText()) };
+      const raw = (err.error && err.error.metadata && err.error.metadata.raw) || '';
+      const msg = (err.error && err.error.message) || res.getContentText();
+      return { success: false, message: 'API 오류(' + code + '): ' + msg + (raw ? ' | ' + raw : '') };
     }
 
     let text = JSON.parse(res.getContentText()).choices[0].message.content.trim();
