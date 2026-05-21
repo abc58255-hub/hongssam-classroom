@@ -88,16 +88,22 @@ function verifyLogin(studentId, studentName, password) {
   return { success: false, message: "정보 확인 요망" }; 
 }
 
-function getSecureFileBase64(url) { 
-  try { 
-    return { 
-      success: true, 
-      mimeType: DriveApp.getFileById(url.match(/[-\w]{25,}/)[0]).getBlob().getContentType(), 
-      data: Utilities.base64Encode(DriveApp.getFileById(url.match(/[-\w]{25,}/)[0]).getBlob().getBytes()) 
-    }; 
-  } catch(e) { 
-    return { success: false, message: "파일 열기 실패" }; 
-  } 
+function _normalizeImageMime(mime) {
+  if (!mime) return 'image/jpeg';
+  const m = mime.toLowerCase();
+  if (m === 'image/jpg' || m === 'image/jpe' || m === 'image/jfif') return 'image/jpeg';
+  if (['image/jpeg','image/png','image/gif','image/webp'].indexOf(m) >= 0) return m;
+  return null;
+}
+function getSecureFileBase64(url) {
+  try {
+    const f = DriveApp.getFileById(url.match(/[-\w]{25,}/)[0]);
+    const mime = _normalizeImageMime(f.getMimeType());
+    if (!mime) return { success: false, message: '지원하지 않는 형식: ' + f.getMimeType() };
+    return { success: true, mimeType: mime, data: Utilities.base64Encode(f.getBlob().getBytes()) };
+  } catch(e) {
+    return { success: false, message: "파일 열기 실패" };
+  }
 }
 
 // =====================================================
@@ -629,11 +635,9 @@ function _getRubricFileBase64Student(url) {
     if (!fileId) return { success: false };
     const f = DriveApp.getFileById(fileId[0]);
     if (f.getSize() > 10485760) return { success: false };
-    return {
-      success: true,
-      mimeType: f.getMimeType(),
-      data: Utilities.base64Encode(f.getBlob().getBytes())
-    };
+    const mime = _normalizeImageMime(f.getMimeType());
+    if (!mime && !f.getMimeType().includes('pdf')) return { success: false };
+    return { success: true, mimeType: mime || f.getMimeType(), data: Utilities.base64Encode(f.getBlob().getBytes()) };
   } catch(e) { return { success: false }; }
 }
 

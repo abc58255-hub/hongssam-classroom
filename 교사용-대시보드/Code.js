@@ -894,12 +894,12 @@ function saveFeedback(r, f, a, sc, p, m, bestType, bestAnon, bestComment) {
 function getSecureFileBase64(url) {
   try {
     const f = DriveApp.getFileById(url.match(/[-\w]{25,}/)[0]);
-    const m = f.getMimeType().toLowerCase();
-    if (m.includes("heic") || m.includes("heif")) return { success: false, message: "HEIC 불가" };
     if (f.getSize() > 10485760) return { success: false, message: "용량 초과 (10MB)" };
+    const rawMime = f.getMimeType().toLowerCase();
+    const mime = _normalizeImageMime(rawMime);
+    if (!mime) return { success: false, message: "지원하지 않는 형식: " + rawMime };
     const b = f.getBlob();
-    // PDF는 mimeType 그대로 전달 (OpenRouter가 지원)
-    return { success: true, mimeType: b.getContentType(), data: Utilities.base64Encode(b.getBytes()) };
+    return { success: true, mimeType: mime, data: Utilities.base64Encode(b.getBytes()) };
   } catch(e) { return { success: false }; }
 }
 
@@ -2217,16 +2217,24 @@ function deleteRubric(rowIdx) {
 }
 
 // Drive 파일 → base64 (채점기준용, PDF 포함)
+function _normalizeImageMime(mime) {
+  if (!mime) return 'image/jpeg';
+  const m = mime.toLowerCase();
+  if (m === 'image/jpg' || m === 'image/jpe' || m === 'image/jfif') return 'image/jpeg';
+  if (['image/jpeg','image/png','image/gif','image/webp'].indexOf(m) >= 0) return m;
+  return null; // 지원 불가
+}
 function getRubricFileBase64(url) {
   try {
     if (!url || !url.includes('drive.google.com')) return { success: false, message: 'Drive URL이 아닙니다.' };
     const fileId = url.match(/[-\w]{25,}/);
     if (!fileId) return { success: false, message: 'File ID 추출 실패' };
     const f    = DriveApp.getFileById(fileId[0]);
-    const mime = f.getMimeType();
     if (f.getSize() > 10485760) return { success: false, message: '파일 크기 10MB 초과' };
+    const mime = _normalizeImageMime(f.getMimeType());
+    if (!mime && !f.getMimeType().includes('pdf')) return { success: false, message: '지원하지 않는 이미지 형식: ' + f.getMimeType() };
     const b64  = Utilities.base64Encode(f.getBlob().getBytes());
-    return { success: true, mimeType: mime, data: b64, name: f.getName() };
+    return { success: true, mimeType: mime || f.getMimeType(), data: b64, name: f.getName() };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
