@@ -2337,6 +2337,7 @@ function aiGradeSubmission(params) {
       }
     }
 
+    messages.unshift({ role: 'system', content: '당신은 수학 채점 AI입니다. 반드시 JSON 객체만 반환하세요. 설명, 마크다운, 추가 텍스트 없이 오직 { } 형태의 JSON만 출력하세요.' });
     messages.push({ role: 'user', content: content });
 
     // API 호출
@@ -2349,10 +2350,11 @@ function aiGradeSubmission(params) {
         'X-Title':        'Teacher Dashboard'
       },
       payload: JSON.stringify({
-        model:       cfg.model || 'google/gemini-3.5-flash',
-        messages:    messages,
-        max_tokens:  1000,
-        temperature: 0.2
+        model:           cfg.model || 'google/gemini-3.5-flash',
+        messages:        messages,
+        max_tokens:      1000,
+        temperature:     0.2,
+        response_format: { type: 'json_object' }
       }),
       muteHttpExceptions: true
     });
