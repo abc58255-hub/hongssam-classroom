@@ -8298,7 +8298,7 @@
         var color = inFlight ? '#6366f1' : '#94a3b8';
         statusCell = '<span style="font-size:12px;color:'+color+';">'+txt+'</span>';
       } else if (res._error) {
-        statusCell = '<span style="font-size:11px;color:#dc2626;" title="'+res.message+'">❌ 오류</span>';
+        statusCell = '<span style="font-size:11px;color:#dc2626;">❌ ' + (res.message || '오류') + '</span>';
       } else {
         var ci   = res.confidence==='high'?'🟢':res.confidence==='low'?'🔴':'🟡';
         var scoreText = res.grade

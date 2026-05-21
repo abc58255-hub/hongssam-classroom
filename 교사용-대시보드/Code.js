@@ -2337,7 +2337,7 @@ function aiGradeSubmission(params) {
         'X-Title':        'Teacher Dashboard'
       },
       payload: JSON.stringify({
-        model:       cfg.model || 'google/gemini-2.5-flash',
+        model:       cfg.model || 'google/gemini-3.5-flash',
         messages:    messages,
         max_tokens:  1000,
         temperature: 0.2
