@@ -696,7 +696,11 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
       content.push({ type: 'text', text: roleLabel });
       const rFile = _getRubricFileBase64Student(rf.url);
       if (rFile.success) {
-        content.push({ type: 'image_url', image_url: { url: 'data:' + rFile.mimeType + ';base64,' + rFile.data } });
+        if (rFile.mimeType && rFile.mimeType.includes('pdf')) {
+          content.push({ type: 'text', text: '(PDF 채점기준은 텍스트 기준 참고)' });
+        } else {
+          content.push({ type: 'image_url', image_url: { url: 'data:' + rFile.mimeType + ';base64,' + rFile.data } });
+        }
       }
     });
 

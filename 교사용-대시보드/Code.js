@@ -2313,7 +2313,11 @@ function aiGradeSubmission(params) {
       content.push({ type: 'text', text: roleLabel });
       const rubricFile = getRubricFileBase64(rf.url);
       if (rubricFile.success) {
-        content.push({ type: 'image_url', image_url: { url: 'data:' + rubricFile.mimeType + ';base64,' + rubricFile.data } });
+        if (rubricFile.mimeType && rubricFile.mimeType.includes('pdf')) {
+          content.push({ type: 'text', text: '(PDF 채점기준 파일은 텍스트 기준을 참고하세요: ' + (rf.name || '') + ')' });
+        } else {
+          content.push({ type: 'image_url', image_url: { url: 'data:' + rubricFile.mimeType + ';base64,' + rubricFile.data } });
+        }
       } else {
         content.push({ type: 'text', text: '(파일 로드 실패: ' + rubricFile.message + ')' });
       }

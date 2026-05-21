@@ -7253,6 +7253,23 @@
     }
     addNext(0);
   }
+  function _remapModelId(m) {
+    var map = {
+      'google/gemini-2.5-flash-preview':    'google/gemini-2.5-flash',
+      'google/gemini-2.5-pro-preview':      'google/gemini-2.5-pro',
+      'google/gemini-2.0-flash-001':        'google/gemini-2.5-flash',
+      'anthropic/claude-sonnet-latest':     'anthropic/claude-sonnet-4.6',
+      'anthropic/claude-haiku-latest':      'anthropic/claude-haiku-4.5',
+      'anthropic/claude-opus-latest':       'anthropic/claude-opus-4.7',
+      'anthropic/claude-haiku-4-5':         'anthropic/claude-haiku-4.5',
+      'anthropic/claude-sonnet-4-6':        'anthropic/claude-sonnet-4.6',
+      'anthropic/claude-opus-4-7':          'anthropic/claude-opus-4.7',
+      'anthropic/claude-3-haiku':           'anthropic/claude-3-haiku',
+      'anthropic/claude-3.5-haiku':         'anthropic/claude-3.5-haiku',
+      'anthropic/claude-3.5-sonnet':        'anthropic/claude-sonnet-4.6'
+    };
+    return map[m] || m;
+  }
   var OR_MODEL_PRICE = {
     'google/gemini-3.5-flash':          { in: 1.50,  out: 9.00  },
     'google/gemini-3.1-pro-preview':    { in: 2.00,  out: 12.00 },
@@ -7346,13 +7363,7 @@
         }
         var sel = document.getElementById('aiModelSelect');
         if (sel && res.model) {
-          var m = res.model;
-          if (m === 'google/gemini-2.5-flash-preview') m = 'google/gemini-2.5-flash';
-          if (m === 'google/gemini-2.5-pro-preview')   m = 'google/gemini-2.5-pro';
-          if (m === 'google/gemini-2.0-flash-001')     m = 'google/gemini-2.5-flash';
-          if (m === 'anthropic/claude-3-haiku' || m === 'anthropic/claude-3.5-haiku') m = 'anthropic/claude-haiku-4-5';
-          if (m === 'anthropic/claude-sonnet-4-5' || m === 'anthropic/claude-3.5-sonnet') m = 'anthropic/claude-sonnet-4-6';
-          sel.value = m;
+          sel.value = _remapModelId(res.model);
           updateModelPriceHint();
         }
         updateAiStatusBadge(res);
@@ -7765,7 +7776,7 @@
     google.script.run
       .withSuccessHandler(function(res) {
         var sel = document.getElementById('rubricModelSelect');
-        if (sel && res.model) { sel.value = res.model; updateRubricModelHint(); }
+        if (sel && res.model) { sel.value = _remapModelId(res.model); updateRubricModelHint(); }
       })
       .getApiSettings();
     var sel = document.getElementById('rubricTaskName');
