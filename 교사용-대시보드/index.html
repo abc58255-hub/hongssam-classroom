@@ -451,6 +451,32 @@
         <textarea id="rubricCriteria" class="form-input" rows="8" style="resize:vertical;min-height:160px;font-size:13px;line-height:1.7;" placeholder="파일로 전달하기 어려운 추가 기준을 입력해주세요.&#10;예) 단위 표기 누락 시 1점 감점&#10;예) 풀이 과정 없으면 0점&#10;예) 검토과정 필수"></textarea>
       </div>
 
+      <!-- AI 모델 선택 -->
+      <div style="margin-bottom:16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;">
+        <label class="form-label">🤖 AI 채점 모델</label>
+        <select id="rubricModelSelect" class="form-input" style="margin-bottom:4px;" onchange="updateRubricModelHint()">
+          <optgroup label="🔵 Google Gemini">
+            <option value="google/gemini-3.5-flash">google/gemini-3.5-flash ⭐ 권장</option>
+            <option value="google/gemini-3.1-flash-lite">google/gemini-3.1-flash-lite (저렴)</option>
+          </optgroup>
+          <optgroup label="🟣 Anthropic Claude">
+            <option value="anthropic/claude-opus-4.7">anthropic/claude-opus-4.7 (최고성능)</option>
+            <option value="anthropic/claude-sonnet-latest">anthropic/claude-sonnet-latest (균형)</option>
+            <option value="anthropic/claude-haiku-latest">anthropic/claude-haiku-latest (저렴)</option>
+          </optgroup>
+          <optgroup label="🟢 OpenAI">
+            <option value="openai/gpt-5.4">openai/gpt-5.4</option>
+            <option value="openai/gpt-5.4-mini">openai/gpt-5.4-mini (저렴)</option>
+            <option value="openai/gpt-5.4-nano">openai/gpt-5.4-nano (매우 저렴)</option>
+          </optgroup>
+          <optgroup label="🔶 DeepSeek">
+            <option value="deepseek/deepseek-v4-flash">deepseek/deepseek-v4-flash (저렴)</option>
+            <option value="deepseek/deepseek-v4-pro">deepseek/deepseek-v4-pro (고품질)</option>
+          </optgroup>
+        </select>
+        <div id="rubricModelHint" style="font-size:11px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:6px 10px;display:none;"></div>
+      </div>
+
       <button onclick="saveRubricData()" style="width:100%;background:#6366f1;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">💾 채점기준 저장</button>
     </div>
   </div>
@@ -7668,6 +7694,17 @@
     });
     return qs;
   }
+  function updateRubricModelHint() {
+    var sel = document.getElementById('rubricModelSelect');
+    var hint = document.getElementById('rubricModelHint');
+    if (!sel || !hint) return;
+    var p = OR_MODEL_PRICE[sel.value];
+    if (!p) { hint.style.display = 'none'; return; }
+    var cost = (2500 * p.in + 300 * p.out) / 1000000;
+    hint.style.display = 'block';
+    hint.innerHTML = '채점 1건당 약 <b style="color:#4f46e5;">$' + cost.toFixed(5) + '</b>'
+      + ' <span style="color:#94a3b8;">(≈ ' + (cost * 1400).toFixed(1) + '원)</span>';
+  }
   function openRubricManager() {
     rubricFiles = [];
     rubricQuestionCount = 0;
@@ -7677,6 +7714,12 @@
     document.getElementById('rubricQuestionList').innerHTML = '';
     renderRubricFileList();
     updateRubricScoreUI();
+    google.script.run
+      .withSuccessHandler(function(res) {
+        var sel = document.getElementById('rubricModelSelect');
+        if (sel && res.model) { sel.value = res.model; updateRubricModelHint(); }
+      })
+      .getApiSettings();
     var sel = document.getElementById('rubricTaskName');
     if (sel) {
       sel.innerHTML = '<option value="">과제 선택</option>';
@@ -7730,8 +7773,10 @@
     var evalType = document.getElementById('rubricEvalType').value;
     var criteria = document.getElementById('rubricCriteria').value.trim();
     var rowIdx   = parseInt(document.getElementById('rubricRowIdx').value)||null;
+    var model    = (document.getElementById('rubricModelSelect')||{}).value;
     if (!taskName) return alert('과제를 선택해주세요.');
     if (rubricFiles.length===0 && !criteria) return alert('채점기준 파일 또는 설명을 입력해주세요.');
+    if (model) google.script.run.saveApiSetting('Q2', model);
     var questions = (evalType==='문항별점수제') ? getRubricQuestions() : {};
     var maxScore  = evalType==='점수제' ? (parseInt(document.getElementById('rubricMaxScore').value)||10)
                   : evalType==='문항별점수제' ? Object.values(questions).reduce(function(s,q){return s+(q.maxScore||0);},0) : 0;
