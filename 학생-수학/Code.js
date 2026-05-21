@@ -725,7 +725,6 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
         model: cfg.model,
         messages: [sysMsg, { role: 'user', content: content }],
         max_tokens: 1000,
-        response_format: { type: 'json_object' },
         temperature: 0.2
       }),
       muteHttpExceptions: true

@@ -2354,7 +2354,7 @@ function aiGradeSubmission(params) {
         messages:        messages,
         max_tokens:      1000,
         temperature:     0.2,
-        response_format: { type: 'json_object' }
+        temperature: 0.2
       }),
       muteHttpExceptions: true
     });
