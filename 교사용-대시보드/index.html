@@ -490,7 +490,9 @@
             <option value="x-ai/grok-4.20">grok-4.20</option>
           </optgroup>
         </select>
-        <div id="rubricModelHint" style="font-size:11px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:6px 10px;display:none;"></div>
+        <div id="rubricModelHint" style="font-size:11px;color:#6366f1;background:#eef2ff;border-radius:6px;padding:6px 10px;margin-bottom:6px;display:none;"></div>
+        <button onclick="saveRubricModel()" style="width:100%;background:#0f172a;color:white;border:none;padding:8px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">✅ 이 모델로 결정</button>
+        <div id="rubricModelSaveMsg" style="font-size:11px;color:#10b981;text-align:center;margin-top:4px;display:none;">저장됐어요!</div>
       </div>
 
       <button onclick="saveRubricData()" style="width:100%;background:#6366f1;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">💾 채점기준 저장</button>
@@ -7753,6 +7755,16 @@
     });
     return qs;
   }
+  function saveRubricModel() {
+    var model = (document.getElementById('rubricModelSelect') || {}).value;
+    if (!model) return;
+    var msg = document.getElementById('rubricModelSaveMsg');
+    google.script.run
+      .withSuccessHandler(function() {
+        if (msg) { msg.style.display = 'block'; setTimeout(function(){ msg.style.display = 'none'; }, 2000); }
+      })
+      .saveApiSetting('Q2', model);
+  }
   function updateRubricModelHint() {
     var sel = document.getElementById('rubricModelSelect');
     var hint = document.getElementById('rubricModelHint');
@@ -7832,10 +7844,8 @@
     var evalType = document.getElementById('rubricEvalType').value;
     var criteria = document.getElementById('rubricCriteria').value.trim();
     var rowIdx   = parseInt(document.getElementById('rubricRowIdx').value)||null;
-    var model    = (document.getElementById('rubricModelSelect')||{}).value;
     if (!taskName) return alert('과제를 선택해주세요.');
     if (rubricFiles.length===0 && !criteria) return alert('채점기준 파일 또는 설명을 입력해주세요.');
-    if (model) google.script.run.saveApiSetting('Q2', model);
     var questions = (evalType==='문항별점수제') ? getRubricQuestions() : {};
     var maxScore  = evalType==='점수제' ? (parseInt(document.getElementById('rubricMaxScore').value)||10)
                   : evalType==='문항별점수제' ? Object.values(questions).reduce(function(s,q){return s+(q.maxScore||0);},0) : 0;

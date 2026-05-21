@@ -2367,8 +2367,10 @@ function aiGradeSubmission(params) {
 
     let text = JSON.parse(res.getContentText()).choices[0].message.content.trim();
     text = text.replace(/^```[a-z]*\n?/i,'').replace(/\n?```$/,'').trim();
-
-    const result = JSON.parse(text);
+    // JSON 블록만 추출 (앞뒤 설명 텍스트 제거)
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { success: false, message: 'JSON 파싱 실패: ' + text.substring(0, 100) };
+    const result = JSON.parse(jsonMatch[0]);
     result.rowIdx      = params.rowIdx;
     result.studentId   = params.studentId;
     result.studentName = params.studentName;

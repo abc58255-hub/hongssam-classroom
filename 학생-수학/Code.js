@@ -740,7 +740,9 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
 
     let text = JSON.parse(res.getContentText()).choices[0].message.content.trim();
     text = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
-    const result = JSON.parse(text);
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) return { success: false, message: 'JSON 파싱 실패: ' + text.substring(0, 100) };
+    const result = JSON.parse(jsonMatch[0]);
 
     sheet.getRange(rowIdx, 23).setValue(JSON.stringify(result));
 
