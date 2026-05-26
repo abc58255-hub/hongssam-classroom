@@ -6529,7 +6529,16 @@
   function openAlarmQRModal(type) {
     var isIos = (type === 'ios');
     // register.html은 UI 없는 iframe 전용 → 항상 루트 index.html 사용
-    var targetUrl = ALARM_REGISTER_URL.replace(/\/register\.html$/, '/').replace(/\/$/, '') + '/';
+    var base = ALARM_REGISTER_URL.replace(/\/register\.html$/, '/').replace(/\/$/, '') + '/';
+    var mathUrl = appLinkCache['student'];
+    if (!mathUrl) {
+      google.script.run.withSuccessHandler(function(res){
+        if (res && res.url) { appLinkCache['student'] = res.url; openAlarmQRModal(type); }
+        else { alert('수학교실 URL이 시스템설정에 없어요. 바로가기_수학교실 셀을 먼저 설정해주세요.'); }
+      }).getAppLinkUrl('바로가기_수학교실');
+      return;
+    }
+    var targetUrl = base + '?gas=' + encodeURIComponent(mathUrl);
     var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(targetUrl);
     var title  = isIos ? '🍎 아이폰 알림 등록' : '🤖 갤럭시/안드로이드 알림 등록';
     var guide  = isIos
