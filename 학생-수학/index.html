@@ -1373,7 +1373,8 @@
 
   function showAndroidFcmBanner(studentId) {
     if (document.getElementById('androidFcmBanner')) return;
-    var regUrl = FCM_REGISTER_URL + '?sid=' + encodeURIComponent(studentId) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
+    var base = FCM_REGISTER_URL.replace(/\/register\.html$/, '/').replace(/\/$/, '') + '/';
+    var regUrl = base + '?sid=' + encodeURIComponent(studentId) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
     var banner = document.createElement('div');
     banner.id = 'androidFcmBanner';
     banner.style.cssText = 'position:fixed;bottom:70px;left:12px;right:12px;background:#1e3a8a;color:white;border-radius:14px;padding:14px 16px;z-index:9000;display:flex;align-items:center;gap:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);';
@@ -1453,11 +1454,13 @@
 
   function openNotifSetup() {
     var sid = (currentUser && currentUser.id) || '';
-    if (!FCM_REGISTER_URL) return;
-    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-    var url = isIOS
-      ? FCM_REGISTER_URL.replace('/register.html', '') + '/?sid=' + encodeURIComponent(sid) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '')
-      : FCM_REGISTER_URL + '?sid=' + encodeURIComponent(sid) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
+    if (!FCM_REGISTER_URL) {
+      alert('⚠️ 알림 등록 URL이 설정되지 않았습니다.\n선생님께 시스템설정 시트의 FCM_REGISTER_URL 항목 확인을 요청해주세요.');
+      return;
+    }
+    // register.html은 UI 없는 iframe 전용 페이지 → 항상 루트 index.html 사용
+    var base = FCM_REGISTER_URL.replace(/\/register\.html$/, '/').replace(/\/$/, '') + '/';
+    var url = base + '?sid=' + encodeURIComponent(sid) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
     window.open(url, '_blank');
     localStorage.setItem('fcm_registered_' + sid, '1');
     var btn = document.getElementById('notifSetupBtn');
@@ -1467,7 +1470,7 @@
   // 로그인 성공 후 FCM 초기화 (doLogin 함수의 성공 핸들러에서 호출됨)
   function onLoginSuccess(studentId) {
     var notifBtn = document.getElementById('notifSetupBtn');
-    if (notifBtn && FCM_REGISTER_URL && !localStorage.getItem('fcm_registered_' + studentId)) {
+    if (notifBtn && !localStorage.getItem('fcm_registered_' + studentId)) {
       notifBtn.style.display = 'block';
     }
     setTimeout(function() {

@@ -6528,9 +6528,8 @@
   }
   function openAlarmQRModal(type) {
     var isIos = (type === 'ios');
-    var targetUrl = isIos
-      ? ALARM_REGISTER_URL.replace('/register.html', '') + '/'
-      : ALARM_REGISTER_URL;
+    // register.html은 UI 없는 iframe 전용 → 항상 루트 index.html 사용
+    var targetUrl = ALARM_REGISTER_URL.replace(/\/register\.html$/, '/').replace(/\/$/, '') + '/';
     var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(targetUrl);
     var title  = isIos ? '🍎 아이폰 알림 등록' : '🤖 갤럭시/안드로이드 알림 등록';
     var guide  = isIos
