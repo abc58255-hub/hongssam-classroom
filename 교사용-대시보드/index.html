@@ -274,7 +274,8 @@
         <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left;" onclick="openAppLink('board')">📺 교실 알림판</button>
         <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left;" onclick="openAppLink('register')">📝 회원가입 앱</button>
         <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left;" onclick="openAppLink('portal')">🏫 스마트 포털</button>
-        <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left; color:#7c3aed;" onclick="openAlarmQRModal()">🔔 아이폰 알림 등록 QR</button>
+        <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left; color:#7c3aed;" onclick="openAlarmQRModal('ios')">🍎 아이폰 알림 QR</button>
+        <button class="refresh-btn" style="font-size:11px; padding:6px 8px; text-align:left; color:#16a34a;" onclick="openAlarmQRModal('android')">🤖 갤럭시 알림 QR</button>
       </div>
     </div>
 
@@ -6525,8 +6526,16 @@
     var btn = document.getElementById('alarmUrlCopyBtn');
     if (btn) { btn.textContent = '✅ 복사됨'; setTimeout(function(){ btn.textContent = '링크 복사'; }, 1500); }
   }
-  function openAlarmQRModal() {
-    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(ALARM_REGISTER_URL);
+  function openAlarmQRModal(type) {
+    var isIos = (type === 'ios');
+    var targetUrl = isIos
+      ? ALARM_REGISTER_URL.replace('/register.html', '') + '/'
+      : ALARM_REGISTER_URL;
+    var qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=' + encodeURIComponent(targetUrl);
+    var title  = isIos ? '🍎 아이폰 알림 등록' : '🤖 갤럭시/안드로이드 알림 등록';
+    var guide  = isIos
+      ? 'Safari로 이 QR을 열고 <b>홈 화면에 추가</b> 후, 홈 화면 앱에서 학번+비밀번호를 입력하세요.'
+      : 'Chrome으로 이 QR을 열고 학번+비밀번호를 입력하세요. 홈 화면 추가 불필요.';
     var modal = document.getElementById('alarmQRModal');
     if (!modal) {
       modal = document.createElement('div');
@@ -6537,18 +6546,17 @@
     }
     modal.innerHTML = '<div style="background:white;border-radius:20px;padding:24px;width:90%;max-width:360px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.25);">'
       + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">'
-        + '<div style="font-size:17px;font-weight:800;color:#0f172a;">🔔 아이폰 알림 등록</div>'
+        + '<div style="font-size:17px;font-weight:800;color:#0f172a;">' + title + '</div>'
         + '<button onclick="document.getElementById(\'alarmQRModal\').style.display=\'none\'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>'
       + '</div>'
-      + '<p style="font-size:13px;color:#64748b;margin-bottom:16px;line-height:1.6;text-align:left;">학생들에게 QR코드를 보여주세요.<br>학번과 비밀번호를 입력하면 알림이 등록됩니다.</p>'
+      + '<p style="font-size:13px;color:#64748b;margin-bottom:16px;line-height:1.6;text-align:left;">' + guide + '</p>'
       + '<div style="background:#f0f4ff;border-radius:16px;padding:18px;margin-bottom:14px;display:inline-block;">'
         + '<img src="' + qrUrl + '" width="200" height="200" style="display:block;border-radius:8px;" alt="QR코드">'
       + '</div>'
-      + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:12px;display:flex;align-items:center;gap:8px;text-align:left;">'
-        + '<span style="font-size:11px;color:#64748b;flex:1;word-break:break-all;">' + ALARM_REGISTER_URL + '</span>'
-        + '<button id="alarmUrlCopyBtn" onclick="copyAlarmUrl()" style="background:#1e3a8a;color:white;border:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap;">링크 복사</button>'
+      + '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin-bottom:4px;display:flex;align-items:center;gap:8px;text-align:left;">'
+        + '<span style="font-size:11px;color:#64748b;flex:1;word-break:break-all;">' + targetUrl + '</span>'
+        + '<button onclick="navigator.clipboard.writeText(\'' + targetUrl + '\').then(function(){this.textContent=\'복사됨!\';var b=this;setTimeout(function(){b.textContent=\'링크 복사\';},1500);}.bind(this))" style="background:#1e3a8a;color:white;border:none;padding:6px 12px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap;">링크 복사</button>'
       + '</div>'
-      + '<p style="font-size:11px;color:#94a3b8;line-height:1.6;">📱 아이폰: 홈화면 추가 후 앱에서 등록<br>🤖 안드로이드: 학생 앱 로그인 시 자동 등록</p>'
       + '</div>';
     modal.style.display = 'flex';
   }

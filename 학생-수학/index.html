@@ -154,6 +154,7 @@
   <div class="banner-img" style="height: 100px;"><div class="banner-overlay"><div class="banner-title" id="welcomeMsg" style="font-size: 20px;">환영합니다!</div><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div>
   <div class="card-content" style="padding-top: 15px;">
     <button class="logout-btn" onclick="clearLoginInfo()">🔒 다른 기기인가요? 로그아웃하기</button>
+    <button id="notifSetupBtn" onclick="openNotifSetup()" style="display:none;width:100%;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:9px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:10px;">🔔 알림 설정하기</button>
     <div class="tab-container">
       <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">📝 과제 제출</button>
       <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">🔍 내 제출현황</button>
@@ -1450,8 +1451,25 @@
     }
   });
 
+  function openNotifSetup() {
+    var sid = (currentUser && currentUser.id) || '';
+    if (!FCM_REGISTER_URL) return;
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    var url = isIOS
+      ? FCM_REGISTER_URL.replace('/register.html', '') + '/?sid=' + encodeURIComponent(sid) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '')
+      : FCM_REGISTER_URL + '?sid=' + encodeURIComponent(sid) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
+    window.open(url, '_blank');
+    localStorage.setItem('fcm_registered_' + sid, '1');
+    var btn = document.getElementById('notifSetupBtn');
+    if (btn) btn.style.display = 'none';
+  }
+
   // 로그인 성공 후 FCM 초기화 (doLogin 함수의 성공 핸들러에서 호출됨)
   function onLoginSuccess(studentId) {
+    var notifBtn = document.getElementById('notifSetupBtn');
+    if (notifBtn && FCM_REGISTER_URL && !localStorage.getItem('fcm_registered_' + studentId)) {
+      notifBtn.style.display = 'block';
+    }
     setTimeout(function() {
       initFirebaseAndRegisterToken(studentId);
       showIosInstallBanner();
