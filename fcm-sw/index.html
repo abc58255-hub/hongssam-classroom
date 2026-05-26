@@ -139,8 +139,17 @@
     if (!studentId) { alert('학번을 입력해주세요'); return; }
     if (!password) { alert('비밀번호를 입력해주세요'); return; }
 
-    setStatus('비밀번호 확인 중...');
+    // ⚠️ 알림 권한은 user gesture 유지를 위해 가장 먼저 동기적으로 요청
+    // (Galaxy Chrome은 await 후 호출 시 "이 사이트에서는 권한을 요청할 수 없음" 에러 발생)
+    setStatus('알림 권한 요청 중...');
+    var permissionPromise;
+    try {
+      permissionPromise = Notification.requestPermission();
+    } catch(e) {
+      permissionPromise = new Promise(function(res) { Notification.requestPermission(res); });
+    }
 
+    setStatus('비밀번호 확인 중...');
     var pwHash;
     try {
       pwHash = await sha256(password);
@@ -149,13 +158,7 @@
       return;
     }
 
-    setStatus('알림 권한 요청 중...');
-    var permission;
-    try {
-      permission = await Notification.requestPermission();
-    } catch(e) {
-      permission = await new Promise(function(res) { Notification.requestPermission(res); });
-    }
+    var permission = await permissionPromise;
     if (permission !== 'granted') {
       setStatus('❌ 알림이 거부되었습니다. 설정에서 알림을 허용해주세요.', true);
       return;
