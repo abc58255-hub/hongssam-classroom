@@ -1,7 +1,7 @@
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
   || '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
 
-// FCM 토큰 저장 (학생 앱에서 로그인 시 호출)
+// FCM 토큰 저장 — E열에 JSON 배열로 누적 (기기별 최대 5개)
 function saveFcmToken(studentId, token, pwHash) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
@@ -9,7 +9,7 @@ function saveFcmToken(studentId, token, pwHash) {
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][1] || "").trim() === String(studentId || "").trim()) {
         if (pwHash) {
-          const storedHash = String(data[i][3] || "").trim(); // D열 = 비밀번호해시
+          const storedHash = String(data[i][3] || "").trim();
           if (storedHash && storedHash !== pwHash) {
             return { success: false, message: "비밀번호가 올바르지 않습니다." };
           }
@@ -17,7 +17,15 @@ function saveFcmToken(studentId, token, pwHash) {
             return { success: false, message: "미가입 학생입니다. 먼저 회원가입을 해주세요." };
           }
         }
-        sheet.getRange(i + 1, 5).setValue(token); // E열 (FCM토큰)
+        var raw = String(data[i][4] || '').trim();
+        var tokens = [];
+        try { tokens = JSON.parse(raw); if (!Array.isArray(tokens)) tokens = raw ? [raw] : []; }
+        catch(_) { tokens = raw ? [raw] : []; }
+        if (token && tokens.indexOf(token) < 0) {
+          tokens.push(token);
+          if (tokens.length > 5) tokens = tokens.slice(tokens.length - 5);
+        }
+        sheet.getRange(i + 1, 5).setValue(JSON.stringify(tokens));
         return { success: true };
       }
     }

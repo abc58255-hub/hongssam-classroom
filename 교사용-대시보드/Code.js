@@ -87,6 +87,14 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
   } catch(e) { return false; }
 }
 
+// E열 FCM 토큰 파싱 — 구형 단일 문자열·신형 JSON 배열 모두 지원
+function _parseTokens_(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return [];
+  try { var arr = JSON.parse(s); return Array.isArray(arr) ? arr.filter(Boolean) : (s ? [s] : []); }
+  catch(_) { return [s]; }
+}
+
 // 선택한 학생들에게 알림 발송 (클라이언트에서 호출)
 function sendPushToStudents(studentIds, title, body, tag, filterClass) {
   try {
@@ -97,16 +105,19 @@ function sendPushToStudents(studentIds, title, body, tag, filterClass) {
     var sent = 0, skipped = 0;
     var idSet = studentIds ? new Set(studentIds.map(String)) : null;
     for (var i = 1; i < data.length; i++) {
-      var sid   = String(data[i][1] || '').trim();
-      var token = String(data[i][4] || '').trim();
-      if (!sid || !token) { skipped++; continue; }
+      var sid    = String(data[i][1] || '').trim();
+      var tokens = _parseTokens_(data[i][4]);
+      if (!sid || !tokens.length) { skipped++; continue; }
       if (idSet && !idSet.has(sid)) continue;
       if (filterClass) {
         var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
         if (cls !== filterClass) continue;
       }
-      if (sendFcmToToken_(token, title, body, clickUrl, tag || 'default')) sent++;
-      else skipped++;
+      var ok = false;
+      for (var t = 0; t < tokens.length; t++) {
+        if (sendFcmToToken_(tokens[t], title, body, clickUrl, tag || 'default')) ok = true;
+      }
+      if (ok) sent++; else skipped++;
     }
     return { success: true, sent: sent, skipped: skipped };
   } catch(e) { return { success: false, message: e.toString() }; }
