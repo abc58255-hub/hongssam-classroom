@@ -473,7 +473,8 @@ function processForm(formData) {
         if (String(records[i][1] || "").trim() === inputId && 
             String(records[i][3] || "").startsWith(baseTaskName) && 
             String(records[i][10] || "").trim() === "재제출요청") {
-          sheet.getRange(i + 1, 11).setValue("재제출완료"); 
+          sheet.getRange(i + 1, 11).setValue("재제출완료");
+          sheet.getRange(i + 1, 24).setValue(new Date()); // X열 = 상태변경일시
           break;
         }
       }

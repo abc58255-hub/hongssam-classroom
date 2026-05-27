@@ -149,6 +149,229 @@ function sendPushToUnsubmitted(taskName, title, body) {
 }
 
 // =====================================================
+// 🔔 자동 알림 시스템 (트리거 기반)
+// =====================================================
+
+// 제출현황 K열(상태) + X열(상태변경일시) 함께 업데이트
+function _setSubmissionStatus_(sheet, rowIdx, status) {
+  sheet.getRange(rowIdx, 11).setValue(status);
+  sheet.getRange(rowIdx, 24).setValue(new Date());
+}
+
+function _formatDeadline_(dl) {
+  try { return Utilities.formatDate(new Date(dl), 'Asia/Seoul', 'MM/dd HH:mm'); }
+  catch(_) { return String(dl); }
+}
+
+function _dDayText_(deadline, now) {
+  var diffMs = deadline - now;
+  if (diffMs < 0) return '마감 지남';
+  var diffH = Math.floor(diffMs / 3600000);
+  if (diffH < 24) {
+    var hh = Utilities.formatDate(deadline, 'Asia/Seoul', 'HH:mm');
+    return '오늘 ' + hh + ' 마감';
+  }
+  var diffD = Math.floor(diffH / 24);
+  return 'D-' + diffD;
+}
+
+// ① 새 과제 등록 시 — 마감일이 있는 반 학생에게만 발송
+function _notifyNewTask_(taskName, deadlinesJson) {
+  try {
+    var deadlines;
+    try { deadlines = JSON.parse(deadlinesJson || '{}'); } catch(_) { return 0; }
+    var hasAny = Object.keys(deadlines).some(function(k){
+      return !k.startsWith('resub_') && !k.startsWith('open_') && deadlines[k];
+    });
+    if (!hasAny) return 0;
+
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
+    var sent = 0;
+
+    for (var i = 1; i < roster.length; i++) {
+      var sid = String(roster[i][1] || '').trim();
+      if (!sid) continue;
+      var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+      var dl = deadlines[cls] || deadlines['all'];
+      if (!dl) continue;
+      var tokens = _parseTokens_(roster[i][4]);
+      if (!tokens.length) continue;
+      var title = '📝 새 과제: ' + taskName;
+      var body  = '마감: ' + _formatDeadline_(dl);
+      for (var t = 0; t < tokens.length; t++) {
+        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'newTask')) sent++;
+      }
+    }
+    return sent;
+  } catch(e) {
+    Logger.log('_notifyNewTask_ 오류: ' + e.message);
+    return 0;
+  }
+}
+
+// ② 매시간 트리거 — 지난 1시간 내 채점/반려된 학생에게 알림
+function notifyGradedHourly() {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    var lastTs = parseInt(props.getProperty('last_grade_notify_ts') || '0');
+    var now = Date.now();
+    if (!lastTs) lastTs = now - 3600 * 1000;
+
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sheet = ss.getSheetByName('제출현황');
+    var data = sheet.getDataRange().getValues();
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
+
+    var tokenMap = {};
+    for (var r = 1; r < roster.length; r++) {
+      var rsid = String(roster[r][1] || '').trim();
+      if (rsid) tokenMap[rsid] = _parseTokens_(roster[r][4]);
+    }
+
+    var sent = 0;
+    for (var i = 1; i < data.length; i++) {
+      var changeTs = data[i][23]; // X열
+      if (!changeTs) continue;
+      var changeTime = new Date(changeTs).getTime();
+      if (changeTime <= lastTs || changeTime > now) continue;
+
+      var status = String(data[i][10] || '').trim();
+      var sid = String(data[i][1] || '').trim();
+      var taskName = String(data[i][3] || '').split(' (')[0];
+      var tokens = tokenMap[sid] || [];
+      if (!tokens.length) continue;
+
+      var title, body;
+      if (status === '채점완료') {
+        title = '✅ 채점 완료: ' + taskName;
+        body  = '선생님의 피드백을 확인하세요';
+      } else if (status === '재제출요청') {
+        title = '🔄 재제출 요청: ' + taskName;
+        body  = '과제를 다시 제출해주세요';
+      } else {
+        continue;
+      }
+      for (var t = 0; t < tokens.length; t++) {
+        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'graded')) sent++;
+      }
+    }
+    props.setProperty('last_grade_notify_ts', String(now));
+    Logger.log('notifyGradedHourly: ' + sent + '건 발송');
+    return { sent: sent };
+  } catch(e) {
+    Logger.log('notifyGradedHourly 오류: ' + e.message);
+    return { error: e.message };
+  }
+}
+
+// ③ 매일 8:20 — 마감 안 된 미제출 과제 알림 (한 학생당 한 번)
+function notifyUnsubmittedDaily() {
+  try {
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var tasks = ss.getSheetByName('과제설정').getDataRange().getValues();
+    var subs  = ss.getSheetByName('제출현황').getDataRange().getValues();
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
+    var now = new Date();
+
+    var tokenMap = {};
+    for (var r = 1; r < roster.length; r++) {
+      var rsid = String(roster[r][1] || '').trim();
+      if (rsid) tokenMap[rsid] = _parseTokens_(roster[r][4]);
+    }
+
+    // 학번 → {과제명 → true}
+    var submittedMap = {};
+    for (var s = 1; s < subs.length; s++) {
+      var ssid = String(subs[s][1] || '').trim();
+      var stask = String(subs[s][3] || '').split(' (')[0];
+      if (!ssid || !stask) continue;
+      if (!submittedMap[ssid]) submittedMap[ssid] = {};
+      submittedMap[ssid][stask] = true;
+    }
+
+    // 학생별 미제출 과제 모음
+    var studentMissing = {}; // sid → [{name, deadline}, ...]
+
+    for (var i = 1; i < tasks.length; i++) {
+      var tName = String(tasks[i][1] || '').trim();
+      if (!tName) continue;
+      var deadlines;
+      try { deadlines = JSON.parse(tasks[i][3] || '{}'); } catch(_) { continue; }
+
+      for (var r2 = 1; r2 < roster.length; r2++) {
+        var rsid2 = String(roster[r2][1] || '').trim();
+        if (!rsid2) continue;
+        var cls = rsid2.length >= 2 ? (rsid2.substring(0,1) + '학년 ' + rsid2.substring(1,2) + '반') : '';
+        var dl = deadlines[cls] || deadlines['all'];
+        if (!dl) continue;
+        var dlDate = new Date(dl);
+        if (dlDate < now) continue;
+        if ((submittedMap[rsid2] || {})[tName]) continue;
+
+        if (!studentMissing[rsid2]) studentMissing[rsid2] = [];
+        studentMissing[rsid2].push({ name: tName, deadline: dlDate });
+      }
+    }
+
+    var sent = 0, studentCount = 0;
+    Object.keys(studentMissing).forEach(function(sid) {
+      var tokens = tokenMap[sid] || [];
+      if (!tokens.length) return;
+      var missing = studentMissing[sid];
+      missing.sort(function(a, b) { return a.deadline - b.deadline; });
+      studentCount++;
+
+      var title, body;
+      if (missing.length === 1) {
+        var m = missing[0];
+        title = '📌 미제출 과제: ' + m.name;
+        body  = _dDayText_(m.deadline, now);
+      } else {
+        title = '📌 미제출 과제 ' + missing.length + '개';
+        body  = missing.slice(0, 4).map(function(m){
+          return m.name + ' (' + _dDayText_(m.deadline, now) + ')';
+        }).join(', ');
+        if (missing.length > 4) body += ' 외 ' + (missing.length - 4) + '개';
+      }
+
+      for (var t = 0; t < tokens.length; t++) {
+        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'unsub')) sent++;
+      }
+    });
+
+    Logger.log('notifyUnsubmittedDaily: 학생 ' + studentCount + '명, ' + sent + '건 발송');
+    return { sent: sent, students: studentCount };
+  } catch(e) {
+    Logger.log('notifyUnsubmittedDaily 오류: ' + e.message);
+    return { error: e.message };
+  }
+}
+
+// 트리거 설치 (GAS 에디터에서 1회 실행)
+function installAutoNotifyTriggers() {
+  var deleted = 0;
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    var fn = t.getHandlerFunction();
+    if (fn === 'notifyGradedHourly' || fn === 'notifyUnsubmittedDaily') {
+      ScriptApp.deleteTrigger(t);
+      deleted++;
+    }
+  });
+
+  ScriptApp.newTrigger('notifyGradedHourly')
+    .timeBased().everyHours(1).nearMinute(0).create();
+
+  ScriptApp.newTrigger('notifyUnsubmittedDaily')
+    .timeBased().atHour(8).nearMinute(20).everyDays(1).create();
+
+  return { success: true, message: '기존 ' + deleted + '개 정리 후 트리거 2개 설치 완료' };
+}
+
+// =====================================================
 // ✅ 피드백 템플릿 (시스템설정 시트 '피드백_N' 키 행에 저장)
 // =====================================================
 
@@ -757,8 +980,10 @@ function saveNewTask(taskData) {
     let taskFolder = parentFolder.createFolder(taskData.name);
     let deadlineObj = JSON.parse(taskData.deadlines);
     for (let cls in deadlineObj) taskFolder.createFolder(cls);
-    clearCache(); // 과제 추가 시 캐시 초기화
-    return { success: true };
+    clearCache();
+    // 🔔 새 과제 알림 — 마감일 설정된 반 학생만
+    var pushed = _notifyNewTask_(taskData.name, taskData.deadlines);
+    return { success: true, pushed: pushed };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -855,26 +1080,26 @@ function saveFeedback(r, f, a, sc, p, m, bestType, bestAnon, bestComment) {
     let studentId = String(rowData[1] || "").trim();
     let taskName = String(rowData[3] || "").trim();
     if (a === "완료") {
-      s.getRange(r, 11).setValue("채점완료");
+      _setSubmissionStatus_(s, r, "채점완료");
       if (taskName.includes("(재제출)")) {
         let baseTaskName = taskName.split(" (재제출)")[0];
         let records = s.getDataRange().getValues();
         for (let i = records.length - 1; i >= 1; i--) {
           if (String(records[i][1]).trim() === studentId && String(records[i][3]).trim() === baseTaskName) {
             let oldStatus = String(records[i][10] || "").trim();
-            if (oldStatus !== "이전기록채점완료") s.getRange(i+1, 11).setValue("이전기록채점완료");
+            if (oldStatus !== "이전기록채점완료") _setSubmissionStatus_(s, i+1, "이전기록채점완료");
           }
         }
       }
     } else if (a === "재제출") {
       s.getRange(r, 10).clearContent();
-      s.getRange(r, 11).setValue("재제출요청");
+      _setSubmissionStatus_(s, r, "재제출요청");
     } else if (a === "반려검토") {
-      s.getRange(r, 11).setValue("반려검토");
+      _setSubmissionStatus_(s, r, "반려검토");
     } else if (a === "채점중") {
       let curStatus = String(s.getRange(r, 11).getValue() || "").trim();
       if (curStatus !== "채점완료" && curStatus !== "재제출요청" && curStatus !== "반려검토") {
-        s.getRange(r, 11).setValue("채점중");
+        _setSubmissionStatus_(s, r, "채점중");
       }
     }
     s.getRange(r, 8).setValue(f);
@@ -1053,24 +1278,24 @@ function saveMultiAnnotatedImages(rowIdx, payloadArray, studentId, studentName, 
     // ✅ 상태 저장
     // =====================================================
     if (finalStatus === '완료') {
-      sheet.getRange(rowIdx, 11).setValue('채점완료');
+      _setSubmissionStatus_(sheet, rowIdx, '채점완료');
       if (String(taskName).includes('(재제출)')) {
         let records = sheet.getDataRange().getValues();
         for (let i = records.length - 1; i >= 1; i--) {
           if (String(records[i][1]||'').trim() === safeStudentId &&
               String(records[i][3]||'').trim() === baseTask) {
             let oldSt = String(records[i][10]||'').trim();
-            if (oldSt !== '이전기록채점완료') sheet.getRange(i+1, 11).setValue('이전기록채점완료');
+            if (oldSt !== '이전기록채점완료') _setSubmissionStatus_(sheet, i+1, '이전기록채점완료');
           }
         }
       }
     } else if (finalStatus === '반려검토') {
-      sheet.getRange(rowIdx, 11).setValue('반려검토');
+      _setSubmissionStatus_(sheet, rowIdx, '반려검토');
     } else {
       // 채점중 — 이미 완료/반려 상태면 덮어쓰지 않음
       let curSt = String(sheet.getRange(rowIdx, 11).getValue() || '').trim();
       if (curSt !== '채점완료' && curSt !== '재제출요청' && curSt !== '반려검토') {
-        sheet.getRange(rowIdx, 11).setValue('채점중');
+        _setSubmissionStatus_(sheet, rowIdx, '채점중');
       }
     }
 
@@ -2209,7 +2434,7 @@ function saveAiGradeResult(rowIdx, feedback, score, statusAction, perQuestionJso
     const statusMap = { 'pass': '채점완료', 'reject': '재제출요청' };
     const newStatus = statusMap[statusAction] || statusAction;
     sheet.getRange(rowIdx, 8).setValue(feedback || '');
-    sheet.getRange(rowIdx, 11).setValue(newStatus);
+    _setSubmissionStatus_(sheet, rowIdx, newStatus);
     sheet.getRange(rowIdx, 13).setValue(score || '');
     if (perQuestionJson) {
       sheet.getRange(rowIdx, 22).setValue(perQuestionJson);
@@ -2632,7 +2857,7 @@ function approveResubmitRequest(rowIdx) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('제출현황');
     if (!sheet) return { success: false };
-    sheet.getRange(rowIdx, 11).setValue('재제출요청'); // K열 = 상태
+    _setSubmissionStatus_(sheet, rowIdx, '재제출요청'); // K열 + X열
     sheet.getRange(rowIdx, 16).setValue('');           // P열 = 답글 초기화
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
