@@ -78,8 +78,22 @@ function getHomeroomData(studentId) {
     });
     activities.reverse();
   }
-  let myRecords = []; const subSheet = ss.getSheetByName("창체제출현황");
-  if (subSheet) { let subData = subSheet.getDataRange().getValues(); for (let i = 1; i < subData.length; i++) { if (String(subData[i][1]).trim() === String(studentId).trim()) { myRecords.push({ date: Utilities.formatDate(new Date(subData[i][0]), "Asia/Seoul", "MM/dd HH:mm"), activity: subData[i][3], role: subData[i][4], reflection: subData[i][5], url: subData[i][6] }); } } }
+  let myRecords = [];
+  const subSheet = ss.getSheetByName("창체제출현황");
+  if (subSheet) {
+    const subData = subSheet.getDataRange().getValues();
+    const sidStr = String(studentId).trim();
+    for (let i = 1; i < subData.length; i++) {
+      if (String(subData[i][1]).trim() !== sidStr) continue;
+      myRecords.push({
+        date: Utilities.formatDate(new Date(subData[i][0]), "Asia/Seoul", "MM/dd HH:mm"),
+        activity: subData[i][3],
+        role: subData[i][4],
+        reflection: subData[i][5],
+        url: subData[i][6]
+      });
+    }
+  }
   
   let roster = []; let hrStr = _getSysHr(ss);
   const rosterData = ss.getSheetByName("학생명부").getDataRange().getValues();

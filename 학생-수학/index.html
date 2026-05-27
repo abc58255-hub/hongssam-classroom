@@ -1290,7 +1290,7 @@
     google.script.run.withSuccessHandler(function(success) {
       if (success) { alert("선생님께 전달되었습니다!"); refreshData(); }
       else { alert("오류가 발생했습니다."); btn.innerText = "답장 보내기"; btn.disabled = false; }
-    }).saveStudentReply(rowIdx, text);
+    }).saveStudentReply(rowIdx, text, currentUser.id);
   }
 
   function requestResubmit(rowIdx, btn) {
@@ -1299,7 +1299,7 @@
     google.script.run.withSuccessHandler(function(res) {
       if (res && res.success) { refreshData(); }
       else { alert("오류가 발생했습니다."); btn.innerText = "🔄 재제출 요청하기"; btn.disabled = false; }
-    }).requestResubmission(rowIdx);
+    }).requestResubmission(rowIdx, currentUser.id);
   }
 
   function closeImageModal() { document.getElementById('imageModal').style.display = 'none'; }
@@ -1322,43 +1322,9 @@
   }
 
   // =====================================================
-  // ✅ FCM 푸시 알림 — GitHub Pages iframe 방식
+  // ✅ FCM 푸시 알림 — 외부 등록 페이지(GitHub Pages) 방식
   var FCM_REGISTER_URL = ''; // 시스템설정 FCM_REGISTER_URL에서 로드
   var FCM_MATH_APP_URL = ''; // 시스템설정 바로가기_수학교실에서 로드
-  var fcmFrame = null;
-  var fcmFrameReady = false;
-  var pendingFcmStudentId = null;
-
-  function setupFcmIframe() {
-    if (fcmFrame) return;
-    fcmFrame = document.createElement('iframe');
-    var sep = FCM_REGISTER_URL.indexOf('?') >= 0 ? '&' : '?';
-    fcmFrame.src = FCM_REGISTER_URL + (FCM_MATH_APP_URL ? sep + 'gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
-    fcmFrame.style.cssText = 'display:none;width:0;height:0;border:none;position:absolute;';
-    fcmFrame.setAttribute('allow', 'notifications');
-    document.body.appendChild(fcmFrame);
-
-    window.addEventListener('message', function(e) {
-      var d = e.data;
-      if (!d || !d.type) return;
-      if (d.type === 'FCM_FRAME_READY') {
-        fcmFrameReady = true;
-        if (pendingFcmStudentId) {
-          fcmFrame.contentWindow.postMessage({ type: 'INIT_FCM', studentId: pendingFcmStudentId }, '*');
-          pendingFcmStudentId = null;
-        }
-      } else if (d.type === 'FCM_TOKEN' && !d.cached) {
-        // 새 토큰 → 스프레드시트 저장
-        google.script.run.saveFcmToken(d.studentId, d.token);
-      } else if (d.type === 'FCM_MESSAGE') {
-        // 포그라운드 알림
-        var p = d.payload;
-        var title = (p.notification && p.notification.title) || '수학 교실 알림';
-        var body  = (p.notification && p.notification.body)  || '';
-        showInAppNotification(title, body);
-      }
-    });
-  }
 
   function initFirebaseAndRegisterToken(studentId) {
     if (!FCM_REGISTER_URL) return;

@@ -173,7 +173,7 @@ function getDashboardData(studentId, studentName) {
           }
           resubDeadline = deadlines["resub_" + className] || deadlines["resub_all"] || myDeadline;
           openDeadline = deadlines["open_" + className] || deadlines["open_all"] || null;
-        } catch(e) {}
+        } catch(e) { Logger.log('getDashboardData 마감일 파싱 실패: ' + e.message); }
       }
 
       taskDeadlineMap[tName] = {
@@ -366,18 +366,30 @@ function markFeedbacksAsSeen(rowIndices) {
   return true; 
 }
 
-function saveStudentReply(rowIdx, replyText) {
+// 행 소유자 검증: 제출현황 시트와 rowIdx를 받아 학번(B열) 일치 확인 (sheet 재활용)
+function _verifyRowOwner_(sheet, rowIdx, studentId) {
+  if (!rowIdx || !studentId) return false;
+  if (rowIdx < 2 || rowIdx > sheet.getLastRow()) return false;
+  var rowSid = String(sheet.getRange(rowIdx, 2).getValue() || '').trim();
+  return rowSid === String(studentId).trim();
+}
+
+function saveStudentReply(rowIdx, replyText, studentId) {
   try {
-    SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황").getRange(rowIdx, 16).setValue(replyText);
+    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황");
+    if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return false;
+    sheet.getRange(rowIdx, 16).setValue(replyText);
     return true;
   } catch(e) {
     return false;
   }
 }
 
-function requestResubmission(rowIdx) {
+function requestResubmission(rowIdx, studentId) {
   try {
-    SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황").getRange(rowIdx, 16).setValue("[재제출요청]");
+    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황");
+    if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return { success: false };
+    sheet.getRange(rowIdx, 16).setValue("[재제출요청]");
     return { success: true };
   } catch(e) {
     return { success: false };
@@ -397,7 +409,11 @@ function processForm(formData) {
     let incomingFiles = formData.filesData;
     let fileHashObj = {};
     const records = sheet.getDataRange().getValues();
-    incomingFiles.forEach(f => { fileHashObj[f.key] = getHash(Utilities.base64Decode(f.b64)); });
+    try {
+      incomingFiles.forEach(f => { fileHashObj[f.key] = getHash(Utilities.base64Decode(f.b64)); });
+    } catch(e) {
+      return { success: false, message: '이미지 파일 처리 중 오류가 발생했습니다. (' + e.message + ')' };
+    }
 
     // ✅ 마감일 서버측 검증
     const taskSheet = ss.getSheetByName("과제설정");
@@ -431,7 +447,7 @@ function processForm(formData) {
                   return { success: false, message: "⏳ 아직 제출 가능 시간이 아닙니다." };
                 }
               }
-            } catch(e) {}
+            } catch(e) { Logger.log('processForm 마감일 파싱 실패: ' + e.message + ' / dStr=' + dStr); }
           }
           break;
         }
@@ -479,7 +495,7 @@ function processForm(formData) {
     incomingFiles.forEach(f => {
       let suffix = isResubmit ? `_재제출_${f.key}` : `_${f.key}`;
       const blob = Utilities.newBlob(
-        Utilities.base64Decode(f.b64), 'image/jpeg', 
+        Utilities.base64Decode(f.b64), f.mime || 'image/jpeg',
         `[${inputId}] ${inputName}_${baseTaskName}${suffix}.jpg`
       );
       finalUrls[f.key] = classFolder.createFile(blob).getUrl(); 

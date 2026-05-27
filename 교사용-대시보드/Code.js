@@ -2364,8 +2364,7 @@ function aiGradeSubmission(params) {
         model:           cfg.model || 'google/gemini-3.5-flash',
         messages:        messages,
         max_tokens:      1000,
-        temperature:     0.2,
-        temperature: 0.2
+        temperature:     0.2
       }),
       muteHttpExceptions: true
     });
