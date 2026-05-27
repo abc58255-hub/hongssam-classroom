@@ -2452,6 +2452,33 @@ function deleteRubric(rowIdx) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
+// AI 응답 JSON 느슨하게 파싱 — 토큰 한도로 잘린 응답도 닫는 괄호 보정해서 복구
+function _parseAiJsonLoose_(text) {
+  if (!text) return null;
+  var start = text.indexOf('{');
+  if (start < 0) return null;
+  var body = text.substring(start);
+  try { return JSON.parse(body); } catch(_) {}
+  var lastBrace = body.lastIndexOf('}');
+  if (lastBrace > 0) {
+    try { return JSON.parse(body.substring(0, lastBrace + 1)); } catch(_) {}
+  }
+  var s = body, inStr = false, esc = false, depth = 0;
+  for (var i = 0; i < s.length; i++) {
+    var c = s[i];
+    if (esc) { esc = false; continue; }
+    if (c === '\\') { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === '{') depth++;
+    else if (c === '}') depth--;
+  }
+  var patched = s;
+  if (inStr) patched += '"';
+  while (depth > 0) { patched += '}'; depth--; }
+  try { return JSON.parse(patched); } catch(_) { return null; }
+}
+
 // Drive 파일 → base64 (채점기준용, PDF 포함)
 function _normalizeImageMime(mime) {
   if (!mime) return 'image/jpeg';
@@ -2588,7 +2615,7 @@ function aiGradeSubmission(params) {
       payload: JSON.stringify({
         model:           cfg.model || 'google/gemini-3.5-flash',
         messages:        messages,
-        max_tokens:      1000,
+        max_tokens:      4000,
         temperature:     0.2
       }),
       muteHttpExceptions: true
@@ -2604,10 +2631,8 @@ function aiGradeSubmission(params) {
 
     let text = JSON.parse(res.getContentText()).choices[0].message.content.trim();
     text = text.replace(/^```[a-z]*\n?/i,'').replace(/\n?```$/,'').trim();
-    // JSON 블록만 추출 (앞뒤 설명 텍스트 제거)
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) return { success: false, message: 'JSON 파싱 실패: ' + text.substring(0, 100) };
-    const result = JSON.parse(jsonMatch[0]);
+    const result = _parseAiJsonLoose_(text);
+    if (!result) return { success: false, message: 'JSON 파싱 실패: ' + text.substring(0, 150) };
     result.rowIdx      = params.rowIdx;
     result.studentId   = params.studentId;
     result.studentName = params.studentName;
