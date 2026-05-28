@@ -6080,6 +6080,13 @@
     return s.length >= 2 ? s.substring(0,1) + '학년 ' + s.substring(1,2) + '반' : '';
   }
   function _cleanTask(t) { return String(t || '').split(' (')[0]; }
+  // 학생의 반이 해당 과제 제출 대상인지 (마감일이 설정된 반만 집계)
+  function _taskExpectsClass(task, cls) {
+    if (!task || !task.deadlines) return false;
+    var dl; try { dl = JSON.parse(task.deadlines || '{}'); } catch(_) { return false; }
+    if (dl['all']) return true;
+    return !!dl[cls];
+  }
   function _avg(nums) {
     if (!nums.length) return null;
     return (nums.reduce(function(a,b){return a+b;},0) / nums.length).toFixed(1);
@@ -6154,14 +6161,24 @@
       });
     });
 
-    // No-submission: roster × tasks
+    // 반별로 "제출 대상 과제 수" 집계 (마감일이 설정된 반만 카운트)
+    var clsExpectedTasks = {};
+    clsList.forEach(function(cls) { clsExpectedTasks[cls] = 0; });
+    allTasks.forEach(function(t) {
+      clsList.forEach(function(cls) {
+        if (_taskExpectsClass(t, cls)) clsExpectedTasks[cls]++;
+      });
+    });
+
+    // No-submission: roster × tasks — 단, 해당 학생 반이 과제 대상일 때만
     roster.forEach(function(stu) {
       allTasks.forEach(function(t) {
         var tn = t.name;
+        var cls = stu.cls;
+        if (!_taskExpectsClass(t, cls)) return; // 대상 아님 → 미제출로 카운트 안 함
         var sub = (tsm[tn] || {})[stu.id];
         if (!sub) {
           gNoSub++;
-          var cls = stu.cls;
           if (clsStats[cls]) clsStats[cls].noSub++;
           if (tStats[tn]) tStats[tn].noSubList.push(stu.id + ' ' + stu.name);
           var key = stu.id + ' ' + stu.name;
@@ -6170,20 +6187,22 @@
       });
     });
 
-    // Submission rate per class (across all tasks)
+    // Submission rate per class — 분모는 해당 반이 대상인 과제 수만
     clsList.forEach(function(cls) {
       var st = clsStats[cls];
-      var expected = st.total * allTasks.length;
+      var expected = st.total * clsExpectedTasks[cls];
+      st.expectedTasks = clsExpectedTasks[cls];
       st.submissionRate = expected > 0 ? Math.round(st.submitted / expected * 100) : 0;
       st.gradingRate    = st.submitted > 0 ? Math.round(st.graded / st.submitted * 100) : 0;
       st.avgScore = _avg(st.scores);
     });
 
-    // Submission rate per task
+    // Submission rate per task — 분모는 그 과제의 대상 학생 수만
     allTasks.forEach(function(t) {
       var ts = tStats[t.name];
       ts.submitted = ts.graded + ts.resub + ts.pending;
-      var totalStu = roster.length;
+      var totalStu = roster.filter(function(stu){ return _taskExpectsClass(t, stu.cls); }).length;
+      ts.expectedStudents = totalStu;
       ts.submissionRate = totalStu > 0 ? Math.round(ts.submitted / totalStu * 100) : 0;
       ts.gradingRate    = ts.submitted > 0 ? Math.round(ts.graded / ts.submitted * 100) : 0;
       ts.avgScore = _avg(ts.scores);
@@ -6216,7 +6235,12 @@
     var studStats = {};
     Object.keys(rosterIds).forEach(function(id) {
       studStats[id] = { id:id, name:rosterIds[id].name, cls:rosterIds[id].cls,
-        scores:[], submittedTasks:0, ranks:[], bestWorks:0 };
+        scores:[], submittedTasks:0, expectedTasks:0, ranks:[], bestWorks:0 };
+    });
+    // 학생별 "제출 대상 과제 수"
+    Object.keys(studStats).forEach(function(id) {
+      var cls = studStats[id].cls;
+      studStats[id].expectedTasks = allTasks.filter(function(t){ return _taskExpectsClass(t, cls); }).length;
     });
 
     allTasks.forEach(function(t) {
@@ -6244,7 +6268,8 @@
         ? Math.round(s.scores.reduce(function(a,b){return a+b;},0) / s.scores.length * 10) / 10 : null;
       s.avgRank = s.ranks.length > 0
         ? Math.round(s.ranks.reduce(function(a,b){return a+b;},0) / s.ranks.length * 10) / 10 : null;
-      s.submitRate = Math.round(s.submittedTasks / allTasks.length * 100);
+      s.submitRate = s.expectedTasks > 0
+        ? Math.round(s.submittedTasks / s.expectedTasks * 100) : 0;
     });
 
     var topScorers = students.filter(function(s){return s.avgScore!==null;})
@@ -6386,7 +6411,7 @@
 
     var kpiHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px;">'
       + _kpi(cs.total || 0, '총 학생 수', '#6366f1')
-      + _kpi((cs.submissionRate||0) + '%', '과제 제출률', '#10b981', cs.submitted + '/' + (cs.total * allTasks.length) + '건')
+      + _kpi((cs.submissionRate||0) + '%', '과제 제출률', '#10b981', cs.submitted + '/' + (cs.total * (cs.expectedTasks || 0)) + '건')
       + _kpi(gradePct + '%', '채점 완료율', '#3b82f6', cs.graded + '/' + cs.submitted + '건')
       + _kpi(avgTxt, '평균 점수', '#f59e0b', '점수제 과제 기준')
       + _kpi(cs.pending||0, '채점 대기', '#ef4444', '', '_csClickMap("채점 대기",_lastStats.waitMap)')
