@@ -6417,23 +6417,24 @@
       + _kpi(cs.pending||0, '채점 대기', '#ef4444', '', '_csClickMap("채점 대기",_lastStats.waitMap)')
       + '</div>';
 
-    // 과제별 세부 현황
-    var taskRows = allTasks.map(function(t) {
-      var ts = s.tStats[t.name] || {};
-      var studs = cs.students || [];
-      var tn = t.name;
-      var noSubStuds = studs.filter(function(stu){ return !(window._lastStats && window._lastStats.noSubMap) ? false : (s.noSubMap[stu.id + ' ' + stu.name] || []).indexOf(tn) >= 0; });
-      var noSub = (ts.noSubList || []).length;
-      return '<div style="padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:12px;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-          + '<span style="font-weight:700;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + t.name + '">' + t.name + '</span>'
-          + '<span style="color:#64748b;">제출 <b>' + ts.submissionRate + '%</b> · 완료 <b style="color:#10b981;">' + ts.gradingRate + '%</b>'
-            + (ts.avgScore ? ' · 평균 <b style="color:#6366f1;">' + ts.avgScore + '점</b>' : '')
-            + (noSub > 0 ? ' · <span style="color:#dc2626;font-weight:700;cursor:pointer;" onclick=\'showStatDetail("미제출",' + JSON.stringify(ts.noSubList || []) + ')\'>' + noSub + '명 미제출</span>' : '')
-          + '</span>'
-        + '</div>'
-        + _bar(ts.gradingRate, '#10b981', 5) + '</div>';
-    }).join('');
+    // 과제별 세부 현황 — 이 반에 마감일이 설정된 과제만
+    var classTasks = allTasks.filter(function(t){ return _taskExpectsClass(t, cls); });
+    var taskRows = classTasks.length === 0
+      ? '<div style="color:#94a3b8;font-size:12px;padding:8px;">이 반에 부여된 과제가 없습니다.</div>'
+      : classTasks.map(function(t) {
+          var ts = s.tStats[t.name] || {};
+          var tn = t.name;
+          var noSub = (ts.noSubList || []).length;
+          return '<div style="padding:7px 0;border-bottom:1px solid #f1f5f9;font-size:12px;">'
+            + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+              + '<span style="font-weight:700;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + t.name + '">' + t.name + '</span>'
+              + '<span style="color:#64748b;">제출 <b>' + ts.submissionRate + '%</b> · 완료 <b style="color:#10b981;">' + ts.gradingRate + '%</b>'
+                + (ts.avgScore ? ' · 평균 <b style="color:#6366f1;">' + ts.avgScore + '점</b>' : '')
+                + (noSub > 0 ? ' · <span style="color:#dc2626;font-weight:700;cursor:pointer;" onclick=\'showStatDetail("미제출",' + JSON.stringify(ts.noSubList || []) + ')\'>' + noSub + '명 미제출</span>' : '')
+              + '</span>'
+            + '</div>'
+            + _bar(ts.gradingRate, '#10b981', 5) + '</div>';
+        }).join('');
 
     // 미제출 학생 목록 (가장 많이 미제출인 순)
     var noSubStudents = (cs.students || []).map(function(stu) {
@@ -6465,8 +6466,11 @@
 
   // ── MODE 3: 과제+반 대시보드 (기존 뷰 개선) ──
   function _renderTaskDashboard(div, taskF, classF) {
+    var taskObj = allTasks.find(function(x){ return x.name === taskF; });
     var rosterBase = allRoster.filter(function(s) {
-      return !classF || s.cls === classF;
+      if (classF && s.cls !== classF) return false;
+      if (taskObj && !_taskExpectsClass(taskObj, s.cls)) return false; // 미배정 반 제외
+      return true;
     });
     var total = rosterBase.length;
     var baseSubs = allSubmissions.filter(function(i) {
@@ -6960,6 +6964,16 @@
   function _renderStatsTaskDetail(div, taskName, classF) {
     var t = taskName;
     var c = classF || 'all';
+    var taskObj = allTasks.find(function(x){ return x.name === t; });
+    // 특정 반 선택 + 그 반에 부여 안 된 과제면 미배정 안내
+    if (c !== 'all' && taskObj && !_taskExpectsClass(taskObj, c)) {
+      div.innerHTML = '<div style="background:white;border-radius:16px;padding:24px;border:1px solid #e2e8f0;text-align:center;">'
+        + '<div style="font-size:32px;margin-bottom:8px;">📭</div>'
+        + '<div style="font-size:14px;font-weight:700;color:#0f172a;margin-bottom:4px;">이 반에 부여되지 않은 과제예요</div>'
+        + '<div style="font-size:12px;color:#64748b;">"' + t + '"은(는) <b>' + c + '</b>에 마감일이 설정되어 있지 않습니다.</div>'
+        + '</div>';
+      return;
+    }
     var s = allSubmissions.filter(function(x) {
       if (String(x.task).split(' (')[0] !== t) return false;
       if (c !== 'all') {
@@ -6968,8 +6982,10 @@
       }
       return true;
     });
+    // 전체 반 모드일 때도 미배정 반 학생은 분모에서 제외
     var rosterBase = allRoster.filter(function(st) {
-      if (c !== 'all') return st.cls === c;
+      if (c !== 'all' && st.cls !== c) return false;
+      if (taskObj && !_taskExpectsClass(taskObj, st.cls)) return false;
       return true;
     });
     var totalStudents = rosterBase.length;
