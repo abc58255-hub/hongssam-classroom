@@ -6375,7 +6375,7 @@
     Object.keys(rosterIds).forEach(function(id) {
       studStats[id] = { id:id, name:rosterIds[id].name, cls:rosterIds[id].cls,
         scores:[], submittedTasks:0, expectedTasks:0, ranks:[], bestWorks:0,
-        gradeGpa:[], gradeBreakdown:{A:0,B:0,C:0,D:0} };
+        gradeGpa:[], gradeBreakdown:{A:0,B:0,C:0,D:0,'미제출':0} };
     });
     // 학생별 "제출 대상 과제 수"
     Object.keys(studStats).forEach(function(id) {
@@ -6399,13 +6399,29 @@
         var sub = lates[id];
         var rawScore = String(sub.score || '').trim();
         if (rawScore && !isNaN(parseFloat(rawScore))) st.scores.push(parseFloat(rawScore));
-        // ABCD 등급 처리
-        var gpaMap = { 'A':4, 'B':3, 'C':2, 'D':1 };
+        if (sub.bestType && sub.bestType !== '' && sub.bestType !== 'undefined') st.bestWorks++;
+      });
+    });
+
+    // ABCD 등급 — 미제출자도 0점으로 카운트 (분모에 포함)
+    var gpaMap = { 'A':4, 'B':3, 'C':2, 'D':1 };
+    allTasks.forEach(function(t) {
+      var isGradeTask = String(t.evalType || '').indexOf('A-B-C-D') >= 0;
+      if (!isGradeTask) return;
+      var lates = latestSub[t.name] || {};
+      Object.keys(rosterIds).forEach(function(id) {
+        var st = studStats[id]; if (!st) return;
+        if (!_taskExpectsClass(t, st.cls)) return;
+        var sub = lates[id];
+        var rawScore = sub ? String(sub.score || '').trim() : '';
         if (gpaMap[rawScore] !== undefined) {
           st.gradeGpa.push(gpaMap[rawScore]);
           st.gradeBreakdown[rawScore]++;
+        } else {
+          // 미제출 / 미채점 / 명시적 '미제출' → 0점
+          st.gradeGpa.push(0);
+          st.gradeBreakdown['미제출']++;
         }
-        if (sub.bestType && sub.bestType !== '' && sub.bestType !== 'undefined') st.bestWorks++;
       });
     });
 
@@ -6447,7 +6463,7 @@
 
     function gradeBreakText(s) {
       var b = s.gradeBreakdown;
-      var parts = ['A','B','C','D'].filter(function(k){return b[k]>0;}).map(function(k){return k+' '+b[k];});
+      var parts = ['A','B','C','D','미제출'].filter(function(k){return b[k]>0;}).map(function(k){return k+' '+b[k];});
       return parts.join(' · ');
     }
 
