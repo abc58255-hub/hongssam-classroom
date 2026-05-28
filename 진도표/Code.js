@@ -734,7 +734,7 @@ function getSyllabusData(groupId) {
         if (status.indexOf('받음:') === 0) {
           var srcDate = status.substring(3);
           if (!movedIn[key]) movedIn[key] = [];
-          movedIn[key].push({ lessonNo: ln, sourceDate: srcDate, memo: String(r[3]||'').trim() });
+          movedIn[key].push({ lessonNo: ln, plannedLessonNo: pln || ln, sourceDate: srcDate, memo: String(r[3]||'').trim() });
           return;
         }
         if (!ln && !pln && status.indexOf('취소') !== 0 && status.indexOf('이동:') !== 0) return;
@@ -859,7 +859,8 @@ function saveMovedInLesson(data, groupId) {
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
     var status = '받음:' + String(data.sourceDate || '');
-    var ln = data.lessonNo || 0;
+    var ln  = data.lessonNo || 0;
+    var pln = data.plannedLessonNo || ln; // 미지정 시 실제와 동일
     var found = false;
     if (sh.getLastRow() >= 2) {
       var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
@@ -869,12 +870,12 @@ function saveMovedInLesson(data, groupId) {
           : String(rows[i][0]).trim();
         if (rowDate === String(data.date).trim() && String(rows[i][1]).trim() === String(data.cls).trim()
             && String(rows[i][4]||'').trim() === status) {
-          sh.getRange(i + 2, 1, 1, 6).setValues([[data.date, data.cls, ln, data.memo||'', status, 0]]);
+          sh.getRange(i + 2, 1, 1, 6).setValues([[data.date, data.cls, ln, data.memo||'', status, pln]]);
           found = true; break;
         }
       }
     }
-    if (!found) sh.appendRow([data.date, data.cls, ln, data.memo||'', status, 0]);
+    if (!found) sh.appendRow([data.date, data.cls, ln, data.memo||'', status, pln]);
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
