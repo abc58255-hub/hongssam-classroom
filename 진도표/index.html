@@ -817,19 +817,37 @@ function renderSylTable() {
         var miList = sylMovedInCache[key];
         html += '<td style="padding:4px 5px;cursor:pointer;vertical-align:top;' + wbStyle + '" ' + cellAttrs + ' title="클릭하여 수업 기록">';
 
-        // ① 이동받은 수업 카드
+        // ① 이동받은 수업 카드 — 수업 전 / 예상대로 / 다른 차시 상태별 스타일
         miList.forEach(function(mi) {
           var fromD = new Date(mi.sourceDate + 'T09:00:00');
           var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + '(' + DAY_KR[fromD.getDay()] + ')';
-          var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === mi.lessonNo; });
-          html += '<div style="background:#faf5ff;border:1px solid #ddd6fe;' + CARD + '">'
+          var planned = mi.plannedLessonNo || mi.lessonNo;
+          var actual  = mi.lessonNo;
+          var displayLn = actual || planned;
+          var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === displayLn; });
+          var stateLabel, stateBg, stateBorder, stateColor, stateIcon, stateBadge;
+          if (!actual) {
+            // 수업 전
+            stateBg = '#eef2ff'; stateBorder = '#a5b4fc'; stateColor = '#4338ca';
+            stateIcon = '📋'; stateBadge = '예정 (이동)';
+          } else if (actual === planned) {
+            // 예상대로
+            stateBg = '#faf5ff'; stateBorder = '#ddd6fe'; stateColor = '#7c3aed';
+            stateIcon = '🔀'; stateBadge = '이동';
+          } else {
+            // 다른 차시
+            stateBg = '#fef3c7'; stateBorder = '#fcd34d'; stateColor = '#b45309';
+            stateIcon = '🔀'; stateBadge = '다른 차시';
+          }
+          html += '<div style="background:' + stateBg + ';border:1px solid ' + stateBorder + ';' + CARD + '">'
             + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
-              + '<span>🔀</span>'
-              + '<span style="font-weight:800;color:#7c3aed;">' + mi.lessonNo + '차시</span>'
-              + '<span style="font-size:8px;background:#ede9fe;color:#7c3aed;padding:0 4px;border-radius:3px;margin-left:1px;">이동</span>'
+              + '<span>' + stateIcon + '</span>'
+              + '<span style="font-weight:800;color:' + stateColor + ';">' + displayLn + '차시' + (actual ? '' : ' 예정') + '</span>'
+              + '<span style="font-size:8px;background:rgba(255,255,255,0.6);color:' + stateColor + ';padding:0 4px;border-radius:3px;margin-left:1px;">' + stateBadge + '</span>'
             + '</div>'
-            + '<div style="font-size:9px;color:#a78bfa;margin-bottom:1px;">📍 ' + fromLabel + ' 수업</div>'
+            + '<div style="font-size:9px;color:' + stateColor + ';opacity:0.7;margin-bottom:1px;">📍 ' + fromLabel + ' 수업</div>'
             + (miPlan && miPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(miPlan.content) + '</div>' : '')
+            + (actual && actual !== planned ? '<div style="font-size:8px;color:#94a3b8;margin-top:1px;">예정: ' + planned + '차시</div>' : '')
           + '</div>';
         });
 
@@ -1360,20 +1378,20 @@ function confirmCheck() {
     if (!lessonNo) return alert('이동할 차시 번호를 입력하세요.');
     document.getElementById('checkDateModal').classList.remove('open');
 
-    // 출발 날짜: 이동됨 표시 — plannedLessonNo로 어떤 차시였는지 보존
-    sylCheckCache[date + '_' + cls] = { lessonNo: lessonNo, plannedLessonNo: lessonNo, memo: '', status: '이동:' + targetDate };
+    // 출발 날짜: 이동됨 표시 — 아직 안 한 수업이므로 실제는 0, plannedLessonNo로 보존
+    sylCheckCache[date + '_' + cls] = { lessonNo: 0, plannedLessonNo: lessonNo, memo: '', status: '이동:' + targetDate };
 
-    // 도착 날짜: 이동받은 수업 추가 (기존 기록 유지)
+    // 도착 날짜: 이동받은 수업 추가 (수업 전 상태)
     var tKey = targetDate + '_' + cls;
     if (!sylMovedInCache[tKey]) sylMovedInCache[tKey] = [];
     sylMovedInCache[tKey] = sylMovedInCache[tKey].filter(function(r){ return r.sourceDate !== date; });
-    sylMovedInCache[tKey].push({ lessonNo: lessonNo, plannedLessonNo: lessonNo, sourceDate: date, memo: memo });
+    sylMovedInCache[tKey].push({ lessonNo: 0, plannedLessonNo: lessonNo, sourceDate: date, memo: memo });
 
     renderSylTable();
     google.script.run.withSuccessHandler(function(){})
-      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: lessonNo, plannedLessonNo: lessonNo, memo: '', status: '이동:' + targetDate }, currentGroupId);
+      .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, plannedLessonNo: lessonNo, memo: '', status: '이동:' + targetDate }, currentGroupId);
     google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
-      .saveMovedInLesson({ date: targetDate, cls: cls, lessonNo: lessonNo, plannedLessonNo: lessonNo, sourceDate: date, memo: memo }, currentGroupId);
+      .saveMovedInLesson({ date: targetDate, cls: cls, lessonNo: 0, plannedLessonNo: lessonNo, sourceDate: date, memo: memo }, currentGroupId);
     return;
   }
 
