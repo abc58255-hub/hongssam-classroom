@@ -211,6 +211,49 @@ function _notifyNewTask_(taskName, deadlinesJson) {
   }
 }
 
+// ①-b 과제 수정 시 — 학생별 effective 마감일이 바뀐 경우만 발송
+function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
+  try {
+    var oldDl, newDl;
+    try { oldDl = JSON.parse(oldJson || '{}'); } catch(_) { oldDl = {}; }
+    try { newDl = JSON.parse(newJson || '{}'); } catch(_) { return 0; }
+
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
+    var sent = 0;
+
+    function eff(map, cls) {
+      var v = map[cls] || map['all'];
+      return v ? String(v) : '';
+    }
+
+    for (var i = 1; i < roster.length; i++) {
+      var sid = String(roster[i][1] || '').trim();
+      if (!sid) continue;
+      var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+      var oldEff = eff(oldDl, cls);
+      var newEff = eff(newDl, cls);
+      if (newEff === oldEff) continue;      // 변경 없음
+      if (!newEff) continue;                 // 마감일이 사라진 경우는 알리지 않음
+      var tokens = _parseTokens_(roster[i][4]);
+      if (!tokens.length) continue;
+
+      var title = oldEff
+        ? '📅 마감일 변경: ' + taskName
+        : '📝 마감일 추가: ' + taskName;
+      var body = '새 마감: ' + _formatDeadline_(newEff);
+      for (var t = 0; t < tokens.length; t++) {
+        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'taskUpdate')) sent++;
+      }
+    }
+    return sent;
+  } catch(e) {
+    Logger.log('_notifyTaskDeadlineChange_ 오류: ' + e.message);
+    return 0;
+  }
+}
+
 // ② 매시간 트리거 — 지난 1시간 내 채점/반려된 학생에게 알림
 function notifyGradedHourly() {
   try {
@@ -987,6 +1030,23 @@ function saveNewTask(taskData) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
+// 과제 삭제 — 과제설정 행만 제거. 제출현황·Drive 폴더는 학생 기록 보존을 위해 그대로 둠
+function deleteTask(taskName) {
+  try {
+    if (!taskName) return { success: false, message: '과제명이 없습니다.' };
+    const s = SpreadsheetApp.openById(SHEET_ID).getSheetByName('과제설정');
+    const d = s.getDataRange().getValues();
+    for (let i = 1; i < d.length; i++) {
+      if (String(d[i][1]).trim() === taskName) {
+        s.deleteRow(i + 1);
+        clearCache();
+        return { success: true };
+      }
+    }
+    return { success: false, message: '과제를 찾을 수 없습니다.' };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 function updateTaskSettings(t) {
   try {
     const s = SpreadsheetApp.openById(SHEET_ID).getSheetByName("과제설정");
@@ -996,12 +1056,15 @@ function updateTaskSettings(t) {
       if (String(d[i][1]).trim() === t.originalName) { r = i + 1; break; }
     }
     if (r === -1) return { success: false, message: "과제를 찾을 수 없습니다." };
+    const oldDeadlines = String(d[r-1][3] || '');
     s.getRange(r, 3).setValue(t.desc);
     s.getRange(r, 4).setValue(t.deadlines);
     s.getRange(r, 5).setValue(t.evalType);
     s.getRange(r, 6).setValue(t.isPublic ? "일괄공개" : "비공개");
-    clearCache(); // 과제 수정 시 캐시 초기화
-    return { success: true };
+    clearCache();
+    // 🔔 마감일 변경/신규 반 추가 시 해당 학생만 알림
+    var pushed = _notifyTaskDeadlineChange_(t.originalName, oldDeadlines, t.deadlines);
+    return { success: true, pushed: pushed };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

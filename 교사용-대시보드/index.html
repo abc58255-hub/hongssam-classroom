@@ -2571,14 +2571,16 @@
       
       let tag = t.choiceList ? '<span class="choice-tag">🎯 선택형 과제</span>' : '';
 
-      let editBtn = '<button style="flex:1; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:10px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer;" onclick="openEditTaskModal(\'' + t.name + '\')">✏️ 수정</button>';
-      let cheatBtn = '<button style="flex:1; background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer;" onclick="runCheatCheck(\'' + t.name.replace(/'/g, "\\'") + '\')">🕵️ 부정 검사</button>';
+      let safeName = t.name.replace(/'/g, "\\'");
+      let editBtn = '<button style="flex:1; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; padding:10px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer;" onclick="openEditTaskModal(\'' + safeName + '\')">✏️ 수정</button>';
+      let cheatBtn = '<button style="flex:1; background:#ef4444; color:white; border:none; padding:10px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer;" onclick="runCheatCheck(\'' + safeName + '\')">🕵️ 부정 검사</button>';
+      let delBtn = '<button style="flex:0 0 auto; background:#fff; color:#dc2626; border:1px solid #fecaca; padding:10px 14px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer;" onclick="deleteTaskConfirm(\'' + safeName + '\')" title="과제 삭제">🗑️</button>';
 
       h += '<div class="task-card">' +
            '<div class="task-card-header"><div class="task-title-area"><div>' + t.name + '</div>' + tag + '<span class="pic-badge">📸 필수 ' + (t.reqPics || 1) + '개</span></div><span class="task-badge">' + t.evalType + '</span></div>' +
            '<div class="task-desc" style="margin-bottom:10px;">' + (t.desc || '-') + '</div>' +
            '<div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:12px;">' + dH + '</div>' +
-           '<div style="display:flex; gap:8px; margin-top:14px; width:100%;">' + editBtn + cheatBtn + '</div>' +
+           '<div style="display:flex; gap:8px; margin-top:14px; width:100%;">' + editBtn + cheatBtn + delBtn + '</div>' +
            '</div>';
     });
     g.innerHTML = h;
@@ -2705,6 +2707,24 @@
       }
       else { alert(r.message || "저장 실패"); }
     }).updateTaskSettings(td);
+  }
+
+  function deleteTaskConfirm(taskName) {
+    if (!confirm('"' + taskName + '" 과제를 삭제할까요?\n\n⚠️ 과제설정에서만 제거됩니다.\n학생 제출 기록과 Drive 파일은 그대로 남아요.')) return;
+    google.script.run
+      .withFailureHandler(function(err) { alert('삭제 실패: ' + err.message); })
+      .withSuccessHandler(function(r) {
+        if (!r || !r.success) { alert(r && r.message ? r.message : '삭제 실패'); return; }
+        google.script.run.withSuccessHandler(function(data) {
+          allTasks = data.tasks || [];
+          var evalMap = {};
+          allTasks.forEach(function(t){ evalMap[t.name] = t.evalType; });
+          taskEvalMap = evalMap;
+          populateFilters();
+          renderManageTasks();
+        }).getTasksOnly();
+      })
+      .deleteTask(taskName);
   }
 
   function openEditTaskModal(t) {
