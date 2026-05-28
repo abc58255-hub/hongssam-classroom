@@ -6235,7 +6235,8 @@
     var studStats = {};
     Object.keys(rosterIds).forEach(function(id) {
       studStats[id] = { id:id, name:rosterIds[id].name, cls:rosterIds[id].cls,
-        scores:[], submittedTasks:0, expectedTasks:0, ranks:[], bestWorks:0 };
+        scores:[], submittedTasks:0, expectedTasks:0, ranks:[], bestWorks:0,
+        gradeGpa:[], gradeBreakdown:{A:0,B:0,C:0,D:0} };
     });
     // 학생별 "제출 대상 과제 수"
     Object.keys(studStats).forEach(function(id) {
@@ -6257,7 +6258,14 @@
         var st = studStats[id]; if (!st) return;
         st.submittedTasks++;
         var sub = lates[id];
-        if (sub.score && !isNaN(parseFloat(sub.score))) st.scores.push(parseFloat(sub.score));
+        var rawScore = String(sub.score || '').trim();
+        if (rawScore && !isNaN(parseFloat(rawScore))) st.scores.push(parseFloat(rawScore));
+        // ABCD 등급 처리
+        var gpaMap = { 'A':4, 'B':3, 'C':2, 'D':1 };
+        if (gpaMap[rawScore] !== undefined) {
+          st.gradeGpa.push(gpaMap[rawScore]);
+          st.gradeBreakdown[rawScore]++;
+        }
         if (sub.bestType && sub.bestType !== '' && sub.bestType !== 'undefined') st.bestWorks++;
       });
     });
@@ -6266,6 +6274,8 @@
     students.forEach(function(s) {
       s.avgScore = s.scores.length > 0
         ? Math.round(s.scores.reduce(function(a,b){return a+b;},0) / s.scores.length * 10) / 10 : null;
+      s.avgGpa = s.gradeGpa.length > 0
+        ? Math.round(s.gradeGpa.reduce(function(a,b){return a+b;},0) / s.gradeGpa.length * 100) / 100 : null;
       s.avgRank = s.ranks.length > 0
         ? Math.round(s.ranks.reduce(function(a,b){return a+b;},0) / s.ranks.length * 10) / 10 : null;
       s.submitRate = s.expectedTasks > 0
@@ -6274,6 +6284,8 @@
 
     var topScorers = students.filter(function(s){return s.avgScore!==null;})
       .sort(function(a,b){return b.avgScore-a.avgScore;}).slice(0, 5);
+    var topGraders = students.filter(function(s){return s.avgGpa!==null;})
+      .sort(function(a,b){return b.avgGpa-a.avgGpa;}).slice(0, 5);
     var fastSubmitters = students.filter(function(s){return s.avgRank!==null && s.submittedTasks>=2;})
       .sort(function(a,b){return a.avgRank-b.avgRank;}).slice(0, 5);
     var perfectAttend = students.filter(function(s){return s.submitRate===100;})
@@ -6294,16 +6306,37 @@
       }).join('');
     }
 
+    function gradeBreakText(s) {
+      var b = s.gradeBreakdown;
+      var parts = ['A','B','C','D'].filter(function(k){return b[k]>0;}).map(function(k){return k+' '+b[k];});
+      return parts.join(' · ');
+    }
+
+    var overflowExtra = perfectAttend.slice(5);
+    var overflowHtml = '';
+    if (overflowExtra.length) {
+      var overflowNames = overflowExtra.map(function(s){
+        return s.name + (filterCls ? '' : ' (' + s.cls + ')');
+      }).join('\n');
+      overflowHtml = '<div title="' + overflowNames.replace(/"/g,'&quot;') + '" '
+        + 'style="font-size:11px;color:#94a3b8;margin-top:4px;text-align:center;cursor:help;border-top:1px dashed #e2e8f0;padding-top:4px;">'
+        + '외 ' + overflowExtra.length + '명 (마우스 올려서 확인)</div>';
+    }
+
     return '<div style="background:white;border-radius:16px;padding:20px;border:1px solid #e2e8f0;margin-bottom:16px;">'
       + '<div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:14px;">👑 학생 개별 분석</div>'
       + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">'
-        + '<div><div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:6px;">🏆 평균 점수 Top 5</div>'
+        + '<div><div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:6px;">🏆 평균 점수 Top 5 <span style="font-weight:500;color:#94a3b8;">(점수제)</span></div>'
           + renderList(topScorers, '#f59e0b', function(s){return s.avgScore + '점';}, '아직 점수 없음') + '</div>'
+        + '<div><div style="font-size:12px;font-weight:800;color:#dc2626;margin-bottom:6px;">📊 등급 평균 Top 5 <span style="font-weight:500;color:#94a3b8;">(A=4 ~ D=1)</span></div>'
+          + renderList(topGraders, '#dc2626', function(s){
+              return s.avgGpa.toFixed(2) + ' <span style="font-weight:400;color:#94a3b8;font-size:11px;">(' + gradeBreakText(s) + ')</span>';
+            }, '아직 등급 없음') + '</div>'
         + '<div><div style="font-size:12px;font-weight:800;color:#3b82f6;margin-bottom:6px;">⚡ 빠른 제출 Top 5 <span style="font-weight:500;color:#94a3b8;">(평균 순위)</span></div>'
           + renderList(fastSubmitters, '#3b82f6', function(s){return s.avgRank + '등';}, '제출 데이터 부족') + '</div>'
         + '<div><div style="font-size:12px;font-weight:800;color:#10b981;margin-bottom:6px;">💯 개근왕 <span style="font-weight:500;color:#94a3b8;">(전 과제 제출)</span></div>'
           + renderList(perfectAttend.slice(0, 5), '#10b981', function(s){return s.submittedTasks + '개 완주';}, '아직 없음')
-          + (perfectAttend.length > 5 ? '<div style="font-size:11px;color:#94a3b8;margin-top:4px;text-align:center;">외 ' + (perfectAttend.length - 5) + '명</div>' : '') + '</div>'
+          + overflowHtml + '</div>'
         + '<div><div style="font-size:12px;font-weight:800;color:#8b5cf6;margin-bottom:6px;">⭐ 우수작 다발자 Top 5</div>'
           + renderList(bestStars, '#8b5cf6', function(s){return s.bestWorks + '회';}, '아직 없음') + '</div>'
       + '</div></div>';
