@@ -5836,7 +5836,14 @@
     let qData = JSON.parse(sv.questions);
     let html = mHtml + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;"><h3 style="margin:0; color:#b45309;">' + sv.title + ' 전체 통계</h3></div>';
     qData.forEach(function(q, idx) {
-      html += '<div style="margin-bottom:30px; background:#f8fafc; padding:20px; border-radius:12px; border:1px solid #cbd5e1;"><div style="font-weight:bold; font-size:16px; margin-bottom:15px; color:#1e293b;">Q' + (idx+1) + '. ' + (q.text || q.title || '') + '</div>';
+      var posterBtn = q.type === 'dynamic'
+        ? '<button onclick="openPosterPrompt(\'' + svId + '\',' + idx + ')" style="background:#7c3aed;color:white;border:none;padding:7px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">🎨 포스터 디자인 만들기</button>'
+        : '';
+      html += '<div style="margin-bottom:30px; background:#f8fafc; padding:20px; border-radius:12px; border:1px solid #cbd5e1;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:15px;">'
+          + '<div style="font-weight:bold; font-size:16px; color:#1e293b;flex:1;">Q' + (idx+1) + '. ' + (q.text || q.title || '') + '</div>'
+          + posterBtn
+        + '</div>';
       if (q.type === 'score') {
         let sum = 0, count = 0, breakdown = {};
         resList.forEach(function(r) { let ans = JSON.parse(r.answers); if (ans[idx] !== undefined && ans[idx] !== null && ans[idx] !== '') { let v = parseInt(ans[idx]); sum += v; count++; breakdown[v] = (breakdown[v]||0)+1; } });
@@ -6030,6 +6037,138 @@
         .sendPushToAll(title, body, 'general');
     }
   }
+  // 칭찬 포스터용 프롬프트 생성 (dynamic 문항 전용)
+  function openPosterPrompt(svId, qIdx) {
+    var sv = gSurveys.find(function(s){ return String(s.id) === String(svId); });
+    if (!sv) { alert('설문을 찾을 수 없습니다.'); return; }
+    var qData; try { qData = JSON.parse(sv.questions); } catch(_) { return; }
+    var q = qData[qIdx];
+    if (!q || q.type !== 'dynamic') return;
+
+    var resList = gSurveyRes.filter(function(r){ return String(r.svId).trim() === String(svId).trim(); });
+    var targetReasons = {};
+    resList.forEach(function(r) {
+      var ans; try { ans = JSON.parse(r.answers); } catch(_) { return; }
+      var dData = ans[qIdx];
+      if (!dData || typeof dData !== 'object') return;
+      for (var target in dData) {
+        var reason = String(dData[target] || '').trim();
+        if (!reason) continue;
+        if (!targetReasons[target]) targetReasons[target] = [];
+        targetReasons[target].push(reason);
+      }
+    });
+
+    var sorted = Object.keys(targetReasons).map(function(name){
+      return { name: name, count: targetReasons[name].length, reasons: targetReasons[name] };
+    }).sort(function(a, b){ return b.count - a.count; });
+
+    if (sorted.length === 0) { alert('이 문항에는 아직 투표 데이터가 없습니다.'); return; }
+
+    // 등수 계산 (1,1,2,3 방식)
+    var prevCount = null, prevRank = 0;
+    sorted.forEach(function(s) {
+      if (s.count !== prevCount) { prevRank++; prevCount = s.count; }
+      s.rank = prevRank;
+    });
+
+    var topGroups = {}; // rank → [students]
+    sorted.forEach(function(s) {
+      if (s.rank <= 3) {
+        if (!topGroups[s.rank]) topGroups[s.rank] = [];
+        topGroups[s.rank].push(s);
+      }
+    });
+    var others = sorted.filter(function(s){ return s.rank > 3; });
+    var medals = { 1: '🥇', 2: '🥈', 3: '🥉' };
+
+    var p = '다음 학급 설문 결과로 따뜻하고 밝은 학급 게시용 칭찬 포스터를 디자인해주세요.\n\n';
+    p += '📋 설문 문항: "' + (q.text || '') + '"\n';
+    p += '📅 설문명: ' + sv.title + '\n';
+    p += '👥 응답자: ' + resList.length + '명\n\n';
+    p += '─────────────────────\n\n';
+
+    [1, 2, 3].forEach(function(rank) {
+      var group = topGroups[rank];
+      if (!group) return;
+      var medal = medals[rank];
+      if (group.length === 1) {
+        var s = group[0];
+        p += medal + ' ' + rank + '등: ' + s.name + ' (' + s.count + '표)\n';
+        p += '받은 이유들:\n';
+        s.reasons.forEach(function(r){ p += '- ' + r + '\n'; });
+        p += '\n';
+      } else {
+        p += medal + ' 공동 ' + rank + '등 (' + group.length + '명):\n\n';
+        group.forEach(function(s) {
+          p += '  • ' + s.name + ' (' + s.count + '표)\n';
+          p += '    받은 이유들:\n';
+          s.reasons.forEach(function(r){ p += '    - ' + r + '\n'; });
+          p += '\n';
+        });
+      }
+    });
+
+    if (others.length) {
+      p += '─────────────────────\n';
+      p += '🎖️ 그 외 표를 받은 친구들:\n';
+      others.forEach(function(s){ p += '- ' + s.name + ': ' + s.count + '표\n'; });
+      p += '\n';
+    }
+
+    p += '─────────────────────\n\n';
+    p += '[디자인 요구사항]\n';
+    p += '1. 학급 게시판에 어울리는 따뜻하고 밝은 톤 (파스텔/소프트 컬러)\n';
+    p += '2. 제목은 문항 내용을 보고 어울리는 짧고 임팩트 있는 헤드라인으로 자동 생성 (예: "📚 수업 참여왕", "🤝 친절왕")\n';
+    p += '3. 1~3등은 메달 아이콘과 함께 시각적으로 강조\n';
+    p += '4. 동순위는 같은 등수로 표시 (1, 1, 2, 3 방식 — 공동 1등이 2명이면 그 다음은 2등)\n';
+    p += '5. 각 학생의 "받은 이유들" 중에서 의미 있는 2~3개를 골라서 자연스럽게 요약\n';
+    p += '   ⚠️ 작성자가 누구인지 짐작할 수 없도록 반드시 익명화 (예: "지난주에 나한테 도와줘서" → "친구를 잘 도와줌")\n';
+    p += '   ⚠️ 학생 이름은 칭찬받는 학생만 노출, 작성자 학생 이름이 이유 안에 있으면 제거\n';
+    p += '6. 그 외 표를 받은 친구들은 이름과 표 수만 깔끔하게 나열\n';
+    p += '7. 한 페이지 분량, A4 세로 비율\n';
+    p += '8. 응원/축하 분위기 — 모든 참여자가 기분 좋아질 디자인';
+
+    var modal = document.getElementById('posterPromptModal');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'posterPromptModal';
+      modal.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px;';
+      modal.addEventListener('click', function(e){ if (e.target === modal) modal.style.display = 'none'; });
+      document.body.appendChild(modal);
+    }
+    var safeP = p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    modal.innerHTML = '<div style="background:white;border-radius:20px;padding:24px;width:100%;max-width:680px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.25);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">'
+        + '<div style="font-size:17px;font-weight:800;color:#0f172a;">🎨 칭찬 포스터 프롬프트</div>'
+        + '<button onclick="document.getElementById(\'posterPromptModal\').style.display=\'none\'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>'
+      + '</div>'
+      + '<p style="font-size:12px;color:#64748b;margin-bottom:10px;line-height:1.5;">아래 프롬프트를 복사해서 <b style="color:#7c3aed;">claude.ai</b>에 붙여넣으면 포스터가 자동으로 만들어져요.</p>'
+      + '<textarea id="posterPromptText" readonly style="flex:1;min-height:320px;font-size:12px;font-family:monospace;padding:12px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;resize:vertical;line-height:1.55;">' + safeP + '</textarea>'
+      + '<div style="display:flex;gap:8px;margin-top:12px;">'
+        + '<button onclick="copyPosterPrompt()" id="posterCopyBtn" style="flex:1;background:#7c3aed;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">📋 프롬프트 복사하기</button>'
+        + '<button onclick="document.getElementById(\'posterPromptModal\').style.display=\'none\'" style="background:#e2e8f0;color:#475569;border:none;padding:12px 20px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">닫기</button>'
+      + '</div>'
+      + '</div>';
+    modal.style.display = 'flex';
+  }
+
+  function copyPosterPrompt() {
+    var ta = document.getElementById('posterPromptText');
+    if (!ta) return;
+    var done = function() {
+      var btn = document.getElementById('posterCopyBtn');
+      if (btn) { var orig = btn.innerHTML; btn.innerHTML = '✅ 복사 완료!'; setTimeout(function(){ btn.innerHTML = orig; }, 2000); }
+    };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(ta.value).then(done).catch(function(){
+        ta.select(); document.execCommand('copy'); done();
+      });
+    } else {
+      ta.select(); document.execCommand('copy'); done();
+    }
+  }
+
   function toggleSurveyNames(idx) {
     var checked = document.getElementById('svShowName-'+idx).checked;
     document.querySelectorAll('#svtxt-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'inline' : 'none'; });
