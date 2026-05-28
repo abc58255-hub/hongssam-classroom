@@ -6194,6 +6194,96 @@
              waitMap:waitMap, resubMap:resubMap, noSubMap:noSubMap };
   }
 
+  // ── 학생 개별 분석 (전체/반별 공용) ──
+  function _renderStudentRankings(filterCls) {
+    var roster = filterCls ? allRoster.filter(function(s){return s.cls===filterCls;}) : allRoster;
+    if (!roster.length || !allTasks.length) return '';
+
+    var rosterIds = {};
+    roster.forEach(function(s){ rosterIds[s.id] = s; });
+
+    var latestSub = {}, earliestSub = {};
+    allSubmissions.forEach(function(s) {
+      if (s.status === '이전기록채점완료') return;
+      if (!rosterIds[s.id]) return;
+      var tn = _cleanTask(s.task);
+      if (!latestSub[tn]) latestSub[tn] = {};
+      if (!latestSub[tn][s.id] || s.rowIdx > latestSub[tn][s.id].rowIdx) latestSub[tn][s.id] = s;
+      if (!earliestSub[tn]) earliestSub[tn] = {};
+      if (!earliestSub[tn][s.id] || s.rowIdx < earliestSub[tn][s.id].rowIdx) earliestSub[tn][s.id] = s;
+    });
+
+    var studStats = {};
+    Object.keys(rosterIds).forEach(function(id) {
+      studStats[id] = { id:id, name:rosterIds[id].name, cls:rosterIds[id].cls,
+        scores:[], submittedTasks:0, ranks:[], bestWorks:0 };
+    });
+
+    allTasks.forEach(function(t) {
+      var tn = t.name;
+      var earlies = earliestSub[tn] || {};
+      var lates = latestSub[tn] || {};
+      var sorted = Object.keys(earlies).map(function(id){return earlies[id];})
+        .sort(function(a,b){return a.rowIdx-b.rowIdx;});
+      sorted.forEach(function(sub, idx) {
+        var st = studStats[sub.id];
+        if (st) st.ranks.push(idx + 1);
+      });
+      Object.keys(lates).forEach(function(id) {
+        var st = studStats[id]; if (!st) return;
+        st.submittedTasks++;
+        var sub = lates[id];
+        if (sub.score && !isNaN(parseFloat(sub.score))) st.scores.push(parseFloat(sub.score));
+        if (sub.bestType && sub.bestType !== '' && sub.bestType !== 'undefined') st.bestWorks++;
+      });
+    });
+
+    var students = Object.keys(studStats).map(function(id){return studStats[id];});
+    students.forEach(function(s) {
+      s.avgScore = s.scores.length > 0
+        ? Math.round(s.scores.reduce(function(a,b){return a+b;},0) / s.scores.length * 10) / 10 : null;
+      s.avgRank = s.ranks.length > 0
+        ? Math.round(s.ranks.reduce(function(a,b){return a+b;},0) / s.ranks.length * 10) / 10 : null;
+      s.submitRate = Math.round(s.submittedTasks / allTasks.length * 100);
+    });
+
+    var topScorers = students.filter(function(s){return s.avgScore!==null;})
+      .sort(function(a,b){return b.avgScore-a.avgScore;}).slice(0, 5);
+    var fastSubmitters = students.filter(function(s){return s.avgRank!==null && s.submittedTasks>=2;})
+      .sort(function(a,b){return a.avgRank-b.avgRank;}).slice(0, 5);
+    var perfectAttend = students.filter(function(s){return s.submitRate===100;})
+      .sort(function(a,b){return (b.avgScore||0)-(a.avgScore||0);});
+    var bestStars = students.filter(function(s){return s.bestWorks>0;})
+      .sort(function(a,b){return b.bestWorks-a.bestWorks;}).slice(0, 5);
+
+    function medal(i) { return i===0 ? '🥇' : i===1 ? '🥈' : i===2 ? '🥉' : (i+1)+'위'; }
+    function renderList(items, color, getValue, emptyText) {
+      if (!items.length) return '<div style="color:#94a3b8;font-size:12px;padding:8px;">' + emptyText + '</div>';
+      return items.map(function(s, i) {
+        var clsTag = filterCls ? '' : '<span style="font-size:10px;color:#94a3b8;margin-left:4px;">' + s.cls + '</span>';
+        return '<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 8px;background:#fafafa;border-radius:6px;margin-bottom:3px;font-size:12px;">'
+          + '<span><span style="display:inline-block;width:28px;">' + medal(i) + '</span> '
+            + '<b>' + s.name + '</b>' + clsTag + '</span>'
+          + '<span style="font-weight:800;color:' + color + ';">' + getValue(s) + '</span>'
+          + '</div>';
+      }).join('');
+    }
+
+    return '<div style="background:white;border-radius:16px;padding:20px;border:1px solid #e2e8f0;margin-bottom:16px;">'
+      + '<div style="font-size:15px;font-weight:800;color:#0f172a;margin-bottom:14px;">👑 학생 개별 분석</div>'
+      + '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;">'
+        + '<div><div style="font-size:12px;font-weight:800;color:#f59e0b;margin-bottom:6px;">🏆 평균 점수 Top 5</div>'
+          + renderList(topScorers, '#f59e0b', function(s){return s.avgScore + '점';}, '아직 점수 없음') + '</div>'
+        + '<div><div style="font-size:12px;font-weight:800;color:#3b82f6;margin-bottom:6px;">⚡ 빠른 제출 Top 5 <span style="font-weight:500;color:#94a3b8;">(평균 순위)</span></div>'
+          + renderList(fastSubmitters, '#3b82f6', function(s){return s.avgRank + '등';}, '제출 데이터 부족') + '</div>'
+        + '<div><div style="font-size:12px;font-weight:800;color:#10b981;margin-bottom:6px;">💯 개근왕 <span style="font-weight:500;color:#94a3b8;">(전 과제 제출)</span></div>'
+          + renderList(perfectAttend.slice(0, 5), '#10b981', function(s){return s.submittedTasks + '개 완주';}, '아직 없음')
+          + (perfectAttend.length > 5 ? '<div style="font-size:11px;color:#94a3b8;margin-top:4px;text-align:center;">외 ' + (perfectAttend.length - 5) + '명</div>' : '') + '</div>'
+        + '<div><div style="font-size:12px;font-weight:800;color:#8b5cf6;margin-bottom:6px;">⭐ 우수작 다발자 Top 5</div>'
+          + renderList(bestStars, '#8b5cf6', function(s){return s.bestWorks + '회';}, '아직 없음') + '</div>'
+      + '</div></div>';
+  }
+
   // ── MODE 1: 전체 현황 대시보드 ──
   function _renderOverallDashboard(div) {
     if (!allTasks || !allTasks.length || !allRoster || !allRoster.length) {
@@ -6280,7 +6370,8 @@
         + _secTitle('💡 분석 결과')
         + '<div style="display:flex;flex-direction:column;gap:6px;">' + insightHtml + '</div>'
       + '</div>'
-      + '</div>';
+      + '</div>'
+      + _renderStudentRankings(null);
 
     window._lastStats = s;
   }
@@ -6341,7 +6432,8 @@
       + taskRows
       + _secTitle('🚨 미제출 학생')
       + '<div style="flex-wrap:wrap;display:flex;">' + noSubHtml + '</div>'
-      + '</div>';
+      + '</div>'
+      + _renderStudentRankings(cls);
 
     window._lastStats = s;
   }
