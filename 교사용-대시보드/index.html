@@ -233,7 +233,6 @@
   <ul class="menu-list">
     <li class="menu-item active" onclick="switchPage('page-grade', this)">✍️ 채점 / 첨삭 <span id="ungradedBadge" style="display:none; margin-left:auto; background:#ef4444; color:white; font-size:11px; font-weight:900; padding:2px 7px; border-radius:10px; min-width:18px; text-align:center;"></span></li>
     <li class="menu-item" onclick="switchPage('page-manage', this)">⚙️ 수학 과제 관리</li>
-    <li class="menu-item" onclick="switchPage('page-report', this)">👥 미제출자 명단</li>
     <li class="menu-item" onclick="switchPage('page-stats', this)">📈 반별 성취도 분석</li>
     <li class="menu-item" onclick="window.open('https://script.google.com/macros/s/AKfycbwn_9wAf1Qyb744x-t3b46CkuikXhg748qryip_tMQYpYUDVz65nPuK_rxVN7LUBkHf9g/exec','_blank')" style="color:#93c5fd;">📋 진도표 관리 ↗</li>
     <li class="menu-item" onclick="switchPage('page-port', this)">📁 학생 누적 포트폴리오</li>
@@ -511,24 +510,6 @@
     </div>
   </div>
 
-
-  <!-- ✅ 미제출자 명단 -->
-  <div id="page-report" class="page-section" style="display:none;">
-    <h2 class="page-title">
-      <span style="display:flex;align-items:center;">
-        <button class="mobile-menu-btn" onclick="toggleSidebar()">☰</button>
-        👥 미제출자 명단
-      </span>
-      <button onclick="loadData()" style="background:#e2e8f0;color:#374151;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🔄 새로고침</button>
-    </h2>
-    <div class="controls">
-      <div class="filter-group">
-        <select id="reportClassFilter" class="filter-select" onchange="renderReport()"></select>
-        <select id="reportTaskFilter" class="filter-select" onchange="renderReport()"></select>
-      </div>
-    </div>
-    <div id="reportResult"></div>
-  </div>
 
   <!-- ✅ 반별 성취도 분석 -->
   <div id="page-stats" class="page-section" style="display:none;">
@@ -1819,7 +1800,6 @@
     if (window.innerWidth <= 768) toggleSidebar();
     
     if (pageId === 'page-manage') renderManageTasks();
-    else if (pageId === 'page-report') renderReport();
     else if (pageId === 'page-stats') renderStats();
     else if (pageId === 'page-port') { updatePortStudentList(); renderPortfolio(); }
     else if (pageId === 'page-best') renderBestWorks();
@@ -1945,7 +1925,6 @@
           if (p.style.display !== 'none') visiblePages.push(p.id);
         });
         if (visiblePages.indexOf('page-manage') >= 0) renderManageTasks();
-        if (visiblePages.indexOf('page-report') >= 0) renderReport();
         if (visiblePages.indexOf('page-stats') >= 0) renderStats();
         if (visiblePages.indexOf('page-port') >= 0) { updatePortStudentList(); renderPortfolio(); }
         if (visiblePages.indexOf('page-best') >= 0) renderBestWorks();
@@ -1990,10 +1969,10 @@
     let cAll = '<option value="all">🏫 전체 반</option>', cBlank = '<option value="">선택하세요</option>';
     classList.forEach(function(c) { cAll += '<option value="' + c + '">' + c + '</option>'; cBlank += '<option value="' + c + '">' + c + '</option>'; });
     const safeSetHtml = function(id, html) { let el = document.getElementById(id); if (el) el.innerHTML = html; };
-    safeSetHtml('classFilter', cAll); safeSetHtml('statsClassFilter', cAll); safeSetHtml('reportClassFilter', cBlank); safeSetHtml('smartClass', '<option value="all">🏫 전체 반</option>' + classList.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('')); safeSetHtml('portClassFilter', cBlank); safeSetHtml('bulkClass', cAll); safeSetHtml('bestClassFilter', cAll);
+    safeSetHtml('classFilter', cAll); safeSetHtml('statsClassFilter', cAll); safeSetHtml('smartClass', '<option value="all">🏫 전체 반</option>' + classList.map(function(c) { return '<option value="' + c + '">' + c + '</option>'; }).join('')); safeSetHtml('portClassFilter', cBlank); safeSetHtml('bulkClass', cAll); safeSetHtml('bestClassFilter', cAll);
     let tAll = '<option value="all">📚 전체 과제</option>', tBlank = '<option value="">선택하세요</option>';
     allTasks.forEach(function(t) { tAll += '<option value="' + t.name + '">' + t.name + '</option>'; tBlank += '<option value="' + t.name + '">' + t.name + '</option>'; });
-    safeSetHtml('taskFilter', tAll); safeSetHtml('statsTaskFilter', tBlank); safeSetHtml('reportTaskFilter', tBlank); safeSetHtml('smartTask', tBlank); safeSetHtml('bulkTask', tBlank); safeSetHtml('bestTaskFilter', tAll);
+    safeSetHtml('taskFilter', tAll); safeSetHtml('statsTaskFilter', tBlank); safeSetHtml('smartTask', tBlank); safeSetHtml('bulkTask', tBlank); safeSetHtml('bestTaskFilter', tAll);
     safeSetHtml('cheatTaskSelect', '<option value="">🕵️ 검사할 과제 선택</option>' + allTasks.map(function(t) { return '<option value="' + t.name + '">' + t.name + '</option>'; }).join(''));
     let hAct = '<option value="">📋 활동 선택 (전체)</option>';
     hrActivities.forEach(function(a) { hAct += '<option value="' + a.name + '">[' + a.category + '] ' + a.name + '</option>'; });
@@ -2514,7 +2493,6 @@
       })
       .saveFeedback(r, fb, a, sc, pub, mm, bestType, bestAnon, bestComment);
   }
-  function renderReport() { const t = document.getElementById('reportTaskFilter').value, c = document.getElementById('reportClassFilter').value; if (!t || !c) return; let s = allRoster.filter(function(x) { return x.cls === c; }); let p = [], r = [], m = []; s.forEach(function(x) { let rec = allSubmissions.filter(function(y) { return y.id === x.id && String(y.task).startsWith(t); }); if (rec.length === 0) m.push(x.name); else if (rec[0].status === "재제출요청") r.push(x.name); else p.push(x.name); }); document.getElementById('reportResult').innerHTML = '<div class="report-box" style="border-top:4px solid #10b981;"><b>✅ 완료: ' + p.length + '명</b><br>' + (p.join(', ') || '없음') + '</div><div class="report-box" style="border-top:4px solid #f59e0b;"><b>🚨 재제출: ' + r.length + '명</b><br>' + (r.join(', ') || '없음') + '</div><div class="report-box" style="border-top:4px solid #ef4444;"><b>❌ 미제출: ' + m.length + '명</b><br>' + (m.join(', ') || '없음') + '</div>'; }
   function updatePortStudentList() { const c = document.getElementById('portClassFilter').value; let o = '<option value="">학생 선택</option>'; if (c) allRoster.filter(function(s) { return s.cls === c; }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); }).forEach(function(s) { o += '<option value="' + s.id + '">' + s.id + ' ' + s.name + '</option>'; }); document.getElementById('portStudentFilter').innerHTML = o; }
   function toggleChoiceMode() { const isChecked = document.getElementById('checkChoiceMode').checked; document.getElementById('choiceModeSetup').style.display = isChecked ? 'block' : 'none'; }
  // 1. 과제 관리 카드 렌더링 (부정검사 버튼 추가 및 재제출 마감일 표시)
