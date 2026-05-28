@@ -162,6 +162,10 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
     <!-- 탭1: 진도표 -->
     <div id="tab-content-1">
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;">
+        <button onclick="expandAllSylMonths()" style="background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▼ 모두 펼치기</button>
+        <button onclick="collapseAllSylMonths()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▶ 모두 접기</button>
+      </div>
       <div class="syl-table-wrap">
         <div id="sylTableWrap"><div class="loading">불러오는 중...</div></div>
       </div>
@@ -400,6 +404,10 @@ var sylCheckCache    = {};
 var sylScheduleCache = {};
 var sylHolidayCache  = {};
 var sylMovedInCache  = {};
+var sylCollapsedMonths = (function() {
+  try { return JSON.parse(localStorage.getItem('syl_collapsed_months') || '{}'); }
+  catch(_) { return {}; }
+})();
 var sylClassList     = [];
 var sylTaskRates     = {};
 var allClasses       = [];
@@ -583,6 +591,32 @@ function escapeHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// 월별 토글 (행 show/hide만 처리 — 전체 재렌더 불필요)
+function toggleSylMonth(monthKey) {
+  sylCollapsedMonths[monthKey] = !sylCollapsedMonths[monthKey];
+  try { localStorage.setItem('syl_collapsed_months', JSON.stringify(sylCollapsedMonths)); } catch(_) {}
+  var collapsed = !!sylCollapsedMonths[monthKey];
+  var rows = document.querySelectorAll('.syl-row[data-month="' + monthKey + '"]');
+  rows.forEach(function(r) { r.style.display = collapsed ? 'none' : ''; });
+  var header = document.querySelector('.syl-month-header[data-month="' + monthKey + '"] span');
+  if (header) header.textContent = collapsed ? '▶' : '▼';
+}
+
+function expandAllSylMonths() {
+  sylCollapsedMonths = {};
+  try { localStorage.setItem('syl_collapsed_months', '{}'); } catch(_) {}
+  renderSylTable();
+}
+
+function collapseAllSylMonths() {
+  document.querySelectorAll('.syl-month-header').forEach(function(h) {
+    var mk = h.getAttribute('data-month');
+    if (mk) sylCollapsedMonths[mk] = true;
+  });
+  try { localStorage.setItem('syl_collapsed_months', JSON.stringify(sylCollapsedMonths)); } catch(_) {}
+  renderSylTable();
+}
+
 // ─── 진도표 렌더 (날짜 기반) ───
 function renderSylTable() {
   var wrap = document.getElementById('sylTableWrap');
@@ -670,15 +704,33 @@ function renderSylTable() {
   });
   html += '</tr></thead><tbody>';
 
+  // 월별 행 개수 사전 집계 (헤더에 표시용)
+  var monthCount = {};
+  sortedDates.forEach(function(ds) {
+    var dd = new Date(ds + 'T09:00:00');
+    var mk = dd.getFullYear() + '-' + String(dd.getMonth()+1).padStart(2,'0');
+    monthCount[mk] = (monthCount[mk] || 0) + 1;
+  });
+
   var lastMonth = '';
   var prevMonday = '';
   sortedDates.forEach(function(dateStr) {
     var d = new Date(dateStr + 'T09:00:00');
+    var monthKey = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
     var monthLabel = d.getFullYear() + '년 ' + (d.getMonth()+1) + '월';
     if (monthLabel !== lastMonth) {
       lastMonth = monthLabel;
-      html += '<tr><td colspan="' + (cols.length+1) + '" style="background:#1e3a8a;color:white;font-weight:800;padding:6px 16px;font-size:13px;">' + monthLabel + '</td></tr>';
-      prevMonday = ''; // 월 헤더 뒤엔 주차 구분선 생략
+      var isCollapsed = !!sylCollapsedMonths[monthKey];
+      var arrow = isCollapsed ? '▶' : '▼';
+      html += '<tr class="syl-month-header" data-month="' + monthKey + '">'
+        + '<td colspan="' + (cols.length+1) + '" '
+          + 'onclick="toggleSylMonth(\'' + monthKey + '\')" '
+          + 'style="background:#1e3a8a;color:white;font-weight:800;padding:8px 16px;font-size:13px;cursor:pointer;user-select:none;">'
+          + '<span style="display:inline-block;width:16px;font-size:11px;">' + arrow + '</span> '
+          + monthLabel
+          + ' <span style="font-size:11px;font-weight:500;opacity:0.8;margin-left:8px;">(' + monthCount[monthKey] + '일)</span>'
+        + '</td></tr>';
+      prevMonday = '';
     }
 
     var curMonday = getMondayStr(dateStr);
@@ -691,7 +743,8 @@ function renderSylTable() {
     var isHoliday = !!sylHolidayCache[dateStr];
     var dayColor = (dow === 0 || isHoliday) ? '#dc2626' : dow === 6 ? '#2563eb' : '#1e293b';
     var dateCellBg = isHoliday ? '#fef2f2' : wc.date;
-    html += '<tr>'
+    var rowDisplay = sylCollapsedMonths[monthKey] ? 'display:none;' : '';
+    html += '<tr class="syl-row" data-month="' + monthKey + '" style="' + rowDisplay + '">'
       + '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;background:' + dateCellBg + ';' + weekBorder + '">'
         + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')'
         + (isHoliday ? ' <span style="font-size:11px;">🏖️</span>' : '') + '</span>'
