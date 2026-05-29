@@ -383,6 +383,7 @@ function getDashboardData(studentId, studentName) {
       resubmitTasks: resubmitTasks,
       unreadFeedbacks: unreadFeedbacks,
       bestWorksMap: bestWorksMap,
+      taskOrder: allBaseTasks, // 과제 부여 순서 (갤러리 정렬용)
       fcmRegisterUrl: _getSysStudent('FCM_REGISTER_URL'),
       mathAppUrl: _getSysStudent('바로가기_수학교실')
     };

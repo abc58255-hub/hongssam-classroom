@@ -203,9 +203,9 @@
         <select id="galleryTaskFilter" onchange="applyGalleryFilter()" style="flex:1; min-width:140px; padding:8px 12px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:13px; font-weight:700; background:white; color:#1e293b;">
           <option value="all">📚 전체 과제</option>
         </select>
-        <select id="gallerySortFilter" onchange="applyGalleryFilter()" style="flex:1; min-width:120px; padding:8px 12px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:13px; font-weight:700; background:white; color:#1e293b;">
-          <option value="newest">🕐 최신순</option>
-          <option value="oldest">🕐 오래된 순</option>
+        <select id="gallerySortFilter" onchange="applyGalleryFilter()" style="flex:1; min-width:130px; padding:8px 12px; border:1.5px solid #e5e7eb; border-radius:10px; font-size:13px; font-weight:700; background:white; color:#1e293b;">
+          <option value="task_desc">📋 최근 과제순</option>
+          <option value="task_asc">📋 오래된 과제순</option>
           <option value="new_only">🆕 NEW만 보기</option>
         </select>
       </div>
@@ -318,6 +318,7 @@
   var selectedChoices = [];
   // ✅ 갤러리 필터용 전역 변수
   var gBestWorksMap = {};
+  var gTaskOrder = []; // 과제 부여 순서
   var gViewedBest = [];
 
   // ✅ 갤러리 렌더링 함수 (필터 적용)
@@ -332,9 +333,14 @@
     // 과제 필터
     if (taskFilter !== 'all') taskNames = taskNames.filter(function(n) { return n === taskFilter; });
 
-    // 정렬
-    if (sortFilter === 'oldest') taskNames = taskNames.reverse();
-    // newest는 기본(reverse 안 함 — 이미 reverse 상태)
+    // 과제 부여 순서 기반 정렬 (gTaskOrder = 시트 등록 순)
+    taskNames.sort(function(a, b) {
+      var idxA = gTaskOrder.indexOf(a);
+      var idxB = gTaskOrder.indexOf(b);
+      if (idxA < 0) idxA = 9999;
+      if (idxB < 0) idxB = 9999;
+      return sortFilter === 'task_asc' ? idxA - idxB : idxB - idxA; // task_desc = 최근(높은 인덱스)이 위
+    });
 
     // NEW만 보기
     if (sortFilter === 'new_only') {
@@ -819,6 +825,7 @@
 
     var viewedBest = JSON.parse(localStorage.getItem('viewed_best_' + currentUser.id) || '[]');
     gBestWorksMap = data.bestWorksMap;
+    gTaskOrder = data.taskOrder || [];
     gViewedBest = viewedBest;
 
     // 🌟 새 우수작 — 미해결 과제 모달이 뜰 경우 함께 포함, 아니면 단독 팝업
