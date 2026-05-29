@@ -6487,11 +6487,11 @@
           st.gradeGpa.push(gpaMap[rawScore]);
           st.gradeBreakdown[rawScore]++;
         } else {
-          st.gradeGpa.push(0);
+          // 미제출/미채점은 평균 계산에서 제외 (gradeGpa에 추가 안 함)
           if (!sub) {
-            st.gradeBreakdown['미제출']++;  // 제출 자체가 없음
+            st.gradeBreakdown['미제출']++;
           } else {
-            st.gradeBreakdown['미채점']++;  // 제출했지만 아직 등급 없음
+            st.gradeBreakdown['미채점']++;
           }
         }
       });
