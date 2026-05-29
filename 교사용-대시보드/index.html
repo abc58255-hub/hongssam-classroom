@@ -593,6 +593,10 @@
         style="flex:1;padding:10px;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;background:transparent;color:#64748b;transition:0.2s;">
         📺 교실 알림판
       </button>
+      <button id="noticeTabBtn3" onclick="switchNoticeTab(3)"
+        style="flex:1;padding:10px;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer;background:transparent;color:#64748b;transition:0.2s;">
+        🔔 자동발송 기록
+      </button>
     </div>
 
     <!-- 탭1: 학생 앱 알림 목록 -->
@@ -613,6 +617,15 @@
         <button onclick="renderNotices(true)" style="background:#e2e8f0;color:#374151;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🔄 새로고침</button>
       </div>
       <div id="noticeList"></div>
+    </div>
+
+    <!-- 탭3: 자동발송 기록 -->
+    <div id="noticeTab3" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <span style="font-size:13px;color:#64748b;">최근 자동 발송된 알림 기록 (최대 30건)</span>
+        <button onclick="loadNotifyLog()" style="background:#e2e8f0;color:#374151;border:none;padding:7px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">🔄 새로고침</button>
+      </div>
+      <div id="notifyLogList"><div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px;">불러오는 중...</div></div>
     </div>
 
     <!-- 탭2: 교실 알림판 등록/관리 -->
@@ -4527,16 +4540,50 @@
       })
       .getBoardNotices();
   }
+  function loadNotifyLog() {
+    var area = document.getElementById('notifyLogList');
+    if (!area) return;
+    area.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px;">불러오는 중...</div>';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.logs || res.logs.length === 0) {
+          area.innerHTML = '<div style="text-align:center;padding:30px;color:#94a3b8;font-size:13px;">아직 자동 발송 기록이 없어요.</div>';
+          return;
+        }
+        area.innerHTML = res.logs.map(function(log) {
+          var typeColor = log.type.indexOf('미제출') >= 0 ? '#ef4444'
+            : log.type.indexOf('채점') >= 0 ? '#10b981'
+            : log.type.indexOf('마감') >= 0 ? '#f59e0b'
+            : '#6366f1';
+          return '<div style="display:flex;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid #f1f5f9;font-size:13px;">'
+            + '<span style="color:#94a3b8;font-size:11px;white-space:nowrap;min-width:76px;">' + log.time + '</span>'
+            + '<span style="background:' + typeColor + '1a;color:' + typeColor + ';font-weight:700;padding:2px 8px;border-radius:6px;font-size:11px;white-space:nowrap;">' + log.type + '</span>'
+            + '<span style="flex:1;color:#374151;">' + log.content + '</span>'
+            + '<span style="color:#64748b;font-size:12px;white-space:nowrap;">' + log.sent + '명에게 발송</span>'
+            + '</div>';
+        }).join('');
+      })
+      .withFailureHandler(function() {
+        area.innerHTML = '<div style="text-align:center;padding:20px;color:#ef4444;font-size:13px;">불러오기 실패</div>';
+      })
+      .getNotifyLog();
+  }
+
   function switchNoticeTab(n) {
     currentNoticeTab = n;
     document.getElementById('noticeTab1').style.display = n === 1 ? 'block' : 'none';
     document.getElementById('noticeTab2').style.display = n === 2 ? 'block' : 'none';
+    document.getElementById('noticeTab3').style.display = n === 3 ? 'block' : 'none';
     var btn1 = document.getElementById('noticeTabBtn1');
     var btn2 = document.getElementById('noticeTabBtn2');
+    var btn3 = document.getElementById('noticeTabBtn3');
     btn1.style.background = n === 1 ? '#f59e0b' : 'transparent';
     btn1.style.color = n === 1 ? 'white' : '#64748b';
     btn2.style.background = n === 2 ? '#0284c7' : 'transparent';
     btn2.style.color = n === 2 ? 'white' : '#64748b';
+    btn3.style.background = n === 3 ? '#6366f1' : 'transparent';
+    btn3.style.color = n === 3 ? 'white' : '#64748b';
+    if (n === 3) loadNotifyLog();
     if (n === 2) {
       var dateEl = document.getElementById('boardDate');
       if (dateEl && !dateEl.value) {

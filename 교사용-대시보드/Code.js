@@ -152,6 +152,43 @@ function sendPushToUnsubmitted(taskName, title, body) {
 // 🔔 자동 알림 시스템 (트리거 기반)
 // =====================================================
 
+// 알림 발송 로그 기록 (알림발송로그 시트)
+function _logNotify_(type, content, sent) {
+  try {
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = ss.getSheetByName('알림발송로그');
+    if (!sh) {
+      sh = ss.insertSheet('알림발송로그');
+      sh.getRange(1, 1, 1, 4).setValues([['발송시각','유형','내용','발송수']]);
+      sh.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#1e3a8a').setFontColor('white');
+      sh.setFrozenRows(1);
+    }
+    sh.appendRow([new Date(), type, content, sent]);
+    // 최대 500행 유지
+    if (sh.getLastRow() > 501) sh.deleteRow(2);
+  } catch(e) { Logger.log('_logNotify_ 오류: ' + e.message); }
+}
+
+// 로그 조회 (교사 대시보드용, 최근 30건)
+function getNotifyLog() {
+  try {
+    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('알림발송로그');
+    if (!sh || sh.getLastRow() < 2) return { success: true, logs: [] };
+    var lastRow = sh.getLastRow();
+    var startRow = Math.max(2, lastRow - 29);
+    var rows = sh.getRange(startRow, 1, lastRow - startRow + 1, 4).getValues();
+    var logs = rows.reverse().map(function(r) {
+      return {
+        time: r[0] ? Utilities.formatDate(new Date(r[0]), 'Asia/Seoul', 'MM/dd HH:mm') : '',
+        type: String(r[1] || ''),
+        content: String(r[2] || ''),
+        sent: Number(r[3] || 0)
+      };
+    });
+    return { success: true, logs: logs };
+  } catch(e) { return { success: false, logs: [] }; }
+}
+
 // 제출현황 K열(상태) + X열(상태변경일시) 함께 업데이트
 function _setSubmissionStatus_(sheet, rowIdx, status) {
   sheet.getRange(rowIdx, 11).setValue(status);
@@ -303,6 +340,7 @@ function notifyGradedHourly() {
     }
     props.setProperty('last_grade_notify_ts', String(now));
     Logger.log('notifyGradedHourly: ' + sent + '건 발송');
+    if (sent > 0) _logNotify_('✅ 채점/반려 알림', '지난 1시간 채점·반려 학생', sent);
     return { sent: sent };
   } catch(e) {
     Logger.log('notifyGradedHourly 오류: ' + e.message);
@@ -387,6 +425,7 @@ function notifyUnsubmittedDaily() {
     });
 
     Logger.log('notifyUnsubmittedDaily: 학생 ' + studentCount + '명, ' + sent + '건 발송');
+    if (sent > 0) _logNotify_('📌 미제출 알림', '미제출자 ' + studentCount + '명', sent);
     return { sent: sent, students: studentCount };
   } catch(e) {
     Logger.log('notifyUnsubmittedDaily 오류: ' + e.message);
@@ -1026,6 +1065,7 @@ function saveNewTask(taskData) {
     clearCache();
     // 🔔 새 과제 알림 — 마감일 설정된 반 학생만
     var pushed = _notifyNewTask_(taskData.name, taskData.deadlines);
+    if (pushed > 0) _logNotify_('📝 새 과제', taskData.name, pushed);
     return { success: true, pushed: pushed };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
@@ -1064,6 +1104,7 @@ function updateTaskSettings(t) {
     clearCache();
     // 🔔 마감일 변경/신규 반 추가 시 해당 학생만 알림
     var pushed = _notifyTaskDeadlineChange_(t.originalName, oldDeadlines, t.deadlines);
+    if (pushed > 0) _logNotify_('📅 마감일 변경', t.originalName, pushed);
     return { success: true, pushed: pushed };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
