@@ -258,15 +258,17 @@ function getDashboardData(studentId, studentName) {
       let bestType = historyData[i][16] ? String(historyData[i][16]).trim() : "";
       
       if (bestType !== "") {
-        let isAnon = historyData[i][17] === true || String(historyData[i][17]).toUpperCase() === "TRUE"; 
+        let isAnon = historyData[i][17] === true || String(historyData[i][17]).toUpperCase() === "TRUE";
         let authorCls = rowId.length >= 2 ? `${rowId.substring(0,1)}학년 ${rowId.substring(1,2)}반` : "기타";
-        
-        if (bestType === "학년공개" || (bestType === "학급공개" && authorCls === className)) {
+        // 이 학생 반에 마감일이 없으면(= 과제 대상 아님) 우수작 팝업 대상에서 제외
+        const taskDl = taskDeadlineMap[baseName];
+        const isTaskAssigned = taskDl && taskDl.main;
+        if (isTaskAssigned && (bestType === "학년공개" || (bestType === "학급공개" && authorCls === className))) {
           if (!bestWorksMap[baseName]) bestWorksMap[baseName] = [];
-          bestWorksMap[baseName].push({ 
-            rowIdx: i + 1, id: rowId, name: String(historyData[i][2] || ""), 
-            urls: urls, annoUrls: annoUrls, bestKey: bestKey, 
-            comment: historyData[i][18] ? String(historyData[i][18]) : "", 
+          bestWorksMap[baseName].push({
+            rowIdx: i + 1, id: rowId, name: String(historyData[i][2] || ""),
+            urls: urls, annoUrls: annoUrls, bestKey: bestKey,
+            comment: historyData[i][18] ? String(historyData[i][18]) : "",
             isAnon: isAnon,
             bestType: bestType
           });
