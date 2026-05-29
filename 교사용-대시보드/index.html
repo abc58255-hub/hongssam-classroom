@@ -7277,15 +7277,31 @@
       maxS = Math.max.apply(null, scores);
       minS = Math.min.apply(null, scores);
     }
-    var bands = {'100': 0, '90~99': 0, '80~89': 0, '70~79': 0, '60~69': 0, '~59': 0};
+    // 과제 최대점수: AI채점기준 > 실제 제출 최고점 > 100 순으로 참조
+    var taskObj = allTasks.find(function(x){ return x.name === t; });
+    var rubricMaxScore = (rubricCache && rubricCache.find(function(r){ return r.taskName === t; }) || {}).maxScore || 0;
+    var topScore = rubricMaxScore || (scored.length > 0 ? Math.max.apply(null, scored.map(function(x){ return parseFloat(x.score); })) : 100);
+    // 자연스러운 만점 반올림 (예: 97→100, 48→50, 28→30)
+    var roundTo = topScore <= 10 ? 1 : topScore <= 20 ? 5 : topScore <= 50 ? 10 : topScore <= 100 ? 10 : 50;
+    var maxScore = Math.ceil(topScore / roundTo) * roundTo;
+    // 6구간 생성 (최고점 기준 20%씩)
+    var step = maxScore / 5;
+    var bandKeys = [], bandThresholds = [], bandCols = ['#10b981','#22c55e','#84cc16','#f59e0b','#f97316','#ef4444'];
+    for (var bi = 4; bi >= 0; bi--) {
+      var lo = Math.round(step * bi);
+      var hi = bi === 4 ? maxScore : Math.round(step * (bi + 1)) - 1;
+      var label = lo === hi ? String(lo) : (bi === 0 ? '~' + hi : lo + '~' + hi);
+      bandKeys.push(label);
+      bandThresholds.push(lo);
+    }
+    var bands = {}; bandKeys.forEach(function(k){ bands[k] = 0; });
     scored.forEach(function(x) {
       var v = parseFloat(x.score);
-      if (v >= 100) bands['100']++;
-      else if (v >= 90) bands['90~99']++;
-      else if (v >= 80) bands['80~89']++;
-      else if (v >= 70) bands['70~79']++;
-      else if (v >= 60) bands['60~69']++;
-      else bands['~59']++;
+      var placed = false;
+      for (var bi2 = 0; bi2 < bandThresholds.length; bi2++) {
+        if (v >= bandThresholds[bi2]) { bands[bandKeys[bi2]]++; placed = true; break; }
+      }
+      if (!placed) bands[bandKeys[bandKeys.length-1]]++;
     });
     var lvl = {'😀 쉬움': 0, '😐 보통': 0, '😭 어려움': 0};
     latest.forEach(function(x) { if (lvl[x.level] !== undefined) lvl[x.level]++; });
@@ -7336,15 +7352,18 @@
           '</div>';
       });
       h += '</div>';
-      h += '<div style="font-size:13px; font-weight:700; color:#475569; margin-bottom:8px;">점수 구간 분포</div>';
-      var bandColors = {'100':'#10b981','90~99':'#22c55e','80~89':'#84cc16','70~79':'#f59e0b','60~69':'#f97316','~59':'#ef4444'};
-      Object.keys(bands).forEach(function(band) {
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">'
+        + '<div style="font-size:13px;font-weight:700;color:#475569;">점수 구간 분포</div>'
+        + '<div style="font-size:11px;color:#94a3b8;">만점 ' + maxScore + '점 기준 · 5구간</div>'
+        + '</div>';
+      bandKeys.forEach(function(band, bi3) {
         var cnt = bands[band];
         var pct = scored.length > 0 ? Math.round(cnt / scored.length * 100) : 0;
+        var bandColor = bandCols[bi3] || '#94a3b8';
         h += '<div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">' +
           '<div style="font-size:12px; font-weight:700; color:#64748b; width:50px; text-align:right;">' + band + '</div>' +
           '<div style="flex:1; background:#f1f5f9; border-radius:6px; height:20px; overflow:hidden;">' +
-            '<div style="height:100%; width:' + pct + '%; background:' + bandColors[band] + '; border-radius:6px; transition:width 0.5s; display:flex; align-items:center; padding-left:6px;">' +
+            '<div style="height:100%; width:' + pct + '%; background:' + bandColor + '; border-radius:6px; transition:width 0.5s; display:flex; align-items:center; padding-left:6px;">' +
               (pct > 10 ? '<span style="font-size:11px; color:white; font-weight:bold;">' + cnt + '명</span>' : '') +
             '</div>' +
           '</div>' +
