@@ -6469,8 +6469,11 @@
       });
     });
 
-    // ABCD 등급 — 미제출자도 0점으로 카운트 (분모에 포함)
+    // ABCD 등급 — 미제출·미채점 모두 0점으로 분모에 포함 (구분 표시)
     var gpaMap = { 'A':4, 'B':3, 'C':2, 'D':1 };
+    Object.keys(studStats).forEach(function(id) {
+      studStats[id].gradeBreakdown['미채점'] = 0;
+    });
     allTasks.forEach(function(t) {
       var isGradeTask = String(t.evalType || '').indexOf('A-B-C-D') >= 0;
       if (!isGradeTask) return;
@@ -6484,9 +6487,12 @@
           st.gradeGpa.push(gpaMap[rawScore]);
           st.gradeBreakdown[rawScore]++;
         } else {
-          // 미제출 / 미채점 / 명시적 '미제출' → 0점
           st.gradeGpa.push(0);
-          st.gradeBreakdown['미제출']++;
+          if (!sub) {
+            st.gradeBreakdown['미제출']++;  // 제출 자체가 없음
+          } else {
+            st.gradeBreakdown['미채점']++;  // 제출했지만 아직 등급 없음
+          }
         }
       });
     });
@@ -6529,7 +6535,7 @@
 
     function gradeBreakText(s) {
       var b = s.gradeBreakdown;
-      var parts = ['A','B','C','D','미제출'].filter(function(k){return b[k]>0;}).map(function(k){return k+' '+b[k];});
+      var parts = ['A','B','C','D','미채점','미제출'].filter(function(k){return b[k]>0;}).map(function(k){return k+' '+b[k];});
       return parts.join(' · ');
     }
 
