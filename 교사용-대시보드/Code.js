@@ -128,20 +128,38 @@ function sendPushToAll(title, body, tag) {
   return sendPushToStudents(null, title, body, tag);
 }
 
-// 특정 과제 미제출자에게 알림
+// 특정 과제 미제출자에게 알림 — 마감일이 설정된 반 학생에게만
 function sendPushToUnsubmitted(taskName, title, body) {
   try {
-    var roster  = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부').getDataRange().getValues();
-    var history = SpreadsheetApp.openById(SHEET_ID).getSheetByName('제출현황').getDataRange().getValues();
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var roster  = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var history = ss.getSheetByName('제출현황').getDataRange().getValues();
+    var tasks   = ss.getSheetByName('과제설정').getDataRange().getValues();
+
+    // 해당 과제의 마감일 설정 로드
+    var deadlines = {};
+    for (var k = 1; k < tasks.length; k++) {
+      if (String(tasks[k][1] || '').trim() === taskName) {
+        try { deadlines = JSON.parse(tasks[k][3] || '{}'); } catch(_) {}
+        break;
+      }
+    }
+
     var submittedIds = new Set();
     for (var i = 1; i < history.length; i++) {
       var tn = String(history[i][3] || '').split(' (')[0];
       if (tn === taskName) submittedIds.add(String(history[i][1] || '').trim());
     }
+
     var unsubIds = [];
     for (var j = 1; j < roster.length; j++) {
       var sid = String(roster[j][1] || '').trim();
-      if (sid && !submittedIds.has(sid)) unsubIds.push(sid);
+      if (!sid) continue;
+      // 이 학생 반에 마감일이 설정된 경우에만 대상
+      var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+      var dl = deadlines[cls] || deadlines['all'];
+      if (!dl) continue;
+      if (!submittedIds.has(sid)) unsubIds.push(sid);
     }
     if (unsubIds.length === 0) return { success: true, sent: 0, skipped: 0, message: '미제출자 없음' };
     return sendPushToStudents(unsubIds, title || ('📢 [' + taskName + '] 아직 제출 안 했어요!'), body || '지금 바로 제출해주세요.', 'unsub');
