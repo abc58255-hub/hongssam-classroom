@@ -311,6 +311,12 @@ function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
 
 // ② 매시간 트리거 — 지난 1시간 내 채점/반려된 학생에게 알림
 function notifyGradedHourly() {
+  // 동시 실행 방지 (트리거 중복 설치 시 한 번만 실행되도록)
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) {
+    Logger.log('notifyGradedHourly: 이미 실행 중, 건너뜀');
+    return { skipped: true };
+  }
   try {
     var props = PropertiesService.getScriptProperties();
     var lastTs = parseInt(props.getProperty('last_grade_notify_ts') || '0');
@@ -363,6 +369,8 @@ function notifyGradedHourly() {
   } catch(e) {
     Logger.log('notifyGradedHourly 오류: ' + e.message);
     return { error: e.message };
+  } finally {
+    lock.releaseLock();
   }
 }
 
