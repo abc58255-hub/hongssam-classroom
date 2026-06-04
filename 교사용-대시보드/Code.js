@@ -2249,10 +2249,11 @@ function analyzeTaskText(text, fileAttachment) {
     const body    = JSON.parse(res.getContentText());
     let   content = body.choices[0].message.content.trim();
 
-    // 마크다운 코드블록 제거 (```json ... ```)
+    // 마크다운 코드블록 제거 후 느슨한 JSON 파싱 (앞뒤 설명 텍스트 대응)
     content = content.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/,'').trim();
 
-    const parsed = JSON.parse(content);
+    const parsed = _parseAiJsonLoose_(content);
+    if (!parsed) return { success: false, message: 'JSON 파싱 실패: ' + content.substring(0, 150) };
     return { success: true, result: parsed, model: cfg.model };
 
   } catch(e) {
