@@ -959,47 +959,7 @@ function openCheckDate(date, cls) {
   document.getElementById('extraDateRow').style.display = 'none';
 
   // 이동받은 수업 섹션
-  var miKey = date + '_' + cls;
-  var miList = sylMovedInCache[miKey] || [];
-  var miSection = document.getElementById('movedInSection');
-  var miListDiv = document.getElementById('movedInList');
-  var DAY_KR_MI = ['일','월','화','수','목','금','토'];
-  if (miList.length > 0) {
-    miSection.style.display = 'block';
-    miListDiv.innerHTML = miList.map(function(mi) {
-      var fromD = new Date(mi.sourceDate + 'T09:00:00');
-      var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + ' (' + DAY_KR_MI[fromD.getDay()] + ')';
-      var planned = mi.plannedLessonNo || mi.lessonNo;
-      var actual  = mi.lessonNo;
-      var planObj = sylPlanCache.find(function(p){ return p.lessonNo === planned; });
-      // 현재 상태: none(수업 전) / same(예상대로) / diff(다른 차시)
-      var curMode = !actual ? 'none' : (actual === planned ? 'same' : 'diff');
-      var srcEnc = encodeURIComponent(mi.sourceDate);
-      var key = srcEnc; // 셀 ID 식별자
-      return '<div style="background:white;border:1px solid #ddd6fe;border-radius:8px;padding:10px;margin-bottom:6px;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
-          + '<div style="min-width:0;">'
-            + '<div><span style="font-weight:800;color:#7c3aed;">' + planned + '차시 예정</span>'
-              + ' <span style="font-size:11px;color:#a78bfa;">(' + fromLabel + ' 수업)</span></div>'
-            + (planObj && planObj.content ? '<div style="font-size:11px;color:#374151;word-break:keep-all;">' + escapeHtml(planObj.content) + '</div>' : '')
-            + (mi.memo ? '<div style="font-size:11px;color:#94a3b8;">' + escapeHtml(mi.memo) + '</div>' : '')
-          + '</div>'
-          + '<button onclick="removeMovedIn(\'' + escapeHtml(date) + '\',\'' + escapeHtml(cls) + '\',\'' + escapeHtml(mi.sourceDate) + '\')" '
-            + 'style="flex-shrink:0;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;">삭제</button>'
-        + '</div>'
-        + '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">'
-          + '<button class="actual-btn ' + (curMode==='none'?'active-none':'') + '" data-mi="' + key + '" data-mode="none" onclick="setMovedInMode(\'' + srcEnc + '\',\'none\')">📌 수업 전</button>'
-          + '<button class="actual-btn ' + (curMode==='same'?'active-same':'') + '" data-mi="' + key + '" data-mode="same" onclick="setMovedInMode(\'' + srcEnc + '\',\'same\')">✅ 예상대로</button>'
-          + '<button class="actual-btn ' + (curMode==='diff'?'active-diff':'') + '" data-mi="' + key + '" data-mode="diff" onclick="setMovedInMode(\'' + srcEnc + '\',\'diff\')">✏️ 다른 차시</button>'
-          + '<input type="number" min="1" data-mi-input="' + key + '" value="' + (curMode==='diff'?actual:'') + '" placeholder="차시" '
-            + 'style="width:70px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;display:' + (curMode==='diff'?'':'none') + ';" '
-            + 'oninput="updateMovedInActual(\'' + srcEnc + '\',this.value)">'
-        + '</div>'
-      + '</div>';
-    }).join('');
-  } else {
-    miSection.style.display = 'none';
-  }
+  renderMovedInSection(date, cls);
 
   var isScheduled = (sylScheduleCache[cls]||[]).indexOf(date) >= 0;
   var key      = date + '_' + cls;
@@ -1280,6 +1240,50 @@ function cancelCheck() {
 
 // 이동받은 수업 개별 삭제 (모달에서 삭제 버튼 클릭)
 // 이동받은 수업 — 예상대로/다른 차시/수업 전 모드 변경
+// 이동받은 수업 섹션 렌더 (모달 내) — 상태 변경 시 재호출하여 색상 갱신
+function renderMovedInSection(date, cls) {
+  var miKey = date + '_' + cls;
+  var miList = sylMovedInCache[miKey] || [];
+  var miSection = document.getElementById('movedInSection');
+  var miListDiv = document.getElementById('movedInList');
+  var DAY_KR_MI = ['일','월','화','수','목','금','토'];
+  if (miList.length > 0) {
+    miSection.style.display = 'block';
+    miListDiv.innerHTML = miList.map(function(mi) {
+      var fromD = new Date(mi.sourceDate + 'T09:00:00');
+      var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + ' (' + DAY_KR_MI[fromD.getDay()] + ')';
+      var planned = mi.plannedLessonNo || mi.lessonNo;
+      var actual  = mi.lessonNo;
+      var planObj = sylPlanCache.find(function(p){ return p.lessonNo === planned; });
+      var curMode = !actual ? 'none' : (actual === planned ? 'same' : 'diff');
+      var srcEnc = encodeURIComponent(mi.sourceDate);
+      var key = srcEnc;
+      return '<div style="background:white;border:1px solid #ddd6fe;border-radius:8px;padding:10px;margin-bottom:6px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;">'
+          + '<div style="min-width:0;">'
+            + '<div><span style="font-weight:800;color:#7c3aed;">' + planned + '차시 예정</span>'
+              + ' <span style="font-size:11px;color:#a78bfa;">(' + fromLabel + ' 수업)</span></div>'
+            + (planObj && planObj.content ? '<div style="font-size:11px;color:#374151;word-break:keep-all;">' + escapeHtml(planObj.content) + '</div>' : '')
+            + (mi.memo ? '<div style="font-size:11px;color:#94a3b8;">' + escapeHtml(mi.memo) + '</div>' : '')
+          + '</div>'
+          + '<button onclick="removeMovedIn(\'' + escapeHtml(date) + '\',\'' + escapeHtml(cls) + '\',\'' + escapeHtml(mi.sourceDate) + '\')" '
+            + 'style="flex-shrink:0;background:#fee2e2;color:#dc2626;border:none;border-radius:6px;padding:5px 9px;cursor:pointer;font-size:11px;font-weight:700;white-space:nowrap;">삭제</button>'
+        + '</div>'
+        + '<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">'
+          + '<button class="actual-btn ' + (curMode==='none'?'active-none':'') + '" data-mi="' + key + '" data-mode="none" onclick="setMovedInMode(\'' + srcEnc + '\',\'none\')">📌 수업 전</button>'
+          + '<button class="actual-btn ' + (curMode==='same'?'active-same':'') + '" data-mi="' + key + '" data-mode="same" onclick="setMovedInMode(\'' + srcEnc + '\',\'same\')">✅ 예상대로</button>'
+          + '<button class="actual-btn ' + (curMode==='diff'?'active-diff':'') + '" data-mi="' + key + '" data-mode="diff" onclick="setMovedInMode(\'' + srcEnc + '\',\'diff\')">✏️ 다른 차시</button>'
+          + '<input type="number" min="1" data-mi-input="' + key + '" value="' + (curMode==='diff'?actual:'') + '" placeholder="차시" '
+            + 'style="width:70px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;display:' + (curMode==='diff'?'':'none') + ';" '
+            + 'oninput="updateMovedInActual(\'' + srcEnc + '\',this.value)">'
+        + '</div>'
+      + '</div>';
+    }).join('');
+  } else {
+    miSection.style.display = 'none';
+  }
+}
+
 function setMovedInMode(srcEncoded, mode) {
   var sourceDate = decodeURIComponent(srcEncoded);
   var targetDate = document.getElementById('checkDate').value;
@@ -1305,16 +1309,8 @@ function setMovedInMode(srcEncoded, mode) {
     sylCheckCache[srcKey].lessonNo = mi.lessonNo;
     sylCheckCache[srcKey].plannedLessonNo = planned;
   }
-  // 버튼 상태 + 입력칸 표시 갱신
-  document.querySelectorAll('[data-mi="' + srcEncoded + '"]').forEach(function(b) {
-    var bm = b.getAttribute('data-mode');
-    b.className = 'actual-btn' + (bm === mode ? ' active-' + bm : '');
-  });
-  var input2 = document.querySelector('[data-mi-input="' + srcEncoded + '"]');
-  if (input2) {
-    input2.style.display = (mode === 'diff') ? '' : 'none';
-    if (mode !== 'diff') input2.value = '';
-  }
+  // 모달 섹션 전체 재렌더 (버튼 색상·입력칸 확실히 갱신) — diff 입력 중엔 포커스 유지 위해 건너뜀
+  if (mode !== 'diff') renderMovedInSection(targetDate, cls);
   renderSylTable();
   // 서버 저장 (movedIn + source cell 둘 다)
   google.script.run.withSuccessHandler(function(){})
