@@ -460,6 +460,19 @@ function notifyUnsubmittedDaily() {
 }
 
 // 트리거 설치 (GAS 에디터에서 1회 실행)
+// 트리거 현황 조회 (대시보드에서 확인용)
+function getTriggerStatus() {
+  try {
+    var triggers = ScriptApp.getProjectTriggers();
+    var counts = {};
+    triggers.forEach(function(t) {
+      var fn = t.getHandlerFunction();
+      counts[fn] = (counts[fn] || 0) + 1;
+    });
+    return { success: true, counts: counts, total: triggers.length };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 function installAutoNotifyTriggers() {
   var deleted = 0;
   ScriptApp.getProjectTriggers().forEach(function(t) {

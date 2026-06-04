@@ -640,6 +640,14 @@
 
     <!-- 탭3: 자동발송 기록 -->
     <div id="noticeTab3" style="display:none;">
+      <!-- 트리거 상태 -->
+      <div id="triggerStatusBox" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;margin-bottom:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:13px;font-weight:700;color:#374151;">⚙️ 자동 트리거 상태</span>
+          <button onclick="checkTriggerStatus()" style="background:#e2e8f0;color:#374151;border:none;padding:5px 12px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;">🔍 확인</button>
+        </div>
+        <div id="triggerStatusResult" style="font-size:12px;color:#94a3b8;">확인 버튼을 눌러주세요.</div>
+      </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <span style="font-size:13px;color:#64748b;">최근 자동 발송된 알림 기록 (최대 30건)</span>
         <button onclick="loadNotifyLog()" style="background:#e2e8f0;color:#374151;border:none;padding:7px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">🔄 새로고침</button>
@@ -4559,6 +4567,47 @@
       })
       .getBoardNotices();
   }
+  function checkTriggerStatus() {
+    var res = document.getElementById('triggerStatusResult');
+    res.textContent = '확인 중...';
+    google.script.run
+      .withSuccessHandler(function(r) {
+        if (!r.success) { res.innerHTML = '<span style="color:#ef4444;">조회 실패: ' + (r.message||'') + '</span>'; return; }
+        var counts = r.counts || {};
+        var graded  = counts['notifyGradedHourly'] || 0;
+        var unsub   = counts['notifyUnsubmittedDaily'] || 0;
+        var hasIssue = graded !== 1 || unsub !== 1;
+        var icon = hasIssue ? '⚠️' : '✅';
+        var html = icon + ' <b>채점 알림 트리거:</b> ' + graded + '개'
+          + ' &nbsp;|&nbsp; <b>미제출 알림 트리거:</b> ' + unsub + '개';
+        if (hasIssue) {
+          html += '<br><span style="color:#dc2626;font-size:11px;">정상은 각 1개입니다. 아래 버튼으로 정리하세요.</span>'
+            + '<br><button onclick="fixTriggers()" style="margin-top:8px;background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;">🔧 트리거 정리하기</button>';
+        } else {
+          html += '<br><span style="color:#10b981;font-size:11px;">정상입니다.</span>';
+        }
+        res.innerHTML = html;
+      })
+      .withFailureHandler(function(e) { res.innerHTML = '<span style="color:#ef4444;">오류: ' + e.message + '</span>'; })
+      .getTriggerStatus();
+  }
+
+  function fixTriggers() {
+    var res = document.getElementById('triggerStatusResult');
+    res.innerHTML = '⏳ 트리거 정리 중...';
+    google.script.run
+      .withSuccessHandler(function(r) {
+        if (r.success) {
+          res.innerHTML = '✅ 트리거 정리 완료! 다시 확인해보세요.';
+          setTimeout(checkTriggerStatus, 1500);
+        } else {
+          res.innerHTML = '<span style="color:#ef4444;">실패: ' + (r.message||'') + '</span>';
+        }
+      })
+      .withFailureHandler(function(e) { res.innerHTML = '<span style="color:#ef4444;">오류: ' + e.message + '</span>'; })
+      .installAutoNotifyTriggers();
+  }
+
   function loadNotifyLog() {
     var area = document.getElementById('notifyLogList');
     if (!area) return;
