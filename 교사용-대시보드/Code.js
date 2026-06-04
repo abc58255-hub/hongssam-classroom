@@ -2346,16 +2346,26 @@ function addToTickTick(taskData) {
     if (!cfg.ttClientId) return { success: false, message: '시스템설정 TickTick클라이언트ID 항목에 Client ID를 입력해주세요.' };
 
     function postTask(accessToken) {
+      // priority는 0,1,3,5만 허용 — 그 외 값은 기본 normal(3)
+      var pri = parseInt(taskData.priority);
+      if ([0,1,3,5].indexOf(pri) < 0) pri = 0;
+
       const body = {
-        title:    taskData.title,
+        title:    String(taskData.title || '').trim() || '제목 없음',
         content:  taskData.detail || '',
-        priority: taskData.priority || 3
+        priority: pri
       };
 
-      // 마감일 + 시간
+      // 마감일 + 시간 (TickTick은 dueDate 사용 시 timeZone 필요)
       if (taskData.deadline) {
-        const timeStr = taskData.time || '09:00';
-        body.dueDate = taskData.deadline + 'T' + timeStr + ':00+0900';
+        if (taskData.time) {
+          body.dueDate  = taskData.deadline + 'T' + taskData.time + ':00+0900';
+          body.isAllDay = false;
+        } else {
+          body.dueDate  = taskData.deadline + 'T00:00:00+0900';
+          body.isAllDay = true;
+        }
+        body.timeZone = 'Asia/Seoul';
       }
 
       // 프로젝트
@@ -2363,20 +2373,20 @@ function addToTickTick(taskData) {
         body.projectId = taskData.projectId;
       }
 
-      // 태그
-      if (taskData.tags && taskData.tags.length > 0) {
-        body.tags = taskData.tags;
+      // 태그 (문자열 배열만)
+      if (Array.isArray(taskData.tags) && taskData.tags.length > 0) {
+        body.tags = taskData.tags.map(function(t){ return String(t); }).filter(Boolean);
       }
 
       // 체크리스트
-      if (taskData.checklist && taskData.checklist.length > 0) {
+      if (Array.isArray(taskData.checklist) && taskData.checklist.length > 0) {
         body.items = taskData.checklist.map(function(item, i) {
-          return { title: item, status: 0, sortOrder: i };
+          return { title: String(item), status: 0, sortOrder: i };
         });
       }
 
-      // 반복
-      if (taskData.repeat) {
+      // 반복 — RRULE 형식만 허용 (AI가 한글/임의값 넣으면 무시)
+      if (taskData.repeat && /^RRULE:/i.test(String(taskData.repeat))) {
         body.repeatFlag = taskData.repeat;
       }
 
