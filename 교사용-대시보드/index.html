@@ -963,7 +963,7 @@
         </div>
         <img id="aiImagePreview" src="" style="display:none;max-width:100%;max-height:220px;border-radius:8px;object-fit:contain;border:1px solid #c7d2fe;">
       </div>
-      <textarea id="aiTaskInput" class="form-input" rows="5" style="resize:vertical;font-size:14px;line-height:1.7;" placeholder="일정이 적힌 사진을 첨부하거나, 공문/메시지를 여기 붙여넣으세요.&#10;&#10;사진만 첨부해도 AI가 일정을 자동으로 추출해요."></textarea>
+      <textarea id="aiTaskInput" class="form-input" rows="5" style="resize:vertical;font-size:14px;line-height:1.7;transition:0.15s;" placeholder="공문/메시지를 붙여넣거나, 사진을 여기로 끌어다 놓으세요.&#10;캡처 후 Ctrl+V(붙여넣기)로 이미지도 바로 첨부돼요.&#10;&#10;사진만 첨부해도 AI가 일정을 자동으로 추출해요."></textarea>
       <div style="display:flex;justify-content:flex-end;margin-top:10px;gap:8px;">
         <button onclick="document.getElementById('aiTaskInput').value=''" style="background:#f1f5f9;color:#64748b;border:none;padding:10px 18px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🗑️ 초기화</button>
         <button id="aiAnalyzeBtn" onclick="runAiAnalysis()" style="background:#6366f1;color:white;border:none;padding:10px 22px;border-radius:8px;font-weight:800;font-size:14px;cursor:pointer;">🤖 AI 분석 시작</button>
@@ -7467,6 +7467,7 @@
   }
   var aiAnalysisResult = null; // 마지막 분석 결과 저장
   function initAiTaskPage() {
+    _setupAiDropZone();
     google.script.run
       .withSuccessHandler(function(res) {
         updateAiStatusBadge(res);
@@ -7491,10 +7492,12 @@
   var _aiFileType = null;
   var _aiFileName = null;
   function handleAiFile(input) {
-    var file = input.files[0];
+    if (input.files && input.files[0]) _processAiFile(input.files[0]);
+  }
+  function _processAiFile(file) {
     if (!file) return;
-    if (file.size > 10 * 1024 * 1024) { alert('파일 크기는 10MB 이하만 가능해요.'); input.value=''; return; }
-    _aiFileName = file.name;
+    if (file.size > 10 * 1024 * 1024) { alert('파일 크기는 10MB 이하만 가능해요.'); return; }
+    _aiFileName = file.name || ('붙여넣은 이미지.' + ((file.type||'').split('/')[1] || 'png'));
     _aiFileType = file.type || 'application/octet-stream';
     var reader = new FileReader();
     reader.onload = function(e) {
@@ -7504,9 +7507,9 @@
       var nameEl   = document.getElementById('aiFileNameDisplay');
       var imgEl    = document.getElementById('aiImagePreview');
       if (preview) preview.style.display = 'block';
-      if (nameEl)  nameEl.textContent = (file.type.startsWith('image/') ? '📷 ' : '📎 ') + _aiFileName;
+      if (nameEl)  nameEl.textContent = ((_aiFileType.indexOf('image/')===0) ? '📷 ' : '📎 ') + _aiFileName;
       if (imgEl) {
-        if (file.type.startsWith('image/')) {
+        if (_aiFileType.indexOf('image/')===0) {
           imgEl.src = dataUrl;
           imgEl.style.display = 'block';
         } else {
@@ -7515,6 +7518,31 @@
       }
     };
     reader.readAsDataURL(file);
+  }
+  // 드래그앤드롭 + 붙여넣기(Ctrl+V) 연결
+  function _setupAiDropZone() {
+    var zone = document.getElementById('aiTaskInput');
+    if (!zone || zone._dndReady) return;
+    zone._dndReady = true;
+    ['dragenter','dragover'].forEach(function(ev){
+      zone.addEventListener(ev, function(e){ e.preventDefault(); zone.style.background = '#eef2ff'; zone.style.borderColor = '#6366f1'; });
+    });
+    ['dragleave','drop'].forEach(function(ev){
+      zone.addEventListener(ev, function(e){ e.preventDefault(); zone.style.background = ''; zone.style.borderColor = ''; });
+    });
+    zone.addEventListener('drop', function(e){
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) _processAiFile(f);
+    });
+    zone.addEventListener('paste', function(e){
+      var items = (e.clipboardData && e.clipboardData.items) || [];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].type && items[i].type.indexOf('image/') === 0) {
+          var f = items[i].getAsFile();
+          if (f) { _processAiFile(f); e.preventDefault(); break; }
+        }
+      }
+    });
   }
   function clearAiFile() {
     _aiFileData = null; _aiFileType = null; _aiFileName = null;
