@@ -2167,7 +2167,7 @@
         if (statF === "반려검토" && st !== "반려검토") return false;
         if (statF === "재제출요청" && st !== "재제출요청") return false;
         if (statF === "재제출완료" && st !== "재제출완료") return false;
-        if (statF === "채점완료" && st !== "채점완료") return false;
+        if (statF === "채점완료" && st !== "채점완료" && st !== "이전기록채점완료") return false;
       }
       let safeId = String(i.id || "");
       if (classF !== "all" && (safeId.substring(0,1) + "학년 " + safeId.substring(1,2) + "반") !== classF) return false;
@@ -2206,7 +2206,7 @@
       let tb = "";
       if (item.status === "재제출요청") tb = '<span class="resubmit-badge">🚨 재제출 대기</span>';
       else if (item.status === "재제출완료") tb = '<span class="resubmit-badge" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1;">✅ 재제출됨 (과거기록)</span>';
-      else if (item.status === "이전기록채점완료") tb = '<span class="resubmit-badge" style="background:#e2e8f0; color:#475569; border:1px solid #94a3b8;">📦 이전 기록 (채점 완료)</span>';
+      else if (item.status === "이전기록채점완료") tb = '<span class="resubmit-badge" style="background:#dcfce3; color:#15803d;">✅ 완료</span><span class="resubmit-badge" style="background:#f1f5f9; color:#64748b; border:1px solid #cbd5e1; margin-left:4px;">🔄 재제출됨</span>';
       else if (item.status === "반려검토") tb = '<span class="resubmit-badge" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca;">🔴 반려 검토</span>';
       else if (String(item.task).includes('(재제출)') && item.status === "") tb = '<span class="resubmit-badge" style="background:#ffedd5; color:#c2410c; border:1px solid #fed7aa;">🔄 학생 재제출본</span>';
       else if (String(item.task).includes('(재제출)') && (item.status === "채점중" || item.status === "임시저장")) tb = '<span class="resubmit-badge" style="background:#fef08a; color:#b45309;">✏️ 재제출 채점중</span>';
@@ -2230,7 +2230,7 @@
       if (item.status === '재제출요청' || item.status === '반려검토') {
           rankBadge = '<span style="background:#fef2f2;color:#dc2626;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid #fecaca;">🚨 반려됨 (순위 제외)</span>';
       } else if (item.status === '이전기록채점완료') {
-          rankBadge = '<span style="background:#f1f5f9;color:#64748b;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid #cbd5e1;">📦 과거 기록</span>';
+          rankBadge = '';
       } else if (isResubmit && item.status === '') {
           rankBadge = '<span style="background:#ffedd5;color:#c2410c;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;border:1px solid #fed7aa;">🔄 재제출</span>';
       } else if (item.classRank > 0 && item.totalRank > 0) {
