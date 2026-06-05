@@ -192,6 +192,7 @@
     <div id="tab2" class="tab-content">
       <!-- 요약 테이블 (기본 화면) -->
       <div id="taskSummaryView">
+        <div id="myAchievements" style="margin-bottom:14px;"></div>
         <div id="taskSummaryStat" style="margin-bottom:14px;"></div>
         <div id="taskSummaryTable"></div>
       </div>
@@ -496,10 +497,43 @@
     return { label: '채점중', color: '#a16207', bg: '#fef9c3', icon: '⏳' }; // '' 또는 채점중
   }
 
+  function renderMyAchievements(myStats) {
+    var box = document.getElementById('myAchievements');
+    if (!box) return;
+    if (!myStats) { box.innerHTML = ''; return; }
+
+    function rankText(m) {
+      if (!m) return '';
+      if (m.none) return '';
+      return '<span style="font-size:10px;color:#94a3b8;font-weight:600;">반 ' + m.classRank + '등 · 전체 ' + m.overallRank + '등</span>';
+    }
+    function card(icon, label, m, valFmt, emptyText) {
+      var valHtml, sub;
+      if (!m) { valHtml = '<span style="color:#cbd5e1;font-size:15px;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">' + (emptyText||'기록 없음') + '</span>'; }
+      else if (m.none) { valHtml = '<span style="color:#cbd5e1;font-size:15px;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">아직 없음</span>'; }
+      else { valHtml = valFmt(m.value); sub = rankText(m); }
+      return '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;">'
+        + '<div style="font-size:11px;color:#64748b;font-weight:700;margin-bottom:3px;">' + icon + ' ' + label + '</div>'
+        + '<div style="font-size:18px;font-weight:900;color:#1e3a8a;line-height:1.1;margin-bottom:2px;">' + valHtml + '</div>'
+        + '<div>' + sub + '</div>'
+        + '</div>';
+    }
+
+    box.innerHTML = '<div style="background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid #e0e7ff;border-radius:16px;padding:14px;">'
+      + '<div style="font-size:14px;font-weight:800;color:#4338ca;margin-bottom:10px;">🏆 내 업적</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
+        + card('⚡', '평균 제출순위', myStats.submitRank, function(v){ return v + '등'; }, '제출 기록 없음')
+        + card('🌟', '우수작', myStats.best, function(v){ return v + '개'; }, '아직 없음')
+        + card('📊', '등급 평균', myStats.grade, function(v){ return v.toFixed(2); }, '등급 과제 없음')
+        + card('💯', '점수 평균', myStats.score, function(v){ return v + '점'; }, '점수 과제 없음')
+      + '</div></div>';
+  }
+
   function renderTaskSummary(data) {
     var tableDiv = document.getElementById('taskSummaryTable');
     var statDiv  = document.getElementById('taskSummaryStat');
     if (!tableDiv) return;
+    renderMyAchievements(data.myStats);
 
     var latestMap = gLatestHistoryByTask();
     // 전체 과제 = taskOrder(부여순) + 혹시 빠진 history/missing 과제 보강

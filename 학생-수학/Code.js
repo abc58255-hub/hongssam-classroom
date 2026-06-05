@@ -381,6 +381,13 @@ function getDashboardData(studentId, studentName) {
       }
     });
 
+    // 🏆 내 업적 (학급·전체 등수 포함)
+    let myStats = null;
+    try {
+      const rosterData = ss.getSheetByName("학생명부").getDataRange().getValues();
+      myStats = _computeAchievements(historyData, taskData, rosterData, safeId, className);
+    } catch(e) { Logger.log('업적 계산 오류: ' + e.message); }
+
     return {
       history: history.reverse(),
       missingTasks: missingTasks,
@@ -388,6 +395,7 @@ function getDashboardData(studentId, studentName) {
       unreadFeedbacks: unreadFeedbacks,
       bestWorksMap: bestWorksMap,
       taskOrder: allBaseTasks, // 과제 부여 순서 (갤러리 정렬용)
+      myStats: myStats,
       fcmRegisterUrl: _getSysStudent('FCM_REGISTER_URL'),
       mathAppUrl: _getSysStudent('바로가기_수학교실')
     };
@@ -395,6 +403,148 @@ function getDashboardData(studentId, studentName) {
   } catch(e) {
     throw new Error("데이터 로딩 중 오류: " + e.toString());
   }
+}
+
+// 학생 업적 계산 — 평균 제출순위, 우수작, 등급평균, 점수평균 + 학급/전체 등수
+function _computeAchievements(historyData, taskData, rosterData, myId, myClass) {
+  // 1) 과제 분류 (점수제/등급제) + 반별 배정 여부
+  var taskInfo = {}; // name → { isGrade, isScore, classes:Set('all' or 반명) }
+  for (var i = 1; i < taskData.length; i++) {
+    var tName = String(taskData[i][1] || '').trim();
+    if (!tName) continue;
+    var evalType = String(taskData[i][4] || '').trim();
+    var isGrade = evalType.indexOf('A-B-C-D') >= 0;
+    var isScore = evalType.indexOf('점수') >= 0;
+    var clsSet = {};
+    try {
+      var dl = JSON.parse(taskData[i][3] || '{}');
+      Object.keys(dl).forEach(function(k){
+        if (k === 'all') clsSet['all'] = true;
+        else if (!k.startsWith('resub_') && !k.startsWith('open_') && k !== '_classes' && dl[k]) clsSet[k] = true;
+      });
+    } catch(_) {}
+    taskInfo[tName] = { isGrade: isGrade, isScore: isScore, classes: clsSet };
+  }
+  function assignedToClass(tName, cls) {
+    var ti = taskInfo[tName]; if (!ti) return false;
+    return !!(ti.classes['all'] || ti.classes[cls]);
+  }
+
+  // 2) 전체 학생 목록 (반 포함)
+  var students = {}; // id → { id, cls }
+  for (var r = 1; r < rosterData.length; r++) {
+    var sid = String(rosterData[r][1] || '').trim();
+    if (!sid) continue;
+    var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '기타';
+    students[sid] = { id: sid, cls: cls };
+  }
+
+  // 3) 제출 데이터 집계 — 과제별 최종/최초 제출
+  var latest = {}; // task → sid → row
+  var earliest = {}; // task → sid → row (제출순위용)
+  for (var h = 1; h < historyData.length; h++) {
+    var hid = String(historyData[h][1] || '').trim();
+    if (!hid || !students[hid]) continue;
+    var hTask = String(historyData[h][3] || '').split(' (')[0];
+    if (!hTask) continue;
+    var hStatus = String(historyData[h][10] || '').trim();
+    if (hStatus === '이전기록채점완료') continue;
+    var rowObj = { rowIdx: h, status: hStatus, score: String(historyData[h][12] || '').trim(),
+                   bestType: String(historyData[h][16] || '').trim() };
+    if (!latest[hTask]) latest[hTask] = {};
+    if (!latest[hTask][hid] || h > latest[hTask][hid].rowIdx) latest[hTask][hid] = rowObj;
+    if (!earliest[hTask]) earliest[hTask] = {};
+    if (!earliest[hTask][hid] || h < earliest[hTask][hid].rowIdx) earliest[hTask][hid] = rowObj;
+  }
+
+  // 4) 학생별 지표 계산
+  var gpaMap = { 'A':4, 'B':3, 'C':2, 'D':1 };
+  var stat = {}; // sid → { cls, submitRanks:[], best, gradeSum, gradeN, scoreSum, scoreN }
+  Object.keys(students).forEach(function(sid){
+    stat[sid] = { cls: students[sid].cls, submitRanks: [], best: 0, gradeSum: 0, gradeN: 0, scoreSum: 0, scoreN: 0 };
+  });
+
+  Object.keys(taskInfo).forEach(function(tName){
+    var ti = taskInfo[tName];
+    // 제출순위: 최초 제출 rowIdx 오름차순
+    var subs = earliest[tName] ? Object.keys(earliest[tName]).map(function(sid){
+      return { sid: sid, rowIdx: earliest[tName][sid].rowIdx };
+    }).sort(function(a,b){ return a.rowIdx - b.rowIdx; }) : [];
+    subs.forEach(function(s, idx){ if (stat[s.sid]) stat[s.sid].submitRanks.push(idx + 1); });
+
+    // 우수작 + 등급/점수 (배정된 학생 전체 분모, 미제출=0)
+    Object.keys(students).forEach(function(sid){
+      var cls = students[sid].cls;
+      if (!assignedToClass(tName, cls)) return;
+      var lt = latest[tName] ? latest[tName][sid] : null;
+      // 우수작
+      if (lt && lt.bestType) stat[sid].best++;
+      // 등급
+      if (ti.isGrade) {
+        stat[sid].gradeN++;
+        var g = lt ? gpaMap[lt.score] : undefined;
+        stat[sid].gradeSum += (g !== undefined ? g : 0);
+      }
+      // 점수
+      if (ti.isScore) {
+        stat[sid].scoreN++;
+        var sc = lt && lt.score && !isNaN(parseFloat(lt.score)) ? parseFloat(lt.score) : 0;
+        stat[sid].scoreSum += sc;
+      }
+    });
+  });
+
+  // 5) 지표값 산출
+  var arr = Object.keys(stat).map(function(sid){
+    var st = stat[sid];
+    return {
+      id: sid, cls: st.cls,
+      submitRank: st.submitRanks.length ? (st.submitRanks.reduce(function(a,b){return a+b;},0)/st.submitRanks.length) : null,
+      best: st.best,
+      grade: st.gradeN ? (st.gradeSum/st.gradeN) : null,
+      score: st.scoreN ? (st.scoreSum/st.scoreN) : null
+    };
+  });
+
+  // 6) 등수 계산 헬퍼 (값 비교; lowerBetter면 작을수록 1등)
+  function ranks(metric, lowerBetter, excludeZero) {
+    var pool = arr.filter(function(x){
+      if (x[metric] === null || x[metric] === undefined) return false;
+      if (excludeZero && x[metric] === 0) return false;
+      return true;
+    });
+    function rankIn(list, val) {
+      var better = list.filter(function(x){
+        return lowerBetter ? x[metric] < val : x[metric] > val;
+      }).length;
+      return better + 1;
+    }
+    return { pool: pool, rankIn: rankIn };
+  }
+
+  var me = arr.filter(function(x){ return x.id === myId; })[0];
+  if (!me) return null;
+
+  function build(metric, lowerBetter, excludeZero, decimals) {
+    if (me[metric] === null || me[metric] === undefined) return null;
+    if (excludeZero && me[metric] === 0) return { value: 0, none: true };
+    var R = ranks(metric, lowerBetter, excludeZero);
+    var classPool = R.pool.filter(function(x){ return x.cls === myClass; });
+    return {
+      value: Math.round(me[metric] * Math.pow(10, decimals)) / Math.pow(10, decimals),
+      classRank: R.rankIn(classPool, me[metric]),
+      classTotal: classPool.length,
+      overallRank: R.rankIn(R.pool, me[metric]),
+      overallTotal: R.pool.length
+    };
+  }
+
+  return {
+    submitRank: build('submitRank', true, false, 1),
+    best:       build('best', false, true, 0),
+    grade:      build('grade', false, false, 2),
+    score:      build('score', false, false, 1)
+  };
 }
 
 function markFeedbacksAsSeen(rowIndices) { 
