@@ -522,7 +522,7 @@
     box.innerHTML = '<div style="background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid #e0e7ff;border-radius:16px;padding:14px;">'
       + '<div style="font-size:14px;font-weight:800;color:#4338ca;margin-bottom:10px;">🏆 내 업적</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
-        + card('⚡', '평균 제출순위', myStats.submitRank, function(v){ return v + '등'; }, '제출 기록 없음')
+        + card('⚡', '평균 제출순위', myStats.submitRank, function(v){ return v + '등'; }, '부여 과제 없음')
         + card('🌟', '우수작', myStats.best, function(v){ return v + '개'; }, '아직 없음')
         + card('📊', '등급 평균', myStats.grade, function(v){ return v.toFixed(2); }, '등급 과제 없음')
         + card('💯', '점수 평균', myStats.score, function(v){ return v + '점'; }, '점수 과제 없음')

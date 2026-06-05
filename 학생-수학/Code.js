@@ -432,11 +432,14 @@ function _computeAchievements(historyData, taskData, rosterData, myId, myClass) 
 
   // 2) 전체 학생 목록 (반 포함)
   var students = {}; // id → { id, cls }
+  var classStudents = {}; // cls → [sid]
   for (var r = 1; r < rosterData.length; r++) {
     var sid = String(rosterData[r][1] || '').trim();
     if (!sid) continue;
     var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '기타';
     students[sid] = { id: sid, cls: cls };
+    if (!classStudents[cls]) classStudents[cls] = [];
+    classStudents[cls].push(sid);
   }
 
   // 3) 제출 데이터 집계 — 과제별 최종/최초 제출
@@ -466,11 +469,20 @@ function _computeAchievements(historyData, taskData, rosterData, myId, myClass) 
 
   Object.keys(taskInfo).forEach(function(tName){
     var ti = taskInfo[tName];
-    // 제출순위: 최초 제출 rowIdx 오름차순
-    var subs = earliest[tName] ? Object.keys(earliest[tName]).map(function(sid){
-      return { sid: sid, rowIdx: earliest[tName][sid].rowIdx };
-    }).sort(function(a,b){ return a.rowIdx - b.rowIdx; }) : [];
-    subs.forEach(function(s, idx){ if (stat[s.sid]) stat[s.sid].submitRanks.push(idx + 1); });
+    // 제출순위: 학급 내 최초 제출 순서 (전체 부여 과제 분모, 미제출=꼴등=반 인원수)
+    Object.keys(classStudents).forEach(function(cls){
+      if (!assignedToClass(tName, cls)) return;
+      var clsSids = classStudents[cls];
+      var clsCount = clsSids.length;
+      var submitters = clsSids.filter(function(sid){ return earliest[tName] && earliest[tName][sid]; })
+        .sort(function(a,b){ return earliest[tName][a].rowIdx - earliest[tName][b].rowIdx; });
+      var rankOf = {};
+      submitters.forEach(function(sid, idx){ rankOf[sid] = idx + 1; });
+      clsSids.forEach(function(sid){
+        if (!stat[sid]) return;
+        stat[sid].submitRanks.push(rankOf[sid] || clsCount); // 미제출 = 꼴등
+      });
+    });
 
     // 우수작 + 등급/점수 (배정된 학생 전체 분모, 미제출=0)
     Object.keys(students).forEach(function(sid){
