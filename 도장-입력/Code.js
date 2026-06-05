@@ -117,13 +117,14 @@ function getInputData(cls) {
       s.today[k] = (s.today[k] || 0) + 1;
     }
 
-    // 학습지 목록
+    // 학습지 목록 (숨김 처리된 건 제외)
     var wsSh = ss.getSheetByName('도장_학습지');
     var worksheets = [];
     if (wsSh.getLastRow() > 1) {
-      var wd = wsSh.getRange(2, 1, wsSh.getLastRow()-1, 2).getValues();
+      var wd = wsSh.getRange(2, 1, wsSh.getLastRow()-1, 3).getValues();
       wd.forEach(function(w){
         var nm = String(w[0]||'').trim(); if (!nm) return;
+        if (String(w[2]||'').trim().toUpperCase() === 'TRUE') return; // 숨김
         var probs = []; try { probs = JSON.parse(w[1]||'[]'); } catch(_) {}
         worksheets.push({ name: nm, problems: Array.isArray(probs)?probs:[] });
       });

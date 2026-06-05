@@ -265,33 +265,50 @@ function getWorksheetsList() {
     var sh = ss.getSheetByName('도장_학습지');
     var list = [];
     if (sh.getLastRow() > 1) {
-      var wd = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
+      var wd = sh.getRange(2, 1, sh.getLastRow()-1, 3).getValues(); // A명 B문제 C숨김
       wd.forEach(function(w){
         var nm = String(w[0]||'').trim(); if (!nm) return;
         var probs = []; try { probs = JSON.parse(w[1]||'[]'); } catch(_) {}
-        list.push({ name: nm, problems: Array.isArray(probs)?probs:[] });
+        var hidden = String(w[2]||'').trim().toUpperCase() === 'TRUE';
+        list.push({ name: nm, problems: Array.isArray(probs)?probs:[], hidden: hidden });
       });
     }
     return { success: true, worksheets: list };
   } catch(e) { return { success: false, message: e.toString(), worksheets: [] }; }
 }
-function saveWorksheet(origName, name, problems) {
+function saveWorksheet(origName, name, problems, hidden) {
   try {
     var ss = _ensureSheets_();
     var sh = ss.getSheetByName('도장_학습지');
     name = String(name||'').trim();
     if (!name) return { success: false, message: '이름 필요' };
     var probs = (Array.isArray(problems)?problems:[]).map(function(p){return String(p).trim();}).filter(Boolean);
+    var hideVal = hidden ? 'TRUE' : '';
     var rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues() : [];
     var key = String(origName||name).trim();
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0]).trim() === key) {
-        sh.getRange(i+2, 1, 1, 2).setValues([[name, JSON.stringify(probs)]]);
+        sh.getRange(i+2, 1, 1, 3).setValues([[name, JSON.stringify(probs), hideVal]]);
         return { success: true };
       }
     }
-    sh.appendRow([name, JSON.stringify(probs)]);
+    sh.appendRow([name, JSON.stringify(probs), hideVal]);
     return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+// 표시/숨김 한 번에 토글 (문제 보존)
+function setWorksheetHidden(name, hidden) {
+  try {
+    var ss = _ensureSheets_();
+    var sh = ss.getSheetByName('도장_학습지');
+    var rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues() : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === String(name).trim()) {
+        sh.getRange(i+2, 3).setValue(hidden ? 'TRUE' : '');
+        return { success: true };
+      }
+    }
+    return { success: false, message: '없음' };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 function deleteWorksheet(name) {

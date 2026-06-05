@@ -339,33 +339,44 @@
     document.getElementById('wsBox').innerHTML = '<div class="loading">불러오는 중…</div>';
     google.script.run.withSuccessHandler(function(res){
       if (!res || !res.success) { document.getElementById('wsBox').innerHTML='<div class="empty">불러오기 실패</div>'; return; }
-      WS = res.worksheets.map(function(w){ return { name:w.name, orig:w.name, problems:(w.problems||[]).slice() }; });
+      WS = res.worksheets.map(function(w){ return { name:w.name, orig:w.name, problems:(w.problems||[]).slice(), hidden:!!w.hidden }; });
       renderWs();
     }).getWorksheetsList();
   }
   function renderWs() {
     var h = '<span class="closebtn" onclick="closeWs()">×</span><h2>📘 학습지·문제 관리</h2>'
-      + '<div class="mcount">학습지별로 발표 문제를 미리 등록해두면 입력 화면에 버튼으로 떠요.</div>';
+      + '<div class="mcount">학습지별로 발표 문제를 미리 등록해두면 입력 화면에 버튼으로 떠요. 수업이 끝난 학습지는 👁 숨김 하면 입력 목록에서 빠져요(데이터는 보존).</div>';
     WS.forEach(function(w, i){
-      h += '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;">'
+      var dim = w.hidden ? 'opacity:.5;' : '';
+      h += '<div style="background:#f7f8fa;border-radius:14px;padding:12px;margin-bottom:8px;'+dim+'">'
         + '<div class="set-row"><input type="text" value="'+esc(w.name)+'" placeholder="학습지 이름" oninput="WS['+i+'].name=this.value">'
-        + '<button onclick="saveWs('+i+')" style="padding:7px 12px;border:none;background:#7c3aed;color:#fff;border-radius:7px;cursor:pointer;font-weight:700;">저장</button>'
+        + '<button onclick="toggleWsHidden('+i+')" title="표시/숨김" style="padding:9px 12px;border:none;background:'+(w.hidden?'#e5e8eb':'#eef2ff')+';color:'+(w.hidden?'#8b95a1':'#4f46e5')+';border-radius:10px;cursor:pointer;font-weight:700;">'+(w.hidden?'🙈 숨김':'👁 표시')+'</button>'
+        + '<button onclick="saveWs('+i+')" style="padding:9px 14px;border:none;background:#4f46e5;color:#fff;border-radius:10px;cursor:pointer;font-weight:700;">저장</button>'
         + '<span class="set-del" onclick="delWs('+i+')">×</span></div>'
-        + '<div style="font-size:11px;color:#94a3b8;margin:6px 0 4px;">문제 (쉼표로 구분)</div>'
-        + '<input type="text" value="'+esc((w.problems||[]).join(', '))+'" oninput="WS['+i+'].problems=this.value.split(\',\').map(function(x){return x.trim();}).filter(Boolean)" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">'
+        + '<div style="font-size:11px;color:#8b95a1;margin:8px 0 4px;">문제 (쉼표로 구분)</div>'
+        + '<input type="text" value="'+esc((w.problems||[]).join(', '))+'" oninput="WS['+i+'].problems=this.value.split(\',\').map(function(x){return x.trim();}).filter(Boolean)" style="width:100%;padding:11px;border:none;background:#fff;border-radius:10px;font-size:13px;outline:none;">'
         + '</div>';
     });
     h += '<div class="set-add" onclick="addWs()">+ 학습지 추가</div>';
     document.getElementById('wsBox').innerHTML = h;
   }
-  function addWs(){ WS.push({ name:'', orig:'', problems:[] }); renderWs(); }
+  function addWs(){ WS.push({ name:'', orig:'', problems:[], hidden:false }); renderWs(); }
   function saveWs(i){
     var w = WS[i];
     if (!w.name.trim()) { alert('학습지 이름을 입력하세요'); return; }
     google.script.run.withSuccessHandler(function(res){
       if (res && res.success) { w.orig = w.name; alert('저장됨'); }
       else alert('저장 실패');
-    }).saveWorksheet(w.orig||w.name, w.name, w.problems);
+    }).saveWorksheet(w.orig||w.name, w.name, w.problems, w.hidden);
+  }
+  function toggleWsHidden(i){
+    var w = WS[i];
+    if (!w.orig) { w.hidden = !w.hidden; renderWs(); return; } // 아직 저장 안 된 행
+    var nv = !w.hidden;
+    google.script.run.withSuccessHandler(function(res){
+      if (res && res.success) { w.hidden = nv; renderWs(); }
+      else alert('변경 실패');
+    }).setWorksheetHidden(w.orig, nv);
   }
   function delWs(i){
     var w = WS[i];
