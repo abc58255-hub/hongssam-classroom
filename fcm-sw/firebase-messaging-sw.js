@@ -6,6 +6,10 @@ firebase.initializeApp(FIREBASE_CONFIG);
 
 const messaging = firebase.messaging();
 
+// 새 서비스워커 즉시 활성화 (옛 버전 캐시로 내용 비는 문제 방지)
+self.addEventListener('install', function() { self.skipWaiting(); });
+self.addEventListener('activate', function(e) { e.waitUntil(self.clients.claim()); });
+
 // 앱이 닫혀 있을 때 백그라운드 알림 처리 — data-only 메시지 사용 (중복 표시 방지)
 messaging.onBackgroundMessage(function(payload) {
   const d = payload.data || {};
