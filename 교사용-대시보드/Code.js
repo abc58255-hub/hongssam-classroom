@@ -67,17 +67,21 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
   try {
     var projectId   = _getSys(SpreadsheetApp.openById(SHEET_ID), 'FCM_PROJECT_ID');
     var accessToken = getFCMAccessToken_();
-    // iOS는 notification 필드가 있어야 표시됨 (data-only는 iOS 미표시).
-    // webpush.notification 하나만 + 고정 tag로 중복을 1개로 합침 (iOS는 같은 tag면 교체).
-    // ⚠️ data-only (notification 필드 절대 금지). iOS는 notification 필드가 있으면
-    // 자체표시 + 서비스워커표시 = 2번 (tag로도 안 합쳐짐). data만 보내고 SW가 1번만 표시.
+    // notification 필드 + data 동시 전송 → 어떤 SW 버전에서도 내용이 확실히 표시됨.
+    //  - 구형 SW(onBackgroundMessage 없음): FCM이 notification을 자동 표시 → 내용O
+    //  - 신형 SW(onBackgroundMessage): data로도 내용 표시 → 내용O
+    // iOS는 notification 필드가 있으면 자체표시까지 2번 뜸(웹푸시 한계, 감수).
+    // 갤럭시는 1번, 아이폰은 2번. 학생 재등록/SW갱신 불필요.
+    var t = String(title || ''); var b = String(body || '');
     var link = clickUrl || _getSys(SpreadsheetApp.openById(SHEET_ID), '바로가기_수학교실') || '';
     var ntag = tag || 'default';
     var message = {
       message: {
         token: token,
-        data: { title: String(title || ''), body: String(body || ''), url: link, tag: ntag },
+        notification: { title: t, body: b },
+        data: { title: t, body: b, url: link, tag: ntag },
         webpush: {
+          notification: { title: t, body: b, tag: ntag, icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png' },
           fcm_options: { link: link }
         }
       }
