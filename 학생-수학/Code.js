@@ -407,27 +407,33 @@ function getDashboardData(studentId, studentName) {
 
 // 학생 업적 계산 — 평균 제출순위, 우수작, 등급평균, 점수평균 + 학급/전체 등수
 function _computeAchievements(historyData, taskData, rosterData, myId, myClass) {
-  // 1) 과제 분류 (점수제/등급제) + 반별 배정 여부
-  var taskInfo = {}; // name → { isGrade, isScore, classes:Set('all' or 반명) }
+  // 1) 과제 분류 (점수제/등급제) + 반별 배정 여부 (학생 대시보드와 동일 판정)
+  var nowTime = new Date();
+  var taskInfo = {}; // name → { isGrade, isScore, deadlines, restrictClasses }
   for (var i = 1; i < taskData.length; i++) {
     var tName = String(taskData[i][1] || '').trim();
     if (!tName) continue;
     var evalType = String(taskData[i][4] || '').trim();
     var isGrade = evalType.indexOf('A-B-C-D') >= 0;
     var isScore = evalType.indexOf('점수') >= 0;
-    var clsSet = {};
+    var dl = {}; var restrict = null;
     try {
-      var dl = JSON.parse(taskData[i][3] || '{}');
-      Object.keys(dl).forEach(function(k){
-        if (k === 'all') clsSet['all'] = true;
-        else if (!k.startsWith('resub_') && !k.startsWith('open_') && k !== '_classes' && dl[k]) clsSet[k] = true;
-      });
-    } catch(_) {}
-    taskInfo[tName] = { isGrade: isGrade, isScore: isScore, classes: clsSet };
+      dl = JSON.parse(taskData[i][3] || '{}');
+      if (Array.isArray(dl['_classes']) && dl['_classes'].length > 0) restrict = dl['_classes'];
+    } catch(_) { dl = {}; }
+    taskInfo[tName] = { isGrade: isGrade, isScore: isScore, deadlines: dl, restrict: restrict };
   }
+  // 이 반에 실제로 부여된 과제인지: _classes 제한 통과 + (해당 반/all 마감일 존재) + 공개일 지남
   function assignedToClass(tName, cls) {
     var ti = taskInfo[tName]; if (!ti) return false;
-    return !!(ti.classes['all'] || ti.classes[cls]);
+    if (ti.restrict && ti.restrict.indexOf(cls) < 0) return false; // 다른 반 전용
+    var d = ti.deadlines || {};
+    var myDl = d[cls] || d['all'];
+    if (!myDl) return false; // 이 반에 마감일 없음 = 미부여
+    // 공개일이 미래면 아직 부여 전
+    var openDl = d['open_' + cls] || d['open_all'];
+    if (openDl && new Date(openDl) > nowTime) return false;
+    return true;
   }
 
   // 2) 전체 학생 목록 (반 포함)
