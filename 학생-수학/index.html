@@ -1690,12 +1690,9 @@
 
   // 로그인 성공 후 FCM 초기화 (doLogin 함수의 성공 핸들러에서 호출됨)
   function onLoginSuccess(studentId) {
+    // 알림 안내는 상단 '🔔 알림 설정하기' 버튼 하나로 통일 (배너 중복 제거)
     var notifBtn = document.getElementById('notifSetupBtn');
     if (notifBtn) notifBtn.style.display = 'block';
-    setTimeout(function() {
-      initFirebaseAndRegisterToken(studentId);
-      showIosInstallBanner();
-    }, 1000);
   }
 
 </script>
