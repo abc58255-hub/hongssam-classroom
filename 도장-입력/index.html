@@ -87,6 +87,7 @@
   <div class="top">
     <h1>🏅 도장</h1>
     <select id="classSel" onchange="loadInput()"></select>
+    <button onclick="openQR()" style="margin-left:auto;font-size:14px;padding:9px 14px;border:2px solid #c4b5fd;border-radius:10px;background:#fff;color:#6d28d9;font-weight:700;cursor:pointer;">📱 QR</button>
   </div>
   <div class="ws-banner" id="wsBanner" style="display:none;"></div>
   <div id="grid"><div class="loading">불러오는 중…</div></div>
@@ -103,6 +104,10 @@
 <!-- 오늘 기록 모달 -->
 <div class="modal-bg" id="todayBg" onclick="if(event.target===this)closeToday()">
   <div class="modal" id="todayBox"></div>
+</div>
+<!-- QR 모달 -->
+<div class="modal-bg" id="qrBg" onclick="if(event.target===this)closeQR()">
+  <div class="modal" id="qrBox" style="max-width:360px;text-align:center;"></div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -321,6 +326,20 @@
       else { toast('삭제 실패'); el.textContent = '✕'; }
     }).deleteRecord(ts, sid);
   }
+
+  // ===== QR (다른 태블릿에서 바로 접속) =====
+  var APP_URL = 'https://script.google.com/macros/s/AKfycbyw2zd72G2D2QXFVOV-4wELVHjiDqadpRoNyUKj7t9U2NXnJcSSsvTcKvBf3j9bC7BOwQ/exec';
+  function openQR() {
+    var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(APP_URL);
+    document.getElementById('qrBox').innerHTML =
+        '<h2 style="font-size:18px;color:#6d28d9;margin-bottom:6px;">📱 도장 입력 바로가기</h2>'
+      + '<div style="font-size:13px;color:#64748b;margin-bottom:14px;">다른 태블릿/폰 카메라로 스캔하면 이 화면이 바로 열려요.</div>'
+      + '<img src="' + qr + '" alt="QR" style="width:240px;height:240px;border:1px solid #e2e8f0;border-radius:12px;">'
+      + '<div style="margin-top:14px;"><a href="' + APP_URL + '" target="_blank" style="font-size:12px;color:#7c3aed;word-break:break-all;">' + APP_URL + '</a></div>'
+      + '<button onclick="closeQR()" style="margin-top:16px;padding:12px 24px;border:none;background:#7c3aed;color:#fff;border-radius:12px;font-weight:700;font-size:15px;cursor:pointer;">닫기</button>';
+    document.getElementById('qrBg').classList.add('show');
+  }
+  function closeQR(){ document.getElementById('qrBg').classList.remove('show'); }
 
   loadClasses();
 </script>
