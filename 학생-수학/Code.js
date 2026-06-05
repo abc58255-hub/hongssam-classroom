@@ -17,19 +17,9 @@ function saveFcmToken(studentId, token, pwHash, deviceId) {
             return { success: false, message: "미가입 학생입니다. 먼저 회원가입을 해주세요." };
           }
         }
-        var raw = String(data[i][4] || '').trim();
-        var objs = _parseTokenObjs(raw); // [{t, d}]
-        if (token) {
-          if (deviceId) {
-            // 같은 기기의 기존 토큰 제거 후 새 토큰 추가 (기기당 1개)
-            objs = objs.filter(function(o){ return o.d !== deviceId; });
-            objs.push({ t: token, d: deviceId });
-          } else {
-            // 기기ID 없으면 토큰 중복만 제거
-            if (!objs.some(function(o){ return o.t === token; })) objs.push({ t: token, d: '' });
-          }
-          if (objs.length > 5) objs = objs.slice(objs.length - 5);
-        }
+        // ✅ 학생당 토큰 1개만 유지 — 가장 최근 등록 토큰으로 교체
+        // (iOS Safari·홈화면앱이 각각 토큰을 만들어 같은 폰에 2번 오던 문제 방지)
+        var objs = token ? [{ t: token, d: deviceId || '' }] : _parseTokenObjs(String(data[i][4] || '').trim());
         sheet.getRange(i + 1, 5).setValue(JSON.stringify(objs));
         return { success: true };
       }
