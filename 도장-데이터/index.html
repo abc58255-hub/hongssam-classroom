@@ -84,6 +84,7 @@
       <option value="30">최근 30일</option>
       <option value="7">최근 7일</option>
     </select>
+    <select id="sortSel" onchange="changeSort()"></select>
     <button id="staleBtn" class="toggle" onclick="toggleStale()">⚠ 소외만</button>
     <button id="viewBtn" onclick="toggleView()">▦ 그리드 보기</button>
     <div class="spacer"></div>
@@ -117,7 +118,28 @@
 </div>
 
 <script>
-  var STATE = { rows: [], staleOnly: false, staleDays: 14, view: 'table', categories: [], staleCat: '' };
+  var STATE = { rows: [], staleOnly: false, staleDays: 14, view: 'table', categories: [], staleCat: '', sort: 'sid' };
+
+  function buildSortOptions() {
+    var sel = document.getElementById('sortSel');
+    var cur = STATE.sort;
+    var opts = [['sid','학번순'],['name','이름순'],['cls','학년·반순'],['total','총 도장 많은순']];
+    (STATE.categories||[]).forEach(function(c){ opts.push(['cat:'+c.name, c.emoji+' '+c.name+' 많은순']); });
+    sel.innerHTML = opts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join('');
+  }
+  function changeSort() { STATE.sort = document.getElementById('sortSel').value; render(); }
+  function applySort(rows) {
+    var s = STATE.sort, r = rows.slice();
+    if (s === 'name') r.sort(function(a,b){ return a.name.localeCompare(b.name,'ko'); });
+    else if (s === 'cls') r.sort(function(a,b){ return a.cls.localeCompare(b.cls,'ko') || a.sid.localeCompare(b.sid); });
+    else if (s === 'total') r.sort(function(a,b){ return b.total - a.total || a.name.localeCompare(b.name,'ko'); });
+    else if (s && s.indexOf('cat:')===0) {
+      var cn = s.slice(4);
+      r.sort(function(a,b){ return (b.counts[cn]||0)-(a.counts[cn]||0) || a.name.localeCompare(b.name,'ko'); });
+    }
+    else r.sort(function(a,b){ return a.sid.localeCompare(b.sid); }); // 학번순
+    return r;
+  }
 
   function toggleStale() {
     STATE.staleOnly = !STATE.staleOnly;
@@ -152,6 +174,7 @@
       STATE.rows = res.rows; STATE.staleDays = res.staleDays;
       STATE.categories = res.categories || [];
       STATE.staleCat = res.staleCat || '';
+      buildSortOptions();
       renderChips(res.summary);
       render();
     }).getDojangData(cls, period, '');
@@ -182,6 +205,7 @@
 
   function render() {
     var rows = STATE.staleOnly ? STATE.rows.filter(function(r){ return r.stale; }) : STATE.rows;
+    rows = applySort(rows);
     if (!rows.length) {
       document.getElementById('grid').innerHTML = '<div class="empty">표시할 데이터가 없어요.</div>';
       return;
