@@ -4,15 +4,12 @@ importScripts('./config.js');
 
 firebase.initializeApp(FIREBASE_CONFIG);
 
-const messaging = firebase.messaging();
+// FCM 메시징 초기화만 (onBackgroundMessage 정의 안 함 → SDK가 webpush.notification을 자동 1회 표시)
+firebase.messaging();
 
-// 새 서비스워커 즉시 활성화 (옛 버전 캐시로 내용 비는 문제 방지)
+// 새 서비스워커 즉시 활성화
 self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(e) { e.waitUntil(self.clients.claim()); });
-
-// ⚠️ 중복 표시 방지: onBackgroundMessage에서 showNotification 하지 않음.
-// notification 필드가 있으면 브라우저/iOS가 자동으로 1번 표시하므로 여기선 아무것도 안 함.
-messaging.onBackgroundMessage(function() { /* no-op: 브라우저 자동표시에 맡김 */ });
 
 // 알림 클릭 시 앱 열기
 self.addEventListener('notificationclick', function(event) {
