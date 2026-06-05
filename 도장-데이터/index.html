@@ -73,6 +73,7 @@
     </select>
     <button id="staleBtn" class="toggle" onclick="toggleStale()">⚠ 소외만</button>
     <div class="spacer"></div>
+    <button onclick="openCarry()">📥 기존 이월 입력</button>
     <button class="primary" onclick="load()">↻ 새로고침</button>
   </div>
 
@@ -85,6 +86,10 @@
 
 <div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
   <div class="modal" id="modalBox"></div>
+</div>
+
+<div class="modal-bg" id="carryBg" onclick="if(event.target===this)closeCarry()">
+  <div class="modal" id="carryBox" style="max-width:640px;"></div>
 </div>
 
 <script>
@@ -198,6 +203,47 @@
 
   function esc(s) { return String(s==null?'':s).replace(/[&<>"]/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  // ===== 기존 이월 입력 =====
+  function openCarry() {
+    document.getElementById('carryBg').classList.add('show');
+    var box = document.getElementById('carryBox');
+    box.innerHTML = '<div class="loading">불러오는 중…</div>';
+    var cls = document.getElementById('classSel').value;
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) { box.innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
+      var h = '<span class="closebtn" onclick="closeCarry()">×</span>'
+        + '<h2>📥 기존 도장 이월 입력</h2>'
+        + '<div class="mcount">도장판·학습지 도장의 누적 개수를 학생별로 입력하세요. (반: ' + (cls==='all'?'전체':cls) + ')</div>'
+        + '<div style="max-height:60vh;overflow:auto;">'
+        + '<table style="width:100%;border-collapse:collapse;font-size:13px;"><thead><tr>'
+        + '<th style="text-align:left;padding:8px;border-bottom:1px solid #eee;">이름</th>'
+        + '<th style="padding:8px;border-bottom:1px solid #eee;">👏 칭찬</th>'
+        + '<th style="padding:8px;border-bottom:1px solid #eee;">🙋 발표</th>'
+        + '<th style="padding:8px;border-bottom:1px solid #eee;"></th></tr></thead><tbody>';
+      res.students.forEach(function(s){
+        h += '<tr data-sid="'+s.sid+'" data-name="'+esc(s.name)+'">'
+          + '<td style="padding:6px 8px;font-weight:600;">'+esc(s.name)+'</td>'
+          + '<td style="padding:6px 8px;text-align:center;"><input type="number" min="0" value="'+s.praise+'" class="cy-p" style="width:60px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;"></td>'
+          + '<td style="padding:6px 8px;text-align:center;"><input type="number" min="0" value="'+s.present+'" class="cy-r" style="width:60px;padding:6px;border:1px solid #cbd5e1;border-radius:6px;text-align:center;"></td>'
+          + '<td style="padding:6px 8px;text-align:center;"><button onclick="saveCarryRow(this)" style="padding:6px 12px;border:none;background:#7c3aed;color:#fff;border-radius:7px;cursor:pointer;font-weight:700;">저장</button></td>'
+          + '</tr>';
+      });
+      h += '</tbody></table></div>';
+      box.innerHTML = h;
+    }).getCarryList(cls);
+  }
+  function closeCarry() { document.getElementById('carryBg').classList.remove('show'); load(); }
+  function saveCarryRow(btn) {
+    var tr = btn.closest('tr');
+    var sid = tr.getAttribute('data-sid'), name = tr.getAttribute('data-name');
+    var praise = tr.querySelector('.cy-p').value, present = tr.querySelector('.cy-r').value;
+    btn.textContent = '…'; btn.disabled = true;
+    google.script.run.withSuccessHandler(function(res){
+      if (res && res.success) { btn.textContent = '✓ 저장됨'; btn.style.background = '#16a34a'; }
+      else { btn.textContent = '실패'; btn.disabled = false; }
+    }).saveCarry(sid, name, praise, present);
+  }
 
   loadClasses();
   load();

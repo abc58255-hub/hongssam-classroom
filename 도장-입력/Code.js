@@ -186,6 +186,14 @@ function recordStamp(p) {
     // 발표 학습지·문제는 다음에 버튼으로 쓰도록 도장_학습지에 자동 누적
     if (kind === '발표' && sheet) { _upsertWorksheetProblem_(ss, sheet, problem); }
 
+    // 발표 시 학생 폰에 자동 푸시 (best-effort)
+    if (kind === '발표') {
+      try {
+        var info = [sheet, problem].filter(Boolean).join(' ');
+        _pushToStudent_(ss, sid, '🙋 발표 도장 +1', info ? (info + ' 발표!') : '발표 잘했어요!');
+      } catch(_) {}
+    }
+
     // 오늘 이 학생 카운트 다시 계산
     var today = _todayStr_();
     var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
@@ -242,6 +250,73 @@ function getTodayRecords(cls) {
     items.sort(function(a,b){ return b.ts - a.ts; });
     return { success: true, items: items };
   } catch(e) { return { success: false, message: e.toString(), items: [] }; }
+}
+
+// =====================================================
+// ✅ FCM 푸시 (대시보드 로직 복제 — HTTP v1 + 서비스계정)
+// =====================================================
+function _getSys_(ss, key) {
+  var sh = ss.getSheetByName('시스템설정');
+  if (!sh || sh.getLastRow() < 2) return '';
+  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+  }
+  return '';
+}
+
+function _getFcmToken_() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var privateKey  = _getSys_(ss, 'FCM_PRIVATE_KEY').replace(/\\n/g, '\n');
+  var clientEmail = _getSys_(ss, 'FCM_CLIENT_EMAIL');
+  if (!privateKey || !clientEmail) return '';
+  var now = Math.floor(Date.now() / 1000);
+  var header  = Utilities.base64EncodeWebSafe(JSON.stringify({alg:'RS256',typ:'JWT'})).replace(/=+$/,'');
+  var payload = Utilities.base64EncodeWebSafe(JSON.stringify({
+    iss: clientEmail, scope: 'https://www.googleapis.com/auth/firebase.messaging',
+    aud: 'https://oauth2.googleapis.com/token', exp: now + 3600, iat: now
+  })).replace(/=+$/,'');
+  var toSign = header + '.' + payload;
+  var sig = Utilities.base64EncodeWebSafe(Utilities.computeRsaSha256Signature(toSign, privateKey)).replace(/=+$/,'');
+  var res = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', contentType: 'application/x-www-form-urlencoded',
+    payload: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + toSign + '.' + sig,
+    muteHttpExceptions: true
+  });
+  return JSON.parse(res.getContentText()).access_token || '';
+}
+
+function _pushToStudent_(ss, sid, title, body) {
+  // 학생명부 E열에서 토큰 읽기 (가장 최근 토큰 1개)
+  var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+  var raw = '';
+  for (var i = 1; i < roster.length; i++) {
+    if (String(roster[i][1] || '').trim() === String(sid).trim()) { raw = String(roster[i][4] || '').trim(); break; }
+  }
+  if (!raw) return;
+  var objs = [];
+  try { var a = JSON.parse(raw); if (!Array.isArray(a)) a = [a];
+        objs = a.map(function(e){ return (typeof e==='string')?e:(e&&e.t?e.t:null); }).filter(Boolean); }
+  catch(_) { objs = [raw]; }
+  if (!objs.length) return;
+  var token = objs[objs.length - 1];
+
+  var projectId = _getSys_(ss, 'FCM_PROJECT_ID');
+  var accessToken = _getFcmToken_();
+  if (!projectId || !accessToken) return;
+  var link = _getSys_(ss, '바로가기_수학교실') || '';
+  var t = String(title||''), b = String(body||'');
+  var message = { message: {
+    token: token,
+    notification: { title: t, body: b },
+    data: { title: t, body: b, url: link, tag: 'dojang' },
+    webpush: { notification: { title: t, body: b, tag: 'dojang', icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png' }, fcm_options: { link: link } }
+  } };
+  UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/' + projectId + '/messages:send', {
+    method:'POST', contentType:'application/json',
+    headers:{'Authorization':'Bearer ' + accessToken},
+    payload: JSON.stringify(message), muteHttpExceptions: true
+  });
 }
 
 // 기록 삭제 (오정정) — 일시(ms)+학번으로 1행 식별

@@ -202,6 +202,49 @@ function _assignRank_(sortedArr, key, rankField) {
   }
 }
 
+// 이월 입력용: 반 학생 + 현재 이월값
+function getCarryList(cls) {
+  try {
+    var ss = _ensureSheets_();
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var carrySh = ss.getSheetByName('도장_이월');
+    var carry = carrySh.getLastRow() > 1 ? carrySh.getRange(2, 1, carrySh.getLastRow()-1, 4).getValues() : [];
+    var cmap = {};
+    carry.forEach(function(c){ cmap[String(c[0]||'').trim()] = { praise: Number(c[2]||0), present: Number(c[3]||0) }; });
+    var students = [];
+    for (var i = 1; i < roster.length; i++) {
+      var sid = String(roster[i][1] || '').trim();
+      if (!sid) continue;
+      if (cls && cls !== 'all' && _clsOf_(sid) !== cls) continue;
+      var c = cmap[sid] || { praise: 0, present: 0 };
+      students.push({ sid: sid, name: String(roster[i][2] || '').trim(), praise: c.praise, present: c.present });
+    }
+    students.sort(function(a,b){ return a.sid.localeCompare(b.sid); });
+    return { success: true, students: students };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 이월 저장 (upsert)
+function saveCarry(sid, name, praise, present) {
+  try {
+    var ss = _ensureSheets_();
+    sid = String(sid||'').trim();
+    if (!sid) return { success: false };
+    praise = Math.max(0, parseInt(praise)||0);
+    present = Math.max(0, parseInt(present)||0);
+    var sh = ss.getSheetByName('도장_이월');
+    var rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues() : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === sid) {
+        sh.getRange(i+2, 1, 1, 4).setValues([[sid, String(name||'').trim(), praise, present]]);
+        return { success: true };
+      }
+    }
+    sh.appendRow([sid, String(name||'').trim(), praise, present]);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 // 한 학생의 전체 도장 내역 (상세)
 function getStudentDetail(studentId) {
   try {

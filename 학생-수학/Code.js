@@ -1118,6 +1118,92 @@ function testAutoGrade() {
   Logger.log('📌 결과: ' + JSON.stringify(result));
 }
 
+// =====================================================
+// 🏅 내 도장 (발표·칭찬 누적 + 등수)
+// =====================================================
+function getMyDojang(studentId) {
+  try {
+    var sid = String(studentId || '').trim();
+    if (!sid) return { success: false };
+    var myCls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var logSh = ss.getSheetByName('도장기록');
+    var carrySh = ss.getSheetByName('도장_이월');
+    if (!logSh) return { success: true, present: 0, praise: 0, rankAll: null, rankClass: null, recent: [], showRank: true };
+
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var clsOf = function(id){ id = String(id||'').trim(); return id.length>=2 ? (id.substring(0,1)+'학년 '+id.substring(1,2)+'반') : ''; };
+
+    // 전체 학생 발표수 집계 (등수용)
+    var present = {}, rosterIds = {};
+    for (var i = 1; i < roster.length; i++) {
+      var rid = String(roster[i][1] || '').trim();
+      if (rid) { present[rid] = 0; rosterIds[rid] = clsOf(rid); }
+    }
+    // 이월 반영
+    if (carrySh && carrySh.getLastRow() > 1) {
+      var carry = carrySh.getRange(2, 1, carrySh.getLastRow()-1, 4).getValues();
+      carry.forEach(function(c){
+        var cid = String(c[0]||'').trim();
+        if (present[cid] !== undefined) present[cid] += Number(c[3]||0);
+      });
+    }
+    var myPraise = 0, myPresent = 0, recent = [];
+    if (carrySh && carrySh.getLastRow() > 1) {
+      var carry2 = carrySh.getRange(2, 1, carrySh.getLastRow()-1, 4).getValues();
+      carry2.forEach(function(c){ if (String(c[0]||'').trim()===sid){ myPraise += Number(c[2]||0); myPresent += Number(c[3]||0); } });
+    }
+    var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
+    for (var r = 0; r < log.length; r++) {
+      var lid = String(log[r][1] || '').trim();
+      var kind = String(log[r][3] || '').trim();
+      if (present[lid] !== undefined && kind === '발표') present[lid]++;
+      if (lid === sid) {
+        if (kind === '발표') myPresent++;
+        else if (kind === '칭찬') myPraise++;
+        var dt = log[r][0] ? new Date(log[r][0]) : null;
+        recent.push({
+          date: dt ? Utilities.formatDate(dt,'Asia/Seoul','MM/dd') : '',
+          kind: kind, info: [String(log[r][6]||''), String(log[r][7]||'')].filter(Boolean).join(' ') || String(log[r][4]||''),
+          ts: dt ? dt.getTime() : 0
+        });
+      }
+    }
+    recent.sort(function(a,b){ return b.ts - a.ts; });
+
+    // 등수 (발표수 기준, 동점 동순위)
+    var myP = present[sid] || 0;
+    var rankAll = 1, rankClass = 1;
+    Object.keys(present).forEach(function(id){
+      if (present[id] > myP) {
+        rankAll++;
+        if (rosterIds[id] === myCls) rankClass++;
+      }
+    });
+
+    var rv = _getDojangSetting_(ss, 'rankVisibility', 'show');
+    var showRank = (rv !== 'teacher');
+
+    return { success: true, present: myPresent, praise: myPraise,
+             rankAll: rankAll, rankClass: rankClass, showRank: showRank,
+             recent: recent.slice(0, 6) };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+function _getDojangSetting_(ss, key, def) {
+  try {
+    var sh = ss.getSheetByName('도장_설정');
+    if (!sh || sh.getLastRow() < 2) return def;
+    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === key) {
+        try { return JSON.parse(rows[i][1]); } catch(_) { return rows[i][1]; }
+      }
+    }
+    return def;
+  } catch(_) { return def; }
+}
+
 // 🔐 외부 API 권한 승인용 (한 번만 실행)
 function grantPermissions() {
   // 이 함수 실행 시 구글이 권한 요청 창을 띄워줘요
