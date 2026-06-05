@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>홍쌤 도장-입력</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+         background: #f8fafc; color: #1e293b; padding: 14px; padding-bottom: 80px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+  h1 { font-size: 18px; color: #6d28d9; }
+  select { font-size: 16px; padding: 10px 14px; border: 2px solid #c4b5fd; border-radius: 10px;
+           background: #fff; font-weight: 700; color: #6d28d9; outline: none; }
+  .ws-banner { background: #ede9fe; border: 1px solid #ddd6fe; border-radius: 10px; padding: 10px 14px;
+               font-size: 14px; color: #5b21b6; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ws-banner b { font-weight: 800; }
+  .ws-banner .none { color: #a78bfa; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
+  .name-btn { position: relative; background: #fff; border: 2px solid #e2e8f0; border-radius: 14px;
+              padding: 18px 8px; font-size: 17px; font-weight: 700; cursor: pointer; text-align: center;
+              transition: transform .05s; }
+  .name-btn:active { transform: scale(.96); border-color: #c4b5fd; }
+  .name-btn .badges { display: flex; justify-content: center; gap: 5px; margin-top: 7px; min-height: 18px; }
+  .bdg { font-size: 12px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+  .bdg.p { background: #ede9fe; color: #6d28d9; }
+  .bdg.c { background: #ccfbf1; color: #0f766e; }
+  .loading, .empty { padding: 40px; text-align: center; color: #94a3b8; }
+
+  /* 하단 바 */
+  .bottombar { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #e2e8f0;
+               padding: 10px 14px; display: flex; gap: 10px; justify-content: center; z-index: 20; }
+  .bottombar button { font-size: 15px; padding: 12px 20px; border-radius: 12px; border: none; cursor: pointer; font-weight: 700; }
+  .btn-check { background: #f1f5f9; color: #475569; }
+
+  /* 모달 */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; }
+  .modal-bg.show { display: flex; align-items: flex-end; justify-content: center; }
+  @media(min-width:640px){ .modal-bg.show { align-items: center; } }
+  .modal { background: #fff; border-radius: 18px 18px 0 0; width: 100%; max-width: 560px; max-height: 88vh;
+           overflow: auto; padding: 20px; }
+  @media(min-width:640px){ .modal { border-radius: 18px; } }
+  .modal h2 { font-size: 22px; color: #1e293b; text-align: center; margin-bottom: 4px; }
+  .modal .sid { text-align: center; color: #94a3b8; font-size: 12px; margin-bottom: 16px; }
+
+  .kind-row { display: flex; gap: 12px; margin-bottom: 8px; }
+  .kind-btn { flex: 1; padding: 22px 8px; border-radius: 14px; border: 3px solid #e2e8f0; background: #fff;
+              font-size: 19px; font-weight: 800; cursor: pointer; }
+  .kind-btn.present.sel { border-color: #7c3aed; background: #f5f3ff; color: #6d28d9; }
+  .kind-btn.praise.sel { border-color: #0d9488; background: #f0fdfa; color: #0f766e; }
+
+  .section { margin-top: 16px; }
+  .section .lbl { font-size: 13px; color: #64748b; font-weight: 700; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .opt { padding: 11px 16px; border-radius: 12px; border: 2px solid #e2e8f0; background: #fff;
+         font-size: 15px; cursor: pointer; font-weight: 600; }
+  .opt.sel { border-color: #7c3aed; background: #f5f3ff; color: #6d28d9; }
+  .opt.ghost { border-style: dashed; color: #94a3b8; }
+  select.ws-sel { width: 100%; font-size: 15px; padding: 11px; border: 2px solid #e2e8f0; border-radius: 12px; color: #1e293b; }
+  input.txt { width: 100%; font-size: 15px; padding: 11px; border: 2px solid #c4b5fd; border-radius: 12px; margin-top: 8px; outline: none; }
+
+  .actions { display: flex; gap: 10px; margin-top: 22px; }
+  .actions button { flex: 1; padding: 16px; border-radius: 14px; border: none; font-size: 17px; font-weight: 800; cursor: pointer; }
+  .save { background: #7c3aed; color: #fff; }
+  .save:disabled { background: #cbd5e1; }
+  .cancel { background: #f1f5f9; color: #64748b; flex: 0 0 90px; }
+
+  /* 토스트 */
+  .toast { position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(20px);
+           background: #1e293b; color: #fff; padding: 13px 22px; border-radius: 999px; font-size: 15px; font-weight: 700;
+           opacity: 0; transition: all .25s; z-index: 100; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  /* 오늘 기록 패널 */
+  .rec-item { display: flex; align-items: center; gap: 10px; padding: 11px 0; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  .rec-item .rk { font-weight: 800; width: 42px; }
+  .rk.발표 { color: #7c3aed; } .rk.칭찬 { color: #0d9488; }
+  .rec-item .rd { flex: 1; }
+  .rec-item .rd small { color: #94a3b8; }
+  .rec-item .rx { color: #ef4444; font-size: 20px; cursor: pointer; padding: 4px 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <h1>🏅 도장</h1>
+    <select id="classSel" onchange="loadInput()"></select>
+  </div>
+  <div class="ws-banner" id="wsBanner" style="display:none;"></div>
+  <div id="grid"><div class="loading">불러오는 중…</div></div>
+</div>
+
+<div class="bottombar">
+  <button class="btn-check" onclick="openToday()">📋 오늘 기록 확인 · 정정</button>
+</div>
+
+<!-- 입력 모달 -->
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+<!-- 오늘 기록 모달 -->
+<div class="modal-bg" id="todayBg" onclick="if(event.target===this)closeToday()">
+  <div class="modal" id="todayBox"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var DATA = { students: [], worksheets: [], praisePresets: [], todayWorksheet: {sheet:'',lessonNo:''} };
+  var SEL = null; // 현재 입력중인 선택 상태
+
+  function toast(msg) {
+    var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._h); t._h = setTimeout(function(){ t.classList.remove('show'); }, 1600);
+  }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  function loadClasses() {
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) return;
+      var sel = document.getElementById('classSel');
+      sel.innerHTML = res.classes.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
+      loadInput();
+    }).getClassList();
+  }
+
+  function loadInput() {
+    var cls = document.getElementById('classSel').value;
+    document.getElementById('grid').innerHTML = '<div class="loading">불러오는 중…</div>';
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) {
+        document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: '+((res&&res.message)||'')+'</div>';
+        return;
+      }
+      DATA = res;
+      renderBanner();
+      renderGrid();
+    }).getInputData(cls);
+  }
+
+  function renderBanner() {
+    var b = document.getElementById('wsBanner');
+    var w = DATA.todayWorksheet || {};
+    if (w.sheet) {
+      b.style.display = 'flex';
+      b.innerHTML = '📘 오늘 학습지: <b>'+esc(w.sheet)+'</b>'+(w.lessonNo?' ('+esc(w.lessonNo)+'차시)':'')+' <span style="color:#a78bfa;font-size:12px;">· 발표 입력 시 기본 선택</span>';
+    } else {
+      b.style.display = 'none';
+    }
+  }
+
+  function renderGrid() {
+    if (!DATA.students.length) { document.getElementById('grid').innerHTML = '<div class="empty">학생이 없어요.</div>'; return; }
+    var h = '<div class="grid">';
+    DATA.students.forEach(function(s, i){
+      h += '<div class="name-btn" onclick="openInput('+i+')">'+esc(s.name)
+        + '<div class="badges">'
+        + (s.todayPresent?'<span class="bdg p">🙋'+s.todayPresent+'</span>':'')
+        + (s.todayPraise?'<span class="bdg c">👏'+s.todayPraise+'</span>':'')
+        + '</div></div>';
+    });
+    h += '</div>';
+    document.getElementById('grid').innerHTML = h;
+  }
+
+  function openInput(i) {
+    var s = DATA.students[i];
+    SEL = { idx: i, sid: s.sid, name: s.name, kind: null,
+            sheet: (DATA.todayWorksheet&&DATA.todayWorksheet.sheet)||'', problem: '', reason: '', lessonNo: (DATA.todayWorksheet&&DATA.todayWorksheet.lessonNo)||'' };
+    renderModal();
+    document.getElementById('modalBg').classList.add('show');
+  }
+  function closeModal(){ document.getElementById('modalBg').classList.remove('show'); SEL=null; }
+
+  function renderModal() {
+    var s = SEL;
+    var h = '<h2>'+esc(s.name)+'</h2><div class="sid">'+esc(s.sid)+'</div>';
+    h += '<div class="kind-row">'
+      + '<div class="kind-btn present '+(s.kind==='발표'?'sel':'')+'" onclick="pickKind(\'발표\')">🙋 발표</div>'
+      + '<div class="kind-btn praise '+(s.kind==='칭찬'?'sel':'')+'" onclick="pickKind(\'칭찬\')">👏 칭찬</div>'
+      + '</div>';
+
+    if (s.kind === '발표') {
+      // 학습지 선택
+      var opts = '<option value="">— 학습지 선택 —</option>';
+      var found = false;
+      DATA.worksheets.forEach(function(w){
+        var seld = (w.name===s.sheet); if (seld) found = true;
+        opts += '<option value="'+esc(w.name)+'"'+(seld?' selected':'')+'>'+esc(w.name)+'</option>';
+      });
+      // 추천 학습지가 목록에 없으면 임시 옵션 추가
+      if (s.sheet && !found) opts = '<option value="'+esc(s.sheet)+'" selected>'+esc(s.sheet)+' (오늘)</option>' + opts;
+      opts += '<option value="__custom__">+ 직접 입력</option>';
+      h += '<div class="section"><div class="lbl">📘 학습지</div>'
+        + '<select class="ws-sel" id="wsSel" onchange="pickWs()">'+opts+'</select>'
+        + '<input class="txt" id="wsCustom" placeholder="학습지 이름 직접 입력" style="display:none;" oninput="SEL.sheet=this.value;renderProblems();">'
+        + '</div>';
+      h += '<div class="section" id="probSec"><div class="lbl">✏️ 문제</div><div class="chips" id="probChips"></div></div>';
+    } else if (s.kind === '칭찬') {
+      h += '<div class="section"><div class="lbl">👏 사유</div><div class="chips" id="praiseChips">'
+        + DATA.praisePresets.map(function(p){ return '<div class="opt '+(s.reason===p?'sel':'')+'" onclick="pickPraise(\''+esc(p).replace(/'/g,"\\'")+'\')">'+esc(p)+'</div>'; }).join('')
+        + '<div class="opt ghost" onclick="pickPraiseCustom()">+ 직접</div>'
+        + '</div>'
+        + '<input class="txt" id="praiseCustom" placeholder="사유 직접 입력" style="display:none;" oninput="SEL.reason=this.value;updateSave();">'
+        + '</div>';
+    }
+
+    h += '<div class="actions">'
+      + '<button class="cancel" onclick="closeModal()">취소</button>'
+      + '<button class="save" id="saveBtn" onclick="doSave()" disabled>기록</button>'
+      + '</div>';
+    document.getElementById('modalBox').innerHTML = h;
+    if (s.kind === '발표') renderProblems();
+    updateSave();
+  }
+
+  function pickKind(k){ SEL.kind = k; if(k==='발표'){SEL.reason='';} else {SEL.problem='';SEL.sheet='';} renderModal(); }
+
+  function pickWs() {
+    var v = document.getElementById('wsSel').value;
+    var ci = document.getElementById('wsCustom');
+    if (v === '__custom__') { ci.style.display='block'; SEL.sheet=ci.value||''; ci.focus(); }
+    else { ci.style.display='none'; SEL.sheet = v; }
+    SEL.problem = '';
+    renderProblems(); updateSave();
+  }
+
+  function renderProblems() {
+    var box = document.getElementById('probChips'); if (!box) return;
+    var ws = DATA.worksheets.filter(function(w){ return w.name===SEL.sheet; })[0];
+    var probs = ws ? ws.problems : [];
+    var h = '';
+    probs.forEach(function(p){
+      h += '<div class="opt '+(SEL.problem===p?'sel':'')+'" onclick="pickProblem(\''+esc(p).replace(/'/g,"\\'")+'\')">'+esc(p)+'</div>';
+    });
+    h += '<div class="opt ghost" onclick="pickProblemCustom()">+ 기타</div>';
+    h += '<div class="opt '+(SEL.problem==='__none__'?'sel':'')+'" onclick="pickProblem(\'__none__\')">문제 무관</div>';
+    box.innerHTML = h;
+    var old = document.getElementById('probCustom');
+    if (old) old.remove();
+  }
+  function pickProblem(p){ SEL.problem = p; renderProblems(); updateSave(); }
+  function pickProblemCustom() {
+    SEL.problem = '';
+    var sec = document.getElementById('probSec');
+    if (!document.getElementById('probCustom')) {
+      var inp = document.createElement('input');
+      inp.className='txt'; inp.id='probCustom'; inp.placeholder='문제 직접 입력 (예: 유제 3)';
+      inp.oninput = function(){ SEL.problem = this.value; updateSave(); };
+      sec.appendChild(inp); inp.focus();
+    }
+  }
+  function pickPraise(p){ SEL.reason = p; var c=document.getElementById('praiseCustom'); if(c)c.style.display='none'; renderModal(); }
+  function pickPraiseCustom(){ var c=document.getElementById('praiseCustom'); c.style.display='block'; SEL.reason=c.value||''; c.focus(); updateSave(); }
+
+  function updateSave() {
+    var ok = false;
+    if (SEL && SEL.kind === '발표') ok = !!(SEL.sheet && (SEL.problem)); // 문제는 '__none__' 포함 값 있으면 OK
+    else if (SEL && SEL.kind === '칭찬') ok = !!(SEL.reason && SEL.reason.trim());
+    var b = document.getElementById('saveBtn'); if (b) b.disabled = !ok;
+  }
+
+  function doSave() {
+    if (!SEL) return;
+    var b = document.getElementById('saveBtn'); b.disabled = true; b.textContent = '저장중…';
+    var payload = { sid: SEL.sid, name: SEL.name, kind: SEL.kind };
+    if (SEL.kind === '발표') {
+      payload.sheet = SEL.sheet;
+      payload.problem = (SEL.problem==='__none__') ? '' : SEL.problem;
+      payload.lessonNo = SEL.lessonNo || '';
+      payload.reason = '발표';
+    } else {
+      payload.reason = SEL.reason;
+    }
+    var savedIdx = SEL.idx, kind = SEL.kind, name = SEL.name;
+    google.script.run.withSuccessHandler(function(res){
+      if (res && res.success) {
+        DATA.students[savedIdx].todayPresent = res.todayPresent;
+        DATA.students[savedIdx].todayPraise = res.todayPraise;
+        renderGrid();
+        toast('✅ '+name+' '+kind+' 기록!');
+        closeModal();
+      } else {
+        toast('⚠ 실패: '+((res&&res.message)||''));
+        b.disabled = false; b.textContent = '기록';
+      }
+    }).recordStamp(payload);
+  }
+
+  // 오늘 기록 확인·정정
+  function openToday() {
+    document.getElementById('todayBg').classList.add('show');
+    document.getElementById('todayBox').innerHTML = '<div class="loading">불러오는 중…</div>';
+    google.script.run.withSuccessHandler(function(res){
+      var h = '<h2>📋 오늘 기록</h2><div class="sid">'+document.getElementById('classSel').value+' · 잘못된 기록은 ✕로 삭제</div>';
+      if (!res || !res.success || !res.items.length) {
+        h += '<div class="empty">오늘 기록이 없어요.</div>';
+      } else {
+        res.items.forEach(function(it){
+          var info = [it.sheet, it.problem].filter(Boolean).join(' · ') || it.reason;
+          h += '<div class="rec-item">'
+            + '<div class="rk '+it.kind+'">'+(it.kind==='발표'?'🙋':'👏')+'</div>'
+            + '<div class="rd"><b>'+esc(it.name)+'</b> '+esc(info)+'<br><small>'+it.time+'</small></div>'
+            + '<div class="rx" onclick="delRec('+it.ts+',\''+esc(it.sid)+'\',this)">✕</div>'
+            + '</div>';
+        });
+      }
+      h += '<div class="actions"><button class="save" onclick="closeToday()">닫기</button></div>';
+      document.getElementById('todayBox').innerHTML = h;
+    }).getTodayRecords(document.getElementById('classSel').value);
+  }
+  function closeToday(){ document.getElementById('todayBg').classList.remove('show'); loadInput(); }
+  function delRec(ts, sid, el) {
+    if (!confirm('이 기록을 삭제할까요?')) return;
+    el.textContent = '…';
+    google.script.run.withSuccessHandler(function(res){
+      if (res && res.success) { el.closest('.rec-item').remove(); toast('삭제됨'); }
+      else { toast('삭제 실패'); el.textContent = '✕'; }
+    }).deleteRecord(ts, sid);
+  }
+
+  loadClasses();
+</script>
+</body>
+</html>

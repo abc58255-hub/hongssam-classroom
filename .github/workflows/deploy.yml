@@ -86,3 +86,10 @@ jobs:
           cd "도장-데이터"
           clasp push --force
           clasp deploy -i "AKfycbyLUVZ5gd5Vru9DQ-TQIVCcQafqlRAy1VvmUQxb1XI65gBTSUOqgTu9AtoUctlsuSrRSQ"
+
+      - name: Deploy 도장-입력
+        continue-on-error: true
+        run: |
+          cd "도장-입력"
+          clasp push --force
+          clasp deploy -i "AKfycbyw2zd72G2D2QXFVOV-4wELVHjiDqadpRoNyUKj7t9U2NXnJcSSsvTcKvBf3j9bC7BOwQ"
