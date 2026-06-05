@@ -1,0 +1,242 @@
+// 홍쌤 도장-데이터 (교사 전용 데이터 뷰)
+// 공유 스프레드시트의 도장 데이터를 집계해 그리드로 보여준다.
+// ⚠️ 교사 전용 화면 — 소외 학생·등수 등 민감정보 포함. 학생에게 노출 금지.
+
+var SHEET_ID = '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
+
+// 소외 기준 (마지막 발표 이후 경과일)
+var STALE_DAYS = 14;
+
+function doGet() {
+  return HtmlService.createHtmlOutputFromFile('index')
+    .setTitle('홍쌤 도장-데이터')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// 필요한 시트가 없으면 생성
+function _ensureSheets_() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  function mk(name, headers, color) {
+    var sh = ss.getSheetByName(name);
+    if (!sh) {
+      sh = ss.insertSheet(name);
+      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground(color || '#1e3a8a').setFontColor('white');
+      sh.setFrozenRows(1);
+    }
+    return sh;
+  }
+  mk('도장기록', ['일시','학번','이름','종류','사유','차시','학습지','문제'], '#7c3aed');
+  mk('도장_이월', ['학번','이름','칭찬이월','발표이월'], '#0d9488');
+  mk('도장_학습지', ['학습지명','발표문제JSON'], '#1e3a8a');
+  return ss;
+}
+
+function _clsOf_(sid) {
+  sid = String(sid || '').trim();
+  return sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+}
+
+function _daysBetween_(from, to) {
+  return Math.floor((to.getTime() - from.getTime()) / 86400000);
+}
+
+function _fmtDate_(d) {
+  try { return Utilities.formatDate(new Date(d), 'Asia/Seoul', 'yyyy-MM-dd'); }
+  catch(_) { return ''; }
+}
+
+// 반 목록 (학생명부 기반)
+function getClassList() {
+  try {
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var set = {};
+    for (var i = 1; i < roster.length; i++) {
+      var c = _clsOf_(roster[i][1]);
+      if (c) set[c] = true;
+    }
+    var list = Object.keys(set).sort();
+    return { success: true, classes: list };
+  } catch(e) { return { success: false, message: e.toString(), classes: [] }; }
+}
+
+// 메인 집계
+// filterClass: '' 또는 'all' = 전체, 그 외 '2학년 1반'
+// period: 'all' | '7' | '30' | 'semester'
+// semesterStart: 'yyyy-MM-dd' (period==semester 일 때)
+function getDojangData(filterClass, period, semesterStart) {
+  try {
+    var ss = _ensureSheets_();
+    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var logSh = ss.getSheetByName('도장기록');
+    var carrySh = ss.getSheetByName('도장_이월');
+    var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
+    var carry = carrySh.getLastRow() > 1 ? carrySh.getRange(2, 1, carrySh.getLastRow()-1, 4).getValues() : [];
+
+    var now = new Date();
+    var cutoff = null;
+    var includeCarry = (period === 'all' || !period); // 이월은 날짜가 없어 기간필터 시 제외
+    if (period === '7') cutoff = new Date(now.getTime() - 7*86400000);
+    else if (period === '30') cutoff = new Date(now.getTime() - 30*86400000);
+    else if (period === 'semester' && semesterStart) {
+      var sp = new Date(semesterStart + 'T00:00:00+09:00');
+      if (!isNaN(sp.getTime())) cutoff = sp;
+    }
+
+    var onlyClass = (filterClass && filterClass !== 'all') ? filterClass : null;
+
+    // 학생 인덱스 구축
+    var students = {}; // sid -> obj
+    var order = [];
+    for (var i = 1; i < roster.length; i++) {
+      var sid = String(roster[i][1] || '').trim();
+      if (!sid) continue;
+      var cls = _clsOf_(sid);
+      if (onlyClass && cls !== onlyClass) continue;
+      students[sid] = {
+        sid: sid, name: String(roster[i][2] || '').trim(), cls: cls,
+        praise: 0, present: 0,
+        lastPresent: null, lastPraise: null,
+        lastPresentInfo: '', recent: []
+      };
+      order.push(sid);
+    }
+
+    // 이월 합산
+    if (includeCarry) {
+      for (var c = 0; c < carry.length; c++) {
+        var csid = String(carry[c][0] || '').trim();
+        if (!csid || !students[csid]) continue;
+        students[csid].praise += Number(carry[c][2] || 0);
+        students[csid].present += Number(carry[c][3] || 0);
+      }
+    }
+
+    // 도장기록 집계
+    for (var r = 0; r < log.length; r++) {
+      var when = log[r][0];
+      var lsid = String(log[r][1] || '').trim();
+      if (!lsid || !students[lsid]) continue;
+      var dt = when ? new Date(when) : null;
+      if (cutoff && (!dt || dt < cutoff)) continue;
+      var kind = String(log[r][3] || '').trim();
+      var reason = String(log[r][4] || '');
+      var sheetName = String(log[r][6] || '');
+      var problem = String(log[r][7] || '');
+      var st = students[lsid];
+      if (kind === '발표') {
+        st.present++;
+        if (dt && (!st.lastPresent || dt > st.lastPresent)) {
+          st.lastPresent = dt;
+          st.lastPresentInfo = [sheetName, problem].filter(Boolean).join(' · ') || reason;
+        }
+      } else if (kind === '칭찬') {
+        st.praise++;
+        if (dt && (!st.lastPraise || dt > st.lastPraise)) st.lastPraise = dt;
+      }
+      st.recent.push({
+        date: dt ? _fmtDate_(dt) : '', kind: kind, reason: reason,
+        sheet: sheetName, problem: problem, ts: dt ? dt.getTime() : 0
+      });
+    }
+
+    // 행 구성
+    var rows = order.map(function(sid){
+      var s = students[sid];
+      var elapsed = s.lastPresent ? _daysBetween_(s.lastPresent, now) : null;
+      var stale = (s.present === 0) || (elapsed !== null && elapsed >= STALE_DAYS);
+      s.recent.sort(function(a,b){ return b.ts - a.ts; });
+      return {
+        sid: s.sid, name: s.name, cls: s.cls,
+        praise: s.praise, present: s.present, total: s.praise + s.present,
+        lastPresent: s.lastPresent ? _fmtDate_(s.lastPresent) : '',
+        lastPresentElapsed: elapsed,
+        lastPresentInfo: s.lastPresentInfo,
+        lastPraise: s.lastPraise ? _fmtDate_(s.lastPraise) : '',
+        stale: stale,
+        recent: s.recent.slice(0, 8)
+      };
+    });
+
+    // 전체 등수 (발표수 desc, 동점 동순위)
+    var byPresentAll = rows.slice().sort(function(a,b){ return b.present - a.present; });
+    _assignRank_(byPresentAll, 'present', 'rankAll');
+    // 반 등수
+    var byClass = {};
+    rows.forEach(function(r){ (byClass[r.cls] = byClass[r.cls] || []).push(r); });
+    Object.keys(byClass).forEach(function(k){
+      var arr = byClass[k].slice().sort(function(a,b){ return b.present - a.present; });
+      _assignRank_(arr, 'present', 'rankClass');
+    });
+
+    // 기본 정렬: 발표수 desc, 그다음 칭찬수 desc, 이름
+    rows.sort(function(a,b){
+      if (b.present !== a.present) return b.present - a.present;
+      if (b.praise !== a.praise) return b.praise - a.praise;
+      return a.name.localeCompare(b.name, 'ko');
+    });
+
+    // 요약
+    var summary = {
+      students: rows.length,
+      totalPresent: rows.reduce(function(s,r){ return s + r.present; }, 0),
+      totalPraise: rows.reduce(function(s,r){ return s + r.praise; }, 0),
+      staleCount: rows.filter(function(r){ return r.stale; }).length
+    };
+
+    return { success: true, rows: rows, summary: summary, staleDays: STALE_DAYS };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+function _assignRank_(sortedArr, key, rankField) {
+  var rank = 0, prev = null, count = 0;
+  for (var i = 0; i < sortedArr.length; i++) {
+    count++;
+    var v = sortedArr[i][key];
+    if (prev === null || v !== prev) { rank = count; prev = v; }
+    sortedArr[i][rankField] = rank;
+  }
+}
+
+// 한 학생의 전체 도장 내역 (상세)
+function getStudentDetail(studentId) {
+  try {
+    var ss = _ensureSheets_();
+    var sid = String(studentId || '').trim();
+    var logSh = ss.getSheetByName('도장기록');
+    var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
+    var carrySh = ss.getSheetByName('도장_이월');
+    var carry = carrySh.getLastRow() > 1 ? carrySh.getRange(2, 1, carrySh.getLastRow()-1, 4).getValues() : [];
+
+    var items = [];
+    var name = '';
+    for (var r = 0; r < log.length; r++) {
+      if (String(log[r][1] || '').trim() !== sid) continue;
+      name = String(log[r][2] || '').trim() || name;
+      var dt = log[r][0] ? new Date(log[r][0]) : null;
+      items.push({
+        date: dt ? _fmtDate_(dt) : '',
+        time: dt ? Utilities.formatDate(dt, 'Asia/Seoul', 'HH:mm') : '',
+        kind: String(log[r][3] || ''), reason: String(log[r][4] || ''),
+        period: String(log[r][5] || ''), sheet: String(log[r][6] || ''),
+        problem: String(log[r][7] || ''), ts: dt ? dt.getTime() : 0
+      });
+    }
+    items.sort(function(a,b){ return b.ts - a.ts; });
+
+    var carryRow = { praise: 0, present: 0 };
+    for (var c = 0; c < carry.length; c++) {
+      if (String(carry[c][0] || '').trim() === sid) {
+        carryRow.praise = Number(carry[c][2] || 0);
+        carryRow.present = Number(carry[c][3] || 0);
+        name = String(carry[c][1] || '').trim() || name;
+        break;
+      }
+    }
+    return { success: true, name: name, items: items, carry: carryRow };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}

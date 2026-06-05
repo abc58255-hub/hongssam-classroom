@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>홍쌤 도장-데이터</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+         background: #f1f5f9; color: #1e293b; padding: 16px; }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 20px; color: #6d28d9; display: flex; align-items: center; gap: 8px; }
+  h1 .sub { font-size: 12px; color: #94a3b8; font-weight: 400; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 14px 0; }
+  select, button { font-size: 13px; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 8px;
+                   background: #fff; color: #1e293b; cursor: pointer; outline: none; }
+  button.primary { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+  button.toggle.on { background: #fee2e2; color: #b91c1c; border-color: #fca5a5; }
+  .spacer { flex: 1; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .chip { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 8px 14px;
+          font-size: 13px; display: flex; gap: 6px; align-items: baseline; }
+  .chip b { font-size: 18px; color: #6d28d9; }
+  .chip.warn b { color: #dc2626; }
+
+  .card { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,.08); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { padding: 10px 10px; text-align: center; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+  th { background: #f8fafc; color: #475569; font-weight: 600; position: sticky; top: 0; z-index: 1; }
+  td.name { text-align: left; font-weight: 600; cursor: pointer; color: #6d28d9; }
+  td.info { text-align: left; color: #64748b; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  tr:hover td { background: #faf5ff; }
+  tr.stale td { background: #fef2f2; }
+  tr.stale:hover td { background: #fee2e2; }
+  .b-present { font-weight: 700; color: #7c3aed; }
+  .b-praise { color: #0d9488; }
+  .badge { display: inline-block; min-width: 22px; padding: 1px 7px; border-radius: 999px; font-size: 12px; }
+  .rank { color: #475569; font-variant-numeric: tabular-nums; }
+  .elapsed-ok { color: #16a34a; }
+  .elapsed-warn { color: #d97706; font-weight: 600; }
+  .elapsed-bad { color: #dc2626; font-weight: 700; }
+  .warnico { color: #dc2626; font-weight: 700; }
+  .empty { padding: 40px; text-align: center; color: #94a3b8; }
+  .loading { padding: 40px; text-align: center; color: #94a3b8; }
+
+  /* 모달 */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; }
+  .modal-bg.show { display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; max-height: 85vh;
+           overflow: auto; padding: 20px; }
+  .modal h2 { font-size: 17px; color: #6d28d9; margin-bottom: 4px; }
+  .modal .mcount { font-size: 13px; color: #64748b; margin-bottom: 12px; }
+  .mitem { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .mitem .mk { flex-shrink: 0; width: 44px; font-weight: 700; }
+  .mk.발표 { color: #7c3aed; } .mk.칭찬 { color: #0d9488; }
+  .mitem .md { flex: 1; }
+  .mitem .mdate { color: #94a3b8; font-size: 11px; }
+  .closebtn { float: right; cursor: pointer; color: #94a3b8; font-size: 22px; line-height: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🏅 도장 데이터 <span class="sub">교사 전용 · 발표/칭찬 현황</span></h1>
+
+  <div class="toolbar">
+    <select id="classSel" onchange="load()"><option value="all">전체 반</option></select>
+    <select id="periodSel" onchange="load()">
+      <option value="all">전체 기간</option>
+      <option value="30">최근 30일</option>
+      <option value="7">최근 7일</option>
+    </select>
+    <button id="staleBtn" class="toggle" onclick="toggleStale()">⚠ 소외만</button>
+    <div class="spacer"></div>
+    <button class="primary" onclick="load()">↻ 새로고침</button>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="card">
+    <div id="grid"><div class="loading">불러오는 중…</div></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="modalBg" onclick="if(event.target===this)closeModal()">
+  <div class="modal" id="modalBox"></div>
+</div>
+
+<script>
+  var STATE = { rows: [], staleOnly: false, staleDays: 14 };
+
+  function toggleStale() {
+    STATE.staleOnly = !STATE.staleOnly;
+    document.getElementById('staleBtn').classList.toggle('on', STATE.staleOnly);
+    render();
+  }
+
+  function loadClasses() {
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) return;
+      var sel = document.getElementById('classSel');
+      res.classes.forEach(function(c){
+        var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o);
+      });
+    }).getClassList();
+  }
+
+  function load() {
+    document.getElementById('grid').innerHTML = '<div class="loading">불러오는 중…</div>';
+    var cls = document.getElementById('classSel').value;
+    var period = document.getElementById('periodSel').value;
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) {
+        document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: ' + ((res&&res.message)||'') + '</div>';
+        return;
+      }
+      STATE.rows = res.rows; STATE.staleDays = res.staleDays;
+      renderChips(res.summary);
+      render();
+    }).getDojangData(cls, period, '');
+  }
+
+  function renderChips(s) {
+    document.getElementById('chips').innerHTML =
+      chip('학생', s.students) +
+      chip('총 발표', s.totalPresent) +
+      chip('총 칭찬', s.totalPraise) +
+      chip('소외(' + STATE.staleDays + '일+)', s.staleCount, s.staleCount > 0);
+  }
+  function chip(label, val, warn) {
+    return '<div class="chip' + (warn?' warn':'') + '">' + label + ' <b>' + val + '</b></div>';
+  }
+
+  function elapsedCell(r) {
+    if (r.present === 0) return '<span class="elapsed-bad">미발표</span>';
+    if (r.lastPresentElapsed === null) return '-';
+    var d = r.lastPresentElapsed;
+    var cls = d >= STATE.staleDays ? 'elapsed-bad' : (d >= 7 ? 'elapsed-warn' : 'elapsed-ok');
+    return '<span class="' + cls + '">' + (d === 0 ? '오늘' : d + '일 전') + '</span>';
+  }
+
+  function render() {
+    var rows = STATE.staleOnly ? STATE.rows.filter(function(r){ return r.stale; }) : STATE.rows;
+    if (!rows.length) {
+      document.getElementById('grid').innerHTML = '<div class="empty">표시할 데이터가 없어요.</div>';
+      return;
+    }
+    var h = '<table><thead><tr>'
+      + '<th>이름</th><th>반</th><th>🙋 발표</th><th>👏 칭찬</th><th>합계</th>'
+      + '<th>최근 발표</th><th>경과</th><th>최근 학습지·문제</th><th>전체</th><th>반</th>'
+      + '</tr></thead><tbody>';
+    rows.forEach(function(r){
+      h += '<tr class="' + (r.stale?'stale':'') + '">'
+        + '<td class="name" onclick="openDetail(\'' + r.sid + '\')">' + (r.stale?'<span class="warnico">⚠ </span>':'') + esc(r.name) + '</td>'
+        + '<td>' + esc(r.cls) + '</td>'
+        + '<td><span class="b-present">' + r.present + '</span></td>'
+        + '<td><span class="b-praise">' + r.praise + '</span></td>'
+        + '<td>' + r.total + '</td>'
+        + '<td>' + (r.lastPresent || '-') + '</td>'
+        + '<td>' + elapsedCell(r) + '</td>'
+        + '<td class="info">' + (esc(r.lastPresentInfo) || '-') + '</td>'
+        + '<td class="rank">' + (r.present>0 ? r.rankAll + '위' : '-') + '</td>'
+        + '<td class="rank">' + (r.present>0 ? r.rankClass + '위' : '-') + '</td>'
+        + '</tr>';
+    });
+    h += '</tbody></table>';
+    document.getElementById('grid').innerHTML = h;
+  }
+
+  function openDetail(sid) {
+    document.getElementById('modalBg').classList.add('show');
+    document.getElementById('modalBox').innerHTML = '<div class="loading">불러오는 중…</div>';
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) { closeModal(); return; }
+      var row = STATE.rows.filter(function(x){ return x.sid === sid; })[0] || {};
+      var h = '<span class="closebtn" onclick="closeModal()">×</span>'
+        + '<h2>' + esc(res.name || row.name || sid) + '</h2>'
+        + '<div class="mcount">🙋 발표 ' + (row.present||0) + '  ·  👏 칭찬 ' + (row.praise||0)
+        + (res.carry && (res.carry.present||res.carry.praise) ? '  <span style="color:#94a3b8">(이월 발표 '+res.carry.present+'·칭찬 '+res.carry.praise+' 포함)</span>' : '')
+        + '</div>';
+      if (!res.items.length) {
+        h += '<div class="empty">기록된 도장 내역이 없어요. (이월만 있을 수 있음)</div>';
+      } else {
+        res.items.forEach(function(it){
+          var info = [it.sheet, it.problem].filter(Boolean).join(' · ');
+          h += '<div class="mitem"><div class="mk ' + it.kind + '">' + it.kind + '</div>'
+            + '<div class="md">' + (esc(info) || esc(it.reason) || '-')
+            + (info && it.reason ? ' <span style="color:#94a3b8">('+esc(it.reason)+')</span>' : '')
+            + '<div class="mdate">' + it.date + (it.time?' '+it.time:'') + (it.period?' · '+esc(it.period)+'차시':'') + '</div>'
+            + '</div></div>';
+        });
+      }
+      document.getElementById('modalBox').innerHTML = h;
+    }).getStudentDetail(sid);
+  }
+  function closeModal() { document.getElementById('modalBg').classList.remove('show'); }
+
+  function esc(s) { return String(s==null?'':s).replace(/[&<>"]/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  loadClasses();
+  load();
+</script>
+</body>
+</html>
