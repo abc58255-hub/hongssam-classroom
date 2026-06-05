@@ -696,28 +696,27 @@
     google.script.run.withSuccessHandler(function(d){
       var box = document.getElementById('myDojang');
       if (!box || !d || !d.success) { if(box) box.innerHTML=''; return; }
-      if (!d.present && !d.praise) { box.innerHTML=''; return; } // 도장 없으면 숨김
-      var rankHtml = '';
-      if (d.showRank && d.present > 0) {
-        rankHtml = '<div style="display:flex;gap:8px;margin-top:10px;">'
-          + '<div style="flex:1;background:#fff;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:11px;color:#94a3b8;">전체</div><div style="font-size:17px;font-weight:800;color:#6d28d9;">'+d.rankAll+'위</div></div>'
-          + '<div style="flex:1;background:#fff;border-radius:10px;padding:8px;text-align:center;"><div style="font-size:11px;color:#94a3b8;">우리 반</div><div style="font-size:17px;font-weight:800;color:#6d28d9;">'+d.rankClass+'위</div></div>'
-          + '</div>';
-      }
+      var cats = d.categories || [];
+      var totalCount = cats.reduce(function(s,c){ return s + (c.count||0); }, 0);
+      if (!totalCount) { box.innerHTML=''; return; } // 도장 없으면 숨김
+      var cards = cats.map(function(c){
+        var rank = (d.showRank && c.count>0)
+          ? '<div style="font-size:10px;color:#94a3b8;margin-top:2px;">전체 '+c.rankAll+'위·반 '+c.rankClass+'위</div>' : '';
+        return '<div style="flex:1;min-width:80px;background:#fff;border-radius:10px;padding:10px;text-align:center;">'
+          + '<div style="font-size:12px;color:#7c3aed;">'+c.emoji+' '+escDj(c.name)+'</div>'
+          + '<div style="font-size:22px;font-weight:800;color:#6d28d9;">'+(c.count||0)+'</div>'+rank+'</div>';
+      }).join('');
       var recentHtml = '';
       if (d.recent && d.recent.length) {
         recentHtml = '<div style="margin-top:10px;font-size:12px;color:#475569;">'
           + d.recent.map(function(it){
-              return '<div style="padding:3px 0;">'+(it.kind==='발표'?'🙋':'👏')+' <b>'+it.date+'</b> '+escDj(it.info);
+              return '<div style="padding:3px 0;"><b>'+it.date+'</b> '+escDj(it.kind)+' '+escDj(it.info)+'</div>';
             }).join('') + '</div>';
       }
       box.innerHTML = '<div style="background:linear-gradient(135deg,#f5f3ff,#ede9fe);border:1px solid #ddd6fe;border-radius:14px;padding:14px;">'
         + '<div style="font-size:15px;font-weight:800;color:#6d28d9;margin-bottom:8px;">🏅 내 도장</div>'
-        + '<div style="display:flex;gap:10px;">'
-        + '<div style="flex:1;background:#fff;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:12px;color:#7c3aed;">🙋 발표</div><div style="font-size:22px;font-weight:800;color:#6d28d9;">'+d.present+'</div></div>'
-        + '<div style="flex:1;background:#fff;border-radius:10px;padding:10px;text-align:center;"><div style="font-size:12px;color:#0f766e;">👏 칭찬</div><div style="font-size:22px;font-weight:800;color:#0f766e;">'+d.praise+'</div></div>'
-        + '</div>' + rankHtml + recentHtml
-        + '</div>';
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + cards + '</div>'
+        + recentHtml + '</div>';
     }).getMyDojang(currentUser.id);
   }
   function escDj(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }

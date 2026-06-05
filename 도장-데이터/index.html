@@ -87,6 +87,7 @@
     <button id="staleBtn" class="toggle" onclick="toggleStale()">⚠ 소외만</button>
     <button id="viewBtn" onclick="toggleView()">▦ 그리드 보기</button>
     <div class="spacer"></div>
+    <button onclick="openWs()">📘 학습지 관리</button>
     <button onclick="openSettings()">⚙ 설정</button>
     <button onclick="openCarry()">📥 기존 이월 입력</button>
     <button class="primary" onclick="load()">↻ 새로고침</button>
@@ -111,8 +112,12 @@
   <div class="modal" id="setBox" style="max-width:480px;"></div>
 </div>
 
+<div class="modal-bg" id="wsBg" onclick="if(event.target===this)closeWs()">
+  <div class="modal" id="wsBox" style="max-width:520px;"></div>
+</div>
+
 <script>
-  var STATE = { rows: [], staleOnly: false, staleDays: 14, view: 'table' };
+  var STATE = { rows: [], staleOnly: false, staleDays: 14, view: 'table', categories: [], staleCat: '' };
 
   function toggleStale() {
     STATE.staleOnly = !STATE.staleOnly;
@@ -145,26 +150,32 @@
         return;
       }
       STATE.rows = res.rows; STATE.staleDays = res.staleDays;
+      STATE.categories = res.categories || [];
+      STATE.staleCat = res.staleCat || '';
       renderChips(res.summary);
       render();
     }).getDojangData(cls, period, '');
   }
 
   function renderChips(s) {
-    document.getElementById('chips').innerHTML =
-      chip('학생', s.students) +
-      chip('총 발표', s.totalPresent) +
-      chip('총 칭찬', s.totalPraise) +
-      chip('소외(' + STATE.staleDays + '일+)', s.staleCount, s.staleCount > 0);
+    var html = chip('학생', s.students);
+    (STATE.categories||[]).forEach(function(c){
+      html += chip(c.emoji + ' ' + c.name, (s.perCat && s.perCat[c.name]) || 0);
+    });
+    html += chip('소외(' + STATE.staleDays + '일+)', s.staleCount, s.staleCount > 0);
+    document.getElementById('chips').innerHTML = html;
   }
   function chip(label, val, warn) {
-    return '<div class="chip' + (warn?' warn':'') + '">' + label + ' <b>' + val + '</b></div>';
+    return '<div class="chip' + (warn?' warn':'') + '">' + esc(label) + ' <b>' + val + '</b></div>';
   }
 
-  function elapsedCell(r) {
-    if (r.present === 0) return '<span class="elapsed-bad">미발표</span>';
-    if (r.lastPresentElapsed === null) return '-';
-    var d = r.lastPresentElapsed;
+  function elapsedHtml(r) {
+    var sc = STATE.staleCat;
+    var cnt = (r.counts && r.counts[sc]) || 0;
+    if (cnt === 0) return '<span class="elapsed-bad">미기록</span>';
+    var l = r.last && r.last[sc];
+    if (!l) return '-';
+    var d = l.elapsed;
     var cls = d >= STATE.staleDays ? 'elapsed-bad' : (d >= 7 ? 'elapsed-warn' : 'elapsed-ok');
     return '<span class="' + cls + '">' + (d === 0 ? '오늘' : d + '일 전') + '</span>';
   }
@@ -176,26 +187,31 @@
       return;
     }
     if (STATE.view === 'grid') { renderGrid(rows); return; }
-    var h = '<table><thead><tr>'
-      + '<th>이름</th><th>반</th><th>🙋 발표</th><th>👏 칭찬</th><th>합계</th>'
-      + '<th>최근 발표</th><th>경과</th><th>최근 학습지·문제</th><th>전체</th><th>반</th>'
-      + '</tr></thead><tbody>';
+    var cats = STATE.categories || [];
+    var sc = STATE.staleCat;
+    var h = '<table><thead><tr><th>이름</th><th>반</th>';
+    cats.forEach(function(c){ h += '<th>'+c.emoji+' '+esc(c.name)+'</th>'; });
+    h += '<th>합계</th><th>최근('+esc(sc)+')</th><th>경과</th>';
+    cats.forEach(function(c){ h += '<th>'+esc(c.name)+'<br>등수</th>'; });
+    h += '</tr></thead><tbody>';
     rows.forEach(function(r){
       h += '<tr class="' + (r.stale?'stale':'') + '">'
         + '<td class="name" onclick="openDetail(\'' + r.sid + '\')">' + (r.stale?'<span class="warnico">⚠ </span>':'') + esc(r.name) + '</td>'
-        + '<td>' + esc(r.cls) + '</td>'
-        + '<td><span class="b-present">' + r.present + '</span></td>'
-        + '<td><span class="b-praise">' + r.praise + '</span></td>'
-        + '<td>' + r.total + '</td>'
-        + '<td>' + (r.lastPresent || '-') + '</td>'
-        + '<td>' + elapsedCell(r) + '</td>'
-        + '<td class="info">' + (esc(r.lastPresentInfo) || '-') + '</td>'
-        + '<td class="rank">' + (r.present>0 ? r.rankAll + '위' : '-') + '</td>'
-        + '<td class="rank">' + (r.present>0 ? r.rankClass + '위' : '-') + '</td>'
-        + '</tr>';
+        + '<td>' + esc(r.cls) + '</td>';
+      cats.forEach(function(c){ h += '<td><b style="color:#6d28d9;">' + (r.counts[c.name]||0) + '</b></td>'; });
+      var lastInfo = (r.last && r.last[sc]) ? (r.last[sc].date) : '-';
+      h += '<td>' + r.total + '</td>'
+        + '<td>' + lastInfo + '</td>'
+        + '<td>' + elapsedHtml(r) + '</td>';
+      cats.forEach(function(c){
+        var cnt = r.counts[c.name]||0;
+        h += '<td class="rank">' + (cnt>0 ? (r.rankAll[c.name]+'/'+r.rankClass[c.name]) : '-') + '</td>';
+      });
+      h += '</tr>';
     });
     h += '</tbody></table>';
-    document.getElementById('grid').innerHTML = h;
+    document.getElementById('grid').innerHTML = h
+      + '<div style="font-size:11px;color:#94a3b8;padding:8px 12px;">등수 = 전체/반 (항목별)</div>';
   }
 
   function openDetail(sid) {
@@ -204,9 +220,10 @@
     google.script.run.withSuccessHandler(function(res){
       if (!res || !res.success) { closeModal(); return; }
       var row = STATE.rows.filter(function(x){ return x.sid === sid; })[0] || {};
+      var cnts = (STATE.categories||[]).map(function(c){ return c.emoji + ' ' + c.name + ' ' + ((row.counts&&row.counts[c.name])||0); }).join('  ·  ');
       var h = '<span class="closebtn" onclick="closeModal()">×</span>'
         + '<h2>' + esc(res.name || row.name || sid) + '</h2>'
-        + '<div class="mcount">🙋 발표 ' + (row.present||0) + '  ·  👏 칭찬 ' + (row.praise||0)
+        + '<div class="mcount">' + cnts
         + (res.carry && (res.carry.present||res.carry.praise) ? '  <span style="color:#94a3b8">(이월 발표 '+res.carry.present+'·칭찬 '+res.carry.praise+' 포함)</span>' : '')
         + '</div>';
       if (!res.items.length) {
@@ -214,7 +231,7 @@
       } else {
         res.items.forEach(function(it){
           var info = [it.sheet, it.problem].filter(Boolean).join(' · ');
-          h += '<div class="mitem"><div class="mk ' + it.kind + '">' + it.kind + '</div>'
+          h += '<div class="mitem"><div class="mk ' + it.kind + '">' + esc(it.kind) + '</div>'
             + '<div class="md">' + (esc(info) || esc(it.reason) || '-')
             + (info && it.reason ? ' <span style="color:#94a3b8">('+esc(it.reason)+')</span>' : '')
             + '<div class="mdate">' + it.date + (it.time?' '+it.time:'') + (it.period?' · '+esc(it.period)+'차시':'') + '</div>'
@@ -230,61 +247,109 @@
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
 
   function renderGrid(rows) {
+    var cats = STATE.categories || [];
     var h = '<div class="tgrid">';
     rows.forEach(function(r){
-      var last;
-      if (r.present === 0) last = '<span class="elapsed-bad">미발표</span>';
-      else if (r.lastPresentElapsed === null) last = '-';
-      else {
-        var d = r.lastPresentElapsed;
-        var cls = d >= STATE.staleDays ? 'elapsed-bad' : (d >= 7 ? 'elapsed-warn' : 'elapsed-ok');
-        last = '<span class="'+cls+'">'+(d===0?'오늘':d+'일 전')+'</span>';
-      }
+      var stat = cats.map(function(c){ return c.emoji + (r.counts[c.name]||0); }).join(' · ');
       h += '<div class="tcell '+(r.stale?'stale':'')+'" onclick="openDetail(\''+r.sid+'\')">'
         + '<div class="tn">'+(r.stale?'⚠ ':'')+esc(r.name)+'</div>'
-        + '<div class="tstat">🙋'+r.present+' · 👏'+r.praise+'</div>'
-        + '<div class="tlast">'+last+'</div>'
+        + '<div class="tstat">'+stat+'</div>'
+        + '<div class="tlast">'+elapsedHtml(r)+'</div>'
         + '</div>';
     });
     h += '</div>';
     document.getElementById('grid').innerHTML = h;
   }
 
-  // ===== 설정 (사유 프리셋 + 등수 공개) =====
-  var SET = { presets: [], rankVisibility: 'show' };
+  // ===== 설정 (도장 종류 + 등수 공개) =====
+  var SET = { categories: [], rankVisibility: 'show' };
   function openSettings() {
     document.getElementById('setBg').classList.add('show');
     document.getElementById('setBox').innerHTML = '<div class="loading">불러오는 중…</div>';
     google.script.run.withSuccessHandler(function(res){
       if (!res || !res.success) { document.getElementById('setBox').innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
-      SET.presets = res.praisePresets || [];
+      SET.categories = (res.categories||[]).map(function(c){ return { name:c.name, emoji:c.emoji, type:c.type, presets:(c.presets||[]).slice() }; });
       SET.rankVisibility = res.rankVisibility || 'show';
       renderSettings();
     }).getDojangSettings();
   }
   function renderSettings() {
-    var h = '<span class="closebtn" onclick="closeSettings()">×</span>'
-      + '<h2>⚙ 도장 설정</h2>'
-      + '<div class="mcount">👏 칭찬 사유 프리셋 (도장-입력 화면 버튼)</div><div id="presetList">';
-    SET.presets.forEach(function(p, i){
-      h += '<div class="set-row"><input type="text" value="'+esc(p)+'" oninput="SET.presets['+i+']=this.value"><span class="set-del" onclick="delPreset('+i+')">×</span></div>';
+    var h = '<span class="closebtn" onclick="closeSettings()">×</span><h2>⚙ 도장 종류 설정</h2>'
+      + '<div class="mcount">학습지형=학습지·문제 선택 / 사유형=사유 버튼만</div><div id="catList">';
+    SET.categories.forEach(function(c, i){
+      h += '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;">'
+        + '<div class="set-row">'
+        + '<input type="text" value="'+esc(c.emoji)+'" oninput="SET.categories['+i+'].emoji=this.value" style="width:48px;text-align:center;">'
+        + '<input type="text" value="'+esc(c.name)+'" placeholder="항목 이름" oninput="SET.categories['+i+'].name=this.value">'
+        + '<select onchange="SET.categories['+i+'].type=this.value;renderSettings();" style="padding:8px;border:1px solid #cbd5e1;border-radius:8px;">'
+        + '<option value="reason"'+(c.type!=='sheet'?' selected':'')+'>사유형</option>'
+        + '<option value="sheet"'+(c.type==='sheet'?' selected':'')+'>학습지형</option></select>'
+        + '<span class="set-del" onclick="delCat('+i+')">×</span></div>';
+      if (c.type !== 'sheet') {
+        h += '<div style="font-size:11px;color:#94a3b8;margin:6px 0 4px;">사유 프리셋 (쉼표로 구분)</div>'
+          + '<input type="text" value="'+esc((c.presets||[]).join(', '))+'" oninput="SET.categories['+i+'].presets=this.value.split(\',\').map(function(x){return x.trim();}).filter(Boolean)" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">';
+      }
+      h += '</div>';
     });
-    h += '</div><div class="set-add" onclick="addPreset()">+ 사유 추가</div>';
+    h += '</div><div class="set-add" onclick="addCat()">+ 도장 종류 추가</div>';
     h += '<div class="mcount" style="margin-top:18px;">🏅 학생에게 등수 공개</div>'
       + '<div class="set-row"><label><input type="radio" name="rv" '+(SET.rankVisibility!=='teacher'?'checked':'')+' onclick="SET.rankVisibility=\'show\'"> 학생 앱에 본인 등수 표시</label></div>'
       + '<div class="set-row"><label><input type="radio" name="rv" '+(SET.rankVisibility==='teacher'?'checked':'')+' onclick="SET.rankVisibility=\'teacher\'"> 등수 숨김 (선생님만)</label></div>';
     h += '<div class="toolbar" style="margin-top:18px;"><div class="spacer"></div><button class="primary" onclick="saveSettings()">저장</button></div>';
     document.getElementById('setBox').innerHTML = h;
   }
-  function addPreset(){ SET.presets.push(''); renderSettings(); }
-  function delPreset(i){ SET.presets.splice(i,1); renderSettings(); }
+  function addCat(){ SET.categories.push({ name:'', emoji:'🏅', type:'reason', presets:[] }); renderSettings(); }
+  function delCat(i){ if(SET.categories.length<=1){alert('최소 1개는 있어야 해요');return;} SET.categories.splice(i,1); renderSettings(); }
   function saveSettings(){
     google.script.run.withSuccessHandler(function(res){
-      if (res && res.success) closeSettings();
-      else alert('저장 실패');
-    }).saveDojangSettings(SET.presets.filter(function(s){return s&&s.trim();}), SET.rankVisibility);
+      if (res && res.success) { closeSettings(); load(); }
+      else alert('저장 실패: ' + ((res&&res.message)||''));
+    }).saveDojangSettings(SET.categories, SET.rankVisibility);
   }
   function closeSettings(){ document.getElementById('setBg').classList.remove('show'); }
+
+  // ===== 학습지·문제 관리 =====
+  var WS = [];
+  function openWs() {
+    document.getElementById('wsBg').classList.add('show');
+    document.getElementById('wsBox').innerHTML = '<div class="loading">불러오는 중…</div>';
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) { document.getElementById('wsBox').innerHTML='<div class="empty">불러오기 실패</div>'; return; }
+      WS = res.worksheets.map(function(w){ return { name:w.name, orig:w.name, problems:(w.problems||[]).slice() }; });
+      renderWs();
+    }).getWorksheetsList();
+  }
+  function renderWs() {
+    var h = '<span class="closebtn" onclick="closeWs()">×</span><h2>📘 학습지·문제 관리</h2>'
+      + '<div class="mcount">학습지별로 발표 문제를 미리 등록해두면 입력 화면에 버튼으로 떠요.</div>';
+    WS.forEach(function(w, i){
+      h += '<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;margin-bottom:8px;">'
+        + '<div class="set-row"><input type="text" value="'+esc(w.name)+'" placeholder="학습지 이름" oninput="WS['+i+'].name=this.value">'
+        + '<button onclick="saveWs('+i+')" style="padding:7px 12px;border:none;background:#7c3aed;color:#fff;border-radius:7px;cursor:pointer;font-weight:700;">저장</button>'
+        + '<span class="set-del" onclick="delWs('+i+')">×</span></div>'
+        + '<div style="font-size:11px;color:#94a3b8;margin:6px 0 4px;">문제 (쉼표로 구분)</div>'
+        + '<input type="text" value="'+esc((w.problems||[]).join(', '))+'" oninput="WS['+i+'].problems=this.value.split(\',\').map(function(x){return x.trim();}).filter(Boolean)" style="width:100%;padding:8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;">'
+        + '</div>';
+    });
+    h += '<div class="set-add" onclick="addWs()">+ 학습지 추가</div>';
+    document.getElementById('wsBox').innerHTML = h;
+  }
+  function addWs(){ WS.push({ name:'', orig:'', problems:[] }); renderWs(); }
+  function saveWs(i){
+    var w = WS[i];
+    if (!w.name.trim()) { alert('학습지 이름을 입력하세요'); return; }
+    google.script.run.withSuccessHandler(function(res){
+      if (res && res.success) { w.orig = w.name; alert('저장됨'); }
+      else alert('저장 실패');
+    }).saveWorksheet(w.orig||w.name, w.name, w.problems);
+  }
+  function delWs(i){
+    var w = WS[i];
+    if (!confirm('학습지를 삭제할까요?')) return;
+    if (!w.orig) { WS.splice(i,1); renderWs(); return; }
+    google.script.run.withSuccessHandler(function(res){ WS.splice(i,1); renderWs(); }).deleteWorksheet(w.orig);
+  }
+  function closeWs(){ document.getElementById('wsBg').classList.remove('show'); }
 
   // ===== 기존 이월 입력 =====
   function openCarry() {

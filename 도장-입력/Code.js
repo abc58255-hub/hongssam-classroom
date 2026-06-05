@@ -50,6 +50,28 @@ function _getSetting_(ss, key, def) {
 }
 
 var DEFAULT_PRAISE = ['박수/격려','질문 답변','친구 도움','적극 참여','발표 경청'];
+var DEFAULT_CATS = [
+  { name: '발표', emoji: '🙋', type: 'sheet' },
+  { name: '칭찬', emoji: '👏', type: 'reason', presets: DEFAULT_PRAISE }
+];
+
+// 도장 종류(카테고리) 설정 — 구버전(praisePresets만 있던 때) 호환
+function _getCategories_(ss) {
+  var cats = _getSetting_(ss, 'categories', null);
+  if (!Array.isArray(cats) || !cats.length) {
+    // 구버전: 칭찬 프리셋만 있던 경우 반영
+    var pp = _getSetting_(ss, 'praisePresets', DEFAULT_PRAISE);
+    cats = [
+      { name: '발표', emoji: '🙋', type: 'sheet' },
+      { name: '칭찬', emoji: '👏', type: 'reason', presets: pp }
+    ];
+  }
+  return cats.map(function(c){
+    return { name: String(c.name||'').trim(), emoji: String(c.emoji||'🏅'),
+             type: (c.type==='sheet'?'sheet':'reason'),
+             presets: Array.isArray(c.presets)?c.presets:[] };
+  }).filter(function(c){ return c.name; });
+}
 
 // 반 목록
 function getClassList() {
@@ -71,11 +93,11 @@ function getInputData(cls) {
       var sid = String(roster[i][1] || '').trim();
       if (!sid) continue;
       if (cls && _clsOf_(sid) !== cls) continue;
-      students.push({ sid: sid, name: String(roster[i][2] || '').trim(), todayPresent: 0, todayPraise: 0 });
+      students.push({ sid: sid, name: String(roster[i][2] || '').trim(), today: {} });
     }
     students.sort(function(a,b){ return a.sid.localeCompare(b.sid); });
 
-    // 오늘 카운트
+    // 오늘 카운트 (카테고리별)
     var today = _todayStr_();
     var logSh = ss.getSheetByName('도장기록');
     var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
@@ -85,8 +107,8 @@ function getInputData(cls) {
       if (d !== today) continue;
       var s = idx[String(log[r][1] || '').trim()];
       if (!s) continue;
-      if (String(log[r][3]).trim() === '발표') s.todayPresent++;
-      else if (String(log[r][3]).trim() === '칭찬') s.todayPraise++;
+      var k = String(log[r][3]).trim();
+      s.today[k] = (s.today[k] || 0) + 1;
     }
 
     // 학습지 목록
@@ -101,11 +123,11 @@ function getInputData(cls) {
       });
     }
 
-    var praisePresets = _getSetting_(ss, 'praisePresets', DEFAULT_PRAISE);
+    var categories = _getCategories_(ss);
     var todayWs = _getTodayWorksheet_(ss, cls);
 
     return { success: true, students: students, worksheets: worksheets,
-             praisePresets: praisePresets, todayWorksheet: todayWs };
+             categories: categories, todayWorksheet: todayWs };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -167,44 +189,46 @@ function _getTodayWorksheet_(ss, cls) {
 }
 
 // 도장 기록
-// p: { sid, name, kind('발표'|'칭찬'), reason, sheet, problem, lessonNo }
+// p: { sid, name, kind(카테고리명), type('sheet'|'reason'), emoji, reason, sheet, problem, lessonNo }
 function recordStamp(p) {
   try {
     var ss = _ensureSheets_();
     var sid = String(p.sid||'').trim();
     if (!sid) return { success: false, message: '학번 없음' };
-    var kind = p.kind === '칭찬' ? '칭찬' : '발표';
+    var kind = String(p.kind||'').trim();
+    if (!kind) return { success: false, message: '종류 없음' };
+    var isSheet = (p.type === 'sheet');
     var reason = String(p.reason||'').trim();
-    var sheet = String(p.sheet||'').trim();
-    var problem = String(p.problem||'').trim();
-    var lessonNo = p.lessonNo || '';
-    if (kind === '발표' && !reason) reason = '발표';
+    var sheet = isSheet ? String(p.sheet||'').trim() : '';
+    var problem = isSheet ? String(p.problem||'').trim() : '';
+    var lessonNo = isSheet ? (p.lessonNo || '') : '';
+    if (isSheet && !reason) reason = kind;
 
     var logSh = ss.getSheetByName('도장기록');
     logSh.appendRow([new Date(), sid, String(p.name||'').trim(), kind, reason, lessonNo, sheet, problem]);
 
-    // 발표 학습지·문제는 다음에 버튼으로 쓰도록 도장_학습지에 자동 누적
-    if (kind === '발표' && sheet) { _upsertWorksheetProblem_(ss, sheet, problem); }
+    // 학습지형은 학습지·문제를 다음에 버튼으로 쓰도록 자동 누적
+    if (isSheet && sheet) { _upsertWorksheetProblem_(ss, sheet, problem); }
 
-    // 발표 시 학생 폰에 자동 푸시 (best-effort)
-    if (kind === '발표') {
-      try {
-        var info = [sheet, problem].filter(Boolean).join(' ');
-        _pushToStudent_(ss, sid, '🙋 발표 도장 +1', info ? (info + ' 발표!') : '발표 잘했어요!');
-      } catch(_) {}
-    }
+    // 학생 폰에 자동 푸시 (best-effort)
+    try {
+      var emoji = String(p.emoji||'🏅');
+      var info = isSheet ? [sheet, problem].filter(Boolean).join(' ') : reason;
+      _pushToStudent_(ss, sid, emoji + ' ' + kind + ' 도장 +1', info || (kind + ' 잘했어요!'));
+    } catch(_) {}
 
-    // 오늘 이 학생 카운트 다시 계산
+    // 오늘 이 학생 카운트 다시 계산 (카테고리별)
     var today = _todayStr_();
     var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
-    var tp = 0, tc = 0;
+    var todayMap = {};
     for (var r = 0; r < log.length; r++) {
       if (String(log[r][1]||'').trim() !== sid) continue;
       var d = log[r][0] ? Utilities.formatDate(new Date(log[r][0]),'Asia/Seoul','yyyy-MM-dd') : '';
       if (d !== today) continue;
-      if (String(log[r][3]).trim() === '발표') tp++; else if (String(log[r][3]).trim() === '칭찬') tc++;
+      var kk = String(log[r][3]).trim();
+      todayMap[kk] = (todayMap[kk]||0) + 1;
     }
-    return { success: true, todayPresent: tp, todayPraise: tc };
+    return { success: true, today: todayMap };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

@@ -62,13 +62,16 @@ function getClassList() {
   } catch(e) { return { success: false, message: e.toString(), classes: [] }; }
 }
 
-// 메인 집계
+// 메인 집계 (카테고리 동적)
 // filterClass: '' 또는 'all' = 전체, 그 외 '2학년 1반'
-// period: 'all' | '7' | '30' | 'semester'
-// semesterStart: 'yyyy-MM-dd' (period==semester 일 때)
+// period: 'all' | '7' | '30'
 function getDojangData(filterClass, period, semesterStart) {
   try {
     var ss = _ensureSheets_();
+    var cats = _getCategories_(ss);
+    var catNames = cats.map(function(c){ return c.name; });
+    var staleCat = (cats.filter(function(c){ return c.type === 'sheet'; })[0] || cats[0] || {name:''}).name;
+
     var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
     var logSh = ss.getSheetByName('도장기록');
     var carrySh = ss.getSheetByName('도장_이월');
@@ -77,118 +80,108 @@ function getDojangData(filterClass, period, semesterStart) {
 
     var now = new Date();
     var cutoff = null;
-    var includeCarry = (period === 'all' || !period); // 이월은 날짜가 없어 기간필터 시 제외
+    var includeCarry = (period === 'all' || !period);
     if (period === '7') cutoff = new Date(now.getTime() - 7*86400000);
     else if (period === '30') cutoff = new Date(now.getTime() - 30*86400000);
-    else if (period === 'semester' && semesterStart) {
-      var sp = new Date(semesterStart + 'T00:00:00+09:00');
-      if (!isNaN(sp.getTime())) cutoff = sp;
-    }
 
     var onlyClass = (filterClass && filterClass !== 'all') ? filterClass : null;
 
-    // 학생 인덱스 구축
-    var students = {}; // sid -> obj
-    var order = [];
+    var students = {}, order = [];
     for (var i = 1; i < roster.length; i++) {
       var sid = String(roster[i][1] || '').trim();
       if (!sid) continue;
       var cls = _clsOf_(sid);
       if (onlyClass && cls !== onlyClass) continue;
-      students[sid] = {
-        sid: sid, name: String(roster[i][2] || '').trim(), cls: cls,
-        praise: 0, present: 0,
-        lastPresent: null, lastPraise: null,
-        lastPresentInfo: '', recent: []
-      };
+      students[sid] = { sid: sid, name: String(roster[i][2] || '').trim(), cls: cls,
+                        counts: {}, last: {}, recent: [] };
       order.push(sid);
     }
 
-    // 이월 합산
+    // 이월 합산 (이월은 발표/칭찬 두 항목만 존재)
     if (includeCarry) {
       for (var c = 0; c < carry.length; c++) {
         var csid = String(carry[c][0] || '').trim();
         if (!csid || !students[csid]) continue;
-        students[csid].praise += Number(carry[c][2] || 0);
-        students[csid].present += Number(carry[c][3] || 0);
+        students[csid].counts['칭찬'] = (students[csid].counts['칭찬']||0) + Number(carry[c][2] || 0);
+        students[csid].counts['발표'] = (students[csid].counts['발표']||0) + Number(carry[c][3] || 0);
       }
     }
 
     // 도장기록 집계
     for (var r = 0; r < log.length; r++) {
-      var when = log[r][0];
       var lsid = String(log[r][1] || '').trim();
       if (!lsid || !students[lsid]) continue;
-      var dt = when ? new Date(when) : null;
+      var dt = log[r][0] ? new Date(log[r][0]) : null;
       if (cutoff && (!dt || dt < cutoff)) continue;
       var kind = String(log[r][3] || '').trim();
       var reason = String(log[r][4] || '');
       var sheetName = String(log[r][6] || '');
       var problem = String(log[r][7] || '');
       var st = students[lsid];
-      if (kind === '발표') {
-        st.present++;
-        if (dt && (!st.lastPresent || dt > st.lastPresent)) {
-          st.lastPresent = dt;
-          st.lastPresentInfo = [sheetName, problem].filter(Boolean).join(' · ') || reason;
-        }
-      } else if (kind === '칭찬') {
-        st.praise++;
-        if (dt && (!st.lastPraise || dt > st.lastPraise)) st.lastPraise = dt;
-      }
-      st.recent.push({
-        date: dt ? _fmtDate_(dt) : '', kind: kind, reason: reason,
-        sheet: sheetName, problem: problem, ts: dt ? dt.getTime() : 0
-      });
+      st.counts[kind] = (st.counts[kind]||0) + 1;
+      var info = [sheetName, problem].filter(Boolean).join(' · ') || reason;
+      if (dt && (!st.last[kind] || dt > st.last[kind].date)) st.last[kind] = { date: dt, info: info };
+      st.recent.push({ date: dt ? _fmtDate_(dt) : '', kind: kind, reason: reason,
+                       sheet: sheetName, problem: problem, ts: dt ? dt.getTime() : 0 });
     }
 
     // 행 구성
     var rows = order.map(function(sid){
       var s = students[sid];
-      var elapsed = s.lastPresent ? _daysBetween_(s.lastPresent, now) : null;
-      var stale = (s.present === 0) || (elapsed !== null && elapsed >= STALE_DAYS);
+      var lastMap = {};
+      catNames.forEach(function(cn){
+        if (s.last[cn]) lastMap[cn] = { date: _fmtDate_(s.last[cn].date), elapsed: _daysBetween_(s.last[cn].date, now), info: s.last[cn].info };
+      });
+      var scnt = s.counts[staleCat] || 0;
+      var sElapsed = (lastMap[staleCat] ? lastMap[staleCat].elapsed : null);
+      var stale = staleCat ? ((scnt === 0) || (sElapsed !== null && sElapsed >= STALE_DAYS)) : false;
+      var total = 0; catNames.forEach(function(cn){ total += (s.counts[cn]||0); });
       s.recent.sort(function(a,b){ return b.ts - a.ts; });
-      return {
-        sid: s.sid, name: s.name, cls: s.cls,
-        praise: s.praise, present: s.present, total: s.praise + s.present,
-        lastPresent: s.lastPresent ? _fmtDate_(s.lastPresent) : '',
-        lastPresentElapsed: elapsed,
-        lastPresentInfo: s.lastPresentInfo,
-        lastPraise: s.lastPraise ? _fmtDate_(s.lastPraise) : '',
-        stale: stale,
-        recent: s.recent.slice(0, 8)
-      };
+      return { sid: s.sid, name: s.name, cls: s.cls, counts: s.counts, last: lastMap,
+               total: total, stale: stale, recent: s.recent.slice(0, 8),
+               rankAll: {}, rankClass: {} };
     });
 
-    // 전체 등수 (발표수 desc, 동점 동순위)
-    var byPresentAll = rows.slice().sort(function(a,b){ return b.present - a.present; });
-    _assignRank_(byPresentAll, 'present', 'rankAll');
-    // 반 등수
-    var byClass = {};
-    rows.forEach(function(r){ (byClass[r.cls] = byClass[r.cls] || []).push(r); });
-    Object.keys(byClass).forEach(function(k){
-      var arr = byClass[k].slice().sort(function(a,b){ return b.present - a.present; });
-      _assignRank_(arr, 'present', 'rankClass');
+    // 항목별 등수 (전체 + 반)
+    catNames.forEach(function(cn){
+      var all = rows.slice().sort(function(a,b){ return (b.counts[cn]||0) - (a.counts[cn]||0); });
+      _assignRankByCount_(all, cn, 'rankAll');
+      var byClass = {};
+      rows.forEach(function(r){ (byClass[r.cls] = byClass[r.cls] || []).push(r); });
+      Object.keys(byClass).forEach(function(k){
+        var arr = byClass[k].slice().sort(function(a,b){ return (b.counts[cn]||0) - (a.counts[cn]||0); });
+        _assignRankByCount_(arr, cn, 'rankClass');
+      });
     });
 
-    // 기본 정렬: 발표수 desc, 그다음 칭찬수 desc, 이름
+    // 기본 정렬: 소외 항목(발표) 많은 순, 그다음 총합
     rows.sort(function(a,b){
-      if (b.present !== a.present) return b.present - a.present;
-      if (b.praise !== a.praise) return b.praise - a.praise;
+      var av = a.counts[staleCat]||0, bv = b.counts[staleCat]||0;
+      if (bv !== av) return bv - av;
+      if (b.total !== a.total) return b.total - a.total;
       return a.name.localeCompare(b.name, 'ko');
     });
 
-    // 요약
-    var summary = {
-      students: rows.length,
-      totalPresent: rows.reduce(function(s,r){ return s + r.present; }, 0),
-      totalPraise: rows.reduce(function(s,r){ return s + r.praise; }, 0),
-      staleCount: rows.filter(function(r){ return r.stale; }).length
-    };
+    var summary = { students: rows.length, perCat: {},
+                    staleCount: rows.filter(function(r){ return r.stale; }).length };
+    catNames.forEach(function(cn){
+      summary.perCat[cn] = rows.reduce(function(s,r){ return s + (r.counts[cn]||0); }, 0);
+    });
 
-    return { success: true, rows: rows, summary: summary, staleDays: STALE_DAYS };
+    return { success: true, rows: rows, summary: summary, staleDays: STALE_DAYS,
+             categories: cats, staleCat: staleCat };
   } catch(e) {
     return { success: false, message: e.toString() };
+  }
+}
+
+function _assignRankByCount_(sortedArr, catName, rankField) {
+  var rank = 0, prev = null, count = 0;
+  for (var i = 0; i < sortedArr.length; i++) {
+    count++;
+    var v = sortedArr[i].counts[catName] || 0;
+    if (prev === null || v !== prev) { rank = count; prev = v; }
+    sortedArr[i][rankField][catName] = rank;
   }
 }
 
@@ -203,6 +196,22 @@ function _assignRank_(sortedArr, key, rankField) {
 }
 
 var DEFAULT_PRAISE = ['박수/격려','질문 답변','친구 도움','적극 참여','발표 경청'];
+
+function _getCategories_(ss) {
+  var cats = _getSettingRaw_(ss, 'categories', null);
+  if (!Array.isArray(cats) || !cats.length) {
+    var pp = _getSettingRaw_(ss, 'praisePresets', DEFAULT_PRAISE);
+    cats = [
+      { name: '발표', emoji: '🙋', type: 'sheet' },
+      { name: '칭찬', emoji: '👏', type: 'reason', presets: pp }
+    ];
+  }
+  return cats.map(function(c){
+    return { name: String(c.name||'').trim(), emoji: String(c.emoji||'🏅'),
+             type: (c.type==='sheet'?'sheet':'reason'),
+             presets: Array.isArray(c.presets)?c.presets:[] };
+  }).filter(function(c){ return c.name; });
+}
 
 function _getSettingRaw_(ss, key, def) {
   var sh = ss.getSheetByName('도장_설정');
@@ -230,17 +239,70 @@ function getDojangSettings() {
   try {
     var ss = _ensureSheets_();
     return { success: true,
-      praisePresets: _getSettingRaw_(ss, 'praisePresets', DEFAULT_PRAISE),
+      categories: _getCategories_(ss),
       rankVisibility: _getSettingRaw_(ss, 'rankVisibility', 'show') };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
-function saveDojangSettings(praisePresets, rankVisibility) {
+function saveDojangSettings(categories, rankVisibility) {
   try {
     var ss = _ensureSheets_();
-    var arr = (praisePresets || []).map(function(s){ return String(s).trim(); }).filter(Boolean);
-    _setSetting_(ss, 'praisePresets', arr);
+    var clean = (categories || []).map(function(c){
+      return { name: String(c.name||'').trim(), emoji: String(c.emoji||'🏅').trim() || '🏅',
+               type: (c.type==='sheet'?'sheet':'reason'),
+               presets: (Array.isArray(c.presets)?c.presets:[]).map(function(p){return String(p).trim();}).filter(Boolean) };
+    }).filter(function(c){ return c.name; });
+    if (!clean.length) return { success: false, message: '최소 1개 항목이 필요해요.' };
+    _setSetting_(ss, 'categories', clean);
     _setSetting_(ss, 'rankVisibility', rankVisibility === 'teacher' ? 'teacher' : 'show');
     return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// ===== 학습지·문제 관리 =====
+function getWorksheetsList() {
+  try {
+    var ss = _ensureSheets_();
+    var sh = ss.getSheetByName('도장_학습지');
+    var list = [];
+    if (sh.getLastRow() > 1) {
+      var wd = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
+      wd.forEach(function(w){
+        var nm = String(w[0]||'').trim(); if (!nm) return;
+        var probs = []; try { probs = JSON.parse(w[1]||'[]'); } catch(_) {}
+        list.push({ name: nm, problems: Array.isArray(probs)?probs:[] });
+      });
+    }
+    return { success: true, worksheets: list };
+  } catch(e) { return { success: false, message: e.toString(), worksheets: [] }; }
+}
+function saveWorksheet(origName, name, problems) {
+  try {
+    var ss = _ensureSheets_();
+    var sh = ss.getSheetByName('도장_학습지');
+    name = String(name||'').trim();
+    if (!name) return { success: false, message: '이름 필요' };
+    var probs = (Array.isArray(problems)?problems:[]).map(function(p){return String(p).trim();}).filter(Boolean);
+    var rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues() : [];
+    var key = String(origName||name).trim();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === key) {
+        sh.getRange(i+2, 1, 1, 2).setValues([[name, JSON.stringify(probs)]]);
+        return { success: true };
+      }
+    }
+    sh.appendRow([name, JSON.stringify(probs)]);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+function deleteWorksheet(name) {
+  try {
+    var ss = _ensureSheets_();
+    var sh = ss.getSheetByName('도장_학습지');
+    var rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues() : [];
+    for (var i = rows.length-1; i >= 0; i--) {
+      if (String(rows[i][0]).trim() === String(name).trim()) { sh.deleteRow(i+2); return { success: true }; }
+    }
+    return { success: false, message: '없음' };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

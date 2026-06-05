@@ -157,15 +157,21 @@
     }
   }
 
+  function catByName(name){ return (DATA.categories||[]).filter(function(c){return c.name===name;})[0]; }
+  function badgesHtml(today){
+    if (!today) return '';
+    return (DATA.categories||[]).map(function(c){
+      var n = today[c.name]||0;
+      return n ? '<span class="bdg" style="background:#f1f5f9;color:#334155;">'+c.emoji+n+'</span>' : '';
+    }).join('');
+  }
+
   function renderGrid() {
     if (!DATA.students.length) { document.getElementById('grid').innerHTML = '<div class="empty">학생이 없어요.</div>'; return; }
     var h = '<div class="grid">';
     DATA.students.forEach(function(s, i){
       h += '<div class="name-btn" onclick="openInput('+i+')">'+esc(s.name)
-        + '<div class="badges">'
-        + (s.todayPresent?'<span class="bdg p">🙋'+s.todayPresent+'</span>':'')
-        + (s.todayPraise?'<span class="bdg c">👏'+s.todayPraise+'</span>':'')
-        + '</div></div>';
+        + '<div class="badges">' + badgesHtml(s.today) + '</div></div>';
     });
     h += '</div>';
     document.getElementById('grid').innerHTML = h;
@@ -173,7 +179,7 @@
 
   function openInput(i) {
     var s = DATA.students[i];
-    SEL = { idx: i, sid: s.sid, name: s.name, kind: null,
+    SEL = { idx: i, sid: s.sid, name: s.name, kind: null, type: null, emoji: '',
             sheet: (DATA.todayWorksheet&&DATA.todayWorksheet.sheet)||'', problem: '', reason: '', lessonNo: (DATA.todayWorksheet&&DATA.todayWorksheet.lessonNo)||'' };
     renderModal();
     document.getElementById('modalBg').classList.add('show');
@@ -183,20 +189,20 @@
   function renderModal() {
     var s = SEL;
     var h = '<h2>'+esc(s.name)+'</h2><div class="sid">'+esc(s.sid)+'</div>';
-    h += '<div class="kind-row">'
-      + '<div class="kind-btn present '+(s.kind==='발표'?'sel':'')+'" onclick="pickKind(\'발표\')">🙋 발표</div>'
-      + '<div class="kind-btn praise '+(s.kind==='칭찬'?'sel':'')+'" onclick="pickKind(\'칭찬\')">👏 칭찬</div>'
+    h += '<div class="kind-row" style="flex-wrap:wrap;">'
+      + (DATA.categories||[]).map(function(c){
+          return '<div class="kind-btn '+(c.type==='sheet'?'present':'praise')+' '+(s.kind===c.name?'sel':'')+'" '
+            + 'style="min-width:90px;flex:1 1 90px;" onclick="pickKind(\''+esc(c.name).replace(/'/g,"\\'")+'\')">'+c.emoji+' '+esc(c.name)+'</div>';
+        }).join('')
       + '</div>';
 
-    if (s.kind === '발표') {
-      // 학습지 선택
+    if (s.type === 'sheet') {
       var opts = '<option value="">— 학습지 선택 —</option>';
       var found = false;
       DATA.worksheets.forEach(function(w){
         var seld = (w.name===s.sheet); if (seld) found = true;
         opts += '<option value="'+esc(w.name)+'"'+(seld?' selected':'')+'>'+esc(w.name)+'</option>';
       });
-      // 추천 학습지가 목록에 없으면 임시 옵션 추가
       if (s.sheet && !found) opts = '<option value="'+esc(s.sheet)+'" selected>'+esc(s.sheet)+' (오늘)</option>' + opts;
       opts += '<option value="__custom__">+ 직접 입력</option>';
       h += '<div class="section"><div class="lbl">📘 학습지</div>'
@@ -204,9 +210,11 @@
         + '<input class="txt" id="wsCustom" placeholder="학습지 이름 직접 입력" style="display:none;" oninput="SEL.sheet=this.value;renderProblems();">'
         + '</div>';
       h += '<div class="section" id="probSec"><div class="lbl">✏️ 문제</div><div class="chips" id="probChips"></div></div>';
-    } else if (s.kind === '칭찬') {
-      h += '<div class="section"><div class="lbl">👏 사유</div><div class="chips" id="praiseChips">'
-        + DATA.praisePresets.map(function(p){ return '<div class="opt '+(s.reason===p?'sel':'')+'" onclick="pickPraise(\''+esc(p).replace(/'/g,"\\'")+'\')">'+esc(p)+'</div>'; }).join('')
+    } else if (s.type === 'reason') {
+      var cat = catByName(s.kind);
+      var presets = (cat && cat.presets) ? cat.presets : [];
+      h += '<div class="section"><div class="lbl">'+(cat?cat.emoji:'')+' 사유</div><div class="chips" id="praiseChips">'
+        + presets.map(function(p){ return '<div class="opt '+(s.reason===p?'sel':'')+'" onclick="pickPraise(\''+esc(p).replace(/'/g,"\\'")+'\')">'+esc(p)+'</div>'; }).join('')
         + '<div class="opt ghost" onclick="pickPraiseCustom()">+ 직접</div>'
         + '</div>'
         + '<input class="txt" id="praiseCustom" placeholder="사유 직접 입력" style="display:none;" oninput="SEL.reason=this.value;updateSave();">'
@@ -218,11 +226,17 @@
       + '<button class="save" id="saveBtn" onclick="doSave()" disabled>기록</button>'
       + '</div>';
     document.getElementById('modalBox').innerHTML = h;
-    if (s.kind === '발표') renderProblems();
+    if (s.type === 'sheet') renderProblems();
     updateSave();
   }
 
-  function pickKind(k){ SEL.kind = k; if(k==='발표'){SEL.reason='';} else {SEL.problem='';SEL.sheet='';} renderModal(); }
+  function pickKind(k){
+    var cat = catByName(k);
+    SEL.kind = k; SEL.type = cat ? cat.type : 'reason'; SEL.emoji = cat ? cat.emoji : '🏅';
+    if (SEL.type === 'sheet') { SEL.reason=''; }
+    else { SEL.problem=''; SEL.sheet=''; SEL.reason=''; }
+    renderModal();
+  }
 
   function pickWs() {
     var v = document.getElementById('wsSel').value;
@@ -263,28 +277,27 @@
 
   function updateSave() {
     var ok = false;
-    if (SEL && SEL.kind === '발표') ok = !!(SEL.sheet && (SEL.problem)); // 문제는 '__none__' 포함 값 있으면 OK
-    else if (SEL && SEL.kind === '칭찬') ok = !!(SEL.reason && SEL.reason.trim());
+    if (SEL && SEL.type === 'sheet') ok = !!(SEL.sheet && SEL.problem);
+    else if (SEL && SEL.type === 'reason') ok = !!(SEL.reason && SEL.reason.trim());
     var b = document.getElementById('saveBtn'); if (b) b.disabled = !ok;
   }
 
   function doSave() {
     if (!SEL) return;
     var b = document.getElementById('saveBtn'); b.disabled = true; b.textContent = '저장중…';
-    var payload = { sid: SEL.sid, name: SEL.name, kind: SEL.kind };
-    if (SEL.kind === '발표') {
+    var payload = { sid: SEL.sid, name: SEL.name, kind: SEL.kind, type: SEL.type, emoji: SEL.emoji };
+    if (SEL.type === 'sheet') {
       payload.sheet = SEL.sheet;
       payload.problem = (SEL.problem==='__none__') ? '' : SEL.problem;
       payload.lessonNo = SEL.lessonNo || '';
-      payload.reason = '발표';
+      payload.reason = SEL.kind;
     } else {
       payload.reason = SEL.reason;
     }
     var savedIdx = SEL.idx, kind = SEL.kind, name = SEL.name;
     google.script.run.withSuccessHandler(function(res){
       if (res && res.success) {
-        DATA.students[savedIdx].todayPresent = res.todayPresent;
-        DATA.students[savedIdx].todayPraise = res.todayPraise;
+        DATA.students[savedIdx].today = res.today || {};
         renderGrid();
         toast('✅ '+name+' '+kind+' 기록!');
         closeModal();
@@ -306,9 +319,10 @@
       } else {
         res.items.forEach(function(it){
           var info = [it.sheet, it.problem].filter(Boolean).join(' · ') || it.reason;
+          var cat = catByName(it.kind);
           h += '<div class="rec-item">'
-            + '<div class="rk '+it.kind+'">'+(it.kind==='발표'?'🙋':'👏')+'</div>'
-            + '<div class="rd"><b>'+esc(it.name)+'</b> '+esc(info)+'<br><small>'+it.time+'</small></div>'
+            + '<div class="rk '+it.kind+'">'+(cat?cat.emoji:'🏅')+'</div>'
+            + '<div class="rd"><b>'+esc(it.name)+'</b> <small style="color:#7c3aed;">'+esc(it.kind)+'</small> '+esc(info)+'<br><small>'+it.time+'</small></div>'
             + '<div class="rx" onclick="delRec('+it.ts+',\''+esc(it.sid)+'\',this)">✕</div>'
             + '</div>';
         });
