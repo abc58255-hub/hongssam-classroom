@@ -69,21 +69,15 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
     var accessToken = getFCMAccessToken_();
     // iOS는 notification 필드가 있어야 표시됨 (data-only는 iOS 미표시).
     // webpush.notification 하나만 + 고정 tag로 중복을 1개로 합침 (iOS는 같은 tag면 교체).
+    // ⚠️ data-only (notification 필드 절대 금지). iOS는 notification 필드가 있으면
+    // 자체표시 + 서비스워커표시 = 2번 (tag로도 안 합쳐짐). data만 보내고 SW가 1번만 표시.
     var link = clickUrl || _getSys(SpreadsheetApp.openById(SHEET_ID), '바로가기_수학교실') || '';
     var ntag = tag || 'default';
     var message = {
       message: {
         token: token,
-        // data에 제목/내용/tag 포함 (서비스워커가 같은 tag로 표시 → iOS 자체표시와 합쳐짐)
         data: { title: String(title || ''), body: String(body || ''), url: link, tag: ntag },
         webpush: {
-          notification: {
-            title: String(title || ''),
-            body: String(body || ''),
-            tag: ntag,
-            renotify: false,
-            icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png'
-          },
           fcm_options: { link: link }
         }
       }
