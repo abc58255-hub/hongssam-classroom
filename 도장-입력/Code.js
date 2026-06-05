@@ -214,13 +214,18 @@ function recordStamp(p) {
 
     var logSh = ss.getSheetByName('도장기록');
     var name = String(p.name||'').trim();
-    if (count === 1) {
-      logSh.appendRow([new Date(), sid, name, kind, reason, lessonNo, sheet, problem]);
-    } else {
-      var rows = [];
-      for (var i = 0; i < count; i++) rows.push([new Date(), sid, name, kind, reason, lessonNo, sheet, problem]);
-      logSh.getRange(logSh.getLastRow()+1, 1, count, 8).setValues(rows);
-    }
+    // 동시 입력(여러 태블릿) 시 행 덮어쓰기 방지
+    var lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(10000);
+      if (count === 1) {
+        logSh.appendRow([new Date(), sid, name, kind, reason, lessonNo, sheet, problem]);
+      } else {
+        var rows = [];
+        for (var i = 0; i < count; i++) rows.push([new Date(), sid, name, kind, reason, lessonNo, sheet, problem]);
+        logSh.getRange(logSh.getLastRow()+1, 1, count, 8).setValues(rows);
+      }
+    } finally { try { lock.releaseLock(); } catch(_) {} }
 
     // 학습지형은 학습지·문제를 다음에 버튼으로 쓰도록 자동 누적
     if (isSheet && sheet) { _upsertWorksheetProblem_(ss, sheet, problem); }
@@ -251,7 +256,11 @@ function recordStampBatch(p) {
       return [now, String(sid).trim(), String(names[i]||'').trim(), kind, reason, '', '', ''];
     });
     var logSh = ss.getSheetByName('도장기록');
-    logSh.getRange(logSh.getLastRow()+1, 1, rows.length, 8).setValues(rows);
+    var lock = LockService.getScriptLock();
+    try {
+      lock.waitLock(10000);
+      logSh.getRange(logSh.getLastRow()+1, 1, rows.length, 8).setValues(rows);
+    } finally { try { lock.releaseLock(); } catch(_) {} }
     return { success: true, count: rows.length, kind: kind };
   } catch(e) { return { success: false, message: e.toString() }; }
 }

@@ -9,16 +9,29 @@
   body { font-family: -apple-system, BlinkMacSystemFont, 'Apple SD Gothic Neo', 'Pretendard', 'Malgun Gothic', sans-serif;
          background: #f2f4f6; color: #191f28; padding: 18px; letter-spacing: -0.01em; }
   .wrap { max-width: 1200px; margin: 0 auto; }
-  h1 { font-size: 22px; font-weight: 800; color: #191f28; display: flex; align-items: baseline; gap: 8px; }
-  h1 .sub { font-size: 12px; color: #b0b8c1; font-weight: 500; }
 
-  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0; }
-  select, button { font-size: 14px; padding: 11px 14px; border: none; border-radius: 12px;
-                   background: #fff; color: #4e5968; cursor: pointer; outline: none; font-weight: 600;
-                   box-shadow: 0 1px 4px rgba(0,0,0,.04); }
+  .appbar { background: #fff; border-radius: 20px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.04); margin-bottom: 14px; }
+  .appbar-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  h1 { font-size: 21px; font-weight: 800; color: #191f28; display: flex; align-items: center; gap: 8px; }
+  h1 .logo { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px;
+             background: #eef2ff; border-radius: 11px; font-size: 19px; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  select, button { font-size: 14px; padding: 10px 14px; border: none; border-radius: 11px;
+                   background: #f2f4f6; color: #4e5968; cursor: pointer; outline: none; font-weight: 600; }
+  select { background: #f2f4f6; }
   button.primary { background: #4f46e5; color: #fff; }
   button.toggle.on { background: #ffeced; color: #f04452; }
+  button.ghostbtn { background: #f2f4f6; color: #4e5968; }
+  button.iconbtn { background: #f2f4f6; color: #4e5968; font-size: 16px; padding: 10px 13px; }
   .spacer { flex: 1; }
+
+  .menu-wrap { position: relative; }
+  .menu { display: none; position: absolute; right: 0; top: calc(100% + 6px); background: #fff;
+          border-radius: 14px; box-shadow: 0 8px 28px rgba(0,0,0,.14); padding: 6px; z-index: 30; min-width: 200px; }
+  .menu.show { display: block; }
+  .menu > div { padding: 12px 14px; border-radius: 10px; font-size: 14px; font-weight: 600; color: #333d4b; cursor: pointer; white-space: nowrap; }
+  .menu > div:hover { background: #f2f4f6; }
 
   .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
   .chip { background: #fff; border-radius: 14px; padding: 12px 16px;
@@ -75,23 +88,31 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>🏅 도장 데이터 <span class="sub">교사 전용</span></h1>
-
-  <div class="toolbar">
-    <select id="classSel" onchange="load()"><option value="all">전체 반</option></select>
-    <select id="periodSel" onchange="load()">
-      <option value="all">전체 기간</option>
-      <option value="30">최근 30일</option>
-      <option value="7">최근 7일</option>
-    </select>
-    <select id="sortSel" onchange="changeSort()"></select>
-    <button id="staleBtn" class="toggle" onclick="toggleStale()">⚠ 소외만</button>
-    <button id="viewBtn" onclick="toggleView()">▦ 그리드 보기</button>
-    <div class="spacer"></div>
-    <button onclick="openWs()">📘 학습지 관리</button>
-    <button onclick="openSettings()">⚙ 설정</button>
-    <button onclick="openCarry()">📥 기존 이월 입력</button>
-    <button class="primary" onclick="load()">↻ 새로고침</button>
+  <div class="appbar">
+    <div class="appbar-top">
+      <h1><span class="logo">🏅</span> 도장 데이터</h1>
+      <div class="menu-wrap">
+        <button class="ghostbtn" onclick="toggleManage(event)">⚙ 관리 ▾</button>
+        <div id="manageMenu" class="menu">
+          <div onclick="openWs();closeManage()">📘 학습지·문제 관리</div>
+          <div onclick="openSettings();closeManage()">🏷️ 도장 종류 설정</div>
+          <div onclick="openCarry();closeManage()">📥 기존 이월 입력</div>
+        </div>
+      </div>
+    </div>
+    <div class="toolbar">
+      <select id="classSel" onchange="load()"><option value="all">전체 반</option></select>
+      <select id="periodSel" onchange="load()">
+        <option value="all">전체 기간</option>
+        <option value="30">최근 30일</option>
+        <option value="7">최근 7일</option>
+      </select>
+      <select id="sortSel" onchange="changeSort()"></select>
+      <button id="staleBtn" class="toggle" onclick="toggleStale()">⚠ 소외만</button>
+      <button id="viewBtn" onclick="toggleView()">▦ 그리드</button>
+      <div class="spacer"></div>
+      <button class="iconbtn" onclick="load()" title="새로고침">↻</button>
+    </div>
   </div>
 
   <div class="chips" id="chips"></div>
@@ -127,6 +148,10 @@
     (STATE.categories||[]).forEach(function(c){ opts.push(['cat:'+c.name, c.emoji+' '+c.name+' 많은순']); });
     sel.innerHTML = opts.map(function(o){ return '<option value="'+o[0]+'"'+(o[0]===cur?' selected':'')+'>'+o[1]+'</option>'; }).join('');
   }
+  function toggleManage(e) { if(e) e.stopPropagation(); document.getElementById('manageMenu').classList.toggle('show'); }
+  function closeManage() { document.getElementById('manageMenu').classList.remove('show'); }
+  document.addEventListener('click', function(e){ if(!e.target.closest('.menu-wrap')) closeManage(); });
+
   function changeSort() { STATE.sort = document.getElementById('sortSel').value; render(); }
   function applySort(rows) {
     var s = STATE.sort, r = rows.slice();
