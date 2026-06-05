@@ -190,10 +190,23 @@
     </div>
 
     <div id="tab2" class="tab-content">
-      <h3 style="font-size:15px; color:#be123c; margin-top:0;">🚨 해결해야 할 과제</h3>
-      <div id="missingList" style="margin-bottom: 25px;"></div>
-      <h3 style="font-size:15px; color:#1e3a8a; border-top: 2px dashed #e5e7eb; padding-top: 20px;">✅ 내가 제출한 기록</h3>
-      <div id="historyList"></div>
+      <!-- 요약 테이블 (기본 화면) -->
+      <div id="taskSummaryView">
+        <div id="taskSummaryStat" style="margin-bottom:14px;"></div>
+        <div id="taskSummaryTable"></div>
+      </div>
+
+      <!-- 상세 보기 (확인해보기 클릭 시) -->
+      <div id="taskDetailView" style="display:none;">
+        <button onclick="backToTaskSummary()" style="background:#f1f5f9;color:#475569;border:none;padding:9px 16px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:14px;">← 목록으로 돌아가기</button>
+        <div id="taskDetailContent"></div>
+      </div>
+
+      <!-- 카드 데이터 소스 (숨김) -->
+      <div style="display:none;">
+        <div id="missingList"></div>
+        <div id="historyList"></div>
+      </div>
     </div>
 
     <div id="tab3" class="tab-content">
@@ -459,6 +472,113 @@
     var activeTab = document.getElementById('tab' + t);
     if (activeBtn) activeBtn.classList.add('active');
     if (activeTab) activeTab.classList.add('active');
+    if (t === 2) backToTaskSummary(); // 제출현황 탭은 항상 요약부터
+  }
+
+  // 내 과제 현황 요약 테이블
+  function gLatestHistoryByTask() {
+    // 과제명 → 최종 제출 항목 (이전기록채점완료 제외, rowIdx 큰 것 우선)
+    var map = {};
+    (gDashData && gDashData.history || []).forEach(function(item) {
+      if (item.status === '이전기록채점완료') return;
+      var key = item.baseName;
+      if (!map[key] || item.rowIdx > map[key].rowIdx) map[key] = item;
+    });
+    return map;
+  }
+
+  function _statusInfo(item) {
+    if (!item) return { label: '미제출', color: '#ef4444', bg: '#fee2e2', icon: '❌' };
+    var s = item.status;
+    if (s === '재제출요청') return { label: '재제출', color: '#c2410c', bg: '#ffedd5', icon: '🔄' };
+    if (s === '반려검토')  return { label: '재검토', color: '#c2410c', bg: '#ffedd5', icon: '🔄' };
+    if (s === '채점완료')  return { label: '완료', color: '#15803d', bg: '#dcfce7', icon: '✅' };
+    return { label: '채점중', color: '#a16207', bg: '#fef9c3', icon: '⏳' }; // '' 또는 채점중
+  }
+
+  function renderTaskSummary(data) {
+    var tableDiv = document.getElementById('taskSummaryTable');
+    var statDiv  = document.getElementById('taskSummaryStat');
+    if (!tableDiv) return;
+
+    var latestMap = gLatestHistoryByTask();
+    // 전체 과제 = taskOrder(부여순) + 혹시 빠진 history/missing 과제 보강
+    var allTasks = (data.taskOrder || []).slice();
+    (data.missingTasks || []).forEach(function(t){ if (allTasks.indexOf(t.name) < 0) allTasks.push(t.name); });
+    Object.keys(latestMap).forEach(function(t){ if (allTasks.indexOf(t) < 0) allTasks.push(t); });
+    // 최근 부여순 (taskOrder 뒤쪽 = 최신 → 위로)
+    allTasks.sort(function(a, b){
+      var ia = data.taskOrder ? data.taskOrder.indexOf(a) : -1;
+      var ib = data.taskOrder ? data.taskOrder.indexOf(b) : -1;
+      if (ia < 0) ia = 9999; if (ib < 0) ib = 9999;
+      return ib - ia;
+    });
+
+    if (allTasks.length === 0) {
+      tableDiv.innerHTML = '<div style="text-align:center;color:#9ca3af;padding:30px;font-size:14px;">아직 받은 과제가 없어요.</div>';
+      statDiv.innerHTML = '';
+      return;
+    }
+
+    // 통계
+    var submitted = 0, scoredVals = [];
+    allTasks.forEach(function(t){
+      var item = latestMap[t];
+      if (item && item.status !== '재제출요청' && item.status !== '반려검토') submitted++;
+      if (item && item.status === '채점완료' && item.score && !isNaN(parseFloat(item.score))) scoredVals.push(parseFloat(item.score));
+    });
+    var avgTxt = scoredVals.length > 0 ? ' · 평균 ' + Math.round(scoredVals.reduce(function(a,b){return a+b;},0)/scoredVals.length*10)/10 + '점' : '';
+    statDiv.innerHTML = '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:700;color:#1e3a8a;">'
+      + '📊 제출 ' + submitted + '/' + allTasks.length + '개' + avgTxt + '</div>';
+
+    // 테이블
+    var rows = allTasks.map(function(t) {
+      var item = latestMap[t];
+      var si = _statusInfo(item);
+      var scoreCell = '-';
+      if (item && item.status === '채점완료') {
+        scoreCell = item.score ? '<b style="color:#0284c7;">' + item.score + '</b>' : '<span style="color:#94a3b8;font-size:11px;">비공개</span>';
+      }
+      var actionCell;
+      if (item) {
+        actionCell = '<button onclick="showTaskDetail(' + item.rowIdx + ')" style="background:#e0e7ff;color:#4338ca;border:none;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">확인</button>';
+      } else {
+        actionCell = '<button onclick="goToSubmit(\'' + String(t).replace(/'/g, "\\'") + '\')" style="background:#fee2e2;color:#dc2626;border:none;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">제출하기</button>';
+      }
+      return '<tr style="border-bottom:1px solid #f1f5f9;">'
+        + '<td style="padding:10px 8px;font-size:13px;font-weight:600;color:#0f172a;word-break:keep-all;">' + t + (item && item.isMyBest ? ' 🌟' : '') + '</td>'
+        + '<td style="padding:10px 6px;text-align:center;"><span style="background:' + si.bg + ';color:' + si.color + ';font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;">' + si.icon + ' ' + si.label + '</span></td>'
+        + '<td style="padding:10px 6px;text-align:center;font-size:13px;">' + scoreCell + '</td>'
+        + '<td style="padding:10px 6px;text-align:right;">' + actionCell + '</td>'
+        + '</tr>';
+    }).join('');
+
+    tableDiv.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">'
+      + '<table style="width:100%;border-collapse:collapse;">'
+        + '<thead><tr style="background:#f8fafc;">'
+          + '<th style="padding:10px 8px;text-align:left;font-size:11px;color:#64748b;font-weight:700;">과제</th>'
+          + '<th style="padding:10px 6px;text-align:center;font-size:11px;color:#64748b;font-weight:700;">상태</th>'
+          + '<th style="padding:10px 6px;text-align:center;font-size:11px;color:#64748b;font-weight:700;">점수</th>'
+          + '<th style="padding:10px 6px;text-align:right;font-size:11px;color:#64748b;font-weight:700;"></th>'
+        + '</tr></thead><tbody>' + rows + '</tbody>'
+      + '</table></div>';
+  }
+
+  function showTaskDetail(rowIdx) {
+    var card = document.getElementById('histCard_' + rowIdx);
+    var detailContent = document.getElementById('taskDetailContent');
+    if (!card || !detailContent) return;
+    detailContent.innerHTML = card.outerHTML; // 카드 복제 표시
+    document.getElementById('taskSummaryView').style.display = 'none';
+    document.getElementById('taskDetailView').style.display = 'block';
+    window.scrollTo(0, 0);
+  }
+
+  function backToTaskSummary() {
+    var sv = document.getElementById('taskSummaryView');
+    var dv = document.getElementById('taskDetailView');
+    if (sv) sv.style.display = 'block';
+    if (dv) dv.style.display = 'none';
   }
 
   function clearLoginInfo() {
@@ -528,7 +648,9 @@
     return html;
   }
 
+  var gDashData = null;
   function renderDashboard(data) {
+    gDashData = data;
     if (data.fcmRegisterUrl) FCM_REGISTER_URL = data.fcmRegisterUrl;
     if (data.mathAppUrl) FCM_MATH_APP_URL = data.mathAppUrl;
     gMissingTasks = data.missingTasks;
@@ -815,13 +937,15 @@
             + '</div>';
         }
 
-        hHtml += '<div class="' + cardClass + '">' + bestBadge +
+        hHtml += '<div class="' + cardClass + '" id="histCard_' + item.rowIdx + '">' + bestBadge +
           '<div style="font-weight:700; font-size:15px; color:#1e3a8a; margin-bottom:4px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;"><span>' + item.task + '</span>' + badge + newBadge + scoreBadge + rankBadge + '</div>' +
           '<div style="font-size:12px; color:#6b7280;">' + item.date + '</div>' +
           carouselHtml + rejectBox + feedHtml + aiRefBox + gradingPlaceholder + replySection + '</div>';
       });
       historyDiv.innerHTML = hHtml;
     }
+    // 요약 테이블 렌더 (history 카드 렌더 후 호출)
+    renderTaskSummary(data);
 
     var viewedBest = JSON.parse(localStorage.getItem('viewed_best_' + currentUser.id) || '[]');
     gBestWorksMap = data.bestWorksMap;
