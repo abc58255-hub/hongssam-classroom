@@ -1084,9 +1084,19 @@
         data.unreadFeedbacks.forEach(function(fb) {
           pendingFeedbackRows.push(fb.rowIdx);
           var tag = fb.status === "재제출요청" ? "<span style='color:#ef4444; font-weight:bold;'>[재제출 요청]</span><br>" : "";
-          var annoTag = (fb.annoUrls && Object.keys(fb.annoUrls).length > 0) ? "<br><span style='color:#ea580c; font-weight:bold;'>[🖍️ 첨삭도 도착했어요!]</span>" : "";
           var bestTag = fb.isMyBest ? "<br><span style='color:#b45309; font-weight:bold; background:#fef08a; padding:2px 4px; border-radius:4px;'>🌟 우수작 선정 축하!</span>" : "";
-          nHtml += '<div class="noti-item"><div style="font-size:12px; color:#64748b; font-weight:bold; margin-bottom:5px;">과제: ' + fb.baseName + '</div><div style="font-size:14px; color:#0f172a; line-height:1.5;">' + tag + fb.feedback + annoTag + bestTag + '</div></div>';
+          var imgObj = (fb.annoUrls && Object.keys(fb.annoUrls).length > 0) ? fb.annoUrls : fb.urls;
+          var thumb = "";
+          if (imgObj) {
+            var ik = Object.keys(imgObj);
+            if (ik.length) {
+              var m = String(imgObj[ik[0]]).match(/[-\w]{25,}/);
+              var isAnno = (fb.annoUrls && Object.keys(fb.annoUrls).length > 0);
+              if (m) thumb = "<div style='margin-top:8px;'>" + (isAnno ? "<div style='font-size:11px;color:#ea580c;font-weight:700;margin-bottom:4px;'>🖍️ 선생님 첨삭</div>" : "")
+                + "<img src='https://drive.google.com/thumbnail?id=" + m[0] + "&sz=w400' style='width:100%;max-width:280px;border-radius:10px;border:1px solid #e2e8f0;'></div>";
+            }
+          }
+          nHtml += '<div class="noti-item"><div style="font-size:12px; color:#64748b; font-weight:bold; margin-bottom:5px;">과제: ' + fb.baseName + '</div><div style="font-size:14px; color:#0f172a; line-height:1.5;">' + tag + fb.feedback + bestTag + '</div>' + thumb + '</div>';
         });
       }
       if (hasPending) {
@@ -1141,6 +1151,22 @@
         var oldGal = document.getElementById('notiGalleryBtn');
         if (oldGal) oldGal.remove();
       }
+
+      var fbBtn = document.getElementById('notiFeedbackBtn');
+      if (hasFeedback) {
+        if (!fbBtn) {
+          fbBtn = document.createElement('button');
+          fbBtn.id = 'notiFeedbackBtn';
+          fbBtn.className = 'primary-btn';
+          fbBtn.style.cssText = 'background:linear-gradient(135deg,#2563eb,#1d4ed8);margin-bottom:8px;';
+          var ab = document.getElementById('ackBtn');
+          ab.parentElement.insertBefore(fbBtn, ab);
+        }
+        fbBtn.style.display = 'block';
+        fbBtn.innerText = '📩 바로 확인하러 가기';
+        var firstFbRow = pendingFeedbackRows[0];
+        fbBtn.onclick = function() { goCheckFeedback(firstFbRow); };
+      } else if (fbBtn) { fbBtn.style.display = 'none'; }
 
       document.getElementById('notiModal').style.display = 'flex';
     } else if (!hasFeedback && !hasPending && hasBestNews) {
@@ -1578,6 +1604,15 @@
     if (newKeys.length) {
       try { google.script.run.markBestSeen(currentUser.id, newKeys); } catch(_) {}
     }
+  }
+
+  function goCheckFeedback(rowIdx) {
+    try { google.script.run.markFeedbacksAsSeen(pendingFeedbackRows); } catch(e) {}
+    markBestAsViewed();
+    document.getElementById('notiModal').style.display = 'none';
+    var fb = document.getElementById('notiFeedbackBtn'); if (fb) fb.style.display = 'none';
+    switchTab(2);
+    setTimeout(function() { showTaskDetail(rowIdx); }, 60);
   }
 
   function acknowledgeFeedback() {
