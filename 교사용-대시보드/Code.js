@@ -121,15 +121,20 @@ function _sendAndPrune_(sheet, rowIdx, title, body, clickUrl, tag) {
   var raw = String(sheet.getRange(rowIdx, 5).getValue() || '').trim();
   var objs = _parseTokenObjs_(raw);
   if (!objs.length) return false;
-  var ok = false, changed = false, kept = [];
-  for (var i = 0; i < objs.length; i++) {
-    var r = sendFcmToToken_(objs[i].t, title, body, clickUrl, tag);
-    if (r.ok) { ok = true; kept.push(objs[i]); }
-    else if (r.invalid) { changed = true; } // 무효 토큰 → 버림
-    else { kept.push(objs[i]); }             // 일시 실패 → 유지
+  // ✅ 학생당 1개(가장 최근 등록 토큰)에만 발송 → 같은 폰 Safari/PWA 중복 방지 (재등록 불필요)
+  var target = objs[objs.length - 1];
+  var r = sendFcmToToken_(target.t, title, body, clickUrl, tag);
+  if (r.ok) {
+    // 발송 성공 시 명부도 1개로 정리 (중복 토큰 자동 청소)
+    if (objs.length > 1) { try { sheet.getRange(rowIdx, 5).setValue(JSON.stringify([target])); } catch(_) {} }
+    return true;
   }
-  if (changed) { try { sheet.getRange(rowIdx, 5).setValue(kept.length ? JSON.stringify(kept) : ''); } catch(_) {} }
-  return ok;
+  if (r.invalid) {
+    // 최신 토큰이 무효면 그것만 빼고 나머지로 다음에 시도
+    var kept = objs.slice(0, objs.length - 1);
+    try { sheet.getRange(rowIdx, 5).setValue(kept.length ? JSON.stringify(kept) : ''); } catch(_) {}
+  }
+  return false;
 }
 
 // 선택한 학생들에게 알림 발송 (클라이언트에서 호출)
@@ -142,14 +147,17 @@ function sendPushToStudents(studentIds, title, body, tag, filterClass) {
     var sent = 0, skipped = 0;
     var idSet = studentIds ? new Set(studentIds.map(String)) : null;
     for (var i = 1; i < data.length; i++) {
-      var sid    = String(data[i][1] || '').trim();
-      var tokens = _parseTokens_(data[i][4]);
-      if (!sid || !tokens.length) { skipped++; continue; }
+      var sid = String(data[i][1] || '').trim();
+      if (!sid) continue;
+      // 🔧 대상 필터 먼저 — 대상이 아닌 학생은 카운트에서 제외
       if (idSet && !idSet.has(sid)) continue;
       if (filterClass) {
         var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
         if (cls !== filterClass) continue;
       }
+      // 대상 학생 중 토큰 없는 사람만 미등록으로 카운트
+      var tokens = _parseTokens_(data[i][4]);
+      if (!tokens.length) { skipped++; continue; }
       var ok = _sendAndPrune_(sheet, i + 1, title, body, clickUrl, tag || 'default');
       if (ok) sent++; else skipped++;
     }
