@@ -202,6 +202,48 @@ function _assignRank_(sortedArr, key, rankField) {
   }
 }
 
+var DEFAULT_PRAISE = ['박수/격려','질문 답변','친구 도움','적극 참여','발표 경청'];
+
+function _getSettingRaw_(ss, key, def) {
+  var sh = ss.getSheetByName('도장_설정');
+  if (!sh || sh.getLastRow() < 2) return def;
+  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === key) {
+      try { return JSON.parse(rows[i][1]); } catch(_) { return rows[i][1]; }
+    }
+  }
+  return def;
+}
+function _setSetting_(ss, key, value) {
+  var sh = ss.getSheetByName('도장_설정');
+  if (!sh) { sh = ss.insertSheet('도장_설정'); sh.getRange(1,1,1,2).setValues([['키','값']]); }
+  var rows = sh.getLastRow() > 1 ? sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues() : [];
+  var v = JSON.stringify(value);
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]).trim() === key) { sh.getRange(i+2, 2).setValue(v); return; }
+  }
+  sh.appendRow([key, v]);
+}
+
+function getDojangSettings() {
+  try {
+    var ss = _ensureSheets_();
+    return { success: true,
+      praisePresets: _getSettingRaw_(ss, 'praisePresets', DEFAULT_PRAISE),
+      rankVisibility: _getSettingRaw_(ss, 'rankVisibility', 'show') };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+function saveDojangSettings(praisePresets, rankVisibility) {
+  try {
+    var ss = _ensureSheets_();
+    var arr = (praisePresets || []).map(function(s){ return String(s).trim(); }).filter(Boolean);
+    _setSetting_(ss, 'praisePresets', arr);
+    _setSetting_(ss, 'rankVisibility', rankVisibility === 'teacher' ? 'teacher' : 'show');
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 // 이월 입력용: 반 학생 + 현재 이월값
 function getCarryList(cls) {
   try {

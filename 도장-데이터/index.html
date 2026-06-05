@@ -45,6 +45,19 @@
   .empty { padding: 40px; text-align: center; color: #94a3b8; }
   .loading { padding: 40px; text-align: center; color: #94a3b8; }
 
+  /* 교사용 그리드 */
+  .tgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 10px; padding: 14px; }
+  .tcell { border: 2px solid #e2e8f0; border-radius: 12px; padding: 12px 8px; text-align: center; cursor: pointer; background:#fff; }
+  .tcell:hover { background: #faf5ff; }
+  .tcell.stale { border-color: #fca5a5; background: #fef2f2; }
+  .tcell .tn { font-weight: 700; font-size: 15px; }
+  .tcell .tstat { font-size: 12px; color: #7c3aed; margin-top: 4px; }
+  .tcell .tlast { font-size: 11px; margin-top: 3px; }
+  .set-row { display:flex; align-items:center; gap:8px; padding:6px 0; }
+  .set-row input[type=text]{ flex:1; padding:9px; border:1px solid #cbd5e1; border-radius:8px; font-size:14px; }
+  .set-del { color:#ef4444; cursor:pointer; font-size:18px; padding:2px 8px; }
+  .set-add { margin-top:8px; padding:9px 14px; border:1px dashed #c4b5fd; background:#faf5ff; color:#6d28d9; border-radius:8px; cursor:pointer; font-weight:700; }
+
   /* 모달 */
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 50; }
   .modal-bg.show { display: flex; align-items: center; justify-content: center; padding: 16px; }
@@ -72,7 +85,9 @@
       <option value="7">최근 7일</option>
     </select>
     <button id="staleBtn" class="toggle" onclick="toggleStale()">⚠ 소외만</button>
+    <button id="viewBtn" onclick="toggleView()">▦ 그리드 보기</button>
     <div class="spacer"></div>
+    <button onclick="openSettings()">⚙ 설정</button>
     <button onclick="openCarry()">📥 기존 이월 입력</button>
     <button class="primary" onclick="load()">↻ 새로고침</button>
   </div>
@@ -92,12 +107,21 @@
   <div class="modal" id="carryBox" style="max-width:640px;"></div>
 </div>
 
+<div class="modal-bg" id="setBg" onclick="if(event.target===this)closeSettings()">
+  <div class="modal" id="setBox" style="max-width:480px;"></div>
+</div>
+
 <script>
-  var STATE = { rows: [], staleOnly: false, staleDays: 14 };
+  var STATE = { rows: [], staleOnly: false, staleDays: 14, view: 'table' };
 
   function toggleStale() {
     STATE.staleOnly = !STATE.staleOnly;
     document.getElementById('staleBtn').classList.toggle('on', STATE.staleOnly);
+    render();
+  }
+  function toggleView() {
+    STATE.view = STATE.view === 'table' ? 'grid' : 'table';
+    document.getElementById('viewBtn').textContent = STATE.view === 'table' ? '▦ 그리드 보기' : '☰ 표 보기';
     render();
   }
 
@@ -151,6 +175,7 @@
       document.getElementById('grid').innerHTML = '<div class="empty">표시할 데이터가 없어요.</div>';
       return;
     }
+    if (STATE.view === 'grid') { renderGrid(rows); return; }
     var h = '<table><thead><tr>'
       + '<th>이름</th><th>반</th><th>🙋 발표</th><th>👏 칭찬</th><th>합계</th>'
       + '<th>최근 발표</th><th>경과</th><th>최근 학습지·문제</th><th>전체</th><th>반</th>'
@@ -203,6 +228,63 @@
 
   function esc(s) { return String(s==null?'':s).replace(/[&<>"]/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+
+  function renderGrid(rows) {
+    var h = '<div class="tgrid">';
+    rows.forEach(function(r){
+      var last;
+      if (r.present === 0) last = '<span class="elapsed-bad">미발표</span>';
+      else if (r.lastPresentElapsed === null) last = '-';
+      else {
+        var d = r.lastPresentElapsed;
+        var cls = d >= STATE.staleDays ? 'elapsed-bad' : (d >= 7 ? 'elapsed-warn' : 'elapsed-ok');
+        last = '<span class="'+cls+'">'+(d===0?'오늘':d+'일 전')+'</span>';
+      }
+      h += '<div class="tcell '+(r.stale?'stale':'')+'" onclick="openDetail(\''+r.sid+'\')">'
+        + '<div class="tn">'+(r.stale?'⚠ ':'')+esc(r.name)+'</div>'
+        + '<div class="tstat">🙋'+r.present+' · 👏'+r.praise+'</div>'
+        + '<div class="tlast">'+last+'</div>'
+        + '</div>';
+    });
+    h += '</div>';
+    document.getElementById('grid').innerHTML = h;
+  }
+
+  // ===== 설정 (사유 프리셋 + 등수 공개) =====
+  var SET = { presets: [], rankVisibility: 'show' };
+  function openSettings() {
+    document.getElementById('setBg').classList.add('show');
+    document.getElementById('setBox').innerHTML = '<div class="loading">불러오는 중…</div>';
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) { document.getElementById('setBox').innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
+      SET.presets = res.praisePresets || [];
+      SET.rankVisibility = res.rankVisibility || 'show';
+      renderSettings();
+    }).getDojangSettings();
+  }
+  function renderSettings() {
+    var h = '<span class="closebtn" onclick="closeSettings()">×</span>'
+      + '<h2>⚙ 도장 설정</h2>'
+      + '<div class="mcount">👏 칭찬 사유 프리셋 (도장-입력 화면 버튼)</div><div id="presetList">';
+    SET.presets.forEach(function(p, i){
+      h += '<div class="set-row"><input type="text" value="'+esc(p)+'" oninput="SET.presets['+i+']=this.value"><span class="set-del" onclick="delPreset('+i+')">×</span></div>';
+    });
+    h += '</div><div class="set-add" onclick="addPreset()">+ 사유 추가</div>';
+    h += '<div class="mcount" style="margin-top:18px;">🏅 학생에게 등수 공개</div>'
+      + '<div class="set-row"><label><input type="radio" name="rv" '+(SET.rankVisibility!=='teacher'?'checked':'')+' onclick="SET.rankVisibility=\'show\'"> 학생 앱에 본인 등수 표시</label></div>'
+      + '<div class="set-row"><label><input type="radio" name="rv" '+(SET.rankVisibility==='teacher'?'checked':'')+' onclick="SET.rankVisibility=\'teacher\'"> 등수 숨김 (선생님만)</label></div>';
+    h += '<div class="toolbar" style="margin-top:18px;"><div class="spacer"></div><button class="primary" onclick="saveSettings()">저장</button></div>';
+    document.getElementById('setBox').innerHTML = h;
+  }
+  function addPreset(){ SET.presets.push(''); renderSettings(); }
+  function delPreset(i){ SET.presets.splice(i,1); renderSettings(); }
+  function saveSettings(){
+    google.script.run.withSuccessHandler(function(res){
+      if (res && res.success) closeSettings();
+      else alert('저장 실패');
+    }).saveDojangSettings(SET.presets.filter(function(s){return s&&s.trim();}), SET.rankVisibility);
+  }
+  function closeSettings(){ document.getElementById('setBg').classList.remove('show'); }
 
   // ===== 기존 이월 입력 =====
   function openCarry() {
