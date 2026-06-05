@@ -205,3 +205,253 @@ function submitReport(data) {
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
+
+// =====================================================
+// 💝 칭찬 기능 (교사용 칭찬앱과 시트 공유)
+// 시트: 칭찬이벤트, 칭찬배정, 칭찬기록
+// =====================================================
+function _prClsOf(sid) {
+  sid = String(sid || '').trim();
+  return sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '기타';
+}
+function _prFmtDate(d) { return Utilities.formatDate(new Date(d), 'Asia/Seoul', 'yyyy-MM-dd'); }
+function _prTime(d) { return d ? Utilities.formatDate(new Date(d), 'Asia/Seoul', 'MM/dd HH:mm') : ''; }
+
+function _prRoster(cls) {
+  var data = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부').getDataRange().getValues();
+  var list = [];
+  for (var i = 1; i < data.length; i++) {
+    var sid = String(data[i][1] || '').trim();
+    if (!sid) continue;
+    if (cls && _prClsOf(sid) !== cls) continue;
+    list.push({ id: sid, name: String(data[i][2] || '').trim() });
+  }
+  return list;
+}
+
+// 활성 이벤트 중 이 학생 반에 해당하는 것
+function getActivePraiseEvents(studentId) {
+  try {
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = ss.getSheetByName('칭찬이벤트');
+    if (!sh || sh.getLastRow() < 2) return { events: [] };
+    var myCls = _prClsOf(studentId);
+    var today = _prFmtDate(new Date());
+    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 10).getValues();
+    var events = [];
+    rows.forEach(function(r) {
+      if (String(r[8]).toUpperCase() !== 'Y') return;       // 활성만
+      if (String(r[3]).trim() !== myCls) return;            // 우리 반만
+      var start = r[4] ? _prFmtDate(r[4]) : '';
+      var end = r[5] ? _prFmtDate(r[5]) : '';
+      if (start && today < start) return;
+      if (end && today > end) return;
+      events.push({ id: String(r[0]), title: String(r[1]), mode: String(r[2]) });
+    });
+    return { events: events };
+  } catch(e) { return { events: [], message: e.toString() }; }
+}
+
+function _prGetEventRow(eventId) {
+  var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('칭찬이벤트');
+  if (!sh || sh.getLastRow() < 2) return null;
+  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 10).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    if (String(rows[i][0]) === String(eventId)) {
+      var opts = {}; try { opts = JSON.parse(rows[i][7] || '{}'); } catch(_) {}
+      var parts = []; try { parts = JSON.parse(rows[i][6] || '[]'); } catch(_) {}
+      return { id:String(rows[i][0]), title:String(rows[i][1]), mode:String(rows[i][2]), cls:String(rows[i][3]),
+               participants: parts, options: opts };
+    }
+  }
+  return null;
+}
+
+function _prShuffle(arr){ var a=arr.slice(); for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;} return a; }
+
+// 오늘 배정 가져오기/생성 (relay, spotlight) — LockService로 동시 생성 방지
+function _prEnsureAssignment(ev, today) {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sh = ss.getSheetByName('칭찬배정') || ss.insertSheet('칭찬배정');
+  if (sh.getLastRow() === 0) sh.appendRow(['날짜','이벤트ID','배정JSON']);
+  // 기존 조회
+  if (sh.getLastRow() >= 2) {
+    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 3).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (_prFmtDate(rows[i][0]) === today && String(rows[i][1]) === String(ev.id)) {
+        try { return JSON.parse(rows[i][2]); } catch(_) { return null; }
+      }
+    }
+  }
+  // 생성 (Lock)
+  var lock = LockService.getScriptLock();
+  try { lock.waitLock(8000); } catch(e) { return null; }
+  try {
+    // Lock 후 재확인
+    if (sh.getLastRow() >= 2) {
+      var rows2 = sh.getRange(2, 1, sh.getLastRow()-1, 3).getValues();
+      for (var j = 0; j < rows2.length; j++) {
+        if (_prFmtDate(rows2[j][0]) === today && String(rows2[j][1]) === String(ev.id)) {
+          try { return JSON.parse(rows2[j][2]); } catch(_) { return null; }
+        }
+      }
+    }
+    var ids = ev.participants && ev.participants.length ? ev.participants : _prRoster(ev.cls).map(function(s){return s.id;});
+    var assignment;
+    if (ev.mode === 'spotlight') {
+      // 최근 주인공 안 겹치게: 과거 주인공 목록 제외 후 랜덤, 다 돌면 리셋
+      var past = _prPastSpotlights(ev.id);
+      var pool = ids.filter(function(x){ return past.indexOf(x) < 0; });
+      if (pool.length === 0) pool = ids;
+      var star = pool[Math.floor(Math.random()*pool.length)];
+      assignment = { spotlight: star };
+    } else { // relay: 랜덤 derangement
+      var map = {};
+      if (ids.length >= 2) { var s = _prShuffle(ids); for (var k=0;k<s.length;k++) map[s[k]] = s[(k+1)%s.length]; }
+      assignment = { map: map };
+    }
+    sh.appendRow([today, ev.id, JSON.stringify(assignment)]);
+    return assignment;
+  } finally { lock.releaseLock(); }
+}
+
+function _prPastSpotlights(eventId) {
+  var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('칭찬배정');
+  var out = [];
+  if (!sh || sh.getLastRow() < 2) return out;
+  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 3).getValues();
+  rows.forEach(function(r){
+    if (String(r[1]) !== String(eventId)) return;
+    try { var a = JSON.parse(r[2]); if (a.spotlight) out.push(a.spotlight); } catch(_) {}
+  });
+  return out;
+}
+
+// 칭찬기록 시트
+function _prRecSheet() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sh = ss.getSheetByName('칭찬기록');
+  if (!sh) {
+    sh = ss.insertSheet('칭찬기록');
+    sh.getRange(1,1,1,9).setValues([['일시','이벤트ID','보낸학번','보낸이름','받은학번','받은이름','내용','익명','숨김']]);
+    sh.getRange(1,1,1,9).setFontWeight('bold').setBackground('#7c3aed').setFontColor('white');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+function _prRecords(eventId) {
+  var sh = _prRecSheet();
+  if (sh.getLastRow() < 2) return [];
+  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 9).getValues();
+  var out = [];
+  rows.forEach(function(r){
+    if (String(r[1]) !== String(eventId)) return;
+    out.push({ time:_prTime(r[0]), dateStr:_prFmtDate(r[0]), fromId:String(r[2]), fromName:String(r[3]),
+               toId:String(r[4]), toName:String(r[5]), content:String(r[6]),
+               anon:String(r[7]).toUpperCase()==='Y', hidden:String(r[8]).toUpperCase()==='Y' });
+  });
+  return out;
+}
+
+// 이벤트 상세 (학생용)
+function getPraiseEventDetail(eventId, studentId, studentName) {
+  try {
+    var ev = _prGetEventRow(eventId);
+    if (!ev) return { success: false, message: '이벤트를 찾을 수 없어요.' };
+    var today = _prFmtDate(new Date());
+    var roster = _prRoster(ev.cls);
+    var nameOf = {}; roster.forEach(function(s){ nameOf[s.id] = s.name; });
+    var recs = _prRecords(eventId);
+    var opts = ev.options || {};
+
+    // 내가 받은 / 보낸
+    var received = recs.filter(function(r){ return r.toId === studentId && !r.hidden; })
+      .map(function(r){ return { content:r.content, fromName:r.fromName, anon:r.anon, time:r.time }; }).reverse();
+    var given = recs.filter(function(r){ return r.fromId === studentId; })
+      .map(function(r){ return { content:r.content, toName:r.toName, time:r.time }; }).reverse();
+
+    // 반 게시판 (옵션 class일 때만)
+    var board = [];
+    if (opts.board === 'class') {
+      board = recs.filter(function(r){ return !r.hidden; })
+        .map(function(r){ return { fromName:r.fromName, toName:r.toName, content:r.content, anon:r.anon }; }).reverse().slice(0, 50);
+    }
+
+    // 오늘 작성 횟수
+    var todayCount = recs.filter(function(r){ return r.fromId === studentId && r.dateStr === today; }).length;
+    var dailyLimit = opts.dailyLimit || 0;
+
+    // 모드별 대상/후보
+    var result = {
+      success: true, title: ev.title, mode: ev.mode,
+      anonChoice: opts.anon === 'choice',
+      received: received, given: given, board: board,
+      doneToday: false, canWrite: true
+    };
+
+    if (ev.mode === 'relay') {
+      var asg = _prEnsureAssignment(ev, today);
+      var tid = asg && asg.map ? asg.map[studentId] : null;
+      if (!tid) { result.canWrite = false; result.doneToday = false; result.message = '오늘 배정이 없어요.'; return result; }
+      // 오늘 이미 그 대상에게 보냈으면 완료
+      var didToday = recs.some(function(r){ return r.fromId===studentId && r.toId===tid && r.dateStr===today; });
+      result.targetId = tid; result.targetName = nameOf[tid] || tid;
+      result.canWrite = !didToday; result.doneToday = didToday;
+    } else if (ev.mode === 'spotlight') {
+      var asg2 = _prEnsureAssignment(ev, today);
+      var star = asg2 ? asg2.spotlight : null;
+      result.targetId = star; result.targetName = nameOf[star] || star;
+      if (star === studentId) { result.canWrite = false; result.doneToday = false; result.message = '오늘은 내가 주인공이에요! 🎉'; result.iAmStar = true; }
+      else {
+        var didStar = recs.some(function(r){ return r.fromId===studentId && r.toId===star && r.dateStr===today; });
+        result.canWrite = !didStar; result.doneToday = didStar;
+      }
+    } else {
+      // random / pick / chain → 후보 = 나 제외 전원
+      result.candidates = roster.filter(function(s){ return s.id !== studentId; });
+      if (dailyLimit > 0 && todayCount >= dailyLimit) { result.canWrite = false; result.doneToday = true; }
+    }
+    return result;
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 칭찬 제출
+function submitPraise(data) {
+  try {
+    var ev = _prGetEventRow(data.eventId);
+    if (!ev) return { success: false, message: '이벤트를 찾을 수 없어요.' };
+    var opts = ev.options || {};
+    var content = String(data.content || '').trim();
+    var minLen = opts.minLen || 0;
+    if (content.length < minLen) return { success: false, message: '칭찬은 최소 ' + minLen + '자 이상 적어주세요.' };
+    if (!data.toId) return { success: false, message: '칭찬할 친구를 선택해주세요.' };
+    if (data.toId === data.fromId) return { success: false, message: '자기 자신은 칭찬할 수 없어요.' };
+
+    var today = _prFmtDate(new Date());
+    var recs = _prRecords(data.eventId);
+
+    // 하루 횟수 제한
+    var dailyLimit = opts.dailyLimit || 0;
+    var todayCount = recs.filter(function(r){ return r.fromId===data.fromId && r.dateStr===today; }).length;
+    if (dailyLimit > 0 && todayCount >= dailyLimit) return { success: false, message: '오늘 작성 가능한 칭찬을 다 썼어요.' };
+
+    // relay/spotlight: 오늘 같은 대상 중복 방지
+    if (ev.mode === 'relay' || ev.mode === 'spotlight') {
+      var dup = recs.some(function(r){ return r.fromId===data.fromId && r.toId===data.toId && r.dateStr===today; });
+      if (dup) return { success: false, message: '오늘 이미 이 친구를 칭찬했어요.' };
+    }
+
+    // 익명 결정
+    var anon = false;
+    if (opts.anon === 'anon') anon = true;
+    else if (opts.anon === 'choice') anon = !!data.anon;
+
+    var roster = _prRoster(ev.cls);
+    var nameOf = {}; roster.forEach(function(s){ nameOf[s.id] = s.name; });
+    var toName = nameOf[data.toId] || data.toId;
+
+    _prRecSheet().appendRow([ new Date(), data.eventId, data.fromId, data.fromName || '', data.toId, toName, content, anon ? 'Y' : 'N', 'N' ]);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}

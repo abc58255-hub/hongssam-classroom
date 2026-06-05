@@ -120,7 +120,8 @@
       <div class="tab-container">
         <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">📝 활동 남기기</button>
         <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">📂 내 기록장</button>
-        <button class="tab-btn" id="btnTab3" onclick="switchTab(3)">💌 이달의 설문 <span id="svBadge" class="survey-badge" style="display:none;">N</span></button>
+        <button class="tab-btn" id="btnTab5" onclick="switchTab(5)" style="color:#7c3aed;">💝 칭찬 <span id="praiseBadge" class="survey-badge" style="display:none;">N</span></button>
+        <button class="tab-btn" id="btnTab3" onclick="switchTab(3)">💌 설문 <span id="svBadge" class="survey-badge" style="display:none;">N</span></button>
         <button class="tab-btn" id="btnTab4" onclick="switchTab(4)" style="color:#ef4444;">🚨 신고</button>
       </div>
 
@@ -184,6 +185,22 @@
           <div class="status-msg" id="reportStatus"></div>
         </div>
       </div>
+
+      <!-- 탭5: 칭찬 -->
+      <div id="tab5" class="tab-content">
+        <div id="praiseEmpty" style="text-align:center; padding:30px 0; display:none;">
+          <div style="font-size:50px; margin-bottom:12px;">💝</div>
+          <h3 style="color:#1e293b; margin:0 0 6px;">진행 중인 칭찬 이벤트가 없어요</h3>
+          <p style="color:#64748b; font-size:14px;">선생님이 칭찬 이벤트를 시작하면 여기에 나타나요.</p>
+        </div>
+        <div id="praiseEventList"></div>
+
+        <!-- 칭찬 작성/게시판 영역 (이벤트 선택 시) -->
+        <div id="praiseDetail" style="display:none;">
+          <button onclick="backToPraiseList()" style="background:#f1f5f9; color:#475569; border:none; padding:8px 14px; border-radius:10px; font-weight:700; font-size:13px; cursor:pointer; margin-bottom:12px;">← 이벤트 목록</button>
+          <div id="praiseDetailContent"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -239,7 +256,7 @@
   };
 
   function switchTab(t) {
-    for (var i = 1; i <= 4; i++) {
+    for (var i = 1; i <= 5; i++) {
       var btn = document.getElementById('btnTab' + i);
       var tab = document.getElementById('tab' + i);
       if (btn) btn.classList.remove('active');
@@ -248,6 +265,7 @@
     document.getElementById('btnTab' + t).classList.add('active');
     document.getElementById('tab' + t).classList.add('active');
     if (t === 4) initReportTab();
+    if (t === 5) loadPraiseEvents();
   }
 
   function initReportTab() {
@@ -285,6 +303,156 @@
         }
       })
       .submitReport({ studentId: currentUser.id, studentName: currentUser.name, category: cat, content: content });
+  }
+
+  // ===== 💝 칭찬 기능 =====
+  var gPraiseEvents = [];
+  var gCurrentPraiseEvent = null;
+
+  function loadPraiseEvents() {
+    var listDiv = document.getElementById('praiseEventList');
+    var emptyDiv = document.getElementById('praiseEmpty');
+    document.getElementById('praiseDetail').style.display = 'none';
+    document.getElementById('praiseEventList').style.display = 'block';
+    listDiv.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:20px;">불러오는 중...</div>';
+    google.script.run.withSuccessHandler(function(res){
+      gPraiseEvents = (res && res.events) || [];
+      if (gPraiseEvents.length === 0) {
+        emptyDiv.style.display = 'block'; listDiv.innerHTML = ''; return;
+      }
+      emptyDiv.style.display = 'none';
+      var MODE_LABEL = { random:'🎲 랜덤 뽑기', pick:'👉 자유 지목', relay:'🔄 칭찬 릴레이', chain:'🔗 칭찬 연쇄', spotlight:'⭐ 오늘의 주인공' };
+      listDiv.innerHTML = gPraiseEvents.map(function(e){
+        return '<div onclick="openPraiseEvent(\'' + e.id + '\')" style="background:white;border:1.5px solid #e9d5ff;border-radius:16px;padding:16px;margin-bottom:10px;cursor:pointer;">'
+          + '<div style="font-weight:800;font-size:16px;color:#7c3aed;">' + e.title + '</div>'
+          + '<div style="font-size:12px;color:#94a3b8;margin-top:4px;">' + (MODE_LABEL[e.mode]||e.mode) + (e.todayDone ? ' · ✅ 오늘 완료' : '') + '</div>'
+          + '</div>';
+      }).join('');
+    }).getActivePraiseEvents(currentUser.id);
+  }
+
+  function backToPraiseList() {
+    document.getElementById('praiseDetail').style.display = 'none';
+    document.getElementById('praiseEventList').style.display = 'block';
+  }
+
+  function openPraiseEvent(eventId) {
+    gCurrentPraiseEvent = eventId;
+    var detail = document.getElementById('praiseDetailContent');
+    document.getElementById('praiseEventList').style.display = 'none';
+    document.getElementById('praiseDetail').style.display = 'block';
+    detail.innerHTML = '<div style="text-align:center;color:#94a3b8;padding:30px;">불러오는 중...</div>';
+    google.script.run.withSuccessHandler(renderPraiseDetail).getPraiseEventDetail(eventId, currentUser.id, currentUser.name);
+  }
+
+  function renderPraiseDetail(d) {
+    var detail = document.getElementById('praiseDetailContent');
+    if (!d || !d.success) { detail.innerHTML = '<div style="color:#ef4444;padding:20px;">' + ((d&&d.message)||'오류') + '</div>'; return; }
+
+    var html = '<div style="font-weight:900;font-size:18px;color:#7c3aed;margin-bottom:12px;">' + d.title + '</div>';
+
+    // 작성 영역 (모드별 대상)
+    if (d.canWrite) {
+      var targetHtml = '';
+      if (d.mode === 'relay' || d.mode === 'spotlight') {
+        targetHtml = '<div style="background:linear-gradient(135deg,#faf5ff,#fdf2f8);border:1.5px solid #e9d5ff;border-radius:16px;padding:18px;text-align:center;margin-bottom:12px;">'
+          + '<div style="font-size:13px;color:#9333ea;font-weight:700;margin-bottom:6px;">' + (d.mode==='spotlight'?'⭐ 오늘의 주인공':'오늘 칭찬할 친구') + '</div>'
+          + '<div style="font-size:24px;font-weight:900;color:#7c3aed;">🌟 ' + d.targetName + ' 🌟</div>'
+          + '<input type="hidden" id="praiseTargetId" value="' + d.targetId + '"></div>';
+      } else {
+        // random / pick / chain → 친구 선택
+        var opts = (d.candidates||[]).map(function(c){ return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('');
+        var pickLabel = d.mode==='random' ? '🎲 랜덤으로 뽑힌 친구' : '칭찬할 친구 선택';
+        if (d.mode === 'random') {
+          targetHtml = '<div style="text-align:center;margin-bottom:12px;">'
+            + '<button onclick="rollRandom()" style="background:#7c3aed;color:white;border:none;padding:12px 22px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;">🎲 랜덤 친구 뽑기</button>'
+            + '<div id="randomResult" style="margin-top:12px;"></div>'
+            + '<input type="hidden" id="praiseTargetId" value=""></div>';
+          window._randomCandidates = d.candidates || [];
+        } else {
+          targetHtml = '<div style="margin-bottom:12px;"><label style="font-size:13px;font-weight:700;color:#475569;">' + pickLabel + '</label>'
+            + '<select id="praiseTargetId" style="width:100%;padding:10px;border:1.5px solid #e2e8f0;border-radius:10px;margin-top:5px;"><option value="">친구 선택</option>' + opts + '</select></div>';
+        }
+      }
+      html += targetHtml;
+      html += '<textarea id="praiseContent" rows="3" placeholder="따뜻한 칭찬 한마디를 적어주세요!" style="width:100%;padding:12px;border:1.5px solid #e2e8f0;border-radius:12px;font-size:14px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>';
+      if (d.anonChoice) {
+        html += '<label style="display:block;margin-top:8px;font-size:13px;color:#64748b;"><input type="checkbox" id="praiseAnon" style="margin-right:6px;">익명으로 보내기</label>';
+      }
+      html += '<button id="praiseSendBtn" onclick="sendPraise()" style="width:100%;margin-top:10px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;padding:13px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;">💝 칭찬 보내기</button>';
+      html += '<div id="praiseStatus" style="text-align:center;font-size:13px;margin-top:8px;color:#7c3aed;"></div>';
+    } else if (d.doneToday) {
+      html += '<div style="background:#f0fdf4;border:1px solid #86efac;border-radius:14px;padding:18px;text-align:center;margin-bottom:12px;color:#15803d;font-weight:700;">✅ 오늘의 칭찬을 완료했어요! 내일 또 만나요 😊</div>';
+    }
+
+    // 받은 칭찬
+    html += '<div style="margin-top:18px;"><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:8px;">💌 내가 받은 칭찬 (' + (d.received||[]).length + ')</div>';
+    if ((d.received||[]).length === 0) html += '<div style="color:#94a3b8;font-size:13px;padding:8px;">아직 받은 칭찬이 없어요.</div>';
+    else html += d.received.map(function(r){
+      return '<div style="background:#fdf4ff;border:1px solid #f0abfc;border-radius:12px;padding:12px;margin-bottom:6px;"><div style="font-size:14px;color:#1e293b;">' + escHtml(r.content) + '</div><div style="font-size:11px;color:#a855f7;margin-top:4px;">— ' + (r.anon?'익명':r.fromName) + ' · ' + r.time + '</div></div>';
+    }).join('');
+    html += '</div>';
+
+    // 내가 보낸 칭찬
+    html += '<div style="margin-top:16px;"><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:8px;">📝 내가 칭찬한 친구들 (' + (d.given||[]).length + ')</div>';
+    if ((d.given||[]).length === 0) html += '<div style="color:#94a3b8;font-size:13px;padding:8px;">아직 보낸 칭찬이 없어요.</div>';
+    else html += d.given.map(function(g){
+      return '<div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;margin-bottom:6px;"><div style="font-size:13px;color:#475569;"><b style="color:#7c3aed;">' + g.toName + '</b>에게: ' + escHtml(g.content) + '</div><div style="font-size:11px;color:#94a3b8;margin-top:2px;">' + g.time + '</div></div>';
+    }).join('');
+    html += '</div>';
+
+    // 반 전체 게시판
+    if (d.board && d.board.length) {
+      html += '<div style="margin-top:16px;"><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:8px;">📜 우리 반 칭찬 게시판</div>';
+      html += d.board.map(function(b){
+        return '<div style="background:white;border:1px solid #f1f5f9;border-radius:12px;padding:10px 12px;margin-bottom:6px;"><div style="font-size:13px;"><b>' + (b.anon?'익명':b.fromName) + '</b> → <b style="color:#7c3aed;">' + b.toName + '</b></div><div style="font-size:13px;color:#475569;margin-top:2px;">' + escHtml(b.content) + '</div></div>';
+      }).join('');
+      html += '</div>';
+    }
+
+    detail.innerHTML = html;
+  }
+
+  function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function rollRandom() {
+    var cands = window._randomCandidates || [];
+    if (!cands.length) return;
+    var resultDiv = document.getElementById('randomResult');
+    var hidden = document.getElementById('praiseTargetId');
+    var spins = 12, i = 0;
+    var timer = setInterval(function(){
+      var pick = cands[Math.floor(Math.random()*cands.length)];
+      resultDiv.innerHTML = '<div style="font-size:22px;font-weight:900;color:#7c3aed;">🎲 ' + pick.name + '</div>';
+      i++;
+      if (i >= spins) {
+        clearInterval(timer);
+        var finalPick = cands[Math.floor(Math.random()*cands.length)];
+        resultDiv.innerHTML = '<div style="font-size:24px;font-weight:900;color:#7c3aed;">🌟 ' + finalPick.name + ' 🌟</div><div style="font-size:12px;color:#94a3b8;">이 친구를 칭찬해주세요!</div>';
+        hidden.value = finalPick.id;
+      }
+    }, 80);
+  }
+
+  function sendPraise() {
+    var targetEl = document.getElementById('praiseTargetId');
+    var targetId = targetEl ? targetEl.value : '';
+    var content = (document.getElementById('praiseContent')||{}).value || '';
+    content = content.trim();
+    var anonEl = document.getElementById('praiseAnon');
+    var anon = anonEl ? anonEl.checked : false;
+    var statusEl = document.getElementById('praiseStatus');
+    if (!targetId) { statusEl.innerText = '칭찬할 친구를 선택해주세요.'; statusEl.style.color='#ef4444'; return; }
+    if (!content) { statusEl.innerText = '칭찬 내용을 입력해주세요.'; statusEl.style.color='#ef4444'; return; }
+    var btn = document.getElementById('praiseSendBtn');
+    btn.disabled = true; btn.innerText = '보내는 중...';
+    google.script.run
+      .withFailureHandler(function(err){ btn.disabled=false; btn.innerText='💝 칭찬 보내기'; statusEl.innerText='오류: '+err.message; statusEl.style.color='#ef4444'; })
+      .withSuccessHandler(function(res){
+        if (res.success) { openPraiseEvent(gCurrentPraiseEvent); }
+        else { btn.disabled=false; btn.innerText='💝 칭찬 보내기'; statusEl.innerText=res.message||'실패'; statusEl.style.color='#ef4444'; }
+      })
+      .submitPraise({ eventId: gCurrentPraiseEvent, fromId: currentUser.id, fromName: currentUser.name, toId: targetId, content: content, anon: anon });
   }
 
   function clearLoginInfo() { localStorage.removeItem("hr_student_id"); localStorage.removeItem("hr_student_name"); location.reload(); }
