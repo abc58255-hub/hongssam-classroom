@@ -412,6 +412,7 @@ function getDashboardData(studentId, studentName) {
       bestWorksMap: bestWorksMap,
       taskOrder: allBaseTasks, // 과제 부여 순서 (갤러리 정렬용)
       myStats: myStats,
+      seenBestKeys: _getSeenBestKeys(safeId), // 서버 저장 "본 우수작" (localStorage 불안정 대비)
       fcmRegisterUrl: _getSysStudent('FCM_REGISTER_URL'),
       mathAppUrl: _getSysStudent('바로가기_수학교실')
     };
@@ -419,6 +420,50 @@ function getDashboardData(studentId, studentName) {
   } catch(e) {
     throw new Error("데이터 로딩 중 오류: " + e.toString());
   }
+}
+
+// ── 본 우수작 추적 (서버 저장) ───────────────────────────
+function _bestSeenSheet() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sh = ss.getSheetByName('우수작읽음');
+  if (!sh) {
+    sh = ss.insertSheet('우수작읽음');
+    sh.getRange(1,1,1,2).setValues([['학번','본키JSON']]);
+    sh.getRange(1,1,1,2).setFontWeight('bold').setBackground('#f59e0b').setFontColor('white');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+function _getSeenBestKeys(studentId) {
+  try {
+    var sh = _bestSeenSheet();
+    if (sh.getLastRow() < 2) return [];
+    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === String(studentId).trim()) {
+        try { var a = JSON.parse(rows[i][1] || '[]'); return Array.isArray(a) ? a : []; } catch(_) { return []; }
+      }
+    }
+    return [];
+  } catch(e) { return []; }
+}
+function markBestSeen(studentId, keys) {
+  try {
+    if (!studentId || !Array.isArray(keys)) return { success: false };
+    var sh = _bestSeenSheet();
+    var existing = _getSeenBestKeys(studentId);
+    keys.forEach(function(k){ if (existing.indexOf(k) < 0) existing.push(String(k)); });
+    if (existing.length > 300) existing = existing.slice(existing.length - 300);
+    var rows = sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues() : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === String(studentId).trim()) {
+        sh.getRange(i+2, 2).setValue(JSON.stringify(existing));
+        return { success: true };
+      }
+    }
+    sh.appendRow([String(studentId), JSON.stringify(existing)]);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 // 학생 업적 계산 — 평균 제출순위, 우수작, 등급평균, 점수평균 + 학급/전체 등수

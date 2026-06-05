@@ -988,7 +988,11 @@
     // 요약 테이블 렌더 (history 카드 렌더 후 호출)
     renderTaskSummary(data);
 
-    var viewedBest = JSON.parse(localStorage.getItem('viewed_best_' + currentUser.id) || '[]');
+    // 본 우수작 = localStorage + 서버 저장(seenBestKeys) 합집합 (iOS localStorage 초기화 대비)
+    var localViewed = JSON.parse(localStorage.getItem('viewed_best_' + currentUser.id) || '[]');
+    var serverViewed = data.seenBestKeys || [];
+    var viewedBest = localViewed.slice();
+    serverViewed.forEach(function(k){ if (viewedBest.indexOf(k) < 0) viewedBest.push(k); });
     gBestWorksMap = data.bestWorksMap;
     gTaskOrder = data.taskOrder || [];
     gViewedBest = viewedBest;
@@ -1507,15 +1511,20 @@
   function markBestAsViewed() {
     var bestData = window._pendingBestData || { map: {}, viewed: [] };
     var viewed = JSON.parse(localStorage.getItem('viewed_best_' + currentUser.id) || '[]');
+    var newKeys = [];
     Object.keys(bestData.map).forEach(function(t) {
       (bestData.map[t] || []).forEach(function(w) {
         var k = w.bestKey || String(w.rowIdx);
-        if (viewed.indexOf(k) < 0) viewed.push(k);
+        if (viewed.indexOf(k) < 0) { viewed.push(k); newKeys.push(k); }
       });
     });
     localStorage.setItem('viewed_best_' + currentUser.id, JSON.stringify(viewed));
     gViewedBest = viewed;
     window._pendingBestData = null;
+    // 서버에도 저장 (localStorage 초기화돼도 유지)
+    if (newKeys.length) {
+      try { google.script.run.markBestSeen(currentUser.id, newKeys); } catch(_) {}
+    }
   }
 
   function acknowledgeFeedback() {
