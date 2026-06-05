@@ -4,6 +4,12 @@
 
 var SHEET_ID = '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
 
+// 🔐 외부 요청(푸시) 권한 승인용 — 에디터에서 한 번 실행하면 됨
+function grantPermissions() {
+  UrlFetchApp.fetch('https://www.google.com');
+  Logger.log('✅ 외부요청 권한 승인 완료 — 이제 도장 알림이 발송됩니다.');
+}
+
 function doGet() {
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('홍쌤 도장-입력')
