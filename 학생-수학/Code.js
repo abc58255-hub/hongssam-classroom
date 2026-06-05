@@ -1193,7 +1193,7 @@ function getMyDojang(studentId) {
       return { name: c.name, emoji: c.emoji, count: my, rankAll: rankAll, rankClass: rankClass };
     });
 
-    return { success: true, categories: result, showRank: showRank, recent: recent.slice(0, 6) };
+    return { success: true, categories: result, showRank: showRank, records: recent };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
