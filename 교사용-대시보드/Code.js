@@ -74,13 +74,15 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
     var message = {
       message: {
         token: token,
-        data: { url: link, tag: ntag },
+        // data에 제목/내용/tag 포함 (서비스워커가 같은 tag로 표시 → iOS 자체표시와 합쳐짐)
+        data: { title: String(title || ''), body: String(body || ''), url: link, tag: ntag },
         webpush: {
           notification: {
             title: String(title || ''),
             body: String(body || ''),
             tag: ntag,
-            renotify: false
+            renotify: false,
+            icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png'
           },
           fcm_options: { link: link }
         }

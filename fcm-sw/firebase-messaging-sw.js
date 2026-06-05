@@ -4,13 +4,25 @@ importScripts('./config.js');
 
 firebase.initializeApp(FIREBASE_CONFIG);
 
-// onBackgroundMessage 정의 안 함 → FCM이 webpush.notification을 자동으로 정확히 1회 표시.
-// (SW 코드에 의존하지 않으므로 옛 SW 기기도 정상 표시됨)
-firebase.messaging();
+const messaging = firebase.messaging();
 
 // 새 서비스워커 즉시 활성화
 self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(e) { e.waitUntil(self.clients.claim()); });
+
+// 알림 표시: 고정 tag로 표시 → iOS가 자체표시한 같은 tag 알림과 합쳐져 1개만 보임
+// (안드로이드는 이 핸들러로 1번, iOS는 자체표시+이 핸들러가 같은 tag로 합쳐져 1번)
+messaging.onBackgroundMessage(function(payload) {
+  const d = payload.data || {};
+  const base = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '');
+  return self.registration.showNotification(d.title || '홍쌤 교실', {
+    body: d.body || '',
+    icon: base + 'icon-192.png',
+    tag: d.tag || 'hongssam',
+    renotify: false,
+    data: d
+  });
+});
 
 // 알림 클릭 시 앱 열기
 self.addEventListener('notificationclick', function(event) {
