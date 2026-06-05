@@ -72,3 +72,9 @@ jobs:
           cd "교실-칭찬"
           clasp push --force
           clasp deploy -i "AKfycbxijB3f7zDKLxKDnSyoHIu0cTOpC2HWEkuVhq8VcogbgEizKuhoi-AVQzEEFV6KxdV3tQ"
+
+      - name: Deploy 우리반-설문
+        continue-on-error: true
+        run: |
+          cd "우리반-설문"
+          clasp push --force
