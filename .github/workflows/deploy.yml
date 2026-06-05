@@ -78,3 +78,4 @@ jobs:
         run: |
           cd "우리반-설문"
           clasp push --force
+          clasp deploy -i "AKfycbx9zDpMWjN8gadHPPnMQg4peWQZdtW_40SBjsvG6A5w3evbi0-NyKlrotX2iIQsTtp8Zw"
