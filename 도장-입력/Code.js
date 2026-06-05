@@ -224,18 +224,27 @@ function recordStamp(p) {
       _pushToStudent_(ss, sid, emoji + ' ' + kind + ' 도장 +1', info || (kind + ' 잘했어요!'));
     } catch(_) {}
 
-    // 오늘 이 학생 카운트 다시 계산 (카테고리별)
-    var today = _todayStr_();
-    var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
-    var todayMap = {};
-    for (var r = 0; r < log.length; r++) {
-      if (String(log[r][1]||'').trim() !== sid) continue;
-      var d = log[r][0] ? Utilities.formatDate(new Date(log[r][0]),'Asia/Seoul','yyyy-MM-dd') : '';
-      if (d !== today) continue;
-      var kk = String(log[r][3]).trim();
-      todayMap[kk] = (todayMap[kk]||0) + 1;
-    }
-    return { success: true, today: todayMap };
+    // 전체 로그 재조회 없이 즉시 응답 (속도) — 카운트는 클라이언트가 +1 처리
+    return { success: true, kind: kind };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 여러 명에게 한 번에 (칭찬 등 사유형 일괄). 푸시 없이 빠르게 일괄 기록.
+function recordStampBatch(p) {
+  try {
+    var ss = _ensureSheets_();
+    var sids = p.sids || [], names = p.names || [];
+    if (!sids.length) return { success: false, message: '대상 없음' };
+    var kind = String(p.kind||'').trim();
+    var reason = String(p.reason||'').trim();
+    if (!kind) return { success: false, message: '종류 없음' };
+    var now = new Date();
+    var rows = sids.map(function(sid, i){
+      return [now, String(sid).trim(), String(names[i]||'').trim(), kind, reason, '', '', ''];
+    });
+    var logSh = ss.getSheetByName('도장기록');
+    logSh.getRange(logSh.getLastRow()+1, 1, rows.length, 8).setValues(rows);
+    return { success: true, count: rows.length, kind: kind };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -278,7 +287,8 @@ function getTodayRecords(cls) {
         reason: String(log[r][4]||''), sheet: String(log[r][6]||''), problem: String(log[r][7]||'')
       });
     }
-    items.sort(function(a,b){ return b.ts - a.ts; });
+    // 학번순 정렬 (같은 학생은 시간순)
+    items.sort(function(a,b){ return String(a.sid).localeCompare(String(b.sid), undefined, {numeric:true}) || a.ts - b.ts; });
     return { success: true, items: items };
   } catch(e) { return { success: false, message: e.toString(), items: [] }; }
 }
@@ -297,6 +307,9 @@ function _getSys_(ss, key) {
 }
 
 function _getFcmToken_() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('fcm_access_token');
+  if (cached) return cached;
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var privateKey  = _getSys_(ss, 'FCM_PRIVATE_KEY').replace(/\\n/g, '\n');
   var clientEmail = _getSys_(ss, 'FCM_CLIENT_EMAIL');
@@ -314,7 +327,9 @@ function _getFcmToken_() {
     payload: 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=' + toSign + '.' + sig,
     muteHttpExceptions: true
   });
-  return JSON.parse(res.getContentText()).access_token || '';
+  var at = JSON.parse(res.getContentText()).access_token || '';
+  if (at) cache.put('fcm_access_token', at, 3000); // 50분 캐시 → 매번 인증 안 함
+  return at;
 }
 
 function _pushToStudent_(ss, sid, title, body) {
