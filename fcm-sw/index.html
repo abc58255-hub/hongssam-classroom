@@ -233,11 +233,18 @@
 
     setStatus('서버에 저장 중...');
     try {
+      // 이 기기(브라우저/홈화면앱 인스턴스) 고유 ID — 같은 기기 중복 토큰 방지
+      var deviceId = localStorage.getItem('fcm_device_id');
+      if (!deviceId) {
+        deviceId = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem('fcm_device_id', deviceId);
+      }
       var url = GAS_URL
         + '?action=saveFcmToken'
         + '&studentId=' + encodeURIComponent(studentId)
         + '&token=' + encodeURIComponent(token)
-        + '&pwHash=' + encodeURIComponent(pwHash);
+        + '&pwHash=' + encodeURIComponent(pwHash)
+        + '&deviceId=' + encodeURIComponent(deviceId);
       var result = await callGasJsonp(url);
       if (!result.success) {
         setStatus('❌ ' + (result.message || '저장 실패'), true);

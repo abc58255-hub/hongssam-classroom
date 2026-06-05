@@ -647,6 +647,13 @@
           <button onclick="checkTriggerStatus()" style="background:#e2e8f0;color:#374151;border:none;padding:5px 12px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;">🔍 확인</button>
         </div>
         <div id="triggerStatusResult" style="font-size:12px;color:#94a3b8;">확인 버튼을 눌러주세요.</div>
+        <div style="border-top:1px solid #e2e8f0;margin-top:10px;padding-top:10px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span style="font-size:12px;color:#64748b;">알림이 여러 번 오면 토큰을 초기화하고 학생들이 재등록하면 돼요.</span>
+            <button onclick="resetFcmTokens()" style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;padding:6px 12px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;white-space:nowrap;">🧹 FCM 토큰 초기화</button>
+          </div>
+          <div id="resetTokenResult" style="font-size:12px;margin-top:6px;"></div>
+        </div>
       </div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
         <span style="font-size:13px;color:#64748b;">최근 자동 발송된 알림 기록 (최대 30건)</span>
@@ -4576,6 +4583,19 @@
       })
       .getBoardNotices();
   }
+  function resetFcmTokens() {
+    if (!confirm('모든 학생의 FCM 알림 토큰을 초기화할까요?\n\n초기화 후 학생들이 "알림 설정"에서 다시 등록해야 알림을 받아요.\n(중복 알림 문제 해결용)')) return;
+    var res = document.getElementById('resetTokenResult');
+    res.innerHTML = '<span style="color:#94a3b8;">초기화 중...</span>';
+    google.script.run
+      .withSuccessHandler(function(r){
+        if (r.success) res.innerHTML = '<span style="color:#10b981;">✅ ' + r.cleared + '명 토큰 초기화 완료. 학생들에게 재등록을 안내해주세요.</span>';
+        else res.innerHTML = '<span style="color:#ef4444;">실패: ' + (r.message||'') + '</span>';
+      })
+      .withFailureHandler(function(e){ res.innerHTML = '<span style="color:#ef4444;">오류: ' + e.message + '</span>'; })
+      .resetAllFcmTokens();
+  }
+
   function checkTriggerStatus() {
     var res = document.getElementById('triggerStatusResult');
     res.textContent = '확인 중...';

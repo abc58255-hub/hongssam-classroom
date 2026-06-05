@@ -1,8 +1,8 @@
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
   || '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
 
-// FCM 토큰 저장 — E열에 JSON 배열로 누적 (기기별 최대 5개)
-function saveFcmToken(studentId, token, pwHash) {
+// FCM 토큰 저장 — E열에 [{t:토큰, d:기기ID}] 배열. 같은 기기는 토큰 1개만 유지
+function saveFcmToken(studentId, token, pwHash, deviceId) {
   try {
     const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
     const data = sheet.getDataRange().getValues();
@@ -18,14 +18,19 @@ function saveFcmToken(studentId, token, pwHash) {
           }
         }
         var raw = String(data[i][4] || '').trim();
-        var tokens = [];
-        try { tokens = JSON.parse(raw); if (!Array.isArray(tokens)) tokens = raw ? [raw] : []; }
-        catch(_) { tokens = raw ? [raw] : []; }
-        if (token && tokens.indexOf(token) < 0) {
-          tokens.push(token);
-          if (tokens.length > 5) tokens = tokens.slice(tokens.length - 5);
+        var objs = _parseTokenObjs(raw); // [{t, d}]
+        if (token) {
+          if (deviceId) {
+            // 같은 기기의 기존 토큰 제거 후 새 토큰 추가 (기기당 1개)
+            objs = objs.filter(function(o){ return o.d !== deviceId; });
+            objs.push({ t: token, d: deviceId });
+          } else {
+            // 기기ID 없으면 토큰 중복만 제거
+            if (!objs.some(function(o){ return o.t === token; })) objs.push({ t: token, d: '' });
+          }
+          if (objs.length > 5) objs = objs.slice(objs.length - 5);
         }
-        sheet.getRange(i + 1, 5).setValue(JSON.stringify(tokens));
+        sheet.getRange(i + 1, 5).setValue(JSON.stringify(objs));
         return { success: true };
       }
     }
@@ -35,11 +40,22 @@ function saveFcmToken(studentId, token, pwHash) {
   }
 }
 
+// E열 토큰 파싱 → [{t, d}] (구형 문자열 배열·단일 문자열 호환)
+function _parseTokenObjs(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return [];
+  try {
+    var arr = JSON.parse(s);
+    if (!Array.isArray(arr)) arr = [s];
+    return arr.map(function(e){ return (typeof e === 'string') ? { t: e, d: '' } : (e && e.t ? { t: e.t, d: e.d || '' } : null); }).filter(Boolean);
+  } catch(_) { return [{ t: s, d: '' }]; }
+}
+
 
 
 function doGet(e) {
   if (e && e.parameter && e.parameter.action === 'saveFcmToken') {
-    var result = saveFcmToken(e.parameter.studentId, e.parameter.token, e.parameter.pwHash || null);
+    var result = saveFcmToken(e.parameter.studentId, e.parameter.token, e.parameter.pwHash || null, e.parameter.deviceId || '');
     var output = JSON.stringify(result);
     if (e.parameter.callback) {
       return ContentService.createTextOutput(e.parameter.callback + '(' + output + ')')

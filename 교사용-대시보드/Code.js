@@ -97,26 +97,35 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
   } catch(e) { return { ok: false, invalid: false }; }
 }
 
-// E열 FCM 토큰 파싱 — 구형 단일 문자열·신형 JSON 배열 모두 지원
-function _parseTokens_(raw) {
+// E열 토큰 파싱 → [{t,d}] (구형 문자열·배열 호환)
+function _parseTokenObjs_(raw) {
   var s = String(raw || '').trim();
   if (!s) return [];
-  try { var arr = JSON.parse(s); return Array.isArray(arr) ? arr.filter(Boolean) : (s ? [s] : []); }
-  catch(_) { return [s]; }
+  try {
+    var arr = JSON.parse(s);
+    if (!Array.isArray(arr)) arr = [s];
+    return arr.map(function(e){ return (typeof e === 'string') ? { t: e, d: '' } : (e && e.t ? { t: e.t, d: e.d || '' } : null); }).filter(Boolean);
+  } catch(_) { return [{ t: s, d: '' }]; }
+}
+// 토큰 문자열 배열만 (있는지 확인용)
+function _parseTokens_(raw) {
+  return _parseTokenObjs_(raw).map(function(o){ return o.t; });
 }
 
-// 한 학생의 토큰 묶음에 발송 + 무효 토큰 자동 제거. 반환: 1명 이상 성공 여부
-function _sendAndPrune_(sheet, rowIdx, tokens, title, body, clickUrl, tag) {
-  var ok = false, invalidSet = [];
-  for (var t = 0; t < tokens.length; t++) {
-    var r = sendFcmToToken_(tokens[t], title, body, clickUrl, tag);
-    if (r.ok) ok = true;
-    else if (r.invalid) invalidSet.push(tokens[t]);
+// 한 학생에게 발송 + 무효 토큰 자동 제거. 셀을 직접 읽어 객체 형식 유지.
+function _sendAndPrune_(sheet, rowIdx, title, body, clickUrl, tag) {
+  if (!rowIdx) return false;
+  var raw = String(sheet.getRange(rowIdx, 5).getValue() || '').trim();
+  var objs = _parseTokenObjs_(raw);
+  if (!objs.length) return false;
+  var ok = false, changed = false, kept = [];
+  for (var i = 0; i < objs.length; i++) {
+    var r = sendFcmToToken_(objs[i].t, title, body, clickUrl, tag);
+    if (r.ok) { ok = true; kept.push(objs[i]); }
+    else if (r.invalid) { changed = true; } // 무효 토큰 → 버림
+    else { kept.push(objs[i]); }             // 일시 실패 → 유지
   }
-  if (invalidSet.length) {
-    var kept = tokens.filter(function(tk){ return invalidSet.indexOf(tk) < 0; });
-    try { sheet.getRange(rowIdx, 5).setValue(kept.length ? JSON.stringify(kept) : ''); } catch(_) {}
-  }
+  if (changed) { try { sheet.getRange(rowIdx, 5).setValue(kept.length ? JSON.stringify(kept) : ''); } catch(_) {} }
   return ok;
 }
 
@@ -138,7 +147,7 @@ function sendPushToStudents(studentIds, title, body, tag, filterClass) {
         var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
         if (cls !== filterClass) continue;
       }
-      var ok = _sendAndPrune_(sheet, i + 1, tokens, title, body, clickUrl, tag || 'default');
+      var ok = _sendAndPrune_(sheet, i + 1, title, body, clickUrl, tag || 'default');
       if (ok) sent++; else skipped++;
     }
     return { success: true, sent: sent, skipped: skipped };
@@ -148,6 +157,17 @@ function sendPushToStudents(studentIds, title, body, tag, filterClass) {
 // 전체 학생 알림
 function sendPushToAll(title, body, tag) {
   return sendPushToStudents(null, title, body, tag);
+}
+
+// FCM 토큰 전체 초기화 — 명부 E열 비움. 학생이 재등록하면 기기당 1개로 깨끗하게 시작
+function resetAllFcmTokens() {
+  try {
+    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
+    if (sheet.getLastRow() < 2) return { success: true, cleared: 0 };
+    var n = sheet.getLastRow() - 1;
+    sheet.getRange(2, 5, n, 1).clearContent(); // E열
+    return { success: true, cleared: n };
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 // 특정 과제 미제출자에게 알림 — 마감일이 설정된 반 학생에게만
@@ -278,7 +298,7 @@ function _notifyNewTask_(taskName, deadlinesJson) {
       if (!tokens.length) continue;
       var title = '📝 새 과제: ' + taskName;
       var body  = '마감: ' + _formatDeadline_(dl);
-      if (_sendAndPrune_(sheet, i + 1, tokens, title, body, clickUrl, 'newTask')) sent++;
+      if (_sendAndPrune_(sheet, i + 1, title, body, clickUrl, 'newTask')) sent++;
     }
     return sent;
   } catch(e) {
@@ -320,7 +340,7 @@ function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
         ? '📅 마감일 변경: ' + taskName
         : '📝 마감일 추가: ' + taskName;
       var body = '새 마감: ' + _formatDeadline_(newEff);
-      if (_sendAndPrune_(sheet, i + 1, tokens, title, body, clickUrl, 'taskUpdate')) sent++;
+      if (_sendAndPrune_(sheet, i + 1, title, body, clickUrl, 'taskUpdate')) sent++;
     }
     return sent;
   } catch(e) {
@@ -379,7 +399,7 @@ function notifyGradedHourly() {
       } else {
         continue;
       }
-      if (_sendAndPrune_(rosterSheet, rowMap[sid], tokens, title, body, clickUrl, 'graded')) sent++;
+      if (_sendAndPrune_(rosterSheet, rowMap[sid], title, body, clickUrl, 'graded')) sent++;
     }
     props.setProperty('last_grade_notify_ts', String(now));
     Logger.log('notifyGradedHourly: ' + sent + '건 발송');
@@ -474,7 +494,7 @@ function notifyUnsubmittedDaily() {
         if (missing.length > 4) body += ' 외 ' + (missing.length - 4) + '개';
       }
 
-      if (_sendAndPrune_(rosterSheet, rowMap[sid], tokens, title, body, clickUrl, 'unsub')) sent++;
+      if (_sendAndPrune_(rosterSheet, rowMap[sid], title, body, clickUrl, 'unsub')) sent++;
     });
 
     props0.setProperty('last_unsub_notify_day', today);
