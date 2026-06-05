@@ -2646,16 +2646,17 @@
 
   function extractDeadlinesJSON(containerId, classesContainerId) {
     var d = {};
+    function val(row, sel) { var el = row.querySelector(sel); return el ? el.value : ''; }
     document.querySelectorAll('#' + containerId + ' .deadline-row').forEach(function(row) {
-      var cls = row.querySelector('.dl-class').value;
-      var date = row.querySelector('.dl-date').value;
-      var time = row.querySelector('.dl-time').value;
-      var openDate = row.querySelector('.dl-open-date').value;
-      var openTime = row.querySelector('.dl-open-time').value;
-      var resubDate = row.querySelector('.dl-resub-date').value;
-      var resubTime = row.querySelector('.dl-resub-time').value;
+      var cls = val(row, '.dl-class');
+      var date = val(row, '.dl-date');
+      var time = val(row, '.dl-time');
+      var openDate = val(row, '.dl-open-date');
+      var openTime = val(row, '.dl-open-time');
+      var resubDate = val(row, '.dl-resub-date');
+      var resubTime = val(row, '.dl-resub-time');
       if (cls && date) {
-        d[cls] = date + 'T' + (time || '23:59');
+        d[cls] = date + 'T' + (time || '17:05');
         if (openDate) d['open_' + cls] = openDate + 'T' + (openTime || '00:00');
         if (resubDate) d['resub_' + cls] = resubDate + 'T' + (resubTime || '23:59');
       }
@@ -2666,7 +2667,11 @@
   function createNewTask() {
     var n = document.getElementById('newTaskName').value.trim();
     if (!n) return alert("과제명을 입력해주세요.");
+    var rowCnt = document.querySelectorAll('#deadlineContainer .deadline-row').length;
     var dJson = extractDeadlinesJSON('deadlineContainer');
+    if (rowCnt > 0 && dJson === '{}') {
+      if (!confirm('마감일 행은 있는데 날짜가 비어있어요.\n날짜를 선택하지 않으면 "기한 없음"으로 저장됩니다.\n그래도 계속할까요?')) return;
+    }
     
     var choiceList = "";
     if (document.getElementById('checkChoiceMode').checked) {
@@ -2702,7 +2707,11 @@
 
   function submitTaskEdit() {
     var n = document.getElementById('editTaskName').value;
+    var rowCnt = document.querySelectorAll('#editDeadlineContainer .deadline-row').length;
     var dJson = extractDeadlinesJSON('editDeadlineContainer');
+    if (rowCnt > 0 && dJson === '{}') {
+      if (!confirm('마감일 행은 있는데 날짜가 비어있어요.\n날짜를 선택하지 않으면 "기한 없음"으로 저장됩니다.\n그래도 계속할까요?')) return;
+    }
     var o = allTasks.find(function(x) { return x.name === n; });
     var td = { originalName: n, desc: document.getElementById('editTaskDesc').value, evalType: document.getElementById('editEvalType').value, deadlines: dJson, isPublic: o ? o.isPublic : false };
     var btn = document.getElementById('btnSaveEdit');
