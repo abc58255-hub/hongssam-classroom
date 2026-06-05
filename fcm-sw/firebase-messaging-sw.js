@@ -6,15 +6,16 @@ firebase.initializeApp(FIREBASE_CONFIG);
 
 const messaging = firebase.messaging();
 
-// 앱이 닫혀 있을 때 백그라운드 알림 처리
+// 앱이 닫혀 있을 때 백그라운드 알림 처리 — data-only 메시지 사용 (중복 표시 방지)
 messaging.onBackgroundMessage(function(payload) {
-  const title   = (payload.notification && payload.notification.title) || '홍쌤 교실';
+  const d = payload.data || {};
+  const title   = d.title || (payload.notification && payload.notification.title) || '홍쌤 교실';
   const options = {
-    body:  (payload.notification && payload.notification.body) || '',
+    body:  d.body || (payload.notification && payload.notification.body) || '',
     icon:  self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '') + 'icon-192.png',
     badge: self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '') + 'badge.png',
-    tag:   (payload.data && payload.data.tag) || 'hongssam',
-    data:  payload.data || {}
+    tag:   d.tag || 'hongssam',
+    data:  d
   };
   return self.registration.showNotification(title, options);
 });
