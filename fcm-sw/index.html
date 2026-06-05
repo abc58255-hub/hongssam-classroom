@@ -143,6 +143,13 @@
   if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
   var messaging = firebase.messaging();
 
+  // 페이지 로드 시 서비스워커 갱신 (재등록 없이도 새 SW 적용 — 알림 내용/중복 수정 반영)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./firebase-messaging-sw.js').then(function(reg) {
+      try { reg.update(); } catch(_) {}
+    }).catch(function(){});
+  }
+
   function setStatus(msg, isError) {
     var el = document.getElementById('status');
     el.textContent = msg;
