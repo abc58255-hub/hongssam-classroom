@@ -65,6 +65,10 @@
   input.txt { width: 100%; font-size: 16px; padding: 14px; border: none; background: #f2f4f6; border-radius: 14px; margin-top: 8px; outline: none; }
   input.txt:focus { box-shadow: inset 0 0 0 2px #6366f1; }
 
+  .qtyrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .qbtn { width: 44px; height: 44px; border: none; border-radius: 12px; background: #f2f4f6; color: #4f46e5;
+          font-size: 22px; font-weight: 800; cursor: pointer; }
+  .qval { min-width: 40px; text-align: center; font-size: 22px; font-weight: 800; color: #191f28; }
   .actions { display: flex; gap: 10px; margin-top: 24px; }
   .actions button { flex: 1; padding: 17px; border-radius: 16px; border: none; font-size: 17px; font-weight: 800; cursor: pointer; }
   .save { background: #4f46e5; color: #fff; }
@@ -90,8 +94,7 @@
   <div class="top">
     <h1>🏅 도장</h1>
     <select id="classSel" onchange="loadInput()"></select>
-    <button id="multiBtn" onclick="toggleMulti()" style="margin-left:auto;font-size:14px;padding:11px 16px;border:none;border-radius:12px;background:#fff;color:#4f46e5;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.04);">✓ 여러 명</button>
-    <button onclick="openQR()" style="font-size:14px;padding:11px 16px;border:none;border-radius:12px;background:#fff;color:#4f46e5;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.04);">📱 QR</button>
+    <button onclick="openQR()" style="margin-left:auto;font-size:14px;padding:11px 16px;border:none;border-radius:12px;background:#fff;color:#4f46e5;font-weight:700;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.04);">📱 QR</button>
   </div>
   <div class="ws-banner" id="wsBanner" style="display:none;"></div>
   <div id="grid"><div class="loading">불러오는 중…</div></div>
@@ -99,10 +102,6 @@
 
 <div class="bottombar" id="normalBar">
   <button class="btn-check" onclick="openToday()">📋 오늘 기록 확인 · 정정</button>
-</div>
-<div class="bottombar" id="multiBar" style="display:none;">
-  <button class="btn-check" onclick="clearMulti()" style="flex:0 0 auto;">해제</button>
-  <button class="save" style="flex:1;background:#4f46e5;color:#fff;" onclick="openBatch()"><span id="multiCount">0</span>명에게 도장 주기</button>
 </div>
 
 <!-- 입력 모달 -->
@@ -174,43 +173,19 @@
     }).join('');
   }
 
-  var MULTI = { on: false, sel: {} };
-
   function renderGrid() {
     if (!DATA.students.length) { document.getElementById('grid').innerHTML = '<div class="empty">학생이 없어요.</div>'; return; }
     var h = '<div class="grid">';
     DATA.students.forEach(function(s, i){
-      var selCls = (MULTI.on && MULTI.sel[s.sid]) ? ' sel' : '';
-      h += '<div class="name-btn'+selCls+'" onclick="nameTap('+i+')">'+esc(s.name)
+      h += '<div class="name-btn" onclick="openInput('+i+')">'+esc(s.name)
         + '<div class="badges">' + badgesHtml(s.today) + '</div></div>';
     });
     h += '</div>';
     document.getElementById('grid').innerHTML = h;
   }
-
-  function nameTap(i) {
-    if (MULTI.on) {
-      var sid = DATA.students[i].sid;
-      if (MULTI.sel[sid]) delete MULTI.sel[sid]; else MULTI.sel[sid] = true;
-      renderGrid(); updateMultiBar();
-    } else { openInput(i); }
-  }
-  function toggleMulti() {
-    MULTI.on = !MULTI.on; MULTI.sel = {};
-    document.getElementById('multiBtn').style.background = MULTI.on ? '#4f46e5' : '#fff';
-    document.getElementById('multiBtn').style.color = MULTI.on ? '#fff' : '#4f46e5';
-    document.getElementById('normalBar').style.display = MULTI.on ? 'none' : 'flex';
-    document.getElementById('multiBar').style.display = MULTI.on ? 'flex' : 'none';
-    renderGrid(); updateMultiBar();
-  }
-  function clearMulti() { MULTI.sel = {}; renderGrid(); updateMultiBar(); }
-  function updateMultiBar() {
-    document.getElementById('multiCount').textContent = Object.keys(MULTI.sel).length;
-  }
-
   function openInput(i) {
     var s = DATA.students[i];
-    SEL = { idx: i, sid: s.sid, name: s.name, kind: null, type: null, emoji: '',
+    SEL = { idx: i, sid: s.sid, name: s.name, kind: null, type: null, emoji: '', qty: 1,
             sheet: (DATA.todayWorksheet&&DATA.todayWorksheet.sheet)||'', problem: '', reason: '', lessonNo: (DATA.todayWorksheet&&DATA.todayWorksheet.lessonNo)||'' };
     renderModal();
     document.getElementById('modalBg').classList.add('show');
@@ -252,6 +227,16 @@
         + '</div>';
     }
 
+    if (s.kind) {
+      h += '<div class="section"><div class="lbl">개수 (한 번에 여러 개)</div>'
+        + '<div class="qtyrow">'
+        + '<button class="qbtn" onclick="setQty(SEL.qty-1)">−</button>'
+        + '<span class="qval" id="qtyVal">'+s.qty+'</span>'
+        + '<button class="qbtn" onclick="setQty(SEL.qty+1)">+</button>'
+        + '<div style="display:flex;gap:6px;margin-left:8px;">'
+        + [1,2,3,5].map(function(n){ return '<div class="opt'+(s.qty===n?' sel':'')+'" style="padding:10px 14px;" onclick="setQty('+n+')">'+n+'</div>'; }).join('')
+        + '</div></div></div>';
+    }
     h += '<div class="actions">'
       + '<button class="cancel" onclick="closeModal()">취소</button>'
       + '<button class="save" id="saveBtn" onclick="doSave()" disabled>기록</button>'
@@ -260,6 +245,7 @@
     if (s.type === 'sheet') renderProblems();
     updateSave();
   }
+  function setQty(n){ SEL.qty = Math.max(1, Math.min(20, n)); renderModal(); }
 
   function pickKind(k){
     var cat = catByName(k);
@@ -310,13 +296,14 @@
     var ok = false;
     if (SEL && SEL.type === 'sheet') ok = !!(SEL.sheet && SEL.problem);
     else if (SEL && SEL.type === 'reason') ok = !!(SEL.reason && SEL.reason.trim());
-    var b = document.getElementById('saveBtn'); if (b) b.disabled = !ok;
+    var b = document.getElementById('saveBtn');
+    if (b) { b.disabled = !ok; b.textContent = (SEL && SEL.qty>1) ? (SEL.qty+'개 기록') : '기록'; }
   }
 
   function doSave() {
     if (!SEL) return;
-    var b = document.getElementById('saveBtn'); b.disabled = true; b.textContent = '저장중…';
-    var payload = { sid: SEL.sid, name: SEL.name, kind: SEL.kind, type: SEL.type, emoji: SEL.emoji };
+    var qty = SEL.qty || 1;
+    var payload = { sid: SEL.sid, name: SEL.name, kind: SEL.kind, type: SEL.type, emoji: SEL.emoji, count: qty };
     if (SEL.type === 'sheet') {
       payload.sheet = SEL.sheet;
       payload.problem = (SEL.problem==='__none__') ? '' : SEL.problem;
@@ -326,65 +313,18 @@
       payload.reason = SEL.reason;
     }
     var savedIdx = SEL.idx, kind = SEL.kind, name = SEL.name;
-    // 즉시 반영 (서버 응답 기다리지 않고 배지 +1) — 빠른 입력
+    // 즉시 반영 (서버 응답 기다리지 않고 배지 +qty) — 빠른 입력
     var st = DATA.students[savedIdx];
-    st.today[kind] = (st.today[kind]||0) + 1;
+    st.today[kind] = (st.today[kind]||0) + qty;
     renderGrid();
-    toast('✅ '+name+' '+kind+' 기록!');
+    toast('✅ '+name+' '+kind+' '+(qty>1?qty+'개 ':'')+'기록!');
     closeModal();
     google.script.run.withSuccessHandler(function(res){
       if (!res || !res.success) {
-        st.today[kind] = Math.max(0,(st.today[kind]||1)-1); renderGrid();
+        st.today[kind] = Math.max(0,(st.today[kind]||qty)-qty); renderGrid();
         toast('⚠ 실패: '+((res&&res.message)||''));
       }
     }).recordStamp(payload);
-  }
-
-  // ===== 여러 명 한꺼번에 (사유형) =====
-  function openBatch() {
-    var n = Object.keys(MULTI.sel).length;
-    if (!n) { toast('학생을 먼저 선택하세요'); return; }
-    BSEL = { kind:null, type:null, emoji:'', reason:'' };
-    renderBatchModal();
-    document.getElementById('modalBg').classList.add('show');
-  }
-  var BSEL = null;
-  function renderBatchModal() {
-    var reasonCats = (DATA.categories||[]).filter(function(c){ return c.type==='reason'; });
-    var h = '<h2>'+Object.keys(MULTI.sel).length+'명에게</h2><div class="sid">사유형 도장을 한 번에 줍니다</div>';
-    h += '<div class="kind-row" style="flex-wrap:wrap;">'
-      + reasonCats.map(function(c){
-          return '<div class="kind-btn praise '+(BSEL.kind===c.name?'sel':'')+'" style="min-width:90px;flex:1 1 90px;" onclick="pickBatchKind(\''+esc(c.name).replace(/'/g,"\\'")+'\')">'+c.emoji+' '+esc(c.name)+'</div>';
-        }).join('') + '</div>';
-    if (BSEL.kind) {
-      var cat = (DATA.categories||[]).filter(function(c){return c.name===BSEL.kind;})[0];
-      var presets = (cat && cat.presets) ? cat.presets : [];
-      h += '<div class="section"><div class="lbl">사유</div><div class="chips">'
-        + presets.map(function(p){ return '<div class="opt '+(BSEL.reason===p?'sel':'')+'" onclick="pickBatchReason(\''+esc(p).replace(/'/g,"\\'")+'\')">'+esc(p)+'</div>'; }).join('')
-        + '<div class="opt ghost" onclick="pickBatchReasonCustom()">+ 직접</div></div>'
-        + '<input class="txt" id="batchCustom" placeholder="사유 직접 입력" style="display:none;" oninput="BSEL.reason=this.value;updBatchSave();"></div>';
-    }
-    h += '<div class="actions"><button class="cancel" onclick="closeModal()">취소</button>'
-      + '<button class="save" id="batchSaveBtn" onclick="doBatch()" disabled>주기</button></div>';
-    document.getElementById('modalBox').innerHTML = h;
-    updBatchSave();
-  }
-  function pickBatchKind(k){ var c=(DATA.categories||[]).filter(function(x){return x.name===k;})[0]; BSEL.kind=k; BSEL.type='reason'; BSEL.emoji=c?c.emoji:'🏅'; BSEL.reason=''; renderBatchModal(); }
-  function pickBatchReason(p){ BSEL.reason=p; var c=document.getElementById('batchCustom'); if(c)c.style.display='none'; renderBatchModal(); }
-  function pickBatchReasonCustom(){ var c=document.getElementById('batchCustom'); c.style.display='block'; BSEL.reason=c.value||''; c.focus(); updBatchSave(); }
-  function updBatchSave(){ var b=document.getElementById('batchSaveBtn'); if(b) b.disabled = !(BSEL && BSEL.reason && BSEL.reason.trim()); }
-  function doBatch() {
-    var sids = Object.keys(MULTI.sel);
-    var names = sids.map(function(sid){ var s=DATA.students.filter(function(x){return x.sid===sid;})[0]; return s?s.name:''; });
-    var b=document.getElementById('batchSaveBtn'); b.disabled=true; b.textContent='저장중…';
-    var kind=BSEL.kind, reason=BSEL.reason;
-    google.script.run.withSuccessHandler(function(res){
-      if (res && res.success) {
-        sids.forEach(function(sid){ var s=DATA.students.filter(function(x){return x.sid===sid;})[0]; if(s){ s.today[kind]=(s.today[kind]||0)+1; } });
-        toast('✅ '+sids.length+'명 '+kind+' 기록!');
-        MULTI.sel = {}; renderGrid(); updateMultiBar(); closeModal();
-      } else { toast('⚠ 실패'); b.disabled=false; b.textContent='주기'; }
-    }).recordStampBatch({ sids: sids, names: names, kind: kind, reason: reason });
   }
 
   // 오늘 기록 확인·정정

@@ -210,22 +210,30 @@ function recordStamp(p) {
     var problem = isSheet ? String(p.problem||'').trim() : '';
     var lessonNo = isSheet ? (p.lessonNo || '') : '';
     if (isSheet && !reason) reason = kind;
+    var count = Math.max(1, Math.min(20, parseInt(p.count) || 1)); // 한 학생에게 여러 개
 
     var logSh = ss.getSheetByName('도장기록');
-    logSh.appendRow([new Date(), sid, String(p.name||'').trim(), kind, reason, lessonNo, sheet, problem]);
+    var name = String(p.name||'').trim();
+    if (count === 1) {
+      logSh.appendRow([new Date(), sid, name, kind, reason, lessonNo, sheet, problem]);
+    } else {
+      var rows = [];
+      for (var i = 0; i < count; i++) rows.push([new Date(), sid, name, kind, reason, lessonNo, sheet, problem]);
+      logSh.getRange(logSh.getLastRow()+1, 1, count, 8).setValues(rows);
+    }
 
     // 학습지형은 학습지·문제를 다음에 버튼으로 쓰도록 자동 누적
     if (isSheet && sheet) { _upsertWorksheetProblem_(ss, sheet, problem); }
 
-    // 학생 폰에 자동 푸시 (best-effort)
+    // 학생 폰에 자동 푸시 (best-effort) — 여러 개면 +N 표시, 1회만 발송
     try {
       var emoji = String(p.emoji||'🏅');
       var info = isSheet ? [sheet, problem].filter(Boolean).join(' ') : reason;
-      _pushToStudent_(ss, sid, emoji + ' ' + kind + ' 도장 +1', info || (kind + ' 잘했어요!'));
+      _pushToStudent_(ss, sid, emoji + ' ' + kind + ' 도장 +' + count, info || (kind + ' 잘했어요!'));
     } catch(_) {}
 
-    // 전체 로그 재조회 없이 즉시 응답 (속도) — 카운트는 클라이언트가 +1 처리
-    return { success: true, kind: kind };
+    // 전체 로그 재조회 없이 즉시 응답 (속도) — 카운트는 클라이언트가 처리
+    return { success: true, kind: kind, count: count };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
