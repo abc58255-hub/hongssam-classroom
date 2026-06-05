@@ -376,7 +376,7 @@
       </div>
       <div class="form-group"><label class="form-label">설명</label><input type="text" id="newTaskDesc" class="form-input" placeholder="학생에게 보여줄 과제 설명 (선택)"></div>
       <div class="form-group">
-        <label class="form-label">마감일 설정 <span style="font-size:12px; color:#64748b; font-weight:normal;">(반별로 다르게 설정 가능 / 날짜만 입력 시 23:59 자동 적용)</span></label>
+        <label class="form-label">마감일 설정 <span style="font-size:12px; color:#64748b; font-weight:normal;">(반별로 다르게 설정 가능 / 마감 시간 기본값 오후 5시 5분)</span></label>
         <div id="deadlineContainer"></div>
         <button type="button" onclick="addDeadlineRow()" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button>
       </div>
@@ -2638,7 +2638,7 @@
   }
 
   function addDeadlineRow() {
-    document.getElementById('deadlineContainer').appendChild(createDeadlineElement('', '', '23:59', '', '00:00', '', ''));
+    document.getElementById('deadlineContainer').appendChild(createDeadlineElement('', '', '17:05', '', '00:00', '', ''));
   }
 
   function addEditDeadlineRow(c, d, t, openD, openT, resubD, resubT) {
