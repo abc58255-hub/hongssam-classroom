@@ -323,7 +323,7 @@ function getCarryList(cls) {
       var c = cmap[sid] || { praise: 0, present: 0 };
       students.push({ sid: sid, name: String(roster[i][2] || '').trim(), praise: c.praise, present: c.present });
     }
-    students.sort(function(a,b){ return a.sid.localeCompare(b.sid); });
+    students.sort(function(a,b){ return a.sid.localeCompare(b.sid, undefined, {numeric:true}); });
     return { success: true, students: students };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
