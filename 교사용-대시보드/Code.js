@@ -83,8 +83,18 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
         headers:{'Authorization':'Bearer ' + accessToken},
         payload: JSON.stringify(message), muteHttpExceptions: true }
     );
-    return res.getResponseCode() === 200;
-  } catch(e) { return false; }
+    var code = res.getResponseCode();
+    if (code === 200) return { ok: true, invalid: false };
+    // 무효(만료/미등록) 토큰 판정 → 자동 정리 대상
+    var invalid = false;
+    if (code === 404) invalid = true;
+    else if (code === 400) {
+      var bodyTxt = res.getContentText() || '';
+      if (bodyTxt.indexOf('UNREGISTERED') >= 0 || bodyTxt.indexOf('INVALID_ARGUMENT') >= 0
+          || bodyTxt.indexOf('registration-token-not-registered') >= 0) invalid = true;
+    }
+    return { ok: false, invalid: invalid };
+  } catch(e) { return { ok: false, invalid: false }; }
 }
 
 // E열 FCM 토큰 파싱 — 구형 단일 문자열·신형 JSON 배열 모두 지원
@@ -93,6 +103,21 @@ function _parseTokens_(raw) {
   if (!s) return [];
   try { var arr = JSON.parse(s); return Array.isArray(arr) ? arr.filter(Boolean) : (s ? [s] : []); }
   catch(_) { return [s]; }
+}
+
+// 한 학생의 토큰 묶음에 발송 + 무효 토큰 자동 제거. 반환: 1명 이상 성공 여부
+function _sendAndPrune_(sheet, rowIdx, tokens, title, body, clickUrl, tag) {
+  var ok = false, invalidSet = [];
+  for (var t = 0; t < tokens.length; t++) {
+    var r = sendFcmToToken_(tokens[t], title, body, clickUrl, tag);
+    if (r.ok) ok = true;
+    else if (r.invalid) invalidSet.push(tokens[t]);
+  }
+  if (invalidSet.length) {
+    var kept = tokens.filter(function(tk){ return invalidSet.indexOf(tk) < 0; });
+    try { sheet.getRange(rowIdx, 5).setValue(kept.length ? JSON.stringify(kept) : ''); } catch(_) {}
+  }
+  return ok;
 }
 
 // 선택한 학생들에게 알림 발송 (클라이언트에서 호출)
@@ -113,10 +138,7 @@ function sendPushToStudents(studentIds, title, body, tag, filterClass) {
         var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
         if (cls !== filterClass) continue;
       }
-      var ok = false;
-      for (var t = 0; t < tokens.length; t++) {
-        if (sendFcmToToken_(tokens[t], title, body, clickUrl, tag || 'default')) ok = true;
-      }
+      var ok = _sendAndPrune_(sheet, i + 1, tokens, title, body, clickUrl, tag || 'default');
       if (ok) sent++; else skipped++;
     }
     return { success: true, sent: sent, skipped: skipped };
@@ -241,7 +263,8 @@ function _notifyNewTask_(taskName, deadlinesJson) {
     if (!hasAny) return 0;
 
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var sheet = ss.getSheetByName('학생명부');
+    var roster = sheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var sent = 0;
 
@@ -255,9 +278,7 @@ function _notifyNewTask_(taskName, deadlinesJson) {
       if (!tokens.length) continue;
       var title = '📝 새 과제: ' + taskName;
       var body  = '마감: ' + _formatDeadline_(dl);
-      for (var t = 0; t < tokens.length; t++) {
-        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'newTask')) sent++;
-      }
+      if (_sendAndPrune_(sheet, i + 1, tokens, title, body, clickUrl, 'newTask')) sent++;
     }
     return sent;
   } catch(e) {
@@ -274,7 +295,8 @@ function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
     try { newDl = JSON.parse(newJson || '{}'); } catch(_) { return 0; }
 
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var sheet = ss.getSheetByName('학생명부');
+    var roster = sheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var sent = 0;
 
@@ -298,9 +320,7 @@ function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
         ? '📅 마감일 변경: ' + taskName
         : '📝 마감일 추가: ' + taskName;
       var body = '새 마감: ' + _formatDeadline_(newEff);
-      for (var t = 0; t < tokens.length; t++) {
-        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'taskUpdate')) sent++;
-      }
+      if (_sendAndPrune_(sheet, i + 1, tokens, title, body, clickUrl, 'taskUpdate')) sent++;
     }
     return sent;
   } catch(e) {
@@ -326,13 +346,14 @@ function notifyGradedHourly() {
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var sheet = ss.getSheetByName('제출현황');
     var data = sheet.getDataRange().getValues();
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var rosterSheet = ss.getSheetByName('학생명부');
+    var roster = rosterSheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
 
-    var tokenMap = {};
+    var tokenMap = {}, rowMap = {};
     for (var r = 1; r < roster.length; r++) {
       var rsid = String(roster[r][1] || '').trim();
-      if (rsid) tokenMap[rsid] = _parseTokens_(roster[r][4]);
+      if (rsid) { tokenMap[rsid] = _parseTokens_(roster[r][4]); rowMap[rsid] = r + 1; }
     }
 
     var sent = 0;
@@ -358,9 +379,7 @@ function notifyGradedHourly() {
       } else {
         continue;
       }
-      for (var t = 0; t < tokens.length; t++) {
-        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'graded')) sent++;
-      }
+      if (_sendAndPrune_(rosterSheet, rowMap[sid], tokens, title, body, clickUrl, 'graded')) sent++;
     }
     props.setProperty('last_grade_notify_ts', String(now));
     Logger.log('notifyGradedHourly: ' + sent + '건 발송');
@@ -376,18 +395,28 @@ function notifyGradedHourly() {
 
 // ③ 매일 8:20 — 마감 안 된 미제출 과제 알림 (한 학생당 한 번)
 function notifyUnsubmittedDaily() {
+  // 동시/중복 실행 방지 (트리거 중복 설치 대비)
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(5000)) { Logger.log('notifyUnsubmittedDaily: 이미 실행 중, 건너뜀'); return { skipped: true }; }
   try {
+    var props0 = PropertiesService.getScriptProperties();
+    var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+    if (props0.getProperty('last_unsub_notify_day') === today) {
+      Logger.log('notifyUnsubmittedDaily: 오늘 이미 발송됨, 건너뜀');
+      return { skipped: true };
+    }
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var tasks = ss.getSheetByName('과제설정').getDataRange().getValues();
     var subs  = ss.getSheetByName('제출현황').getDataRange().getValues();
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var rosterSheet = ss.getSheetByName('학생명부');
+    var roster = rosterSheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var now = new Date();
 
-    var tokenMap = {};
+    var tokenMap = {}, rowMap = {};
     for (var r = 1; r < roster.length; r++) {
       var rsid = String(roster[r][1] || '').trim();
-      if (rsid) tokenMap[rsid] = _parseTokens_(roster[r][4]);
+      if (rsid) { tokenMap[rsid] = _parseTokens_(roster[r][4]); rowMap[rsid] = r + 1; }
     }
 
     // 학번 → {과제명 → true}
@@ -445,17 +474,18 @@ function notifyUnsubmittedDaily() {
         if (missing.length > 4) body += ' 외 ' + (missing.length - 4) + '개';
       }
 
-      for (var t = 0; t < tokens.length; t++) {
-        if (sendFcmToToken_(tokens[t], title, body, clickUrl, 'unsub')) sent++;
-      }
+      if (_sendAndPrune_(rosterSheet, rowMap[sid], tokens, title, body, clickUrl, 'unsub')) sent++;
     });
 
+    props0.setProperty('last_unsub_notify_day', today);
     Logger.log('notifyUnsubmittedDaily: 학생 ' + studentCount + '명, ' + sent + '건 발송');
     if (sent > 0) _logNotify_('📌 미제출 알림', '미제출자 ' + studentCount + '명', sent);
     return { sent: sent, students: studentCount };
   } catch(e) {
     Logger.log('notifyUnsubmittedDaily 오류: ' + e.message);
     return { error: e.message };
+  } finally {
+    lock.releaseLock();
   }
 }
 
