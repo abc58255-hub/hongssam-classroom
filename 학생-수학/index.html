@@ -521,15 +521,17 @@
     }
 
     // 통계
-    var submitted = 0, scoredVals = [];
+    var submitted = 0, scoredVals = [], bestCount = 0;
     allTasks.forEach(function(t){
       var item = latestMap[t];
       if (item && item.status !== '재제출요청' && item.status !== '반려검토') submitted++;
       if (item && item.status === '채점완료' && item.score && !isNaN(parseFloat(item.score))) scoredVals.push(parseFloat(item.score));
+      if (item && item.isMyBest) bestCount++;
     });
     var avgTxt = scoredVals.length > 0 ? ' · 평균 ' + Math.round(scoredVals.reduce(function(a,b){return a+b;},0)/scoredVals.length*10)/10 + '점' : '';
+    var bestTxt = bestCount > 0 ? ' · <span style="color:#f59e0b;">🌟 우수작 ' + bestCount + '개</span>' : '';
     statDiv.innerHTML = '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:700;color:#1e3a8a;">'
-      + '📊 제출 ' + submitted + '/' + allTasks.length + '개' + avgTxt + '</div>';
+      + '📊 제출 ' + submitted + '/' + allTasks.length + '개' + avgTxt + bestTxt + '</div>';
 
     // 테이블
     var rows = allTasks.map(function(t) {
@@ -545,8 +547,13 @@
       } else {
         actionCell = '<button onclick="goToSubmit(\'' + String(t).replace(/'/g, "\\'") + '\')" style="background:#fee2e2;color:#dc2626;border:none;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">제출하기</button>';
       }
-      return '<tr style="border-bottom:1px solid #f1f5f9;">'
-        + '<td style="padding:10px 8px;font-size:13px;font-weight:600;color:#0f172a;word-break:keep-all;">' + t + (item && item.isMyBest ? ' 🌟' : '') + '</td>'
+      var isBest = item && item.isMyBest;
+      var rowBg = isBest ? 'background:#fffbeb;' : '';
+      var bestBadge = isBest
+        ? ' <span style="display:inline-block;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:white;font-size:10px;font-weight:800;padding:2px 7px;border-radius:10px;white-space:nowrap;vertical-align:middle;box-shadow:0 1px 3px rgba(245,158,11,0.4);">🌟 우수작</span>'
+        : '';
+      return '<tr style="border-bottom:1px solid #f1f5f9;' + rowBg + '">'
+        + '<td style="padding:10px 8px;font-size:13px;font-weight:600;color:#0f172a;word-break:keep-all;">' + t + bestBadge + '</td>'
         + '<td style="padding:10px 6px;text-align:center;"><span style="background:' + si.bg + ';color:' + si.color + ';font-size:11px;font-weight:700;padding:3px 8px;border-radius:6px;white-space:nowrap;">' + si.icon + ' ' + si.label + '</span></td>'
         + '<td style="padding:10px 6px;text-align:center;font-size:13px;">' + scoreCell + '</td>'
         + '<td style="padding:10px 6px;text-align:right;">' + actionCell + '</td>'
