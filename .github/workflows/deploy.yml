@@ -71,3 +71,4 @@ jobs:
         run: |
           cd "교실-칭찬"
           clasp push --force
+          clasp deploy -i "AKfycbxijB3f7zDKLxKDnSyoHIu0cTOpC2HWEkuVhq8VcogbgEizKuhoi-AVQzEEFV6KxdV3tQ"
