@@ -10,19 +10,9 @@ const messaging = firebase.messaging();
 self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(e) { e.waitUntil(self.clients.claim()); });
 
-// 앱이 닫혀 있을 때 백그라운드 알림 처리 — data-only 메시지 사용 (중복 표시 방지)
-messaging.onBackgroundMessage(function(payload) {
-  const d = payload.data || {};
-  const title   = d.title || (payload.notification && payload.notification.title) || '홍쌤 교실';
-  const options = {
-    body:  d.body || (payload.notification && payload.notification.body) || '',
-    icon:  self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '') + 'icon-192.png',
-    badge: self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '') + 'badge.png',
-    tag:   d.tag || 'hongssam',
-    data:  d
-  };
-  return self.registration.showNotification(title, options);
-});
+// ⚠️ 중복 표시 방지: onBackgroundMessage에서 showNotification 하지 않음.
+// notification 필드가 있으면 브라우저/iOS가 자동으로 1번 표시하므로 여기선 아무것도 안 함.
+messaging.onBackgroundMessage(function() { /* no-op: 브라우저 자동표시에 맡김 */ });
 
 // 알림 클릭 시 앱 열기
 self.addEventListener('notificationclick', function(event) {

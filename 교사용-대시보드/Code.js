@@ -67,16 +67,17 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
   try {
     var projectId   = _getSys(SpreadsheetApp.openById(SHEET_ID), 'FCM_PROJECT_ID');
     var accessToken = getFCMAccessToken_();
-    // ⚠️ notification 필드 없이 data만 전송 → 서비스워커 onBackgroundMessage에서만 1회 표시
-    // (notification 필드를 넣으면 브라우저 자동표시 + onBackgroundMessage 표시로 2번 뜸)
+    // notification 필드로 전송 (iOS는 notification 있어야 내용 표시됨)
+    // 중복 방지는 서비스워커 onBackgroundMessage를 무력화해서 처리 (브라우저 자동표시 1회만)
+    var link = clickUrl || _getSys(SpreadsheetApp.openById(SHEET_ID), '바로가기_수학교실') || '';
     var message = {
       message: {
         token: token,
-        data: {
-          title: String(title || ''),
-          body: String(body || ''),
-          url: clickUrl || '',
-          tag: tag || 'default'
+        notification: { title: String(title || ''), body: String(body || '') },
+        data: { url: link, tag: tag || 'default' },
+        webpush: {
+          notification: { title: String(title || ''), body: String(body || '') },
+          fcm_options: { link: link }
         }
       }
     };
