@@ -65,3 +65,9 @@ jobs:
           cd "진도표"
           clasp push --force
           clasp deploy -i "AKfycbwn_9wAf1Qyb744x-t3b46CkuikXhg748qryip_tMQYpYUDVz65nPuK_rxVN7LUBkHf9g"
+
+      - name: Deploy 교실-칭찬
+        continue-on-error: true
+        run: |
+          cd "교실-칭찬"
+          clasp push --force
