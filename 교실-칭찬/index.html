@@ -226,11 +226,17 @@
     };
     var btn = document.getElementById('fSaveBtn');
     btn.disabled = true; btn.textContent = '저장 중...';
-    google.script.run.withSuccessHandler(function(res){
-      btn.disabled = false; btn.textContent = '💾 저장';
-      if (res.success) { document.getElementById('formModal').style.display='none'; loadEvents(); }
-      else alert('실패: ' + (res.message||''));
-    }).saveEvent(data);
+    google.script.run
+      .withSuccessHandler(function(res){
+        btn.disabled = false; btn.textContent = '💾 저장';
+        if (res && res.success) { document.getElementById('formModal').style.display='none'; loadEvents(); }
+        else alert('저장 실패: ' + ((res && res.message) || '알 수 없는 오류'));
+      })
+      .withFailureHandler(function(err){
+        btn.disabled = false; btn.textContent = '💾 저장';
+        alert('서버 오류로 저장하지 못했어요:\n' + (err && err.message ? err.message : err));
+      })
+      .saveEvent(data);
   }
 
   function toggleActive(rowIdx, active) {
