@@ -210,7 +210,9 @@ function getEventStats(eventId) {
     var nameOf = {}; roster.forEach(function(s){ nameOf[s.id] = s.name; });
 
     var givenCount = {}, recvCount = {};
+    var gaveSet = {}; // 숨김 포함, 한 번이라도 보낸 학생(실시자)
     recs.forEach(function(r) {
+      if (r.fromId) gaveSet[r.fromId] = true;
       if (r.hidden) return;
       givenCount[r.fromId] = (givenCount[r.fromId] || 0) + 1;
       recvCount[r.toId]   = (recvCount[r.toId]   || 0) + 1;
@@ -223,12 +225,21 @@ function getEventStats(eventId) {
     // 한 번도 못 받은 학생
     var noReceive = roster.filter(function(s){ return !recvCount[s.id]; }).map(function(s){ return s.name; });
 
+    // 미실시자 — 참여 대상 중 한 번도 보내지 않은 학생 (교사 전용, 학생 익명과 무관)
+    var partIds = (ev && ev.participants && ev.participants.length) ? ev.participants.map(String) : roster.map(function(s){ return s.id; });
+    var notGiven = partIds.filter(function(id){ return !gaveSet[id]; })
+      .map(function(id){ return { id: id, name: nameOf[id] || id }; })
+      .sort(function(a,b){ return String(a.id).localeCompare(String(b.id), undefined, {numeric:true}); });
+
     return {
       success: true,
       total: recs.filter(function(r){ return !r.hidden; }).length,
       topGivers: toRank(givenCount).slice(0, 10),
       topReceivers: toRank(recvCount).slice(0, 10),
       noReceive: noReceive,
+      notGiven: notGiven,
+      doneCount: partIds.length - notGiven.length,
+      participantCount: partIds.length,
       rosterCount: roster.length
     };
   } catch(e) { return { success: false, message: e.toString() }; }
