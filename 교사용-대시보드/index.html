@@ -1322,7 +1322,8 @@
   <h3 style="margin-top:0; color:#ea580c;">🚀 스마트 연속 채점</h3>
   <div style="margin-bottom:15px;"><label class="form-label">대상 반</label><select id="smartClass" class="filter-select" style="width:100%;" onchange="updateSmartModeOptions()"></select></div>
   <div style="margin-bottom:15px;"><label class="form-label">대상 과제</label><select id="smartTask" class="filter-select" style="width:100%;" onchange="updateSmartModeOptions()"></select></div>
-  <label style="display:flex; align-items:center; gap:6px; margin-bottom:15px; font-weight:600; cursor:pointer;"><input type="checkbox" id="smartUngraded" checked> 채점 완료된 학생 건너뛰기</label>
+  <label style="display:flex; align-items:center; gap:6px; margin-bottom:15px; font-weight:600; cursor:pointer;"><input type="checkbox" id="smartUngraded" checked onchange="updateSmartModeOptions()"> 채점 완료된 학생 건너뛰기</label>
+  <div id="smartCountBox" style="font-size:13px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:9px 12px;margin-bottom:15px;display:none;"></div>
 
   <!-- ✅ 채점 모드 선택 -->
   <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px; margin-bottom:15px;">
@@ -3375,7 +3376,7 @@
     bgImage.src = rotSrc;
     canvasSaveData[currentPicIdx] = rotSrc;
   }
-  function openSmartSetup() { document.getElementById('smartSetupModal').style.display = 'flex'; }
+  function openSmartSetup() { document.getElementById('smartSetupModal').style.display = 'flex'; updateSmartModeOptions(); }
   function selectSmartMode(mode) {
     var radio = document.querySelector('input[name="smartMode"][value="' + mode + '"]');
     if (radio && radio.disabled) {
@@ -3399,7 +3400,32 @@
     var tsk = document.getElementById('smartTask').value;
     var cls = document.getElementById('smartClass').value;
     var skipDone = document.getElementById('smartUngraded') ? document.getElementById('smartUngraded').checked : true;
-    
+
+    // 📋 선택한 반·과제의 학생 수 표시
+    (function() {
+      var box = document.getElementById('smartCountBox');
+      if (!box) return;
+      if (!tsk) {
+        box.style.display = 'block';
+        box.innerHTML = '과제를 선택하면 채점할 학생 수가 표시돼요.';
+        return;
+      }
+      var total = 0, todo = 0;
+      (allSubmissions || []).forEach(function(i) {
+        var safeId = String(i.id || '');
+        var iCls = safeId.length >= 2 ? safeId.substring(0,1) + '학년 ' + safeId.substring(1,2) + '반' : '기타';
+        if (cls !== 'all' && iCls !== cls) return;
+        if (String(i.task).split(' (재제출)')[0].split(' (')[0] !== tsk) return;
+        if (i.status === '이전기록채점완료') return;
+        total++;
+        if (i.status !== '채점완료') todo++;
+      });
+      var clsLabel = (cls === 'all') ? '전체 반' : cls;
+      box.style.display = 'block';
+      box.innerHTML = '📋 <b>' + clsLabel + '</b> 제출 <b>' + total + '명</b>'
+        + (skipDone ? ' · 채점할 학생 <b style="color:#ea580c;">' + todo + '명</b>' : '');
+    })();
+
     var modeBtnQuestion = document.getElementById('modeBtnQuestion');
     var radioQuestion = document.querySelector('input[name="smartMode"][value="question"]');
     
