@@ -42,6 +42,32 @@ function _clsOf_(sid) {
 }
 function _todayStr_() { return Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'); }
 
+// 도장기록 꼬리 읽기 — 기록은 시간순 append라 '오늘' 조회엔 마지막 N행이면 충분.
+// 전체 읽기는 학기말이 되면 수천 행이라 입력 화면이 점점 느려진다.
+var LOG_TAIL_ROWS = 1000; // 하루 도장 1000개 초과는 사실상 불가
+function _tailLog_(logSh) {
+  var last = logSh.getLastRow();
+  if (last < 2) return [];
+  var n = Math.min(LOG_TAIL_ROWS, last - 1);
+  return logSh.getRange(last - n + 1, 1, n, 8).getValues();
+}
+
+// 명부 캐시 (10분) — 학생 추가는 드물어서 안전. [{sid,name}] 전체.
+function _getRosterCached_() {
+  var cache = CacheService.getScriptCache();
+  var hit = cache.get('dj_roster');
+  if (hit) { try { return JSON.parse(hit); } catch(_) {} }
+  var roster = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부').getDataRange().getValues();
+  var list = [];
+  for (var i = 1; i < roster.length; i++) {
+    var sid = String(roster[i][1] || '').trim();
+    if (!sid) continue;
+    list.push({ sid: sid, name: String(roster[i][2] || '').trim() });
+  }
+  try { cache.put('dj_roster', JSON.stringify(list), 600); } catch(_) {}
+  return list;
+}
+
 // 설정 읽기/쓰기 (도장_설정: 키-값, 값은 JSON 문자열)
 function _getSetting_(ss, key, def) {
   var sh = ss.getSheetByName('도장_설정');
@@ -82,9 +108,9 @@ function _getCategories_(ss) {
 // 반 목록
 function getClassList() {
   try {
-    var roster = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부').getDataRange().getValues();
+    var roster = _getRosterCached_();
     var set = {};
-    for (var i = 1; i < roster.length; i++) { var c = _clsOf_(roster[i][1]); if (c) set[c] = true; }
+    roster.forEach(function(s){ var c = _clsOf_(s.sid); if (c) set[c] = true; });
     return { success: true, classes: Object.keys(set).sort() };
   } catch(e) { return { success: false, classes: [], message: e.toString() }; }
 }
@@ -93,20 +119,18 @@ function getClassList() {
 function getInputData(cls) {
   try {
     var ss = _ensureSheets_();
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var roster = _getRosterCached_();
     var students = [];
-    for (var i = 1; i < roster.length; i++) {
-      var sid = String(roster[i][1] || '').trim();
-      if (!sid) continue;
-      if (cls && _clsOf_(sid) !== cls) continue;
-      students.push({ sid: sid, name: String(roster[i][2] || '').trim(), today: {} });
-    }
+    roster.forEach(function(s){
+      if (cls && _clsOf_(s.sid) !== cls) return;
+      students.push({ sid: s.sid, name: s.name, today: {} });
+    });
     students.sort(function(a,b){ return a.sid.localeCompare(b.sid); });
 
-    // 오늘 카운트 (카테고리별)
+    // 오늘 카운트 (카테고리별) — 꼬리만 읽어 속도 유지
     var today = _todayStr_();
     var logSh = ss.getSheetByName('도장기록');
-    var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
+    var log = _tailLog_(logSh);
     var idx = {}; students.forEach(function(s){ idx[s.sid] = s; });
     for (var r = 0; r < log.length; r++) {
       var d = log[r][0] ? Utilities.formatDate(new Date(log[r][0]), 'Asia/Seoul', 'yyyy-MM-dd') : '';
@@ -291,7 +315,7 @@ function getTodayRecords(cls) {
     var ss = _ensureSheets_();
     var today = _todayStr_();
     var logSh = ss.getSheetByName('도장기록');
-    var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
+    var log = _tailLog_(logSh); // 오늘 기록은 항상 꼬리에 있음
     var items = [];
     for (var r = 0; r < log.length; r++) {
       var dt = log[r][0] ? new Date(log[r][0]) : null;
@@ -314,13 +338,21 @@ function getTodayRecords(cls) {
 // ✅ FCM 푸시 (대시보드 로직 복제 — HTTP v1 + 서비스계정)
 // =====================================================
 function _getSys_(ss, key) {
+  // 도장 1개당 2회 호출(프로젝트ID·링크) — 값이 거의 안 바뀌므로 1시간 캐시
+  var cache = CacheService.getScriptCache();
+  var ck = 'sys_' + key;
+  var hit = cache.get(ck);
+  if (hit !== null) return hit;
+  var val = '';
   var sh = ss.getSheetByName('시스템설정');
-  if (!sh || sh.getLastRow() < 2) return '';
-  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
-  for (var i = 0; i < rows.length; i++) {
-    if (String(rows[i][0]).trim() === key) return String(rows[i][1] || '').trim();
+  if (sh && sh.getLastRow() >= 2) {
+    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === key) { val = String(rows[i][1] || '').trim(); break; }
+    }
   }
-  return '';
+  try { cache.put(ck, val, 3600); } catch(_) {}
+  return val;
 }
 
 function _getFcmToken_() {
@@ -350,12 +382,11 @@ function _getFcmToken_() {
 }
 
 function _pushToStudent_(ss, sid, title, body) {
-  // 학생명부 E열에서 토큰 읽기 (가장 최근 토큰 1개)
-  var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
-  var raw = '';
-  for (var i = 1; i < roster.length; i++) {
-    if (String(roster[i][1] || '').trim() === String(sid).trim()) { raw = String(roster[i][4] || '').trim(); break; }
-  }
+  // 학생명부 E열에서 토큰 읽기 — TextFinder로 해당 행만 (전체 읽기 방지, 도장 1개당 1회 호출됨)
+  var sh = ss.getSheetByName('학생명부');
+  var hit = sh.getRange('B:B').createTextFinder(String(sid).trim()).matchEntireCell(true).findNext();
+  if (!hit) return;
+  var raw = String(sh.getRange(hit.getRow(), 5).getValue() || '').trim();
   if (!raw) return;
   var objs = [];
   try { var a = JSON.parse(raw); if (!Array.isArray(a)) a = [a];
@@ -387,13 +418,16 @@ function deleteRecord(ts, sid) {
   try {
     var ss = _ensureSheets_();
     var logSh = ss.getSheetByName('도장기록');
-    if (logSh.getLastRow() < 2) return { success: false, message: '기록 없음' };
-    var n = logSh.getLastRow()-1;
-    var vals = logSh.getRange(2, 1, n, 2).getValues(); // 일시, 학번
+    var last = logSh.getLastRow();
+    if (last < 2) return { success: false, message: '기록 없음' };
+    // 오늘 기록만 정정 대상이라 꼬리만 스캔
+    var n = Math.min(LOG_TAIL_ROWS, last - 1);
+    var startRow = last - n + 1;
+    var vals = logSh.getRange(startRow, 1, n, 2).getValues(); // 일시, 학번
     for (var i = n-1; i >= 0; i--) {
       var t = vals[i][0] ? new Date(vals[i][0]).getTime() : 0;
       if (t === Number(ts) && String(vals[i][1]||'').trim() === String(sid).trim()) {
-        logSh.deleteRow(i + 2);
+        logSh.deleteRow(startRow + i);
         return { success: true };
       }
     }
