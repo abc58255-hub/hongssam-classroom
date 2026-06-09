@@ -178,31 +178,37 @@
   }
 
   function loadClasses() {
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) return;
-      var sel = document.getElementById('classSel');
-      res.classes.forEach(function(c){
-        var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o);
-      });
-    }).getClassList();
+    google.script.run
+      .withFailureHandler(function(err){ alert('반 목록 오류: '+(err.message||'')); })
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) return;
+        var sel = document.getElementById('classSel');
+        res.classes.forEach(function(c){
+          var o = document.createElement('option'); o.value = c; o.textContent = c; sel.appendChild(o);
+        });
+      }).getClassList();
   }
 
   function load() {
     document.getElementById('grid').innerHTML = '<div class="loading">불러오는 중…</div>';
     var cls = document.getElementById('classSel').value;
     var period = document.getElementById('periodSel').value;
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) {
-        document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: ' + ((res&&res.message)||'') + '</div>';
-        return;
-      }
-      STATE.rows = res.rows; STATE.staleDays = res.staleDays;
-      STATE.categories = res.categories || [];
-      STATE.staleCat = res.staleCat || '';
-      buildSortOptions();
-      renderChips(res.summary);
-      render();
-    }).getDojangData(cls, period, '');
+    google.script.run
+      .withFailureHandler(function(err){
+        document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>';
+      })
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) {
+          document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: ' + ((res&&res.message)||'') + '</div>';
+          return;
+        }
+        STATE.rows = res.rows; STATE.staleDays = res.staleDays;
+        STATE.categories = res.categories || [];
+        STATE.staleCat = res.staleCat || '';
+        buildSortOptions();
+        renderChips(res.summary);
+        render();
+      }).getDojangData(cls, period, '');
   }
 
   function renderChips(s) {
@@ -266,7 +272,9 @@
   function openDetail(sid) {
     document.getElementById('modalBg').classList.add('show');
     document.getElementById('modalBox').innerHTML = '<div class="loading">불러오는 중…</div>';
-    google.script.run.withSuccessHandler(function(res){
+    google.script.run
+      .withFailureHandler(function(err){ document.getElementById('modalBox').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>'; })
+      .withSuccessHandler(function(res){
       if (!res || !res.success) { closeModal(); return; }
       var row = STATE.rows.filter(function(x){ return x.sid === sid; })[0] || {};
       var cnts = (STATE.categories||[]).map(function(c){ return c.emoji + ' ' + c.name + ' ' + ((row.counts&&row.counts[c.name])||0); }).join('  ·  ');
@@ -315,12 +323,14 @@
   function openSettings() {
     document.getElementById('setBg').classList.add('show');
     document.getElementById('setBox').innerHTML = '<div class="loading">불러오는 중…</div>';
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) { document.getElementById('setBox').innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
-      SET.categories = (res.categories||[]).map(function(c){ return { name:c.name, emoji:c.emoji, type:c.type, presets:(c.presets||[]).slice() }; });
-      SET.rankVisibility = res.rankVisibility || 'show';
-      renderSettings();
-    }).getDojangSettings();
+    google.script.run
+      .withFailureHandler(function(err){ document.getElementById('setBox').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>'; })
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) { document.getElementById('setBox').innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
+        SET.categories = (res.categories||[]).map(function(c){ return { name:c.name, emoji:c.emoji, type:c.type, presets:(c.presets||[]).slice() }; });
+        SET.rankVisibility = res.rankVisibility || 'show';
+        renderSettings();
+      }).getDojangSettings();
   }
   function renderSettings() {
     var h = '<span class="closebtn" onclick="closeSettings()">×</span><h2>⚙ 도장 종류 설정</h2>'
@@ -350,10 +360,12 @@
   function addCat(){ SET.categories.push({ name:'', emoji:'🏅', type:'reason', presets:[] }); renderSettings(); }
   function delCat(i){ if(SET.categories.length<=1){alert('최소 1개는 있어야 해요');return;} SET.categories.splice(i,1); renderSettings(); }
   function saveSettings(){
-    google.script.run.withSuccessHandler(function(res){
-      if (res && res.success) { closeSettings(); load(); }
-      else alert('저장 실패: ' + ((res&&res.message)||''));
-    }).saveDojangSettings(SET.categories, SET.rankVisibility);
+    google.script.run
+      .withFailureHandler(function(err){ alert('저장 실패: '+(err.message||'')); })
+      .withSuccessHandler(function(res){
+        if (res && res.success) { closeSettings(); load(); }
+        else alert('저장 실패: ' + ((res&&res.message)||''));
+      }).saveDojangSettings(SET.categories, SET.rankVisibility);
   }
   function closeSettings(){ document.getElementById('setBg').classList.remove('show'); }
 
@@ -362,11 +374,13 @@
   function openWs() {
     document.getElementById('wsBg').classList.add('show');
     document.getElementById('wsBox').innerHTML = '<div class="loading">불러오는 중…</div>';
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) { document.getElementById('wsBox').innerHTML='<div class="empty">불러오기 실패</div>'; return; }
-      WS = res.worksheets.map(function(w){ return { name:w.name, orig:w.name, problems:(w.problems||[]).slice(), hidden:!!w.hidden }; });
-      renderWs();
-    }).getWorksheetsList();
+    google.script.run
+      .withFailureHandler(function(err){ document.getElementById('wsBox').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>'; })
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) { document.getElementById('wsBox').innerHTML='<div class="empty">불러오기 실패</div>'; return; }
+        WS = res.worksheets.map(function(w){ return { name:w.name, orig:w.name, problems:(w.problems||[]).slice(), hidden:!!w.hidden }; });
+        renderWs();
+      }).getWorksheetsList();
   }
   function renderWs() {
     var h = '<span class="closebtn" onclick="closeWs()">×</span><h2>📘 학습지·문제 관리</h2>'
@@ -389,25 +403,31 @@
   function saveWs(i){
     var w = WS[i];
     if (!w.name.trim()) { alert('학습지 이름을 입력하세요'); return; }
-    google.script.run.withSuccessHandler(function(res){
-      if (res && res.success) { w.orig = w.name; alert('저장됨'); }
-      else alert('저장 실패');
-    }).saveWorksheet(w.orig||w.name, w.name, w.problems, w.hidden);
+    google.script.run
+      .withFailureHandler(function(err){ alert('저장 실패: '+(err.message||'')); })
+      .withSuccessHandler(function(res){
+        if (res && res.success) { w.orig = w.name; alert('저장됨'); }
+        else alert('저장 실패');
+      }).saveWorksheet(w.orig||w.name, w.name, w.problems, w.hidden);
   }
   function toggleWsHidden(i){
     var w = WS[i];
     if (!w.orig) { w.hidden = !w.hidden; renderWs(); return; } // 아직 저장 안 된 행
     var nv = !w.hidden;
-    google.script.run.withSuccessHandler(function(res){
-      if (res && res.success) { w.hidden = nv; renderWs(); }
-      else alert('변경 실패');
-    }).setWorksheetHidden(w.orig, nv);
+    google.script.run
+      .withFailureHandler(function(err){ alert('변경 실패: '+(err.message||'')); })
+      .withSuccessHandler(function(res){
+        if (res && res.success) { w.hidden = nv; renderWs(); }
+        else alert('변경 실패');
+      }).setWorksheetHidden(w.orig, nv);
   }
   function delWs(i){
     var w = WS[i];
     if (!confirm('학습지를 삭제할까요?')) return;
     if (!w.orig) { WS.splice(i,1); renderWs(); return; }
-    google.script.run.withSuccessHandler(function(res){ WS.splice(i,1); renderWs(); }).deleteWorksheet(w.orig);
+    google.script.run
+      .withFailureHandler(function(err){ alert('삭제 실패: '+(err.message||'')); })
+      .withSuccessHandler(function(res){ WS.splice(i,1); renderWs(); }).deleteWorksheet(w.orig);
   }
   function closeWs(){ document.getElementById('wsBg').classList.remove('show'); }
 
@@ -417,7 +437,9 @@
     var box = document.getElementById('carryBox');
     box.innerHTML = '<div class="loading">불러오는 중…</div>';
     var cls = document.getElementById('classSel').value;
-    google.script.run.withSuccessHandler(function(res){
+    google.script.run
+      .withFailureHandler(function(err){ box.innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>'; })
+      .withSuccessHandler(function(res){
       if (!res || !res.success) { box.innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
       var h = '<span class="closebtn" onclick="closeCarry()">×</span>'
         + '<h2>📥 기존 도장 이월 입력</h2>'
@@ -446,10 +468,12 @@
     var sid = tr.getAttribute('data-sid'), name = tr.getAttribute('data-name');
     var praise = tr.querySelector('.cy-p').value, present = tr.querySelector('.cy-r').value;
     btn.textContent = '…'; btn.disabled = true;
-    google.script.run.withSuccessHandler(function(res){
-      if (res && res.success) { btn.textContent = '✓ 저장됨'; btn.style.background = '#16a34a'; }
-      else { btn.textContent = '실패'; btn.disabled = false; }
-    }).saveCarry(sid, name, praise, present);
+    google.script.run
+      .withFailureHandler(function(err){ btn.textContent = '실패'; btn.disabled = false; alert('저장 실패: '+(err.message||'')); })
+      .withSuccessHandler(function(res){
+        if (res && res.success) { btn.textContent = '✓ 저장됨'; btn.style.background = '#16a34a'; }
+        else { btn.textContent = '실패'; btn.disabled = false; }
+      }).saveCarry(sid, name, praise, present);
   }
 
   loadClasses();

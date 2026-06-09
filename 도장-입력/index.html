@@ -138,26 +138,32 @@
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
   function loadClasses() {
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) return;
-      var sel = document.getElementById('classSel');
-      sel.innerHTML = res.classes.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
-      loadInput();
-    }).getClassList();
+    google.script.run
+      .withFailureHandler(function(err){ toast('⚠ 반 목록 오류: '+(err.message||'')); })
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) return;
+        var sel = document.getElementById('classSel');
+        sel.innerHTML = res.classes.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
+        loadInput();
+      }).getClassList();
   }
 
   function loadInput() {
     var cls = document.getElementById('classSel').value;
     document.getElementById('grid').innerHTML = '<div class="loading">불러오는 중…</div>';
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) {
-        document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: '+((res&&res.message)||'')+'</div>';
-        return;
-      }
-      DATA = res;
-      renderBanner();
-      renderGrid();
-    }).getInputData(cls);
+    google.script.run
+      .withFailureHandler(function(err){
+        document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>';
+      })
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) {
+          document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: '+((res&&res.message)||'')+'</div>';
+          return;
+        }
+        DATA = res;
+        renderBanner();
+        renderGrid();
+      }).getInputData(cls);
   }
 
   function renderBanner() {
@@ -326,36 +332,45 @@
     renderGrid();
     toast('✅ '+name+' '+kind+' '+(qty>1?qty+'개 ':'')+'기록!');
     closeModal();
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) {
+    google.script.run
+      .withFailureHandler(function(err){
         st.today[kind] = Math.max(0,(st.today[kind]||qty)-qty); renderGrid();
-        toast('⚠ 실패: '+((res&&res.message)||''));
-      }
-    }).recordStamp(payload);
+        toast('⚠ 저장 실패 (롤백): '+(err.message||''));
+      })
+      .withSuccessHandler(function(res){
+        if (!res || !res.success) {
+          st.today[kind] = Math.max(0,(st.today[kind]||qty)-qty); renderGrid();
+          toast('⚠ 실패: '+((res&&res.message)||''));
+        }
+      }).recordStamp(payload);
   }
 
   // 오늘 기록 확인·정정
   function openToday() {
     document.getElementById('todayBg').classList.add('show');
     document.getElementById('todayBox').innerHTML = '<div class="loading">불러오는 중…</div>';
-    google.script.run.withSuccessHandler(function(res){
-      var h = '<h2>📋 오늘 기록</h2><div class="sid">'+document.getElementById('classSel').value+' · 잘못된 기록은 ✕로 삭제</div>';
-      if (!res || !res.success || !res.items.length) {
-        h += '<div class="empty">오늘 기록이 없어요.</div>';
-      } else {
-        res.items.forEach(function(it){
-          var info = [it.sheet, it.problem].filter(Boolean).join(' · ') || it.reason;
-          var cat = catByName(it.kind);
-          h += '<div class="rec-item">'
-            + '<div class="rk '+it.kind+'">'+(cat?cat.emoji:'🏅')+'</div>'
-            + '<div class="rd"><b>'+esc(it.name)+'</b> <small style="color:#7c3aed;">'+esc(it.kind)+'</small> '+esc(info)+'<br><small>'+it.time+'</small></div>'
-            + '<div class="rx" onclick="delRec('+it.ts+',\''+esc(it.sid)+'\',this)">✕</div>'
-            + '</div>';
-        });
-      }
-      h += '<div class="actions"><button class="save" onclick="closeToday()">닫기</button></div>';
-      document.getElementById('todayBox').innerHTML = h;
-    }).getTodayRecords(document.getElementById('classSel').value);
+    google.script.run
+      .withFailureHandler(function(err){
+        document.getElementById('todayBox').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>';
+      })
+      .withSuccessHandler(function(res){
+        var h = '<h2>📋 오늘 기록</h2><div class="sid">'+document.getElementById('classSel').value+' · 잘못된 기록은 ✕로 삭제</div>';
+        if (!res || !res.success || !res.items.length) {
+          h += '<div class="empty">오늘 기록이 없어요.</div>';
+        } else {
+          res.items.forEach(function(it){
+            var info = [it.sheet, it.problem].filter(Boolean).join(' · ') || it.reason;
+            var cat = catByName(it.kind);
+            h += '<div class="rec-item">'
+              + '<div class="rk '+it.kind+'">'+(cat?cat.emoji:'🏅')+'</div>'
+              + '<div class="rd"><b>'+esc(it.name)+'</b> <small style="color:#7c3aed;">'+esc(it.kind)+'</small> '+esc(info)+'<br><small>'+it.time+'</small></div>'
+              + '<div class="rx" onclick="delRec('+it.ts+',\''+esc(it.sid)+'\',this)">✕</div>'
+              + '</div>';
+          });
+        }
+        h += '<div class="actions"><button class="save" onclick="closeToday()">닫기</button></div>';
+        document.getElementById('todayBox').innerHTML = h;
+      }).getTodayRecords(document.getElementById('classSel').value);
   }
   function closeToday(){ document.getElementById('todayBg').classList.remove('show'); loadInput(); }
   function delRec(ts, sid, el) {
