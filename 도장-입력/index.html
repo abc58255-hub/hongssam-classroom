@@ -92,6 +92,23 @@
   .rec-item .rd { flex: 1; color: #333d4b; }
   .rec-item .rd small { color: #b0b8c1; }
   .rec-item .rx { color: #f04452; font-size: 22px; cursor: pointer; padding: 4px 10px; }
+
+  /* 잠금 화면 */
+  .lock-bg { display: none; position: fixed; inset: 0; background: #f2f4f6; z-index: 200;
+             align-items: center; justify-content: center; padding: 20px; }
+  .lock-bg.show { display: flex; }
+  .lock-card { background: #fff; border-radius: 24px; padding: 36px 28px; width: 100%; max-width: 380px;
+               text-align: center; box-shadow: 0 4px 20px rgba(0,0,0,.06); }
+  .lock-card .ico { font-size: 44px; margin-bottom: 12px; }
+  .lock-card h2 { font-size: 20px; font-weight: 800; color: #191f28; margin-bottom: 6px; }
+  .lock-card .desc { font-size: 13px; color: #8b95a1; margin-bottom: 20px; }
+  .lock-card input { width: 100%; font-size: 17px; padding: 15px; border: none; background: #f2f4f6;
+                     border-radius: 14px; outline: none; text-align: center; }
+  .lock-card input:focus { box-shadow: inset 0 0 0 2px #6366f1; }
+  .lock-card button { width: 100%; margin-top: 12px; padding: 16px; border: none; border-radius: 14px;
+                      background: #4f46e5; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .lock-card button:disabled { background: #e5e8eb; color: #b0b8c1; }
+  .lock-card .err { font-size: 13px; color: #f04452; margin-top: 10px; min-height: 18px; font-weight: 600; }
 </style>
 </head>
 <body>
@@ -124,11 +141,58 @@
   <div class="modal" id="qrBox" style="max-width:360px;text-align:center;"></div>
 </div>
 
+<!-- 잠금 화면 (교사 비밀번호) -->
+<div class="lock-bg" id="lockBg">
+  <div class="lock-card">
+    <div class="ico">🔒</div>
+    <h2>도장 입력 잠금</h2>
+    <div class="desc">교사 비밀번호를 입력하면 이 기기에서 계속 사용할 수 있어요.</div>
+    <input type="password" id="lockPw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
+    <button id="lockBtn" onclick="doUnlock()">확인</button>
+    <div class="err" id="lockErr"></div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
   var DATA = { students: [], worksheets: [], praisePresets: [], todayWorksheet: {sheet:'',lessonNo:''} };
   var SEL = null; // 현재 입력중인 선택 상태
+
+  // ===== 접근 잠금 — 교사 비밀번호로 1회 인증, 기기에 토큰 저장 =====
+  var TOK = localStorage.getItem('dj_tok') || '';
+  function showLock() {
+    document.getElementById('lockBg').classList.add('show');
+    setTimeout(function(){ document.getElementById('lockPw').focus(); }, 100);
+  }
+  function hideLock() { document.getElementById('lockBg').classList.remove('show'); }
+  // 서버 응답이 needAuth면 토큰 만료/무효 → 잠금 화면 (true 반환 시 호출측은 중단)
+  function authGate(res) {
+    if (res && res.needAuth) { TOK=''; localStorage.removeItem('dj_tok'); showLock(); return true; }
+    return false;
+  }
+  function doUnlock() {
+    var pw = document.getElementById('lockPw').value;
+    if (!pw) return;
+    var btn = document.getElementById('lockBtn');
+    btn.disabled = true; btn.textContent = '확인 중…';
+    document.getElementById('lockErr').textContent = '';
+    google.script.run
+      .withFailureHandler(function(err){
+        btn.disabled = false; btn.textContent = '확인';
+        document.getElementById('lockErr').textContent = '오류: ' + (err.message||'');
+      })
+      .withSuccessHandler(function(res){
+        btn.disabled = false; btn.textContent = '확인';
+        if (res && res.success && res.token) {
+          TOK = res.token; localStorage.setItem('dj_tok', TOK);
+          document.getElementById('lockPw').value = '';
+          hideLock(); loadClasses();
+        } else {
+          document.getElementById('lockErr').textContent = (res && res.message) || '인증 실패';
+        }
+      }).unlockDojang(pw);
+  }
 
   function toast(msg) {
     var t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show');
@@ -141,11 +205,12 @@
     google.script.run
       .withFailureHandler(function(err){ toast('⚠ 반 목록 오류: '+(err.message||'')); })
       .withSuccessHandler(function(res){
+        if (authGate(res)) return;
         if (!res || !res.success) return;
         var sel = document.getElementById('classSel');
         sel.innerHTML = res.classes.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
         loadInput();
-      }).getClassList();
+      }).getClassList(TOK);
   }
 
   function loadInput() {
@@ -156,6 +221,7 @@
         document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>';
       })
       .withSuccessHandler(function(res){
+        if (authGate(res)) return;
         if (!res || !res.success) {
           document.getElementById('grid').innerHTML = '<div class="empty">불러오기 실패: '+((res&&res.message)||'')+'</div>';
           return;
@@ -163,7 +229,7 @@
         DATA = res;
         renderBanner();
         renderGrid();
-      }).getInputData(cls);
+      }).getInputData(cls, TOK);
   }
 
   function renderBanner() {
@@ -316,7 +382,7 @@
   function doSave() {
     if (!SEL) return;
     var qty = SEL.qty || 1;
-    var payload = { sid: SEL.sid, name: SEL.name, kind: SEL.kind, type: SEL.type, emoji: SEL.emoji, count: qty };
+    var payload = { sid: SEL.sid, name: SEL.name, kind: SEL.kind, type: SEL.type, emoji: SEL.emoji, count: qty, tok: TOK };
     if (SEL.type === 'sheet') {
       payload.sheet = SEL.sheet;
       payload.problem = (SEL.problem==='__none__') ? '' : SEL.problem;
@@ -340,6 +406,7 @@
       .withSuccessHandler(function(res){
         if (!res || !res.success) {
           st.today[kind] = Math.max(0,(st.today[kind]||qty)-qty); renderGrid();
+          if (authGate(res)) { toast('🔒 인증이 필요해요'); return; }
           toast('⚠ 실패: '+((res&&res.message)||''));
         }
       }).recordStamp(payload);
@@ -354,6 +421,7 @@
         document.getElementById('todayBox').innerHTML = '<div class="empty">불러오기 실패: '+(err.message||'')+'</div>';
       })
       .withSuccessHandler(function(res){
+        if (authGate(res)) { closeToday(); return; }
         var h = '<h2>📋 오늘 기록</h2><div class="sid">'+document.getElementById('classSel').value+' · 잘못된 기록은 ✕로 삭제</div>';
         if (!res || !res.success || !res.items.length) {
           h += '<div class="empty">오늘 기록이 없어요.</div>';
@@ -370,16 +438,19 @@
         }
         h += '<div class="actions"><button class="save" onclick="closeToday()">닫기</button></div>';
         document.getElementById('todayBox').innerHTML = h;
-      }).getTodayRecords(document.getElementById('classSel').value);
+      }).getTodayRecords(document.getElementById('classSel').value, TOK);
   }
   function closeToday(){ document.getElementById('todayBg').classList.remove('show'); loadInput(); }
   function delRec(ts, sid, el) {
     if (!confirm('이 기록을 삭제할까요?')) return;
     el.textContent = '…';
-    google.script.run.withSuccessHandler(function(res){
-      if (res && res.success) { el.closest('.rec-item').remove(); toast('삭제됨'); }
-      else { toast('삭제 실패'); el.textContent = '✕'; }
-    }).deleteRecord(ts, sid);
+    google.script.run
+      .withFailureHandler(function(err){ toast('삭제 실패: '+(err.message||'')); el.textContent = '✕'; })
+      .withSuccessHandler(function(res){
+        if (res && res.success) { el.closest('.rec-item').remove(); toast('삭제됨'); }
+        else if (authGate(res)) { closeToday(); }
+        else { toast('삭제 실패'); el.textContent = '✕'; }
+      }).deleteRecord(ts, sid, TOK);
   }
 
   // ===== QR (다른 태블릿에서 바로 접속) =====
@@ -396,7 +467,8 @@
   }
   function closeQR(){ document.getElementById('qrBg').classList.remove('show'); }
 
-  loadClasses();
+  // 시작: 토큰 있으면 바로 로드 (무효 토큰이면 서버가 needAuth → 잠금 화면), 없으면 잠금
+  if (TOK) loadClasses(); else showLock();
 </script>
 </body>
 </html>

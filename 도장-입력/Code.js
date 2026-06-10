@@ -40,6 +40,40 @@ function _clsOf_(sid) {
   sid = String(sid || '').trim();
   return sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
 }
+
+// ===== 접근 잠금 (링크 공개 배포라 학생이 들어올 수 있음) =====
+// 교사 대시보드와 같은 비밀번호(시스템설정 '교사비밀번호') 사용.
+// 인증 성공 시 토큰 = hash('dojang|' + 비밀번호) → 기기 localStorage에 저장.
+// 무상태 검증: 비밀번호가 바뀌면 모든 기기 토큰이 자동 무효화된다.
+function _hash_(s) {
+  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s))
+    .map(function(b){ return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
+}
+function _storedPw_(ss) { return _getSys_(ss, '교사비밀번호'); }
+function _makeTok_(pw) { return _hash_('dojang|' + pw); }
+function _tokOk_(ss, tok) {
+  var pw = _storedPw_(ss);
+  return !!(pw && tok && String(tok) === _makeTok_(pw));
+}
+var NEED_AUTH = { success: false, needAuth: true, message: '비밀번호 인증이 필요해요.' };
+
+function unlockDojang(pw) {
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache.get('dj_pwlock')) return { success: false, message: '🚨 5회 오류로 10분간 잠겼어요.' };
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var stored = _storedPw_(ss);
+    if (!stored) return { success: false, message: '교사 비밀번호가 설정되지 않았어요. (시스템설정 시트)' };
+    if (String(pw||'') !== stored) {
+      var fails = parseInt(cache.get('dj_pwfail') || '0') + 1;
+      if (fails >= 5) { cache.put('dj_pwlock', '1', 600); cache.remove('dj_pwfail'); return { success: false, message: '🚨 5회 오류. 10분간 잠겼어요.' }; }
+      cache.put('dj_pwfail', String(fails), 600);
+      return { success: false, message: '비밀번호 오류 (' + fails + '/5)' };
+    }
+    cache.remove('dj_pwfail');
+    return { success: true, token: _makeTok_(stored) };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
 function _todayStr_() { return Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'); }
 
 // 도장기록 꼬리 읽기 — 기록은 시간순 append라 '오늘' 조회엔 마지막 N행이면 충분.
@@ -106,8 +140,9 @@ function _getCategories_(ss) {
 }
 
 // 반 목록
-function getClassList() {
+function getClassList(tok) {
   try {
+    if (!_tokOk_(SpreadsheetApp.openById(SHEET_ID), tok)) return NEED_AUTH;
     var roster = _getRosterCached_();
     var set = {};
     roster.forEach(function(s){ var c = _clsOf_(s.sid); if (c) set[c] = true; });
@@ -116,9 +151,10 @@ function getClassList() {
 }
 
 // 입력 화면 초기 데이터
-function getInputData(cls) {
+function getInputData(cls, tok) {
   try {
     var ss = _ensureSheets_();
+    if (!_tokOk_(ss, tok)) return NEED_AUTH;
     var roster = _getRosterCached_();
     var students = [];
     roster.forEach(function(s){
@@ -224,6 +260,7 @@ function _getTodayWorksheet_(ss, cls) {
 function recordStamp(p) {
   try {
     var ss = _ensureSheets_();
+    if (!_tokOk_(ss, p && p.tok)) return NEED_AUTH;
     var sid = String(p.sid||'').trim();
     if (!sid) return { success: false, message: '학번 없음' };
     var kind = String(p.kind||'').trim();
@@ -270,6 +307,7 @@ function recordStamp(p) {
 function recordStampBatch(p) {
   try {
     var ss = _ensureSheets_();
+    if (!_tokOk_(ss, p && p.tok)) return NEED_AUTH;
     var sids = p.sids || [], names = p.names || [];
     if (!sids.length) return { success: false, message: '대상 없음' };
     var kind = String(p.kind||'').trim();
@@ -310,9 +348,10 @@ function _upsertWorksheetProblem_(ss, sheet, problem) {
 }
 
 // 오늘 기록 (확인·정정용)
-function getTodayRecords(cls) {
+function getTodayRecords(cls, tok) {
   try {
     var ss = _ensureSheets_();
+    if (!_tokOk_(ss, tok)) return NEED_AUTH;
     var today = _todayStr_();
     var logSh = ss.getSheetByName('도장기록');
     var log = _tailLog_(logSh); // 오늘 기록은 항상 꼬리에 있음
@@ -414,9 +453,10 @@ function _pushToStudent_(ss, sid, title, body) {
 }
 
 // 기록 삭제 (오정정) — 일시(ms)+학번으로 1행 식별
-function deleteRecord(ts, sid) {
+function deleteRecord(ts, sid, tok) {
   try {
     var ss = _ensureSheets_();
+    if (!_tokOk_(ss, tok)) return NEED_AUTH;
     var logSh = ss.getSheetByName('도장기록');
     var last = logSh.getLastRow();
     if (last < 2) return { success: false, message: '기록 없음' };
