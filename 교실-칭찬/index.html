@@ -266,8 +266,8 @@
     resBox.innerHTML = '';
     google.script.run.withSuccessHandler(function(st){
       if (!st.success) { statsBox.innerHTML = '<div class="card">통계 오류</div>'; return; }
-      var giv = st.topGivers.map(function(x,i){ return '<div class="stat-row"><span>' + (i+1) + '. ' + x.name + '</span><b>' + x.count + '회</b></div>'; }).join('') || '<div class="muted">없음</div>';
-      var rec = st.topReceivers.map(function(x,i){ return '<div class="stat-row"><span>' + (i+1) + '. ' + x.name + '</span><b>' + x.count + '회</b></div>'; }).join('') || '<div class="muted">없음</div>';
+      var giv = st.topGivers.map(function(x,i){ return '<div class="stat-row" style="cursor:pointer;" onclick="filterStudent(\'' + x.id + '\',\'sent\')" title="보낸 칭찬 전체 보기"><span>' + (i+1) + '. ' + x.name + ' <span class="muted">›</span></span><b>' + x.count + '회</b></div>'; }).join('') || '<div class="muted">없음</div>';
+      var rec = st.topReceivers.map(function(x,i){ return '<div class="stat-row" style="cursor:pointer;" onclick="filterStudent(\'' + x.id + '\',\'recv\')" title="받은 칭찬 전체 보기"><span>' + (i+1) + '. ' + x.name + ' <span class="muted">›</span></span><b>' + x.count + '회</b></div>'; }).join('') || '<div class="muted">없음</div>';
       var noRec = st.noReceive.length ? '<div style="margin-top:8px;font-size:12px;color:#dc2626;">🔔 아직 못 받은 학생 (' + st.noReceive.length + '명): ' + st.noReceive.join(', ') + '</div>' : '<div style="margin-top:8px;font-size:12px;color:#10b981;">✅ 모든 학생이 칭찬을 받았어요!</div>';
 
       // 미실시자 (교사 전용)
@@ -292,21 +292,88 @@
 
     google.script.run.withSuccessHandler(function(res){
       if (!res.success) { resBox.innerHTML = '<div class="card">기록 오류</div>'; return; }
-      if (res.records.length === 0) { resBox.innerHTML = '<div class="card muted" style="text-align:center;">아직 칭찬 기록이 없어요.</div>'; return; }
-      resBox.innerHTML = '<div class="card"><div style="font-weight:800;margin-bottom:8px;">📜 칭찬 기록 (' + res.records.length + '개)</div>'
-        + res.records.map(function(r){
-          return '<div class="rec" style="' + (r.hidden?'opacity:0.5;':'') + '">'
-            + '<div style="display:flex;justify-content:space-between;align-items:center;">'
-              + '<div><b>' + (r.anon?'(익명)':r.fromName) + '</b> → <b style="color:#7c3aed;">' + r.toName + '</b> <span class="muted">' + r.time + '</span></div>'
-              + '<div style="display:flex;gap:4px;flex-shrink:0;">'
-                + '<button class="btn btn-sm btn-gray" onclick="toggleHide(' + r.rowIdx + ',' + (!r.hidden) + ')">' + (r.hidden?'복원':'숨김') + '</button>'
-                + '<button class="btn btn-sm btn-danger" onclick="delRec(' + r.rowIdx + ')">삭제</button>'
-              + '</div>'
-            + '</div>'
-            + '<div style="margin-top:4px;">' + (r.content||'').replace(/</g,'&lt;') + '</div>'
-          + '</div>';
-        }).join('') + '</div>';
+      _recs = res.records || [];
+      // 이벤트가 바뀐 경우에만 필터 초기화 (숨김/삭제 후 재조회 시엔 유지)
+      if (_lastEventId !== id) { _filter = { sid: '', dir: 'all' }; _lastEventId = id; }
+      renderRecords();
     }).getEventResults(id);
+  }
+
+  // ── 학생별 보기 (보낸/받은 칭찬 전체) ──
+  var _recs = [];
+  var _lastEventId = null;
+  var _filter = { sid: '', dir: 'all' }; // dir: all | sent | recv
+
+  function filterStudent(sid, dir) {
+    _filter.sid = String(sid);
+    _filter.dir = dir || 'all';
+    renderRecords();
+    var box = document.getElementById('resultsBox');
+    if (box) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  function onFilterChange() {
+    _filter.sid = document.getElementById('fltStudent').value;
+    _filter.dir = document.getElementById('fltDir').value;
+    renderRecords();
+  }
+
+  function renderRecords() {
+    var resBox = document.getElementById('resultsBox');
+    if (_recs.length === 0) { resBox.innerHTML = '<div class="card muted" style="text-align:center;">아직 칭찬 기록이 없어요.</div>'; return; }
+
+    // 학생 목록 (기록에 등장한 보낸/받은 학생 전체, 학번순)
+    var nameOf = {};
+    _recs.forEach(function(r){
+      if (r.fromId) nameOf[r.fromId] = r.fromName || nameOf[r.fromId] || r.fromId;
+      if (r.toId)   nameOf[r.toId]   = r.toName   || nameOf[r.toId]   || r.toId;
+    });
+    var sids = Object.keys(nameOf).sort(function(a,b){ return a.localeCompare(b, undefined, {numeric:true}); });
+
+    var list = _recs;
+    var label = '';
+    if (_filter.sid) {
+      var nm = nameOf[_filter.sid] || _filter.sid;
+      if (_filter.dir === 'sent')      { list = _recs.filter(function(r){ return r.fromId === _filter.sid; }); label = nm + ' 학생이 보낸 칭찬'; }
+      else if (_filter.dir === 'recv') { list = _recs.filter(function(r){ return r.toId   === _filter.sid; }); label = nm + ' 학생이 받은 칭찬'; }
+      else                             { list = _recs.filter(function(r){ return r.fromId === _filter.sid || r.toId === _filter.sid; }); label = nm + ' 학생의 칭찬 (보낸+받은)'; }
+    }
+
+    var filterBar = '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;align-items:center;">'
+      + '<select id="fltStudent" style="flex:2;min-width:120px;" onchange="onFilterChange()">'
+        + '<option value="">전체 학생</option>'
+        + sids.map(function(s){ return '<option value="' + s + '"' + (s===_filter.sid?' selected':'') + '>' + (nameOf[s]||s) + ' (' + s + ')</option>'; }).join('')
+      + '</select>'
+      + '<select id="fltDir" style="flex:1;min-width:90px;" onchange="onFilterChange()">'
+        + '<option value="all"' + (_filter.dir==='all'?' selected':'') + '>보낸+받은</option>'
+        + '<option value="sent"' + (_filter.dir==='sent'?' selected':'') + '>🖊 보낸 것만</option>'
+        + '<option value="recv"' + (_filter.dir==='recv'?' selected':'') + '>💌 받은 것만</option>'
+      + '</select>'
+      + (_filter.sid ? '<button class="btn btn-sm btn-gray" onclick="filterStudent(\'\',\'all\')">✕ 해제</button>' : '')
+      + '</div>'
+      + (label ? '<div style="font-size:13px;font-weight:800;color:#7c3aed;margin-bottom:8px;">👤 ' + label + ' — ' + list.length + '개</div>' : '');
+
+    var body;
+    if (list.length === 0) {
+      body = '<div class="muted" style="text-align:center;padding:14px;">해당하는 칭찬이 없어요.</div>';
+    } else {
+      body = list.map(function(r){
+        // 익명 글도 교사 화면에선 실명 확인 가능 (관리 목적) — 익명 표시는 유지
+        var from = r.anon ? r.fromName + ' <span class="muted">(학생에겐 익명)</span>' : r.fromName;
+        return '<div class="rec" style="' + (r.hidden?'opacity:0.5;':'') + '">'
+          + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+            + '<div><b>' + from + '</b> → <b style="color:#7c3aed;">' + r.toName + '</b> <span class="muted">' + r.time + '</span></div>'
+            + '<div style="display:flex;gap:4px;flex-shrink:0;">'
+              + '<button class="btn btn-sm btn-gray" onclick="toggleHide(' + r.rowIdx + ',' + (!r.hidden) + ')">' + (r.hidden?'복원':'숨김') + '</button>'
+              + '<button class="btn btn-sm btn-danger" onclick="delRec(' + r.rowIdx + ')">삭제</button>'
+            + '</div>'
+          + '</div>'
+          + '<div style="margin-top:4px;">' + (r.content||'').replace(/</g,'&lt;') + '</div>'
+        + '</div>';
+      }).join('');
+    }
+
+    resBox.innerHTML = '<div class="card"><div style="font-weight:800;margin-bottom:8px;">📜 칭찬 기록 (' + _recs.length + '개)</div>'
+      + filterBar + body + '</div>';
   }
 
   function toggleHide(rowIdx, hidden) { google.script.run.withSuccessHandler(function(){ loadResults(); }).togglePraiseHidden(rowIdx, hidden); }
