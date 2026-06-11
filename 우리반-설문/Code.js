@@ -2,7 +2,21 @@
 // 우리 반 설문 — 교사용 통합 앱 (제작 + 통계 분석)
 // 공유 스프레드시트 사용 (설문목록 / 설문응답 시트)
 // =====================================================
-const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
+const SHEET_ID = _resolveSheetId_();
+// SHEET_ID 자동 연결: 스크립트 속성 → 대시보드가 드라이브에 남긴 연결 파일 → 없으면 setup 화면
+function _resolveSheetId_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('SHEET_ID');
+  if (id) return id;
+  try {
+    var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
+    if (it.hasNext()) {
+      id = String(it.next().getBlob().getDataAsString() || '').trim();
+      if (/^[a-zA-Z0-9_-]{20,}$/.test(id)) { props.setProperty('SHEET_ID', id); return id; }
+    }
+  } catch (e) {}
+  return '';
+}
 
 function doGet() {
   if (!SHEET_ID) return _setupPage_();

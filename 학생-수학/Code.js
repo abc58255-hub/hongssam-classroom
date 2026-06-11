@@ -1,4 +1,18 @@
-const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
+const SHEET_ID = _resolveSheetId_();
+// SHEET_ID 자동 연결: 스크립트 속성 → 대시보드가 드라이브에 남긴 연결 파일 → 없으면 setup 화면
+function _resolveSheetId_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('SHEET_ID');
+  if (id) return id;
+  try {
+    var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
+    if (it.hasNext()) {
+      id = String(it.next().getBlob().getDataAsString() || '').trim();
+      if (/^[a-zA-Z0-9_-]{20,}$/.test(id)) { props.setProperty('SHEET_ID', id); return id; }
+    }
+  } catch (e) {}
+  return '';
+}
 
 // FCM 토큰 저장 — E열에 [{t:토큰, d:기기ID}] 배열. 같은 기기는 토큰 1개만 유지
 function saveFcmToken(studentId, token, pwHash, deviceId) {

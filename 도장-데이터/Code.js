@@ -2,7 +2,21 @@
 // 공유 스프레드시트의 도장 데이터를 집계해 그리드로 보여준다.
 // ⚠️ 교사 전용 화면 — 소외 학생·등수 등 민감정보 포함. 학생에게 노출 금지.
 
-var SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
+var SHEET_ID = _resolveSheetId_();
+// SHEET_ID 자동 연결: 스크립트 속성 → 대시보드가 드라이브에 남긴 연결 파일 → 없으면 setup 화면
+function _resolveSheetId_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('SHEET_ID');
+  if (id) return id;
+  try {
+    var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
+    if (it.hasNext()) {
+      id = String(it.next().getBlob().getDataAsString() || '').trim();
+      if (/^[a-zA-Z0-9_-]{20,}$/.test(id)) { props.setProperty('SHEET_ID', id); return id; }
+    }
+  } catch (e) {}
+  return '';
+}
 
 // 소외 기준 (마지막 발표 이후 경과일)
 var STALE_DAYS = 14;

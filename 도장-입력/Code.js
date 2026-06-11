@@ -2,7 +2,21 @@
 // 공용 태블릿/TV에서 학생이 자기 이름을 눌러 발표·칭찬 도장을 기록.
 // 데이터는 공유 스프레드시트 도장기록 시트에 누적. 진도표에서 오늘 학습지 자동 추천.
 
-var SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
+var SHEET_ID = _resolveSheetId_();
+// SHEET_ID 자동 연결: 스크립트 속성 → 대시보드가 드라이브에 남긴 연결 파일 → 없으면 setup 화면
+function _resolveSheetId_() {
+  var props = PropertiesService.getScriptProperties();
+  var id = props.getProperty('SHEET_ID');
+  if (id) return id;
+  try {
+    var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
+    if (it.hasNext()) {
+      id = String(it.next().getBlob().getDataAsString() || '').trim();
+      if (/^[a-zA-Z0-9_-]{20,}$/.test(id)) { props.setProperty('SHEET_ID', id); return id; }
+    }
+  } catch (e) {}
+  return '';
+}
 
 // 🔐 외부 요청(푸시) 권한 승인용 — 에디터에서 한 번 실행하면 됨
 function grantPermissions() {
@@ -13,7 +27,11 @@ function grantPermissions() {
 function doGet() {
   if (!SHEET_ID) return _setupPage_();
   var t = HtmlService.createTemplateFromFile('index');
-  t.appUrl = ScriptApp.getService().getUrl(); // QR용 — 배포 URL 자동 주입
+  // QR용 배포 URL 자동 주입 — 권한 문제 등으로 실패하면 시스템설정 바로가기 폴백
+  var appUrl = '';
+  try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
+  if (!appUrl) { try { appUrl = _getSys_(SpreadsheetApp.openById(SHEET_ID), '바로가기_도장입력') || ''; } catch (e) {} }
+  t.appUrl = appUrl;
   return t.evaluate()
     .setTitle('홍쌤 도장-입력')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')

@@ -607,6 +607,28 @@ function doGet(e) {
 // =====================================================
 // ✅ 초기 설정 (SHEET_ID 미설정 시 setup 화면)
 // =====================================================
+// 연결 파일: 대시보드가 드라이브에 SHEET_ID를 남겨두면(아래 마커),
+// 다른 앱들은 첫 실행 때 이 파일을 읽어 자동 연결된다 (붙여넣기 불필요).
+var SHEET_ID_MARKER_NAME = '홍쌤교실시스템_SHEET_ID';
+
+function _writeSheetIdMarker_(id) {
+  try {
+    var it = DriveApp.getFilesByName(SHEET_ID_MARKER_NAME);
+    if (it.hasNext()) it.next().setContent(id);
+    else DriveApp.createFile(SHEET_ID_MARKER_NAME, id, MimeType.PLAIN_TEXT);
+  } catch (e) {}
+}
+
+// 이미 연결된 대시보드도 로그인 때 마커를 보장 (6시간에 1번만 확인)
+function _ensureSheetIdMarker_() {
+  try {
+    var cache = CacheService.getScriptCache();
+    if (cache.get('sheetIdMarkerOk')) return;
+    if (SHEET_ID) _writeSheetIdMarker_(SHEET_ID);
+    cache.put('sheetIdMarkerOk', '1', 21600);
+  } catch (e) {}
+}
+
 function _setupPage_() {
   return HtmlService.createHtmlOutputFromFile('setup')
     .setTitle('홍쌤 교실 시스템 — 초기 설정')
@@ -625,7 +647,8 @@ function saveSheetId(input) {
     var ss = SpreadsheetApp.openById(id);
     var name = ss.getName();
     props.setProperty('SHEET_ID', id);
-    return { success: true, message: '"' + name + '" 연결 완료!' };
+    _writeSheetIdMarker_(id); // 다른 앱들 자동 연결용
+    return { success: true, message: '"' + name + '" 연결 완료! 다른 앱들은 다음에 열 때 자동으로 연결돼요.' };
   } catch (e) {
     return { success: false, message: '스프레드시트를 열 수 없어요. ID와 접근 권한을 확인해주세요.' };
   }
@@ -682,7 +705,8 @@ function createNewSystem(opts) {
     sysSh.getRange(2, 1, seed.length, 2).setValues(seed);
 
     props.setProperty('SHEET_ID', ss.getId());
-    return { success: true, message: '새 시스템 생성 완료!', url: ss.getUrl(), id: ss.getId() };
+    _writeSheetIdMarker_(ss.getId()); // 다른 앱들 자동 연결용
+    return { success: true, message: '새 시스템 생성 완료! 다른 앱들은 다음에 열 때 자동으로 연결돼요.', url: ss.getUrl(), id: ss.getId() };
   } catch (e) {
     return { success: false, message: '생성 중 오류: ' + e.message };
   }
@@ -709,6 +733,8 @@ function teacherLogin(pw) {
     const props = PropertiesService.getScriptProperties();
     props.setProperty(TEACHER_SESSION_KEY, token);
     props.setProperty(TEACHER_SESSION_EXPIRY_KEY, String(expiry));
+
+    _ensureSheetIdMarker_(); // 다른 앱 자동 연결용 마커 보장
 
     return { success: true, token: token };
   } catch(e) {
