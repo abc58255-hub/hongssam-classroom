@@ -18,8 +18,34 @@ function _resolveSheetId_() {
   return '';
 }
 
+// 이 앱의 배포 URL을 시스템설정 '바로가기_*' 키에 자동 기록 → 대시보드 메뉴가 읽어 자동 연결
+function _registerAppUrl_(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var ck = 'appUrlReg_' + key;
+    if (cache && cache.get(ck)) return;
+    var url = '';
+    try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { return; }
+    if (!url || url.indexOf('/dev') >= 0) return;  // 게시된 /exec 주소만 기록
+    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+    if (!sh) return;
+    var last = Math.max(sh.getLastRow(), 1);
+    var data = sh.getRange(1, 1, last, 2).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === key) {
+        if (String(data[i][1]).trim() !== url) sh.getRange(i + 1, 2).setValue(url);
+        if (cache) cache.put(ck, '1', 21600);
+        return;
+      }
+    }
+    sh.appendRow([key, url]);
+    if (cache) cache.put(ck, '1', 21600);
+  } catch (e) {}
+}
+
 function doGet() {
   if (!SHEET_ID) return _setupPage_();
+  _registerAppUrl_('바로가기_설문');
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('우리 반 설문')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')

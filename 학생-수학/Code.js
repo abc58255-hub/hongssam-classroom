@@ -56,6 +56,31 @@ function _parseTokenObjs(raw) {
 
 
 
+// 이 앱의 배포 URL을 시스템설정 '바로가기_*' 키에 자동 기록 → 대시보드 메뉴가 읽어 자동 연결
+function _registerAppUrl_(key) {
+  try {
+    var cache = CacheService.getScriptCache();
+    var ck = 'appUrlReg_' + key;
+    if (cache && cache.get(ck)) return;
+    var url = '';
+    try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { return; }
+    if (!url || url.indexOf('/dev') >= 0) return;  // 게시된 /exec 주소만 기록
+    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
+    if (!sh) return;
+    var last = Math.max(sh.getLastRow(), 1);
+    var data = sh.getRange(1, 1, last, 2).getValues();
+    for (var i = 0; i < data.length; i++) {
+      if (String(data[i][0]).trim() === key) {
+        if (String(data[i][1]).trim() !== url) sh.getRange(i + 1, 2).setValue(url);
+        if (cache) cache.put(ck, '1', 21600);
+        return;
+      }
+    }
+    sh.appendRow([key, url]);
+    if (cache) cache.put(ck, '1', 21600);
+  } catch (e) {}
+}
+
 function doGet(e) {
   if (!SHEET_ID) {
     if (e && e.parameter && e.parameter.action) return ContentService.createTextOutput(JSON.stringify({ success: false, message: "앱이 아직 설정되지 않았어요." })).setMimeType(ContentService.MimeType.JSON);
@@ -70,6 +95,7 @@ function doGet(e) {
     }
     return ContentService.createTextOutput(output).setMimeType(ContentService.MimeType.JSON);
   }
+  _registerAppUrl_('바로가기_수학교실');
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('수학 과제 제출기')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
