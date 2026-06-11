@@ -43,17 +43,13 @@ function _clsOf_(sid) {
 
 // ===== 접근 잠금 (링크 공개 배포라 학생이 들어올 수 있음) =====
 // 교사 대시보드와 같은 비밀번호(시스템설정 '교사비밀번호') 사용.
-// 인증 성공 시 토큰 = hash('dojang|' + 비밀번호) → 기기 localStorage에 저장.
-// 무상태 검증: 비밀번호가 바뀌면 모든 기기 토큰이 자동 무효화된다.
-function _hash_(s) {
-  return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(s))
-    .map(function(b){ return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
-}
+// 인증 성공 시 1시간짜리 세션 토큰(UUID)을 발급해 CacheService에 저장.
+// 1시간이 지나면 서버에서 자동 만료 → 화면에 잠금이 다시 뜬다.
+var SESSION_TTL_SEC = 3600; // 1시간
 function _storedPw_(ss) { return _getSys_(ss, '교사비밀번호'); }
-function _makeTok_(pw) { return _hash_('dojang|' + pw); }
 function _tokOk_(ss, tok) {
-  var pw = _storedPw_(ss);
-  return !!(pw && tok && String(tok) === _makeTok_(pw));
+  if (!tok) return false;
+  return CacheService.getScriptCache().get('djs_' + String(tok)) === '1';
 }
 var NEED_AUTH = { success: false, needAuth: true, message: '비밀번호 인증이 필요해요.' };
 
@@ -71,7 +67,9 @@ function unlockDojang(pw) {
       return { success: false, message: '비밀번호 오류 (' + fails + '/5)' };
     }
     cache.remove('dj_pwfail');
-    return { success: true, token: _makeTok_(stored) };
+    var token = Utilities.getUuid();
+    cache.put('djs_' + token, '1', SESSION_TTL_SEC);
+    return { success: true, token: token };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 function _todayStr_() { return Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd'); }

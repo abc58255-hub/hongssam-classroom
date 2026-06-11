@@ -146,7 +146,7 @@
   <div class="lock-card">
     <div class="ico">🔒</div>
     <h2>도장 입력 잠금</h2>
-    <div class="desc">교사 비밀번호를 입력하면 이 기기에서 계속 사용할 수 있어요.</div>
+    <div class="desc">교사 비밀번호를 입력하면 <b>1시간 동안</b> 사용할 수 있어요.<br>시간이 지나면 자동으로 다시 잠겨요.</div>
     <input type="password" id="lockPw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
     <button id="lockBtn" onclick="doUnlock()">확인</button>
     <div class="err" id="lockErr"></div>
@@ -162,6 +162,9 @@
   // ===== 접근 잠금 — 교사 비밀번호로 1회 인증, 기기에 토큰 저장 =====
   var TOK = localStorage.getItem('dj_tok') || '';
   function showLock() {
+    // 열려 있던 모달 정리 (재조회 없이 닫기만)
+    document.getElementById('modalBg').classList.remove('show'); SEL = null;
+    document.getElementById('todayBg').classList.remove('show');
     document.getElementById('lockBg').classList.add('show');
     setTimeout(function(){ document.getElementById('lockPw').focus(); }, 100);
   }
