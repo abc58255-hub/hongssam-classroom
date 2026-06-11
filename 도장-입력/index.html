@@ -457,7 +457,7 @@
   }
 
   // ===== QR (다른 태블릿에서 바로 접속) =====
-  var APP_URL = 'https://script.google.com/macros/s/AKfycbyw2zd72G2D2QXFVOV-4wELVHjiDqadpRoNyUKj7t9U2NXnJcSSsvTcKvBf3j9bC7BOwQ/exec';
+  var APP_URL = '<?!= appUrl ?>'; // 서버(doGet)에서 배포 URL 자동 주입
   function openQR() {
     var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(APP_URL);
     document.getElementById('qrBox').innerHTML =

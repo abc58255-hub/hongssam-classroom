@@ -1,9 +1,14 @@
-const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID')
-  || '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
+const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
 
 function _getParentFolderId_() {
-  return _getSys(SpreadsheetApp.openById(SHEET_ID), '드라이브폴더ID')
-    || '1nmo4ZtQYK3-0PFjMKO8yzlkNOVoLn9_H';
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var id = _getSys(ss, '드라이브폴더ID');
+  if (id) return id;
+  // 미설정 시 자동 생성(같은 이름 폴더가 있으면 재사용) 후 시스템설정에 저장
+  var it = DriveApp.getFoldersByName('홍쌤 교실 시스템');
+  var folder = it.hasNext() ? it.next() : DriveApp.createFolder('홍쌤 교실 시스템');
+  _setSys(ss, '드라이브폴더ID', folder.getId());
+  return folder.getId();
 }
 
 // ── 시스템설정 키-값 헬퍼 ──────────────────────────────
@@ -73,15 +78,19 @@ function sendFcmToToken_(token, title, body, clickUrl, tag) {
     // iOS는 notification 필드가 있으면 자체표시까지 2번 뜸(웹푸시 한계, 감수).
     // 갤럭시는 1번, 아이폰은 2번. 학생 재등록/SW갱신 불필요.
     var t = String(title || ''); var b = String(body || '');
-    var link = clickUrl || _getSys(SpreadsheetApp.openById(SHEET_ID), '바로가기_수학교실') || '';
+    var ssIc = SpreadsheetApp.openById(SHEET_ID);
+    var link = clickUrl || _getSys(ssIc, '바로가기_수학교실') || '';
     var ntag = tag || 'default';
+    var webNoti = { title: t, body: b, tag: ntag };
+    var iconUrl = _getSys(ssIc, '알림아이콘URL');
+    if (iconUrl) webNoti.icon = iconUrl;
     var message = {
       message: {
         token: token,
         notification: { title: t, body: b },
         data: { title: t, body: b, url: link, tag: ntag },
         webpush: {
-          notification: { title: t, body: b, tag: ntag, icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png' },
+          notification: webNoti,
           fcm_options: { link: link }
         }
       }
@@ -584,6 +593,7 @@ function resetStudentPassword(studentId) {
 }
 
 function doGet(e) {
+  if (!SHEET_ID) return _setupPage_();
   // TickTick OAuth 콜백 처리
   if (e && e.parameter && e.parameter.code) {
     return handleTickTickCallback(e.parameter.code);
@@ -592,6 +602,90 @@ function doGet(e) {
     .setTitle('통합 교사 대시보드')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+// =====================================================
+// ✅ 초기 설정 (SHEET_ID 미설정 시 setup 화면)
+// =====================================================
+function _setupPage_() {
+  return HtmlService.createHtmlOutputFromFile('setup')
+    .setTitle('홍쌤 교실 시스템 — 초기 설정')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function saveSheetId(input) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('SHEET_ID')) return { success: false, message: '이미 설정되어 있어요. 변경하려면 GAS 편집기 > 프로젝트 설정 > 스크립트 속성에서 SHEET_ID를 삭제한 뒤 다시 열어주세요.' };
+    var id = String(input || '').trim();
+    var m = id.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+    if (m) id = m[1];
+    if (!/^[a-zA-Z0-9_-]{20,}$/.test(id)) return { success: false, message: '스프레드시트 ID 형식이 아니에요. 주소창의 URL 전체를 붙여넣어 보세요.' };
+    var ss = SpreadsheetApp.openById(id);
+    var name = ss.getName();
+    props.setProperty('SHEET_ID', id);
+    return { success: true, message: '"' + name + '" 연결 완료!' };
+  } catch (e) {
+    return { success: false, message: '스프레드시트를 열 수 없어요. ID와 접근 권한을 확인해주세요.' };
+  }
+}
+
+// 새 시스템 만들기: 스프레드시트(전체 시트+헤더) + 드라이브 폴더 자동 생성, 시스템설정 시드
+function createNewSystem(opts) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('SHEET_ID')) return { success: false, message: '이미 설정되어 있어요. 변경하려면 스크립트 속성에서 SHEET_ID를 삭제한 뒤 다시 열어주세요.' };
+    opts = opts || {};
+    var teacherPw = String(opts.teacherPw || '').trim();
+    if (!teacherPw) return { success: false, message: '교사 비밀번호를 입력해주세요. (대시보드 로그인에 사용돼요)' };
+
+    var ss = SpreadsheetApp.create('홍쌤 교실 시스템 데이터');
+
+    function mk(name, headers, color) {
+      var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground(color || '#1e3a8a').setFontColor('white');
+      sh.setFrozenRows(1);
+      return sh;
+    }
+    mk('학생명부',     ['번호','학번','이름','비밀번호','FCM토큰'], '#1e3a8a');
+    mk('과제설정',     ['날짜','과제명','설명','마감일','채점유형','공개여부','사진수','선택지'], '#1e3a8a');
+    mk('제출현황',     ['날짜','학번','이름','과제명','난이도','메모','파일URL','피드백','해시','읽음여부','상태','첨삭URL','점수','공개여부','메모2','답글','우수작유형','익명여부','우수작멘트','우수작키','부정행위','문항별JSON','AI채점JSON','상태변경일시'], '#1e3a8a');
+    mk('창체제출현황', ['날짜','학번','이름','활동명','역할','소감','파일URL','추가답변'], '#0d9488');
+    mk('설문목록',     ['ID','날짜','제목','상태','질문JSON','안내문'], '#0d9488');
+    mk('설문응답',     ['날짜','설문ID','학번','이름','답변'], '#0d9488');
+    mk('학급활동목록', ['번호','카테고리','활동명','설명','폼링크','필드JSON'], '#0d9488');
+    mk('학급알림',     ['제목','내용','유형','날짜','표시여부','중요여부'], '#0d9488');
+    mk('AI채점기준',   ['과제명','채점유형','만점','기준','파일JSON','문항JSON'], '#7c3aed');
+    mk('신고접수',     ['일시','학번','이름','유형','내용','처리여부'], '#dc2626');
+    mk('공지사항',     ['날짜','조회공지','조회전달','종례공지','종례전달','슬라이드URL','유튜브URL','영상모드'], '#475569');
+    var sysSh = mk('시스템설정', ['키','값'], '#475569');
+
+    // 기본 시트(Sheet1/시트1) 제거
+    ['Sheet1', '시트1'].forEach(function(n) {
+      var def = ss.getSheetByName(n);
+      if (def) { try { ss.deleteSheet(def); } catch (_) {} }
+    });
+
+    // 드라이브 폴더 생성 (제출 파일 저장용)
+    var it = DriveApp.getFoldersByName('홍쌤 교실 시스템');
+    var folder = it.hasNext() ? it.next() : DriveApp.createFolder('홍쌤 교실 시스템');
+
+    // 시스템설정 시드 (키-값)
+    var seed = [
+      ['교사비밀번호', teacherPw],
+      ['드라이브폴더ID', folder.getId()]
+    ];
+    if (String(opts.homeroom || '').trim()) seed.push(['담임반', String(opts.homeroom).trim()]);
+    if (String(opts.joinCode || '').trim()) seed.push(['가입코드', String(opts.joinCode).trim()]);
+    sysSh.getRange(2, 1, seed.length, 2).setValues(seed);
+
+    props.setProperty('SHEET_ID', ss.getId());
+    return { success: true, message: '새 시스템 생성 완료!', url: ss.getUrl(), id: ss.getId() };
+  } catch (e) {
+    return { success: false, message: '생성 중 오류: ' + e.message };
+  }
 }
 
 // =====================================================

@@ -2,7 +2,7 @@
 // 공용 태블릿/TV에서 학생이 자기 이름을 눌러 발표·칭찬 도장을 기록.
 // 데이터는 공유 스프레드시트 도장기록 시트에 누적. 진도표에서 오늘 학습지 자동 추천.
 
-var SHEET_ID = '1jK7gYGFXCe3FULLs5mKttP959Aa9vp8-WNOGdJy7cZQ';
+var SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
 
 // 🔐 외부 요청(푸시) 권한 승인용 — 에디터에서 한 번 실행하면 됨
 function grantPermissions() {
@@ -11,10 +11,39 @@ function grantPermissions() {
 }
 
 function doGet() {
-  return HtmlService.createHtmlOutputFromFile('index')
+  if (!SHEET_ID) return _setupPage_();
+  var t = HtmlService.createTemplateFromFile('index');
+  t.appUrl = ScriptApp.getService().getUrl(); // QR용 — 배포 URL 자동 주입
+  return t.evaluate()
     .setTitle('홍쌤 도장-입력')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+// ── 초기 설정 (SHEET_ID 미설정 시 setup 화면) ──────────
+function _setupPage_() {
+  return HtmlService.createHtmlOutputFromFile('setup')
+    .setTitle('초기 설정')
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+}
+
+function saveSheetId(input) {
+  try {
+    var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('SHEET_ID')) return { success: false, message: '이미 설정되어 있어요. 변경하려면 GAS 편집기 > 프로젝트 설정 > 스크립트 속성에서 SHEET_ID를 삭제한 뒤 다시 열어주세요.' };
+    var id = String(input || '').trim();
+    var m = id.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
+    if (m) id = m[1];
+    if (!/^[a-zA-Z0-9_-]{20,}$/.test(id)) return { success: false, message: '스프레드시트 ID 형식이 아니에요. 주소창의 URL 전체를 붙여넣어 보세요.' };
+    var ss = SpreadsheetApp.openById(id);
+    var name = ss.getName();
+    var warn = ss.getSheetByName('시스템설정') ? '' : '\n⚠️ 시스템설정 시트가 없는 스프레드시트예요. 교사용 대시보드에서 만든 스프레드시트가 맞는지 확인해주세요.';
+    props.setProperty('SHEET_ID', id);
+    return { success: true, message: '"' + name + '" 연결 완료!' + warn };
+  } catch (e) {
+    return { success: false, message: '스프레드시트를 열 수 없어요. ID와 접근 권한을 확인해주세요.' };
+  }
 }
 
 function _ensureSheets_() {
@@ -437,11 +466,14 @@ function _pushToStudent_(ss, sid, title, body) {
   if (!projectId || !accessToken) return;
   var link = _getSys_(ss, '바로가기_수학교실') || '';
   var t = String(title||''), b = String(body||'');
+  var webNoti = { title: t, body: b, tag: 'dojang' };
+  var iconUrl = _getSys_(ss, '알림아이콘URL');
+  if (iconUrl) webNoti.icon = iconUrl;
   var message = { message: {
     token: token,
     notification: { title: t, body: b },
     data: { title: t, body: b, url: link, tag: 'dojang' },
-    webpush: { notification: { title: t, body: b, tag: 'dojang', icon: 'https://abc58255-hub.github.io/hongssam-classroom/icon-192.png' }, fcm_options: { link: link } }
+    webpush: { notification: webNoti, fcm_options: { link: link } }
   } };
   UrlFetchApp.fetch('https://fcm.googleapis.com/v1/projects/' + projectId + '/messages:send', {
     method:'POST', contentType:'application/json',
