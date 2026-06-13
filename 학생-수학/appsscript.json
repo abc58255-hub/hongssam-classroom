@@ -1,6 +1,15 @@
 {
   "timeZone": "Asia/Seoul",
-  "dependencies": {},
+  "dependencies": {
+    "libraries": [
+      {
+        "userSymbol": "StudentAuth",
+        "libraryId": "1DxKnQVoaMB32iD_QhO9iZ0dBzSY3UuGsBBTUXlghGwhRqh82losQ7MF0",
+        "version": "2",
+        "developmentMode": true
+      }
+    ]
+  },
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
   "webapp": {

@@ -14,33 +14,9 @@ function _resolveSheetId_() {
   return '';
 }
 
-// FCM 토큰 저장 — E열에 [{t:토큰, d:기기ID}] 배열. 같은 기기는 토큰 1개만 유지
+// FCM 토큰 저장 — 인증 라이브러리(인증 시트)로 위임
 function saveFcmToken(studentId, token, pwHash, deviceId) {
-  try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
-    const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1] || "").trim() === String(studentId || "").trim()) {
-        if (pwHash) {
-          const storedHash = String(data[i][3] || "").trim();
-          if (storedHash && storedHash !== pwHash) {
-            return { success: false, message: "비밀번호가 올바르지 않습니다." };
-          }
-          if (!storedHash) {
-            return { success: false, message: "미가입 학생입니다. 먼저 회원가입을 해주세요." };
-          }
-        }
-        // ✅ 학생당 토큰 1개만 유지 — 가장 최근 등록 토큰으로 교체
-        // (iOS Safari·홈화면앱이 각각 토큰을 만들어 같은 폰에 2번 오던 문제 방지)
-        var objs = token ? [{ t: token, d: deviceId || '' }] : _parseTokenObjs(String(data[i][4] || '').trim());
-        sheet.getRange(i + 1, 5).setValue(JSON.stringify(objs));
-        return { success: true };
-      }
-    }
-    return { success: false, message: "학번을 찾을 수 없습니다." };
-  } catch(e) {
-    return { success: false, message: e.toString() };
-  }
+  return StudentAuth.saveFcmToken(studentId, token, pwHash, deviceId);
 }
 
 // E열 토큰 파싱 → [{t, d}] (구형 문자열 배열·단일 문자열 호환)
@@ -109,40 +85,9 @@ function getHash(text) {
 }
 
 // ✅ 로그인 성공 시 실패 횟수 초기화 + 빈 비밀번호 즉시 반환
-function verifyLogin(studentId, studentName, password) { 
-  // 비밀번호가 비어있으면 카운트 건드리지 않고 즉시 반환 (자동로그인 시도 방지)
-  if (!password || password.trim() === "") {
-    return { success: false, message: "" };
-  }
-
-  const cache = CacheService.getScriptCache(); 
-  const lockKey = "lock_" + studentId; 
-  if (cache.get(lockKey)) return { success: false, message: "🚨 5회 오류. 10분 정지됨." }; 
-
-  const rosterData = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부").getDataRange().getValues(); 
-  const inputHash = getHash(password); 
-
-  for (let i = 1; i < rosterData.length; i++) { 
-    if (String(rosterData[i][1] || "").trim() === String(studentId || "").trim() && 
-        String(rosterData[i][2] || "").trim() === String(studentName || "").trim()) { 
-      if (String(rosterData[i][3] || "").trim() === inputHash) { 
-        // ✅ 로그인 성공 시 실패 횟수 + 잠금 모두 초기화
-        cache.remove("fail_" + studentId); 
-        cache.remove(lockKey);
-        return { success: true }; 
-      } else { 
-        let fails = parseInt(cache.get("fail_" + studentId) || "0") + 1; 
-        if (fails >= 5) { 
-          cache.put(lockKey, "locked", 600); 
-          cache.remove("fail_" + studentId); 
-          return { success: false, message: "🚨 10분 정지됨" }; 
-        } 
-        cache.put("fail_" + studentId, fails.toString(), 600); 
-        return { success: false, message: "비번 오류 (" + fails + "/5)" }; 
-      } 
-    } 
-  } 
-  return { success: false, message: "정보 확인 요망" }; 
+// 로그인 — 인증 라이브러리(인증 시트)로 위임. 5회 잠금·해시검증은 라이브러리가 처리.
+function verifyLogin(studentId, studentName, password) {
+  return StudentAuth.login(studentId, studentName, password);
 }
 
 // AI 응답 JSON 느슨하게 파싱 — 토큰 한도로 잘린 응답도 닫는 괄호({,[) 보정해서 복구
@@ -433,7 +378,7 @@ function getDashboardData(studentId, studentName) {
     // 🏆 내 업적 (학급·전체 등수 포함)
     let myStats = null;
     try {
-      const rosterData = ss.getSheetByName("학생명부").getDataRange().getValues();
+      const rosterData = StudentAuth.getRosterValues();
       myStats = _computeAchievements(historyData, taskData, rosterData, safeId, className);
     } catch(e) { Logger.log('업적 계산 오류: ' + e.message); }
 
@@ -864,24 +809,13 @@ function getSubmitRank(studentId, taskName) {
 // ✅ 비밀번호 설정 (미설정 학생이 최초 로그인 시)
 // =====================================================
 function setStudentPassword(studentId, studentName, newPw) {
-  try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
-    const data = sheet.getDataRange().getValues();
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1] || '').trim() === String(studentId).trim() &&
-          String(data[i][2] || '').trim() === String(studentName).trim()) {
-        sheet.getRange(i + 1, 4).setValue(getHash(newPw));
-        return { success: true };
-      }
-    }
-    return { success: false, message: '학생 정보를 찾을 수 없습니다.' };
-  } catch(e) { return { success: false, message: e.toString() }; }
+  return StudentAuth.setPassword(studentId, studentName, newPw);
 }
 
-// verifyLogin 수정: 비밀번호 미설정 학생 감지
+// 비밀번호 미설정 학생 감지 (명부는 인증 시트에서 조회)
 function checkNeedsPwSetup(studentId, studentName) {
   try {
-    const data = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부").getDataRange().getValues();
+    const data = StudentAuth.getRosterValues();
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][1] || '').trim() === String(studentId).trim() &&
           String(data[i][2] || '').trim() === String(studentName).trim()) {
@@ -1193,7 +1127,7 @@ function getMyDojang(studentId) {
     var carrySh = ss.getSheetByName('도장_이월');
     if (!logSh) return { success: true, categories: [], recent: [], showRank: true };
 
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var roster = StudentAuth.getRosterValues();
     var clsOf = function(id){ id = String(id||'').trim(); return id.length>=2 ? (id.substring(0,1)+'학년 '+id.substring(1,2)+'반') : ''; };
     var cats = _getDojangCategories_(ss);
 

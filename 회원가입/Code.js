@@ -58,38 +58,9 @@ function getHash(text) {
 
 // ✅ QR 이미지는 register_index.html에 직접 embed됨 — 서버 함수 불필요
 
-// 회원가입 처리
+// 회원가입 처리 — 인증 라이브러리(인증 시트)로 위임. 가입코드도 인증 시트 설정 사용.
 function registerStudent(studentId, studentName, password, inputCode) {
-  const ss = SpreadsheetApp.openById(SHEET_ID);
-
-  // 가입코드: 시스템설정 '가입코드' 키 우선, 없으면 학생명부 E2 폴백
-  let currentSecretCode = '';
-  const sysSh = ss.getSheetByName('시스템설정');
-  if (sysSh && sysSh.getLastRow() >= 2) {
-    const rows = sysSh.getRange(2, 1, sysSh.getLastRow() - 1, 2).getValues();
-    for (let i = 0; i < rows.length; i++) {
-      if (String(rows[i][0]).trim() === '가입코드') { currentSecretCode = String(rows[i][1] || '').trim(); break; }
-    }
-  }
-
-  if (!currentSecretCode || String(inputCode).trim() !== currentSecretCode) {
-    return { success: false, message: "🚨 가입 코드가 틀렸거나, 현재 가입 기간이 아닙니다." };
-  }
-
-  const rosterSheet = ss.getSheetByName('학생명부');
-  if (!rosterSheet) return { success: false, message: "학생 명부를 찾을 수 없습니다." };
-  const data = rosterSheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][1]).trim() === String(studentId).trim() &&
-        String(data[i][2]).trim() === String(studentName).trim()) {
-      if (data[i][3]) {
-        return { success: false, message: "⚠️ 이미 가입이 완료된 계정입니다. 비밀번호를 잊었다면 선생님께 초기화를 요청하세요." };
-      }
-      rosterSheet.getRange(i + 1, 4).setValue(getHash(password));
-      return { success: true };
-    }
-  }
-  return { success: false, message: "❌ 명부에 없는 학번/이름입니다. 이름을 정확히 띄어쓰기 없이 입력했는지 확인하세요." };
+  return StudentAuth.registerStudent(studentId, studentName, password, inputCode);
 }
 // ── 초기 설정 (SHEET_ID 미설정 시 setup 화면) ──────────
 function _setupPage_() {

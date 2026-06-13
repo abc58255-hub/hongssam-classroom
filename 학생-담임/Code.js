@@ -92,22 +92,10 @@ function verifyHomeroomLogin(studentId, studentName, password) {
   let studentHr = `${String(studentId).substring(0,1)}학년 ${String(studentId).substring(1,2)}반`;
   if (hrStr !== "" && hrStr !== studentHr) return { success: false, message: `🚨 ${hrStr} 학생 전용입니다.` };
 
-  const cache = CacheService.getScriptCache(); const lockKey = "lock_" + studentId;
-  if (cache.get(lockKey)) return { success: false, message: "🚨 5회 오류. 10분간 잠금" };
-  const rosterData = ss.getSheetByName("학생명부").getDataRange().getValues();
-  const inputHash = getHash(password); 
-  
-  for (let i = 1; i < rosterData.length; i++) {
-    if (String(rosterData[i][1]).trim() === String(studentId).trim() && String(rosterData[i][2]).trim() === String(studentName).trim()) {
-      if (String(rosterData[i][3]).trim() === inputHash) { cache.remove("fail_" + studentId); return { success: true, homeroom: hrStr }; } 
-      else {
-        let fails = parseInt(cache.get("fail_" + studentId) || "0") + 1;
-        if (fails >= 5) { cache.put(lockKey, "locked", 600); cache.remove("fail_" + studentId); return { success: false, message: "🚨 10분 잠금" }; }
-        cache.put("fail_" + studentId, fails.toString(), 600); return { success: false, message: `비번 오류 (${fails}/5)` };
-      }
-    }
-  }
-  return { success: false, message: "정보 확인 요망" };
+  // 로그인·5회잠금·해시검증은 인증 라이브러리에 위임, 담임반 제한만 이 앱에서 유지
+  const r = StudentAuth.login(studentId, studentName, password);
+  if (r.success) return { success: true, homeroom: hrStr };
+  return r;
 }
 
 function getHomeroomData(studentId) {
@@ -146,7 +134,7 @@ function getHomeroomData(studentId) {
   }
   
   let roster = []; let hrStr = _getSysHr(ss);
-  const rosterData = ss.getSheetByName("학생명부").getDataRange().getValues();
+  const rosterData = StudentAuth.getRosterValues();
   for(let i=1; i<rosterData.length; i++) {
     let sid = String(rosterData[i][1]).trim();
     if (`${sid.substring(0,1)}학년 ${sid.substring(1,2)}반` === hrStr) roster.push({ id: sid, name: String(rosterData[i][2]).trim() });
@@ -268,7 +256,7 @@ function _prFmtDate(d) { return Utilities.formatDate(new Date(d), 'Asia/Seoul', 
 function _prTime(d) { return d ? Utilities.formatDate(new Date(d), 'Asia/Seoul', 'MM/dd HH:mm') : ''; }
 
 function _prRoster(cls) {
-  var data = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부').getDataRange().getValues();
+  var data = StudentAuth.getRosterValues();
   var list = [];
   for (var i = 1; i < data.length; i++) {
     var sid = String(data[i][1] || '').trim();

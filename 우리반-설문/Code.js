@@ -69,7 +69,7 @@ function getInitData() {
     var hrStr = _getSys(ss, '담임반') || '';
     // 명부
     var roster = [];
-    var rd = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var rd = StudentAuth.getRosterValues();
     for (var i = 1; i < rd.length; i++) {
       var sid = String(rd[i][1] || '').trim();
       if (!sid) continue;

@@ -92,7 +92,7 @@ function _fmtDate_(d) {
 function getClassList() {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var roster = StudentAuth.getRosterValues();
     var set = {};
     for (var i = 1; i < roster.length; i++) {
       var c = _clsOf_(roster[i][1]);
@@ -113,7 +113,7 @@ function getDojangData(filterClass, period, semesterStart) {
     var catNames = cats.map(function(c){ return c.name; });
     var staleCat = (cats.filter(function(c){ return c.type === 'sheet'; })[0] || cats[0] || {name:''}).name;
 
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var roster = StudentAuth.getRosterValues();
     var logSh = ss.getSheetByName('도장기록');
     var carrySh = ss.getSheetByName('도장_이월');
     var log = logSh.getLastRow() > 1 ? logSh.getRange(2, 1, logSh.getLastRow()-1, 8).getValues() : [];
@@ -368,7 +368,7 @@ function deleteWorksheet(name) {
 function getCarryList(cls) {
   try {
     var ss = _ensureSheets_();
-    var roster = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var roster = StudentAuth.getRosterValues();
     var carrySh = ss.getSheetByName('도장_이월');
     var carry = carrySh.getLastRow() > 1 ? carrySh.getRange(2, 1, carrySh.getLastRow()-1, 4).getValues() : [];
     var cmap = {};

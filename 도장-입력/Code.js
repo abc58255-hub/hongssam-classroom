@@ -162,7 +162,7 @@ function _getRosterCached_() {
   var cache = CacheService.getScriptCache();
   var hit = cache.get('dj_roster');
   if (hit) { try { return JSON.parse(hit); } catch(_) {} }
-  var roster = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부').getDataRange().getValues();
+  var roster = StudentAuth.getRosterValues();
   var list = [];
   for (var i = 1; i < roster.length; i++) {
     var sid = String(roster[i][1] || '').trim();
@@ -493,7 +493,7 @@ function _getFcmToken_() {
 
 function _pushToStudent_(ss, sid, title, body) {
   // 학생명부 E열에서 토큰 읽기 — TextFinder로 해당 행만 (전체 읽기 방지, 도장 1개당 1회 호출됨)
-  var sh = ss.getSheetByName('학생명부');
+  var sh = _authRoster_();
   var hit = sh.getRange('B:B').createTextFinder(String(sid).trim()).matchEntireCell(true).findNext();
   if (!hit) return;
   var raw = String(sh.getRange(hit.getRow(), 5).getValue() || '').trim();
@@ -547,4 +547,11 @@ function deleteRecord(ts, sid, tok) {
     }
     return { success: false, message: '해당 기록을 찾지 못함' };
   } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 학생명부는 인증 시트(StudentAuth)가 단일 출처. 명부 시트 객체 직접 접근용 헬퍼.
+var _authRosterSs_ = null;
+function _authRoster_() {
+  if (!_authRosterSs_) _authRosterSs_ = SpreadsheetApp.openById(StudentAuth.getAuthSheetId());
+  return _authRosterSs_.getSheetByName('학생명부');
 }

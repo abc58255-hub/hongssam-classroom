@@ -79,7 +79,7 @@ function _clsOfId(sid) {
 // ── 반 목록 / 학생 명부 ─────────────────────────────────
 function getClassList() {
   try {
-    var data = _ss().getSheetByName('학생명부').getDataRange().getValues();
+    var data = StudentAuth.getRosterValues();
     var set = {};
     for (var i = 1; i < data.length; i++) {
       var sid = String(data[i][1] || '').trim();
@@ -93,7 +93,7 @@ function getClassList() {
 
 function getRoster(cls) {
   try {
-    var data = _ss().getSheetByName('학생명부').getDataRange().getValues();
+    var data = StudentAuth.getRosterValues();
     var list = [];
     for (var i = 1; i < data.length; i++) {
       var sid = String(data[i][1] || '').trim();

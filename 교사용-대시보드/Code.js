@@ -1,5 +1,12 @@
 const SHEET_ID = PropertiesService.getScriptProperties().getProperty('SHEET_ID') || '';
 
+// 학생명부는 인증 시트(StudentAuth)가 단일 출처. 명부 시트 객체를 직접 열어 기존 로직 재사용.
+var _authRosterSs_ = null;
+function _authRoster_() {
+  if (!_authRosterSs_) _authRosterSs_ = SpreadsheetApp.openById(StudentAuth.getAuthSheetId());
+  return _authRosterSs_.getSheetByName('학생명부');
+}
+
 function _getParentFolderId_() {
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var id = _getSys(ss, '드라이브폴더ID');
@@ -156,7 +163,7 @@ function _sendAndPrune_(sheet, rowIdx, title, body, clickUrl, tag) {
 function sendPushToStudents(studentIds, title, body, tag, filterClass) {
   try {
     var ss    = SpreadsheetApp.openById(SHEET_ID);
-    var sheet = ss.getSheetByName('학생명부');
+    var sheet = _authRoster_();
     var data  = sheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var sent = 0, skipped = 0;
@@ -188,7 +195,7 @@ function sendPushToAll(title, body, tag) {
 // FCM 토큰 전체 초기화 — 명부 E열 비움. 학생이 재등록하면 기기당 1개로 깨끗하게 시작
 function resetAllFcmTokens() {
   try {
-    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학생명부');
+    var sheet = _authRoster_();
     if (sheet.getLastRow() < 2) return { success: true, cleared: 0 };
     var n = sheet.getLastRow() - 1;
     sheet.getRange(2, 5, n, 1).clearContent(); // E열
@@ -200,7 +207,7 @@ function resetAllFcmTokens() {
 function sendPushToUnsubmitted(taskName, title, body) {
   try {
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var roster  = ss.getSheetByName('학생명부').getDataRange().getValues();
+    var roster  = _authRoster_().getDataRange().getValues();
     var history = ss.getSheetByName('제출현황').getDataRange().getValues();
     var tasks   = ss.getSheetByName('과제설정').getDataRange().getValues();
 
@@ -309,7 +316,7 @@ function _notifyNewTask_(taskName, deadlinesJson) {
     if (!hasAny) return 0;
 
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sheet = ss.getSheetByName('학생명부');
+    var sheet = _authRoster_();
     var roster = sheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var sent = 0;
@@ -341,7 +348,7 @@ function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
     try { newDl = JSON.parse(newJson || '{}'); } catch(_) { return 0; }
 
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sheet = ss.getSheetByName('학생명부');
+    var sheet = _authRoster_();
     var roster = sheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var sent = 0;
@@ -392,7 +399,7 @@ function notifyGradedHourly() {
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var sheet = ss.getSheetByName('제출현황');
     var data = sheet.getDataRange().getValues();
-    var rosterSheet = ss.getSheetByName('학생명부');
+    var rosterSheet = _authRoster_();
     var roster = rosterSheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
 
@@ -454,7 +461,7 @@ function notifyUnsubmittedDaily() {
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var tasks = ss.getSheetByName('과제설정').getDataRange().getValues();
     var subs  = ss.getSheetByName('제출현황').getDataRange().getValues();
-    var rosterSheet = ss.getSheetByName('학생명부');
+    var rosterSheet = _authRoster_();
     var roster = rosterSheet.getDataRange().getValues();
     var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
     var now = new Date();
@@ -577,7 +584,7 @@ function installAutoNotifyTriggers() {
 // =====================================================
 function resetStudentPassword(studentId) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학생명부");
+    const sheet = _authRoster_();
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       if (String(data[i][1] || "").trim() === String(studentId).trim()) {
@@ -800,7 +807,7 @@ function parseRosterAndClasses(ss) {
   let cached = getCached('roster');
   if (cached) return cached;
 
-  const rosterData = ss.getSheetByName("학생명부").getDataRange().getValues();
+  const rosterData = _authRoster_().getDataRange().getValues();
   let roster = [], classSet = new Set();
   for (let i = 1; i < rosterData.length; i++) {
     if (!rosterData[i][1]) continue;

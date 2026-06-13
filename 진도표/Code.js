@@ -72,7 +72,7 @@ function verifyTeacher(password) {
 function getClassList() {
   try {
     const ss = SpreadsheetApp.openById(SHEET_ID);
-    const rosterSheet = ss.getSheetByName('학생명부');
+    const rosterSheet = _authRoster_();
     if (!rosterSheet || rosterSheet.getLastRow() < 2) return { success: true, classes: [] };
     const data = rosterSheet.getRange(2, 1, rosterSheet.getLastRow() - 1, 3).getValues();
     const clsSet = {};
@@ -132,7 +132,7 @@ function getGroups() {
 }
 
 function _getDefaultClasses_(ss) {
-  var rosterSheet = ss.getSheetByName('학생명부');
+  var rosterSheet = _authRoster_();
   if (!rosterSheet || rosterSheet.getLastRow() < 2) return [];
   var data = rosterSheet.getRange(2, 1, rosterSheet.getLastRow() - 1, 3).getValues();
   var clsSet = {};
@@ -668,7 +668,7 @@ function generateAndApplySchedule(groupId, semData, ttEntries) {
 function _getTaskRatesForGroup_(ss, classes) {
   var byDate = {};
   var classCounts = {};
-  var rosterSh = ss.getSheetByName('학생명부');
+  var rosterSh = _authRoster_();
   if (rosterSh && rosterSh.getLastRow() >= 2) {
     var rData = rosterSh.getRange(2, 1, rosterSh.getLastRow()-1, 3).getValues();
     rData.forEach(function(r) {
@@ -966,4 +966,11 @@ function saveSheetId(input) {
   } catch (e) {
     return { success: false, message: '스프레드시트를 열 수 없어요. ID와 접근 권한을 확인해주세요.' };
   }
+}
+
+// 학생명부는 인증 시트(StudentAuth)가 단일 출처. 명부 시트 객체 직접 접근용 헬퍼.
+var _authRosterSs_ = null;
+function _authRoster_() {
+  if (!_authRosterSs_) _authRosterSs_ = SpreadsheetApp.openById(StudentAuth.getAuthSheetId());
+  return _authRosterSs_.getSheetByName('학생명부');
 }
