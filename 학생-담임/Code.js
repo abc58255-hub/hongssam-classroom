@@ -43,7 +43,6 @@ function doGet() {
   if (!SHEET_ID) return _setupPage_();
   _registerAppUrl_('바로가기_우리반교실');
   return HtmlService.createHtmlOutputFromFile('index').setTitle('우리 반 교실').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).addMetaTag('viewport', 'width=device-width, initial-scale=1'); }
-function getHash(text) { return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text).map(e => (e < 0 ? e + 256 : e).toString(16).padStart(2, '0')).join(''); }
 
 var _sysHrCache_ = null;
 function _getSysHrKey_(key) {

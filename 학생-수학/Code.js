@@ -19,18 +19,6 @@ function saveFcmToken(studentId, token, pwHash, deviceId) {
   return StudentAuth.saveFcmToken(studentId, token, pwHash, deviceId);
 }
 
-// E열 토큰 파싱 → [{t, d}] (구형 문자열 배열·단일 문자열 호환)
-function _parseTokenObjs(raw) {
-  var s = String(raw || '').trim();
-  if (!s) return [];
-  try {
-    var arr = JSON.parse(s);
-    if (!Array.isArray(arr)) arr = [s];
-    return arr.map(function(e){ return (typeof e === 'string') ? { t: e, d: '' } : (e && e.t ? { t: e.t, d: e.d || '' } : null); }).filter(Boolean);
-  } catch(_) { return [{ t: s, d: '' }]; }
-}
-
-
 
 // 이 앱의 배포 URL을 시스템설정 '바로가기_*' 키에 자동 기록 → 대시보드 메뉴가 읽어 자동 연결
 function _registerAppUrl_(key) {
@@ -810,20 +798,6 @@ function getSubmitRank(studentId, taskName) {
 // =====================================================
 function setStudentPassword(studentId, studentName, newPw) {
   return StudentAuth.setPassword(studentId, studentName, newPw);
-}
-
-// 비밀번호 미설정 학생 감지 (명부는 인증 시트에서 조회)
-function checkNeedsPwSetup(studentId, studentName) {
-  try {
-    const data = StudentAuth.getRosterValues();
-    for (let i = 1; i < data.length; i++) {
-      if (String(data[i][1] || '').trim() === String(studentId).trim() &&
-          String(data[i][2] || '').trim() === String(studentName).trim()) {
-        return { found: true, needsSetup: !String(data[i][3] || '').trim() };
-      }
-    }
-    return { found: false, needsSetup: false };
-  } catch(e) { return { found: false, needsSetup: false }; }
 }
 
 // =====================================================

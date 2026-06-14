@@ -48,14 +48,6 @@ function doGet() {
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-// 비밀번호 해시
-function getHash(text) {
-  const rawBytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text);
-  return rawBytes.map(function(e) {
-    return (e < 0 ? e + 256 : e).toString(16).padStart(2, '0');
-  }).join('');
-}
-
 // ✅ QR 이미지는 register_index.html에 직접 embed됨 — 서버 함수 불필요
 
 // 회원가입 처리 — 인증 라이브러리(인증 시트)로 위임. 가입코드도 인증 시트 설정 사용.
