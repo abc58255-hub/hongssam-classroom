@@ -14,33 +14,28 @@ function _resolveSheetId_() {
   return '';
 }
 
+// 과제 데이터는 과제채점 앱의 '과제 시트'(ClassCore 공유 ID '과제시트ID')를 사용
+function _taskSs_() {
+  var id = StudentAuth.getConfig('과제시트ID', '');
+  if (!id) throw new Error('과제 시트가 설정되지 않았습니다. 과제채점 앱을 먼저 실행하세요.');
+  return SpreadsheetApp.openById(id);
+}
+
 // FCM 토큰 저장 — 인증 라이브러리(인증 시트)로 위임
 function saveFcmToken(studentId, token, pwHash, deviceId) {
   return StudentAuth.saveFcmToken(studentId, token, pwHash, deviceId);
 }
 
 
-// 이 앱의 배포 URL을 시스템설정 '바로가기_*' 키에 자동 기록 → 대시보드 메뉴가 읽어 자동 연결
+// 이 앱의 배포 URL을 ClassCore 앱 URL 레지스트리에 자동 기록 (포털 카드용)
 function _registerAppUrl_(key) {
   try {
     var cache = CacheService.getScriptCache();
     var ck = 'appUrlReg_' + key;
     if (cache && cache.get(ck)) return;
-    var url = '';
-    try { url = ScriptApp.getService().getUrl() || ''; } catch (e) { return; }
-    if (!url || url.indexOf('/dev') >= 0) return;  // 게시된 /exec 주소만 기록
-    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-    if (!sh) return;
-    var last = Math.max(sh.getLastRow(), 1);
-    var data = sh.getRange(1, 1, last, 2).getValues();
-    for (var i = 0; i < data.length; i++) {
-      if (String(data[i][0]).trim() === key) {
-        if (String(data[i][1]).trim() !== url) sh.getRange(i + 1, 2).setValue(url);
-        if (cache) cache.put(ck, '1', 21600);
-        return;
-      }
-    }
-    sh.appendRow([key, url]);
+    var url = ScriptApp.getService().getUrl() || '';
+    if (!url || url.indexOf('/dev') >= 0) return;
+    StudentAuth.registerAppUrl(key.replace('바로가기_', ''), url);
     if (cache) cache.put(ck, '1', 21600);
   } catch (e) {}
 }
@@ -140,7 +135,7 @@ function getDashboardData(studentId, studentName) {
     let safeId = String(studentId || "").trim();
     let className = safeId.length >= 2 ? `${safeId.substring(0, 1)}학년 ${safeId.substring(1, 2)}반` : "기타";
     
-    const taskData = ss.getSheetByName("과제설정").getDataRange().getValues();
+    const taskData = _taskSs_().getSheetByName("과제설정").getDataRange().getValues();
     let allBaseTasks = []; 
     let validMissingTasksSet = new Set(); 
     let taskSettingsMap = {};
@@ -201,7 +196,7 @@ function getDashboardData(studentId, studentName) {
       if (!hasDeadline || !isExpired) { validMissingTasksSet.add(tName); }
     }
 
-    const historyData = ss.getSheetByName("제출현황").getDataRange().getValues();
+    const historyData = _taskSs_().getSheetByName("제출현황").getDataRange().getValues();
     let history = []; 
     let taskStatusMap = {}; 
     let unreadFeedbacks = []; 
@@ -391,7 +386,7 @@ function getDashboardData(studentId, studentName) {
 // ── 본 우수작 추적 (서버 저장) ───────────────────────────
 function _bestSeenSheet() {
   var ss = SpreadsheetApp.openById(SHEET_ID);
-  var sh = ss.getSheetByName('우수작읽음');
+  var sh = _taskSs_().getSheetByName('우수작읽음');
   if (!sh) {
     sh = ss.insertSheet('우수작읽음');
     sh.getRange(1,1,1,2).setValues([['학번','본키JSON']]);
@@ -593,7 +588,7 @@ function _computeAchievements(historyData, taskData, rosterData, myId, myClass) 
 }
 
 function markFeedbacksAsSeen(rowIndices) { 
-  const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황"); 
+  const sheet = _taskSs_().getSheetByName("제출현황"); 
   rowIndices.forEach(idx => sheet.getRange(idx, 10).setValue("확인")); 
   return true; 
 }
@@ -608,7 +603,7 @@ function _verifyRowOwner_(sheet, rowIdx, studentId) {
 
 function saveStudentReply(rowIdx, replyText, studentId) {
   try {
-    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황");
+    var sheet = _taskSs_().getSheetByName("제출현황");
     if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return false;
     sheet.getRange(rowIdx, 16).setValue(replyText);
     return true;
@@ -619,7 +614,7 @@ function saveStudentReply(rowIdx, replyText, studentId) {
 
 function requestResubmission(rowIdx, studentId) {
   try {
-    var sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황");
+    var sheet = _taskSs_().getSheetByName("제출현황");
     if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return { success: false };
     sheet.getRange(rowIdx, 16).setValue("[재제출요청]");
     return { success: true };
@@ -631,7 +626,7 @@ function requestResubmission(rowIdx, studentId) {
 function processForm(formData) {
   try {
     const ss = SpreadsheetApp.openById(SHEET_ID);
-    const sheet = ss.getSheetByName("제출현황");
+    const sheet = _taskSs_().getSheetByName("제출현황");
     const now = new Date();
     let inputId = String(formData.studentId || "").trim();
     let inputName = String(formData.studentName || "").trim();
@@ -648,7 +643,7 @@ function processForm(formData) {
     }
 
     // ✅ 마감일 서버측 검증
-    const taskSheet = ss.getSheetByName("과제설정");
+    const taskSheet = _taskSs_().getSheetByName("과제설정");
     if (taskSheet) {
       const taskRows = taskSheet.getDataRange().getValues();
       const className = inputId.length >= 2 ? `${inputId.substring(0,1)}학년 ${inputId.substring(1,2)}반` : "기타";
@@ -754,7 +749,7 @@ function processForm(formData) {
 // 특정 학생의 특정 과제 제출 등수 계산
 function getSubmitRank(studentId, taskName) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("제출현황");
+    const sheet = _taskSs_().getSheetByName("제출현황");
     const data = sheet.getDataRange().getValues();
     const baseTaskName = String(taskName).split(' (')[0].trim(); // (재제출) 등 제외한 기본 과제명
     
@@ -805,34 +800,16 @@ function setStudentPassword(studentId, studentName, newPw) {
 // =====================================================
 
 function _getParentFolderId_() {
-  var id = _getSysStudent('드라이브폴더ID');
+  var id = StudentAuth.getConfig('드라이브폴더ID', '');
   if (id) return id;
-  // 미설정 시 자동 생성(같은 이름 폴더가 있으면 재사용) 후 시스템설정에 저장
   var it = DriveApp.getFoldersByName('홍쌤 교실 시스템');
   var folder = it.hasNext() ? it.next() : DriveApp.createFolder('홍쌤 교실 시스템');
-  try {
-    var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-    if (sh) sh.appendRow(['드라이브폴더ID', folder.getId()]);
-  } catch (e) {}
+  try { StudentAuth.setConfig('드라이브폴더ID', folder.getId()); } catch (e) {}
   return folder.getId();
 }
 
 var _sysStudentCache_ = null;
-function _getSysStudent(key) {
-  if (!_sysStudentCache_) {
-    _sysStudentCache_ = {};
-    try {
-      var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');
-      if (sh && sh.getLastRow() >= 2) {
-        var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
-        for (var i = 0; i < rows.length; i++) {
-          _sysStudentCache_[String(rows[i][0]).trim()] = String(rows[i][1] || '').trim();
-        }
-      }
-    } catch(e) {}
-  }
-  return _sysStudentCache_[key] || '';
-}
+function _getSysStudent(key) { return StudentAuth.getConfig(key, ''); }
 
 function _getApiSettingsForStudent() {
   var orKey = _getSysStudent('OpenRouter키');
@@ -847,7 +824,7 @@ function _getApiSettingsForStudent() {
 
 function _getRubricByTaskName(taskName) {
   try {
-    const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('AI채점기준');
+    const sh = _taskSs_().getSheetByName('AI채점기준');
     if (!sh || sh.getLastRow() < 2) return null;
     const data = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
     for (let i = 0; i < data.length; i++) {
@@ -892,7 +869,7 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
     const cfg = _getApiSettingsForStudent();
     if (!cfg.openrouterKey) return { success: false, message: 'API 키 없음' };
 
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('제출현황');
+    const sheet = _taskSs_().getSheetByName('제출현황');
 
     const existing = String(sheet.getRange(rowIdx, 23).getValue() || '').trim();
     if (existing.startsWith('{')) return { success: false, message: '이미 채점됨' };
@@ -1025,7 +1002,7 @@ function testAutoGrade() {
   }
   
   // 2. 채점기준 시트 확인
-  const sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('AI채점기준');
+  const sh = _taskSs_().getSheetByName('AI채점기준');
   if (!sh) {
     Logger.log('❌ "AI채점기준" 시트가 없습니다!');
     return;
@@ -1045,7 +1022,7 @@ function testAutoGrade() {
   Logger.log('📌 파일 개수: ' + (firstRubric[4] ? JSON.parse(firstRubric[4]).length : 0));
   
   // 4. 최근 제출된 행을 기준으로 실제 채점 시도
-  const sub = SpreadsheetApp.openById(SHEET_ID).getSheetByName('제출현황');
+  const sub = _taskSs_().getSheetByName('제출현황');
   const lastRow = sub.getLastRow();
   Logger.log('📌 제출현황 마지막 행: ' + lastRow);
   

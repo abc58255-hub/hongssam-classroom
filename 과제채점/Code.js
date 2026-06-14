@@ -22,6 +22,8 @@ function _taskSs() {
     props.setProperty('TASK_SHEET_ID', ss.getId());
   }
   _ensureTaskSheets(ss);
+  // 과제 시트 ID를 ClassCore에 공유 → 학생-수학 등 다른 앱이 같은 시트를 참조
+  try { if (ClassCore.getConfig('과제시트ID', '') !== ss.getId()) ClassCore.setConfig('과제시트ID', ss.getId()); } catch(_) {}
   _cachedTaskSs = ss;
   return ss;
 }
