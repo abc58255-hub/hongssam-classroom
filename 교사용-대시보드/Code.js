@@ -1834,69 +1834,30 @@ function runAICheatCheck(targetTaskName) {
 // ✅ 학급 알림 관리 (학급알림 시트 연동)
 // 시트 구조: A=제목, B=내용, C=유형, D=날짜, E=표시여부, F=중요여부
 // =====================================================
-function getNotices() {
-  try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학급알림");
-    if (!sheet) return { success: true, notices: [] };
-    const lastRow = sheet.getLastRow();
-    if (lastRow < 2) return { success: true, notices: [] };
-    const data = sheet.getRange(2, 1, lastRow - 1, 6).getValues();
-    const notices = [];
-    for (let i = 0; i < data.length; i++) {
-      const r = data[i];
-      if (!r[0] && !r[1]) continue; // 빈 행 스킵
-      notices.push({
-        rowIdx: i + 2,
-        title:     String(r[0] || '').trim(),
-        content:   String(r[1] || '').trim(),
-        type:      String(r[2] || '알림').trim(),
-        date:      r[3] instanceof Date ? Utilities.formatDate(r[3], 'Asia/Seoul', 'yyyy-MM-dd') : String(r[3] || '').trim(),
-        visible:   r[4] === true || String(r[4]).trim() === '1' || String(r[4]).trim() === 'TRUE',
-        important: r[5] === true || String(r[5]).trim() === '1' || String(r[5]).trim() === 'TRUE'
-      });
-    }
-    return { success: true, notices: notices };
-  } catch(e) { return { success: false, message: e.toString() }; }
+function getNotices() { return StudentAuth.getNotices(); }
+
+// 학급알림 → ClassCore 이전 (1회 실행)
+function migrateNotices() {
+  var src = SpreadsheetApp.openById(SHEET_ID).getSheetByName('학급알림');
+  if (!src || src.getLastRow() < 2) return { success: true, count: 0 };
+  var data = src.getRange(2, 1, src.getLastRow() - 1, 6).getValues();
+  var n = 0;
+  data.forEach(function(r) {
+    if (!r[0] && !r[1]) return;
+    StudentAuth.saveNotice({
+      title: r[0], content: r[1], type: r[2],
+      date: r[3] instanceof Date ? Utilities.formatDate(r[3], 'Asia/Seoul', 'yyyy-MM-dd') : r[3],
+      visible: r[4], important: r[5]
+    });
+    n++;
+  });
+  Logger.log('✅ 학급알림 이전: ' + n + '건');
+  return { success: true, count: n };
 }
 
-function saveNoticeData(data) {
-  try {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
-    let sheet = ss.getSheetByName("학급알림");
-    if (!sheet) {
-      // 시트가 없으면 생성
-      sheet = ss.insertSheet("학급알림");
-      sheet.getRange(1, 1, 1, 6).setValues([['제목','내용','유형','날짜','표시여부','중요여부']]);
-      sheet.getRange(1, 1, 1, 6).setFontWeight('bold').setBackground('#f59e0b').setFontColor('white');
-    }
-    const row = [
-      data.title || '',
-      data.content || '',
-      data.type || '알림',
-      data.date || '',
-      data.visible ? true : false,
-      data.important ? true : false
-    ];
-    if (data.rowIdx && data.rowIdx > 1) {
-      // 수정
-      sheet.getRange(data.rowIdx, 1, 1, 6).setValues([row]);
-    } else {
-      // 새 행 추가
-      const lastRow = Math.max(sheet.getLastRow(), 1);
-      sheet.getRange(lastRow + 1, 1, 1, 6).setValues([row]);
-    }
-    return { success: true };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
+function saveNoticeData(data) { return StudentAuth.saveNotice(data); }
 
-function deleteNoticeData(rowIdx) {
-  try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("학급알림");
-    if (!sheet) return { success: false, message: '시트 없음' };
-    sheet.deleteRow(rowIdx);
-    return { success: true };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
+function deleteNoticeData(rowIdx) { return StudentAuth.deleteNotice(rowIdx); }
 
 // =====================================================
 // ✅ 교실 알림판 관리 (교실 알림판 앱 스프레드시트 공지사항 시트 연동)

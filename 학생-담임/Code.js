@@ -151,44 +151,31 @@ function getHomeroomData(studentId) {
     }
   }
 
-  // ✅ 학급 알림 읽기 (학급알림 시트 — 교사 대시보드에서 작성)
-  // 시트 구조: A=제목, B=내용, C=유형, D=날짜, E=표시여부, F=중요여부
+  // ✅ 학급 알림 읽기 — ClassCore(공용)에서. 표시여부 필터 + D-day 계산은 이 앱에서.
   let notices = [];
   try {
-    const noticeSheet = ss.getSheetByName("학급알림");
-    if (noticeSheet && noticeSheet.getLastRow() >= 2) {
-      const noticeData = noticeSheet.getRange(2, 1, noticeSheet.getLastRow() - 1, 6).getValues();
-      const today = new Date(); today.setHours(0,0,0,0);
-      for (let i = 0; i < noticeData.length; i++) {
-        const r = noticeData[i];
-        if (!r[0]) continue; // 제목 없으면 스킵
-        const visible = r[4] === true || String(r[4]).trim() === 'TRUE' || String(r[4]).trim() === '1';
-        if (!visible) continue; // 숨김 처리된 알림은 학생에게 안 보임
-        // D-day 계산
-        let dday = null;
-        if (r[3]) {
-          const eventDate = new Date(r[3]); eventDate.setHours(0,0,0,0);
-          const diff = Math.round((eventDate - today) / (1000 * 60 * 60 * 24));
-          if (diff === 0) dday = 'D-Day!';
-          else if (diff > 0) dday = 'D-' + diff;
-          else dday = 'D+' + Math.abs(diff);
-        }
-        notices.push({
-          title:     String(r[0] || '').trim(),
-          content:   String(r[1] || '').trim(),
-          type:      String(r[2] || '알림').trim(),
-          date:      r[3] instanceof Date ? Utilities.formatDate(r[3], 'Asia/Seoul', 'yyyy-MM-dd') : String(r[3] || '').trim(),
-          important: r[5] === true || String(r[5]).trim() === 'TRUE' || String(r[5]).trim() === '1',
-          dday:      dday
-        });
+    var nRes = StudentAuth.getNotices();
+    var raw = (nRes && nRes.notices) || [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    for (let i = 0; i < raw.length; i++) {
+      const n = raw[i];
+      if (!n.title) continue;
+      if (!n.visible) continue; // 숨김 알림은 학생에게 안 보임
+      let dday = null;
+      if (n.date) {
+        const eventDate = new Date(n.date); eventDate.setHours(0,0,0,0);
+        const diff = Math.round((eventDate - today) / (1000 * 60 * 60 * 24));
+        if (diff === 0) dday = 'D-Day!';
+        else if (diff > 0) dday = 'D-' + diff;
+        else dday = 'D+' + Math.abs(diff);
       }
-      // 중요 알림 먼저, 그 다음 날짜순
-      notices.sort(function(a, b) {
-        if (a.important && !b.important) return -1;
-        if (!a.important && b.important) return 1;
-        return (b.date || '').localeCompare(a.date || '');
-      });
+      notices.push({ title: n.title, content: n.content, type: n.type, date: n.date, important: n.important, dday: dday });
     }
+    notices.sort(function(a, b) {
+      if (a.important && !b.important) return -1;
+      if (!a.important && b.important) return 1;
+      return (b.date || '').localeCompare(a.date || '');
+    });
   } catch(e) {}
 
   return { activities: activities.reverse(), myRecords: myRecords.reverse(), roster: roster.sort((a,b)=>a.id.localeCompare(b.id)), activeSurvey: activeSurvey, hasSubmittedSurvey: hasSubmittedSurvey, notices: notices, fcmRegisterUrl: _getSysHrKey_('FCM_REGISTER_URL') };

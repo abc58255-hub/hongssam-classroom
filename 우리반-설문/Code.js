@@ -175,6 +175,20 @@ function importFromBoard() {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
+// 진단 — 마커가 가리키는 원본 시트와 설문목록 상태 확인
+function diagSurvey() {
+  var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
+  if (!it.hasNext()) { Logger.log('❌ 마커(홍쌤교실시스템_SHEET_ID) 없음'); return; }
+  var srcId = String(it.next().getBlob().getDataAsString() || '').trim();
+  var src = SpreadsheetApp.openById(srcId);
+  Logger.log('원본 시트: ' + src.getName() + '  (' + srcId + ')');
+  Logger.log('탭 목록: ' + src.getSheets().map(function(s){ return s.getName(); }).join(', '));
+  var sv = src.getSheetByName('설문목록');
+  Logger.log('설문목록 행수: ' + (sv ? sv.getLastRow() : '시트 없음'));
+  var sr = src.getSheetByName('설문응답');
+  Logger.log('설문응답 행수: ' + (sr ? sr.getLastRow() : '시트 없음'));
+}
+
 function importFromSheet(srcId) {
   try {
     var src = SpreadsheetApp.openById(srcId);
