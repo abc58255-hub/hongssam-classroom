@@ -70,6 +70,40 @@ function _serviceUrl_() {
 function teacherLogin(pw)        { return ClassCore.teacherLogin(pw); }
 function verifyTeacher(token)    { return ClassCore.verifyTeacher(token); }
 function teacherLogout(token)    { return ClassCore.teacherLogout(token); }
+function validateTeacherSession(token) { return ClassCore.verifyTeacher(token); }
+
+// ── 초기 데이터 로드 (과제·제출·명부 — 비과제 필드는 빈 배열) ──
+function getDashboardData() {
+  try {
+    var ss = _taskSs();
+    var cache = CacheService.getScriptCache();
+    var hrStr = ClassCore.getConfig('담임반', '');
+    var defaultSlideUrl = ClassCore.getConfig('기본슬라이드URL', '');
+
+    var roster, classList;
+    var cr = cache.get('roster_v1');
+    if (cr) { var p = JSON.parse(cr); roster = p.roster; classList = p.classList; }
+    else {
+      var r = parseRosterAndClasses(ss);
+      roster = r.roster; classList = r.classList;
+      try { cache.put('roster_v1', JSON.stringify({ roster: roster, classList: classList }), 60); } catch(e) {}
+    }
+
+    var tasks;
+    var ct = cache.get('tasks_v1');
+    if (ct) { try { tasks = JSON.parse(ct); } catch(e) { tasks = parseTasks(ss); } }
+    else { tasks = parseTasks(ss); try { cache.put('tasks_v1', JSON.stringify(tasks), 30); } catch(e) {} }
+
+    var submissions = parseSubmissions(ss);
+
+    return {
+      roster: roster, classList: classList, tasks: tasks, submissions: submissions,
+      homeroom: hrStr, defaultSlideUrl: defaultSlideUrl,
+      alarmRegisterUrl: ClassCore.getConfig('FCM_REGISTER_URL', ''),
+      hrActivities: [], hrSubmissions: [], surveys: [], surveyRes: []
+    };
+  } catch(e) { throw new Error('전체 데이터 로딩 오류: ' + e.message); }
+}
 
 // ── 명부·FCM 호환 헬퍼 (grading.js의 알림 함수가 ClassCore를 통해 동작) ──
 // 학생명부 시트 객체 (ClassCore 공유 시트) — parseRosterAndClasses 등이 행 단위로 읽음
