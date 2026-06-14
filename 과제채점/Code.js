@@ -50,6 +50,8 @@ function _parentFolder() {
   ClassCore.setConfig('드라이브폴더ID', folder.getId());
   return folder;
 }
+// grading.js 호환 — 폴더 ID 반환
+function _getParentFolderId_() { return _parentFolder().getId(); }
 
 // ── 라우팅 ──
 function doGet() {
@@ -69,9 +71,67 @@ function teacherLogin(pw)        { return ClassCore.teacherLogin(pw); }
 function verifyTeacher(token)    { return ClassCore.verifyTeacher(token); }
 function teacherLogout(token)    { return ClassCore.teacherLogout(token); }
 
+// ── 명부·FCM 호환 헬퍼 (grading.js의 알림 함수가 ClassCore를 통해 동작) ──
+// 학생명부 시트 객체 (ClassCore 공유 시트) — parseRosterAndClasses 등이 행 단위로 읽음
+function _authRoster_() {
+  return SpreadsheetApp.openById(ClassCore.getAuthSheetId()).getSheetByName('학생명부');
+}
+
+// 명부 E열 토큰 유무 판단용
+function _parseTokens_(raw) {
+  var s = String(raw || '').trim();
+  if (!s) return [];
+  try {
+    var a = JSON.parse(s);
+    if (!Array.isArray(a)) a = [s];
+    return a.map(function(e) { return typeof e === 'string' ? e : (e && e.t ? e.t : null); }).filter(Boolean);
+  } catch(_) { return [s]; }
+}
+
+// 한 학생 행에 푸시 (명부 B열=학번) → ClassCore.sendPush 위임 (토큰 정리는 ClassCore가 처리)
+function _sendAndPrune_(sheet, rowIdx, title, body, clickUrl, tag) {
+  try {
+    var sid = String(sheet.getRange(rowIdx, 2).getValue() || '').trim();
+    if (!sid) return false;
+    var r = ClassCore.sendPush([sid], title, body, tag, null, clickUrl);
+    return !!(r && r.success && r.sent > 0);
+  } catch(_) { return false; }
+}
+
 // 최초 1회: 과제 시트 생성 확인 (편집기에서 실행)
 function setup() {
   var ss = _taskSs();
   Logger.log('✅ 과제 시트 준비 완료: ' + ss.getUrl());
   return ss.getUrl();
+}
+
+// ── 데이터 이전 (기존 홍쌤 공유시트 → 과제 시트, 1회 실행) ──
+// 과제설정·제출현황·AI채점기준을 그대로 복사. 과제 시트의 기존 데이터는 덮어쓴다.
+function importFromBoard() {
+  try {
+    var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
+    if (!it.hasNext()) return { success: false, message: '홍쌤 연결 파일(마커)을 찾을 수 없습니다. importFromSheet("시트ID")로 직접 지정하세요.' };
+    return importFromSheet(String(it.next().getBlob().getDataAsString() || '').trim());
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+function importFromSheet(srcId) {
+  try {
+    var src = SpreadsheetApp.openById(srcId);
+    var dst = _taskSs();
+    var names = ['과제설정', '제출현황', 'AI채점기준'];
+    var report = [];
+    names.forEach(function(name) {
+      var s = src.getSheetByName(name);
+      var d = dst.getSheetByName(name);
+      if (!s || s.getLastRow() < 2 || !d) { report.push(name + ': 0행(원본 없음/비어있음)'); return; }
+      var cols = Math.min(s.getLastColumn(), d.getLastColumn()); // 대상 컬럼 초과 방지
+      var data = s.getRange(2, 1, s.getLastRow() - 1, cols).getValues();
+      if (d.getLastRow() > 1) d.getRange(2, 1, d.getLastRow() - 1, d.getLastColumn()).clearContent();
+      d.getRange(2, 1, data.length, cols).setValues(data);
+      report.push(name + ': ' + data.length + '행');
+    });
+    Logger.log('✅ 이전 완료 — ' + report.join(' / ') + '  (원본: ' + src.getName() + ')');
+    return { success: true, report: report.join(' / ') };
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
