@@ -10,14 +10,14 @@ const messaging = firebase.messaging();
 self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(e) { e.waitUntil(self.clients.claim()); });
 
-// 알림 표시: 고정 tag로 표시 → iOS가 자체표시한 같은 tag 알림과 합쳐져 1개만 보임
-// (안드로이드는 이 핸들러로 1번, iOS는 자체표시+이 핸들러가 같은 tag로 합쳐져 1번)
+// 알림 표시: 서버가 data-only로 보내므로 표시는 여기서 딱 1번
+// (notification 필드를 함께 보내면 브라우저 자동표시와 겹쳐 2번 뜸 — iOS는 tag 병합이 안 됨)
 messaging.onBackgroundMessage(function(payload) {
   const d = payload.data || {};
   const base = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '');
   return self.registration.showNotification(d.title || '홍쌤 교실', {
     body: d.body || '',
-    icon: base + 'icon-192.png',
+    icon: d.icon || (base + 'icon-192.png'),
     tag: d.tag || 'hongssam',
     renotify: false,
     data: d
