@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="교사 알림">
+  <meta name="robots" content="noindex, nofollow">
+  <title>교사 알림 등록</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: linear-gradient(160deg, #0f172a 0%, #1e3a8a 60%, #312e81 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .card { background: white; border-radius: 28px; padding: 28px 22px; max-width: 400px; width: 100%; box-shadow: 0 20px 60px rgba(2,6,23,0.5); }
+    h1 { font-size: 22px; color: #0f172a; margin-bottom: 8px; }
+    .sub { color: #64748b; font-size: 14px; margin-bottom: 24px; line-height: 1.6; }
+    input { width: 100%; padding: 14px 16px; font-size: 16px; border: 2px solid #e2e8f0; border-radius: 14px; margin-bottom: 12px; outline: none; }
+    input:focus { border-color: #1e3a8a; }
+    button.primary { width: 100%; padding: 16px; background: linear-gradient(135deg,#1e3a8a,#312e81); color: white; border: none; border-radius: 14px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    button.primary:active { transform: scale(0.98); }
+    #status { margin-top: 12px; font-size: 13px; color: #64748b; text-align: center; min-height: 20px; }
+    #status.error { color: #dc2626; }
+    .hidden { display: none; }
+    .icon { font-size: 56px; text-align: center; margin-bottom: 12px; }
+    h2 { font-size: 20px; color: #0f172a; text-align: center; margin-bottom: 8px; }
+    #success p { color: #64748b; font-size: 14px; text-align: center; line-height: 1.6; }
+    .ios-step { background: #f1f5f9; border-radius: 14px; padding: 13px 15px; margin-bottom: 10px; font-size: 14px; color: #334155; line-height: 1.5; }
+    .ios-step b { color: #1e3a8a; }
+    .note { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 12px 14px; font-size: 12.5px; color: #64748b; line-height: 1.6; margin-top: 16px; }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <!-- iOS: 홈 화면 추가 안내 (설치된 웹앱만 iOS 웹푸시 가능) -->
+  <div id="iosGuide" class="hidden">
+    <div class="icon">👩‍🏫</div>
+    <h2>교사 알림 등록</h2>
+    <p class="sub" style="text-align:center;margin-top:8px;">아이폰은 홈 화면에 추가한 뒤에 알림을 받을 수 있어요.</p>
+    <div class="ios-step"><b>1.</b> 화면 아래 <b>공유 버튼(⬆︎)</b>을 누르세요</div>
+    <div class="ios-step"><b>2.</b> <b>"홈 화면에 추가"</b>를 선택하세요</div>
+    <div class="ios-step"><b>3.</b> 홈 화면의 <b>교사 알림</b> 아이콘으로 다시 열면 등록 화면이 나와요</div>
+  </div>
+
+  <!-- 등록 폼 -->
+  <div id="formSection" class="hidden">
+    <h1>👩‍🏫 교사 알림 등록</h1>
+    <p class="sub">교사 비밀번호를 입력하고 알림을 허용하면 이 기기로 학생의 재제출·답글 알림을 받아요.</p>
+    <input type="password" id="password" placeholder="교사 비밀번호 입력">
+    <button class="primary" onclick="register()">알림 등록하기</button>
+    <div id="status"></div>
+    <div class="note">알림 종류는 설정 시트의 <b>교사알림_재제출 / 교사알림_답글 / 교사알림_제출</b> 키(Y/N)로 켜고 끌 수 있어요. 기기는 최대 3대까지 등록됩니다.</div>
+  </div>
+
+  <!-- 성공 화면 -->
+  <div id="success" class="hidden">
+    <div class="icon">✅</div>
+    <h2>교사 알림 등록 완료!</h2>
+    <p>학생이 재제출하거나 답글을 달면<br>이 기기로 알림이 옵니다.</p>
+  </div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+<script src="./config.js"></script>
+<script>
+  var urlParams = new URLSearchParams(window.location.search);
+  var GAS_URL = urlParams.get('gas') || '';
+
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+  if (isIOS && !isStandalone) {
+    document.getElementById('iosGuide').classList.remove('hidden');
+  } else {
+    document.getElementById('formSection').classList.remove('hidden');
+  }
+
+  if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+  var messaging = firebase.messaging();
+
+  function setStatus(msg, isError) {
+    var el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = isError ? 'error' : '';
+  }
+
+  // SHA-256 해시 (SubtleCrypto) — 서버는 교사비밀번호의 해시와 비교
+  async function sha256(text) {
+    var buf = new TextEncoder().encode(text);
+    var hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hashBuf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  // JSONP 방식으로 GAS 호출 (응답 읽기 가능)
+  function callGasJsonp(url) {
+    return new Promise(function(resolve, reject) {
+      var cbName = 'fcm_cb_' + Date.now();
+      var script = document.createElement('script');
+      var timer = setTimeout(function() { cleanup(); reject(new Error('요청 시간 초과')); }, 15000);
+      function cleanup() {
+        clearTimeout(timer);
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+      }
+      window[cbName] = function(data) { cleanup(); resolve(data); };
+      script.onerror = function() { cleanup(); reject(new Error('네트워크 오류')); };
+      script.src = url + '&callback=' + cbName;
+      document.head.appendChild(script);
+    });
+  }
+
+  async function register() {
+    if (!GAS_URL) { setStatus('❌ 주소에 ?gas= 파라미터가 없습니다. 안내받은 전체 주소로 접속하세요.', true); return; }
+    var password = document.getElementById('password').value;
+    if (!password) { alert('교사 비밀번호를 입력해주세요'); return; }
+
+    // ⚠️ 알림 권한은 user gesture 유지를 위해 가장 먼저 동기적으로 요청
+    setStatus('알림 권한 요청 중...');
+    var permissionPromise;
+    try { permissionPromise = Notification.requestPermission(); }
+    catch(e) { permissionPromise = new Promise(function(res) { Notification.requestPermission(res); }); }
+
+    var pwHash;
+    try { pwHash = await sha256(password); }
+    catch(e) { setStatus('SHA-256 오류: ' + e.message, true); return; }
+
+    var permission = await permissionPromise;
+    if (permission !== 'granted') { setStatus('❌ 알림이 거부되었습니다. 설정에서 알림을 허용해주세요.', true); return; }
+
+    setStatus('서비스워커 등록 중...');
+    var reg;
+    try { reg = await navigator.serviceWorker.register('./firebase-messaging-sw.js'); }
+    catch(e) { setStatus('서비스워커 오류: ' + e.message, true); return; }
+
+    setStatus('토큰 발급 중...');
+    var token;
+    try {
+      token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+      if (!token) throw new Error('토큰을 받지 못했습니다');
+    } catch(e) { setStatus('토큰 오류: ' + e.message, true); return; }
+
+    setStatus('서버에 저장 중...');
+    try {
+      var deviceId = localStorage.getItem('fcm_device_id');
+      if (!deviceId) {
+        deviceId = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem('fcm_device_id', deviceId);
+      }
+      var url = GAS_URL
+        + '?action=saveTeacherFcmToken'
+        + '&token=' + encodeURIComponent(token)
+        + '&pwHash=' + encodeURIComponent(pwHash)
+        + '&deviceId=' + encodeURIComponent(deviceId);
+      var result = await callGasJsonp(url);
+      if (!result.success) { setStatus('❌ ' + (result.message || '저장 실패'), true); return; }
+    } catch(e) { setStatus('저장 오류: ' + e.message, true); return; }
+
+    document.getElementById('formSection').classList.add('hidden');
+    document.getElementById('success').classList.remove('hidden');
+  }
+</script>
+</body>
+</html>
