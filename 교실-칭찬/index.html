@@ -266,9 +266,32 @@
     resBox.innerHTML = '';
     google.script.run.withSuccessHandler(function(st){
       if (!st.success) { statsBox.innerHTML = '<div class="card">통계 오류</div>'; return; }
-      var giv = st.topGivers.map(function(x,i){ return '<div class="stat-row" style="cursor:pointer;" onclick="filterStudent(\'' + x.id + '\',\'sent\')" title="보낸 칭찬 전체 보기"><span>' + (i+1) + '. ' + x.name + ' <span class="muted">›</span></span><b>' + x.count + '회</b></div>'; }).join('') || '<div class="muted">없음</div>';
-      var rec = st.topReceivers.map(function(x,i){ return '<div class="stat-row" style="cursor:pointer;" onclick="filterStudent(\'' + x.id + '\',\'recv\')" title="받은 칭찬 전체 보기"><span>' + (i+1) + '. ' + x.name + ' <span class="muted">›</span></span><b>' + x.count + '회</b></div>'; }).join('') || '<div class="muted">없음</div>';
+      var medal = ['🥇','🥈','🥉'];
+      function rankList(arr, dir, unit, valColor) {
+        if (!arr || !arr.length) return '<div class="muted">없음</div>';
+        return arr.map(function(x,i){
+          var rk = medal[i] || ((i+1) + '.');
+          var click = dir ? (' style="cursor:pointer;" onclick="filterStudent(\'' + x.id + '\',\'' + dir + '\')"') : '';
+          return '<div class="stat-row"' + click + '><span>' + rk + ' ' + x.name + (dir ? ' <span class="muted">›</span>' : '') + '</span><b' + (valColor ? ' style="color:' + valColor + ';"' : '') + '>' + x.count + unit + '</b></div>';
+        }).join('');
+      }
+      var giv = rankList(st.topGivers, 'sent', '회');
+      var rec = rankList(st.topReceivers, 'recv', '회');
       var noRec = st.noReceive.length ? '<div style="margin-top:8px;font-size:12px;color:#dc2626;">🔔 아직 못 받은 학생 (' + st.noReceive.length + '명): ' + st.noReceive.join(', ') + '</div>' : '<div style="margin-top:8px;font-size:12px;color:#10b981;">✅ 모든 학생이 칭찬을 받았어요!</div>';
+
+      // ❤️ 하트 랭킹 2종: 많이 선물한 학생(누른 사람) / 많이 받은 학생(칭찬 작성자 = 선물 대상)
+      var hGiven = st.topHeartsGiven || [];
+      var hRecv  = st.topHeartsRecv  || [];
+      var heartHtml;
+      if (!hGiven.length && !hRecv.length) {
+        heartHtml = '<div style="margin-top:12px;padding:12px;background:#fdf2f8;border:1px solid #fbcfe8;border-radius:10px;"><div style="font-weight:800;color:#be185d;font-size:13px;">❤️ 하트 랭킹</div><div class="muted" style="margin-top:4px;">아직 하트가 없어요. 학생들이 받은 칭찬에 하트를 누르면 집계돼요.</div></div>';
+      } else {
+        heartHtml = '<div style="margin-top:12px;padding:12px;background:#fdf2f8;border:1px solid #fbcfe8;border-radius:10px;">'
+          + '<div style="font-weight:800;color:#be185d;font-size:13px;margin-bottom:8px;">❤️ 하트 랭킹 (총 ' + (st.heartTotal||0) + '개)</div>'
+          + '<div class="row"><div><div class="muted" style="font-weight:700;margin-bottom:4px;">🎁 많이 선물한 학생 <span style="font-weight:400;">(하트 누름)</span></div>' + rankList(hGiven, 'recv', '❤️', '#db2777') + '</div>'
+          + '<div><div class="muted" style="font-weight:700;margin-bottom:4px;">💖 많이 받은 학생 <span style="font-weight:400;">(선물 대상)</span></div>' + rankList(hRecv, 'sent', '❤️', '#db2777') + '</div></div>'
+          + '</div>';
+      }
 
       // 미실시자 (교사 전용)
       var ng = st.notGiven || [];
@@ -287,7 +310,7 @@
         + ngHtml
         + '<div class="row" style="margin-top:10px;"><div><div class="muted" style="font-weight:700;margin-bottom:4px;">🖊 많이 칭찬한 학생</div>' + giv + '</div>'
         + '<div><div class="muted" style="font-weight:700;margin-bottom:4px;">💌 많이 받은 학생</div>' + rec + '</div></div>'
-        + noRec + '</div>';
+        + noRec + heartHtml + '</div>';
     }).getEventStats(id);
 
     google.script.run.withSuccessHandler(function(res){

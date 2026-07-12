@@ -42,6 +42,7 @@ function _registerAppUrl_(key) {
 function doGet() {
   if (!SHEET_ID) return _setupPage_();
   _registerAppUrl_('바로가기_우리반교실');
+  try { StudentAuth.registerAppUrl('우리반교실', ScriptApp.getService().getUrl()); } catch(_) {}
   return HtmlService.createHtmlOutputFromFile('index').setTitle('우리 반 교실').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL).addMetaTag('viewport', 'width=device-width, initial-scale=1'); }
 
 var _sysHrCache_ = null;
@@ -97,10 +98,24 @@ function verifyHomeroomLogin(studentId, studentName, password) {
   return r;
 }
 
+// 창체(학급활동) 시트 — ClassCore 공용 설정(창체시트ID)에서. 미설정 시 마스터 폴백.
+var _ccSsCache_ = null;
+function _changcheSs_() {
+  if (_ccSsCache_) return _ccSsCache_;
+  var id = '';
+  try { id = StudentAuth.getConfig('창체시트ID', ''); } catch(_) {}
+  var ss;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  if (!ss) ss = SpreadsheetApp.openById(SHEET_ID);
+  _ccSsCache_ = ss;
+  return ss;
+}
+
 function getHomeroomData(studentId) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
+  const ccSs = _changcheSs_();
   // ── 활동목록 (학급활동목록 시트): [0]=번호, [1]=카테고리, [2]=이름, [3]=설명, [4]=폼링크, [5]=필드
-  let activities = []; const actSheet = ss.getSheetByName('학급활동목록');
+  let activities = []; const actSheet = ccSs.getSheetByName('학급활동목록');
   if (actSheet && actSheet.getLastRow() >= 2) {
     const actData = actSheet.getRange(2, 1, actSheet.getLastRow()-1, 6).getValues();
     actData.forEach(function(r) {
@@ -116,7 +131,7 @@ function getHomeroomData(studentId) {
     activities.reverse();
   }
   let myRecords = [];
-  const subSheet = ss.getSheetByName("창체제출현황");
+  const subSheet = ccSs.getSheetByName("창체제출현황");
   if (subSheet) {
     const subData = subSheet.getDataRange().getValues();
     const sidStr = String(studentId).trim();
@@ -200,7 +215,7 @@ function submitSurveyResponse(payload) {
 
 function processHomeroomForm(data) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("창체제출현황"); const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
+    const sheet = _changcheSs_().getSheetByName("창체제출현황"); const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     const records = sheet.getDataRange().getValues(); for (let i = records.length - 1; i >= 1; i--) { if (String(records[i][1]).trim() === String(data.studentId).trim() && String(records[i][3]).trim() === String(data.activity).trim()) { return { success: false, message: "이미 제출 완료!" }; } }
     let fileUrl = "첨부파일 없음";
     if (data.fileData) { let hrFolder = parentFolder.getFoldersByName("학급기록").hasNext() ? parentFolder.getFoldersByName("학급기록").next() : parentFolder.createFolder("학급기록"); let actFolder = hrFolder.getFoldersByName(data.activity).hasNext() ? hrFolder.getFoldersByName(data.activity).next() : hrFolder.createFolder(data.activity); const blob = Utilities.newBlob(Utilities.base64Decode(data.fileData), data.fileMimeType, `[${data.studentId}] ${data.studentName}_${data.activity}.${data.fileName.split('.').pop()}`); fileUrl = actFolder.createFile(blob).getUrl(); }
@@ -215,9 +230,22 @@ function processHomeroomForm(data) {
 // 시트: 신고접수 (자동 생성)
 // 구조: A=접수일시, B=학번, C=이름, D=유형, E=내용, F=처리여부
 // =====================================================
+// 관찰·신고 시트 — ClassCore 공용 설정(관찰신고시트ID)에서. 미설정 시 마스터 폴백.
+var _obsSsCache_ = null;
+function _obsSs_() {
+  if (_obsSsCache_) return _obsSsCache_;
+  var id = '';
+  try { id = StudentAuth.getConfig('관찰신고시트ID', ''); } catch(_) {}
+  var ss;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  if (!ss) ss = SpreadsheetApp.openById(SHEET_ID);
+  _obsSsCache_ = ss;
+  return ss;
+}
+
 function submitReport(data) {
   try {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const ss = _obsSs_();
     let sheet = ss.getSheetByName('신고접수');
     if (!sheet) {
       sheet = ss.insertSheet('신고접수');
@@ -367,15 +395,29 @@ function _prRecSheet() {
 function _prRecords(eventId) {
   var sh = _prRecSheet();
   if (sh.getLastRow() < 2) return [];
-  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 9).getValues();
+  var rows = sh.getRange(2, 1, sh.getLastRow()-1, 10).getValues(); // 10열=하트
   var out = [];
-  rows.forEach(function(r){
+  rows.forEach(function(r, idx){
     if (String(r[1]) !== String(eventId)) return;
-    out.push({ time:_prTime(r[0]), dateStr:_prFmtDate(r[0]), fromId:String(r[2]), fromName:String(r[3]),
+    out.push({ rowIdx: idx + 2, time:_prTime(r[0]), dateStr:_prFmtDate(r[0]), fromId:String(r[2]), fromName:String(r[3]),
                toId:String(r[4]), toName:String(r[5]), content:String(r[6]),
-               anon:String(r[7]).toUpperCase()==='Y', hidden:String(r[8]).toUpperCase()==='Y' });
+               anon:String(r[7]).toUpperCase()==='Y', hidden:String(r[8]).toUpperCase()==='Y',
+               hearted:String(r[9]).toUpperCase()==='Y' });
   });
   return out;
+}
+
+// 받은 칭찬에 하트 토글 — 받은 본인만 가능. 칭찬기록 10열에 'Y'/'N'.
+function togglePraiseHeart(rowIdx, studentId) {
+  try {
+    var sh = _prRecSheet();
+    if (rowIdx < 2 || rowIdx > sh.getLastRow()) return { success: false, message: '잘못된 칭찬이에요.' };
+    var owner = String(sh.getRange(rowIdx, 5).getValue() || '').trim(); // 5열=받은학번
+    if (owner !== String(studentId).trim()) return { success: false, message: '내가 받은 칭찬에만 누를 수 있어요.' };
+    var cur = String(sh.getRange(rowIdx, 10).getValue() || '').toUpperCase() === 'Y';
+    sh.getRange(rowIdx, 10).setValue(cur ? 'N' : 'Y');
+    return { success: true, hearted: !cur };
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 // 이벤트 상세 (학생용)
@@ -391,7 +433,7 @@ function getPraiseEventDetail(eventId, studentId, studentName) {
 
     // 내가 받은 / 보낸
     var received = recs.filter(function(r){ return r.toId === studentId && !r.hidden; })
-      .map(function(r){ return { content:r.content, fromName:r.fromName, anon:r.anon, time:r.time }; }).reverse();
+      .map(function(r){ return { rowIdx:r.rowIdx, content:r.content, fromName:r.fromName, anon:r.anon, time:r.time, hearted:r.hearted }; }).reverse();
     var given = recs.filter(function(r){ return r.fromId === studentId; })
       .map(function(r){ return { content:r.content, toName:r.toName, time:r.time }; }).reverse();
 
@@ -433,7 +475,17 @@ function getPraiseEventDetail(eventId, studentId, studentName) {
       }
     } else {
       // random / pick / chain → 후보 = 나 제외 전원
-      result.candidates = roster.filter(function(s){ return s.id !== studentId; });
+      var pool = roster.filter(function(s){ return s.id !== studentId; });
+      if (ev.mode === 'random') {
+        // 랜덤 뽑기: 내가 이미 칭찬한 친구는 후보에서 제외(중복 방지). 전원 다 칭찬했으면 다시 전체로 리셋.
+        var givenIds = {};
+        recs.forEach(function(r){ if (r.fromId === studentId) givenIds[r.toId] = true; });
+        var fresh = pool.filter(function(s){ return !givenIds[s.id]; });
+        result.candidates = fresh.length ? fresh : pool;
+        result.allPraised = (fresh.length === 0 && pool.length > 0); // 한 바퀴 다 돔
+      } else {
+        result.candidates = pool;
+      }
       if (dailyLimit > 0 && todayCount >= dailyLimit) { result.canWrite = false; result.doneToday = true; }
     }
     return result;

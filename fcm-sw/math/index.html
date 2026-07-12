@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="수학교실">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="../icon-192.png">
+  <title>수학교실</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; overflow: hidden; background: #eff6ff; }
+    #app {
+      position: fixed; inset: 0; width: 100%; height: 100%;
+      border: none; display: block;
+      /* iOS 노치·홈바 안전영역 */
+      padding-top: env(safe-area-inset-top);
+    }
+    /* 로딩 화면 — iframe이 뜨면 사라짐 */
+    #loading {
+      position: fixed; inset: 0; background: linear-gradient(160deg, #eff6ff, #e0e7ff);
+      display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+      transition: opacity .4s; z-index: 10;
+    }
+    #loading.hide { opacity: 0; pointer-events: none; }
+    .logo { font-size: 54px; }
+    .name { font-size: 20px; font-weight: 800; color: #1e3a8a; }
+    .spinner {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid #c7d2fe; border-top-color: #1e3a8a;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    /* 오프라인 배너 */
+    #offline {
+      position: fixed; top: env(safe-area-inset-top); left: 0; right: 0; z-index: 20;
+      background: #dc2626; color: #fff; font-family: -apple-system, sans-serif;
+      font-size: 13px; font-weight: 700; text-align: center; padding: 8px;
+      display: none;
+    }
+    #offline.show { display: block; }
+  </style>
+</head>
+<body>
+  <div id="offline">📡 인터넷 연결이 없어요 — 연결되면 자동으로 다시 시도합니다</div>
+  <div id="loading">
+    <div class="logo">📐</div>
+    <div class="name">수학교실</div>
+    <div class="spinner"></div>
+  </div>
+  <iframe id="app" src="" allow="camera; microphone; clipboard-write" allowfullscreen></iframe>
+
+<script>
+  // 학생-수학 앱 고정 배포 주소 (GAS 재배포해도 이 주소는 불변)
+  var APP_URL = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+
+  var frame = document.getElementById('app');
+  var loading = document.getElementById('loading');
+  var offlineBar = document.getElementById('offline');
+
+  function load() {
+    if (!navigator.onLine) { offlineBar.classList.add('show'); return; }
+    offlineBar.classList.remove('show');
+    if (!frame.src) frame.src = APP_URL;
+  }
+
+  frame.addEventListener('load', function () {
+    // GAS 래퍼가 뜨는 시점 — 내용 렌더 여유를 조금 두고 로딩 화면 제거
+    setTimeout(function () { loading.classList.add('hide'); }, 600);
+  });
+
+  window.addEventListener('online', load);
+  window.addEventListener('offline', function () { offlineBar.classList.add('show'); });
+  load();
+
+  // 셸 서비스워커 (설치 가능 조건 + 셸 캐시). 실패해도 앱 사용엔 지장 없음
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(function (reg) {
+      try { reg.update(); } catch (_) {}
+    }).catch(function () {});
+  }
+</script>
+</body>
+</html>

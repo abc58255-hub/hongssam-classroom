@@ -1,0 +1,16 @@
+{
+  "name": "수학교실",
+  "short_name": "수학교실",
+  "description": "홍쌤 수학교실 — 과제 제출·피드백·도전과제",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eff6ff",
+  "theme_color": "#1e3a8a",
+  "lang": "ko",
+  "icons": [
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -393,7 +393,7 @@
         + '<button onclick="saveWs('+i+')" style="padding:9px 14px;border:none;background:#4f46e5;color:#fff;border-radius:10px;cursor:pointer;font-weight:700;">저장</button>'
         + '<span class="set-del" onclick="delWs('+i+')">×</span></div>'
         + '<div style="font-size:11px;color:#8b95a1;margin:8px 0 4px;">문제 (쉼표로 구분)</div>'
-        + '<input type="text" value="'+esc((w.problems||[]).join(', '))+'" oninput="WS['+i+'].problems=this.value.split(\',\').map(function(x){return x.trim();}).filter(Boolean)" style="width:100%;padding:11px;border:none;background:#fff;border-radius:10px;font-size:13px;outline:none;">'
+        + '<input type="text" id="wsProb'+i+'" value="'+esc((w.problems||[]).join(', '))+'" placeholder="예: 1, 2, 유제 3 — 비워두면 입력 화면에 문제 버튼이 안 떠요" oninput="WS['+i+'].problems=this.value.split(\',\').map(function(x){return x.trim();}).filter(Boolean);this.style.boxShadow=\'\';this.style.background=\'#fff\';" style="width:100%;padding:11px;border:none;background:#fff;border-radius:10px;font-size:13px;outline:none;">'
         + '</div>';
     });
     h += '<div class="set-add" onclick="addWs()">+ 학습지 추가</div>';
@@ -403,6 +403,12 @@
   function saveWs(i){
     var w = WS[i];
     if (!w.name.trim()) { alert('학습지 이름을 입력하세요'); return; }
+    // 문제번호 빼먹음 경고 — 빈 채 저장하면 입력 화면에 문제 버튼이 안 뜸
+    if (!(w.problems||[]).length) {
+      var inp = document.getElementById('wsProb'+i);
+      if (inp) { inp.style.background='#fef2f2'; inp.style.boxShadow='0 0 0 2px #ef4444 inset'; inp.focus(); }
+      if (!confirm('⚠ 발표 문제가 비어있어요.\n비워두면 도장 입력 화면에 문제 버튼이 안 떠요.\n\n그래도 이대로 저장할까요?')) return;
+    }
     google.script.run
       .withFailureHandler(function(err){ alert('저장 실패: '+(err.message||'')); })
       .withSuccessHandler(function(res){

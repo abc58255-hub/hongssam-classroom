@@ -240,17 +240,18 @@
       if (currentVideo !== data.videoUrl || currentMode !== mode) {
         currentVideo = data.videoUrl; currentMode = mode;
         if (data.videoUrl) {
-          var vidId = '';
-          if (data.videoUrl.indexOf('watch?v=') !== -1) vidId = data.videoUrl.split('v=')[1].split('&')[0];
-          else if (data.videoUrl.indexOf('youtu.be/') !== -1) vidId = data.videoUrl.split('youtu.be/')[1].split('?')[0];
+          // 모든 유튜브 형식 대응: watch?v= / youtu.be/ / embed/ / shorts/ / live/
+          var vidId = (String(data.videoUrl).match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([A-Za-z0-9_-]{11})/) || [])[1] || '';
           if (vidId) {
             document.getElementById('audioNotice').style.display = 'block';
             vidWrapper.innerHTML = '<iframe src="https://www.youtube.com/embed/' + vidId +
-              '?autoplay=1&mute=0&loop=1&playlist=' + vidId + '"></iframe>';
+              '?autoplay=1&mute=0&loop=1&playlist=' + vidId + '&playsinline=1" allow="autoplay; encrypted-media; fullscreen" allowfullscreen></iframe>';
+          } else {
+            vidWrapper.innerHTML = '<div style="color:#fff;display:flex;align-items:center;justify-content:center;height:100%;font-size:1.3vw;text-align:center;">⚠️ 유튜브 주소를 확인하세요<br><span style="font-size:0.9vw;opacity:.7;">' + (data.videoUrl || '') + '</span></div>';
           }
           if (mode === '가득차게') { slideContainer.style.display = 'none'; vidWrapper.style.display = 'block'; vidWrapper.style.flex = '1'; }
-          else if (mode === '보이기') { slideContainer.style.display = 'block'; vidWrapper.style.display = 'block'; vidWrapper.style.flex = '0 0 30%'; }
-          else { slideContainer.style.display = 'block'; vidWrapper.style.display = 'none'; }
+          else if (mode === '소리만') { slideContainer.style.display = 'block'; slideContainer.style.flex = '1'; vidWrapper.style.display = 'none'; }
+          else { /* 보이기: 슬라이드 절반 + 영상 절반 */ slideContainer.style.display = 'block'; slideContainer.style.flex = '1'; vidWrapper.style.display = 'block'; vidWrapper.style.flex = '1'; }
         } else {
           vidWrapper.innerHTML = ''; vidWrapper.style.display = 'none'; slideContainer.style.display = 'block';
         }

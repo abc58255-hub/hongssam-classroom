@@ -42,6 +42,7 @@ function _registerAppUrl_(key) {
 function doGet() {
   if (!SHEET_ID) return _setupPage_();
   _registerAppUrl_('바로가기_진도표');
+  try { StudentAuth.registerAppUrl('진도표', ScriptApp.getService().getUrl()); } catch(_) {}
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('진도표 관리')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);

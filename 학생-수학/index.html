@@ -166,7 +166,7 @@
 
       <!-- ✅ 반려 사유 박스 (재제출 시 표시) -->
       <div id="rejectionReasonBox" style="display:none; background:#fef2f2; border:2px solid #ef4444; border-radius:12px; padding:16px; margin-bottom:4px;">
-        <div style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:8px;">🚨 선생님의 반려 사유</div>
+        <div id="rejectionReasonTitle" style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:8px;">🚨 선생님의 반려 사유</div>
         <div id="rejectionReasonText" style="font-size:14px; color:#1f2937; line-height:1.6; white-space:pre-wrap;"></div>
       </div>
 
@@ -192,8 +192,10 @@
     <div id="tab2" class="tab-content">
       <!-- 요약 테이블 (기본 화면) -->
       <div id="taskSummaryView">
+        <div id="myGrades" style="margin-bottom:14px;"></div>
         <div id="myDojang" style="margin-bottom:14px;"></div>
         <div id="myAchievements" style="margin-bottom:14px;"></div>
+        <div id="myChallenges" style="margin-bottom:14px;"></div>
         <div id="taskSummaryStat" style="margin-bottom:14px;"></div>
         <div id="taskSummaryTable"></div>
       </div>
@@ -329,6 +331,7 @@
   var isOnlyMissingTasks = false;
   var gMissingTasks = [];
   var gResubmitTasks = [];
+  var gVoluntaryTasks = [];
   var currentTargetTask = null;
   var selectedChoices = [];
   // ✅ 갤러리 필터용 전역 변수
@@ -463,6 +466,24 @@
     }
   }
 
+  // 자발적 다시 제출 — 확인 후 제출 폼의 [다시 제출] 옵션 선택
+  function goToResubmit(taskName) {
+    if (!confirm('「' + taskName + '」을(를) 다시 제출할까요?\n\n새로 제출하면 이전 채점·점수는 지워지고 다시 채점돼요.\n(마감 전까지 몇 번이든 가능)')) return;
+    switchTab(1);
+    var sel = document.getElementById('taskName');
+    if (!sel) return;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === taskName && sel.options[i].getAttribute('data-voluntary') === 'true') {
+        sel.selectedIndex = i;
+        initTaskUI();
+        setTimeout(function() { sel.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 100);
+        sel.style.transition = '0.3s'; sel.style.background = '#fef3c7';
+        setTimeout(function() { sel.style.background = ''; }, 1500);
+        return;
+      }
+    }
+  }
+
   function switchTab(t) {
     for (var i = 1; i <= 3; i++) {
       var btn = document.getElementById('btnTab' + i);
@@ -475,6 +496,7 @@
     if (activeBtn) activeBtn.classList.add('active');
     if (activeTab) activeTab.classList.add('active');
     if (t === 2) backToTaskSummary(); // 제출현황 탭은 항상 요약부터
+    if (t === 3) logFeat('우수작갤러리'); // 🧭 탐험가
   }
 
   // 내 과제 현황 요약 테이블
@@ -492,8 +514,10 @@
   function _statusInfo(item) {
     if (!item) return { label: '미제출', color: '#ef4444', bg: '#fee2e2', icon: '❌' };
     var s = item.status;
-    if (s === '재제출요청') return { label: '재제출', color: '#c2410c', bg: '#ffedd5', icon: '🔄' };
+    if (s === '재제출요청') return { label: '재제출', color: '#c2410c', bg: '#ffedd5', icon: '🚨' };
+    if (s === '피드백요청') return { label: '피드백', color: '#b45309', bg: '#fffbeb', icon: '📩' };
     if (s === '반려검토')  return { label: '재검토', color: '#c2410c', bg: '#ffedd5', icon: '🔄' };
+    if (s === '완료')      return { label: '최종완료', color: '#0f172a', bg: '#e2e8f0', icon: '🔒' };
     if (s === '채점완료')  return { label: '완료', color: '#15803d', bg: '#dcfce7', icon: '✅' };
     return { label: '채점중', color: '#a16207', bg: '#fef9c3', icon: '⏳' }; // '' 또는 채점중
   }
@@ -501,7 +525,10 @@
   function renderMyAchievements(myStats) {
     var box = document.getElementById('myAchievements');
     if (!box) return;
-    if (!myStats) { box.innerHTML = ''; return; }
+    if (!myStats) { box.innerHTML = ''; gChallengeStats = null; renderChallenges(); return; }
+    gChallengeStats = myStats.challenges || null;
+    renderChallenges();
+    checkChallengeCelebration();
 
     function rankText(m) {
       if (!m) return '';
@@ -510,7 +537,11 @@
     }
     function card(icon, label, m, valFmt, emptyText) {
       var valHtml, sub;
-      if (!m) { valHtml = '<span style="color:#cbd5e1;font-size:15px;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">' + (emptyText||'기록 없음') + '</span>'; }
+      if (m && m.lowParticipation) {
+        valHtml = '<span style="color:#f59e0b;font-size:14px;font-weight:800;">제출률 ' + m.rate + '%</span>';
+        sub = '<span style="font-size:10px;color:#94a3b8;">50% 이상 제출 시 순위 표시</span>';
+      }
+      else if (!m) { valHtml = '<span style="color:#cbd5e1;font-size:15px;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">' + (emptyText||'기록 없음') + '</span>'; }
       else if (m.none) { valHtml = '<span style="color:#cbd5e1;font-size:15px;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">아직 없음</span>'; }
       else { valHtml = valFmt(m.value); sub = rankText(m); }
       return '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;">'
@@ -520,14 +551,210 @@
         + '</div>';
     }
 
+    // 자동 배지
+    var b = myStats.badges || {};
+    var chips = [];
+    if (b.complete) chips.push(['🏁','완주! 100% 제출','#dcfce7','#16a34a']);
+    if (b.streak >= 2) chips.push(['🔥','연속 제출 ' + b.streak,'#ffedd5','#c2410c']);
+    if (b.perfect > 0) chips.push(['💯','만점 ' + b.perfect + '회','#fef9c3','#a16207']);
+    if (b.bestCount > 0) chips.push(['🌟','우수작 ' + b.bestCount + '회','#e0e7ff','#4338ca']);
+    var badgeHtml = '';
+    if (chips.length) {
+      badgeHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">'
+        + chips.map(function(c){ return '<span style="display:inline-flex;align-items:center;gap:3px;background:' + c[2] + ';color:' + c[3] + ';font-size:12px;font-weight:800;padding:5px 10px;border-radius:20px;">' + c[0] + ' ' + c[1] + '</span>'; }).join('')
+        + '</div>';
+    } else if (b.submissionRate !== undefined) {
+      badgeHtml = '<div style="margin-top:10px;font-size:11px;color:#94a3b8;">📈 제출률 ' + b.submissionRate + '% — 꾸준히 제출하면 배지를 받아요!</div>';
+    }
+
     box.innerHTML = '<div style="background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid #e0e7ff;border-radius:16px;padding:14px;">'
       + '<div style="font-size:14px;font-weight:800;color:#4338ca;margin-bottom:10px;">🏆 내 업적</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
         + card('⚡', '평균 제출순위', myStats.submitRank, function(v){ return v + '등'; }, '부여 과제 없음')
         + card('🌟', '우수작', myStats.best, function(v){ return v + '개'; }, '아직 없음')
-        + card('📊', '등급 평균', myStats.grade, function(v){ return v.toFixed(2); }, '등급 과제 없음')
-        + card('💯', '점수 평균', myStats.score, function(v){ return v + '점'; }, '점수 과제 없음')
-      + '</div></div>';
+        + card('📊', '등급 평균', myStats.grade, function(v){ return v.toFixed(2) + ' / 4.0'; }, '채점된 등급 없음')
+        + card('💯', '점수 평균', myStats.score, function(v){ return v + ' / 5점'; }, '채점된 점수 없음')
+      + '</div>'
+      + badgeHtml
+      + '</div>';
+  }
+
+  // ══════════════════ 🎯 도전과제 (단계형 자동 배지) ══════════════════
+  var gChallengeStats = null;   // myStats.challenges (서버)
+  var gStampTotal = null;       // 도장 총합 (getMyDojang 로딩 후 채워짐)
+
+  var TIER_NAMES = ['브론즈', '실버', '골드', '다이아'];
+  var TIER_STYLE = [
+    { bg:'#fbe8d8', fg:'#9a5b2d', bar:'#c9803f' },
+    { bg:'#eef2f7', fg:'#5b6b7d', bar:'#94a3b8' },
+    { bg:'#fef3c7', fg:'#92600e', bar:'#f59e0b' },
+    { bg:'#dbeafe', fg:'#1d4ed8', bar:'#3b82f6' }
+  ];
+  var CHALLENGE_DEFS = [
+    { key:'submitted', emoji:'📬', name:'성실한 제출러', desc:'과제를 꾸준히 제출해요',            unit:'회 제출',  tiers:[5,10,20,35] },
+    { key:'streak',    emoji:'🔥', name:'불꽃 연속왕',   desc:'과제를 빠짐없이 연속으로 제출!',     unit:'개 연속',  tiers:[3,5,8,12] },
+    { key:'perfect',   emoji:'💯', name:'만점 헌터',     desc:'5점 만점을 모아요',                 unit:'회 만점',  tiers:[2,5,10,20] },
+    { key:'best',      emoji:'🌟', name:'우수작 컬렉터', desc:'우수작에 뽑혀봐요',                 unit:'회 선정',  tiers:[1,3,5,10] },
+    { key:'fast',      emoji:'⚡', name:'스피드러너',    desc:'우리 반에서 1~3번째로 제출',        unit:'회 TOP3', tiers:[3,7,15,25] },
+    { key:'phoenix',   emoji:'📈', name:'불사조',        desc:'재도전해서 점수를 올려요',          unit:'회 역전',  tiers:[1,3,5,8] },
+    { key:'visits',    emoji:'📅', name:'단골손님',      desc:'수학교실에 자주 들러요',            unit:'일 접속',  tiers:[5,15,30,60] },
+    { key:'replies',   emoji:'💬', name:'소통왕',        desc:'선생님 피드백에 답글을 남겨요',      unit:'개 답글',  tiers:[1,3,7,15] },
+    { key:'features',  emoji:'🧭', name:'탐험가',        desc:'앱의 여러 기능을 모두 써봐요',       unit:'개 기능',  tiers:[2,4,6] },
+    { key:'stamps',    emoji:'🏅', name:'도장 부자',     desc:'도장을 차곡차곡 모아요',            unit:'개 도장',  tiers:[10,30,60,100] }
+  ];
+
+  function chValue(key) {
+    if (!gChallengeStats) return null;
+    if (key === 'stamps') return gStampTotal; // 도장 로딩 전엔 null
+    if (key === 'features') return (gChallengeStats.features || []).length;
+    var v = gChallengeStats[key];
+    return (v === undefined || v === null) ? 0 : v;
+  }
+  function chTier(def, val) { // 달성 티어 수 (0 = 미달성)
+    if (val === null) return 0;
+    var t = 0;
+    for (var i = 0; i < def.tiers.length; i++) if (val >= def.tiers[i]) t = i + 1;
+    return t;
+  }
+
+  function renderChallenges() {
+    var box = document.getElementById('myChallenges');
+    if (!box) return;
+    if (!gChallengeStats) { box.innerHTML = ''; return; }
+    var achieved = 0;
+    var cards = CHALLENGE_DEFS.map(function(d, i){
+      var val = chValue(d.key);
+      var v = (val === null) ? 0 : val;
+      var tier = chTier(d, v);
+      if (tier > 0) achieved++;
+      var isMax = (tier >= d.tiers.length);
+      var chip, prog;
+      if (tier > 0) {
+        var st = TIER_STYLE[tier - 1];
+        chip = '<span style="background:' + st.bg + ';color:' + st.fg + ';font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;">' + TIER_NAMES[tier - 1] + '</span>';
+      } else {
+        chip = '<span style="background:#f1f5f9;color:#94a3b8;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;">도전 중</span>';
+      }
+      if (isMax) {
+        prog = '<div style="font-size:11px;font-weight:800;color:#1d4ed8;margin-top:6px;">👑 MAX 달성! (' + v + d.unit + ')</div>';
+      } else {
+        var next = d.tiers[tier];
+        var pct = Math.min(100, Math.round(v / next * 100));
+        var barColor = tier > 0 ? TIER_STYLE[Math.min(tier, TIER_STYLE.length - 1)].bar : '#a5b4fc';
+        prog = '<div style="margin-top:6px;">'
+          + '<div style="display:flex;justify-content:space-between;font-size:10px;color:#64748b;font-weight:700;margin-bottom:3px;"><span>' + v + ' / ' + next + d.unit + '</span><span>' + pct + '%</span></div>'
+          + '<div style="height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px;"></div></div>'
+          + '</div>';
+      }
+      var dim = tier === 0 ? 'opacity:.75;' : '';
+      return '<div onclick="openChallengeDetail(' + i + ')" style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;cursor:pointer;' + dim + '">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">'
+        + '<span style="font-size:12px;font-weight:800;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + d.emoji + ' ' + d.name + '</span>' + chip
+        + '</div>' + prog + '</div>';
+    }).join('');
+    box.innerHTML = '<div style="background:linear-gradient(135deg,#fdf4ff,#eff6ff);border:1px solid #f0e5ff;border-radius:16px;padding:14px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
+      + '<div style="font-size:14px;font-weight:800;color:#7c3aed;">🎯 도전과제</div>'
+      + '<div style="font-size:11px;font-weight:800;color:#a78bfa;">' + achieved + ' / ' + CHALLENGE_DEFS.length + ' 달성</div>'
+      + '</div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + cards + '</div>'
+      + '<div style="font-size:10px;color:#a78bfa;margin-top:8px;text-align:center;">카드를 누르면 모든 단계를 볼 수 있어요</div>'
+      + '</div>';
+  }
+
+  function openChallengeDetail(i) {
+    var d = CHALLENGE_DEFS[i];
+    if (!d) return;
+    logFeat('업적확인');
+    var val = chValue(d.key); var v = (val === null) ? 0 : val;
+    var tier = chTier(d, v);
+    var rows = d.tiers.map(function(th, ti){
+      var done = v >= th;
+      var st = TIER_STYLE[ti];
+      var mark = done ? '✅' : '⬜';
+      var nameStyle = done ? ('background:' + st.bg + ';color:' + st.fg + ';') : 'background:#f1f5f9;color:#94a3b8;';
+      return '<div style="display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid #f2f4f6;' + (done ? '' : 'opacity:.65;') + '">'
+        + '<span style="font-size:17px;">' + mark + '</span>'
+        + '<span style="font-size:11px;font-weight:800;padding:3px 10px;border-radius:10px;' + nameStyle + '">' + TIER_NAMES[ti] + '</span>'
+        + '<span style="flex:1;font-size:13px;color:#334155;font-weight:600;">' + th + d.unit + '</span>'
+        + '</div>';
+    }).join('');
+    var tierLine = tier > 0
+      ? '<span style="background:' + TIER_STYLE[tier-1].bg + ';color:' + TIER_STYLE[tier-1].fg + ';font-size:12px;font-weight:800;padding:3px 10px;border-radius:10px;">' + TIER_NAMES[tier-1] + (tier >= d.tiers.length ? ' · MAX 👑' : '') + '</span>'
+      : '<span style="font-size:12px;color:#94a3b8;font-weight:700;">아직 미달성 — 도전해봐요!</span>';
+    var ov = document.getElementById('challengeModal');
+    if (!ov) { ov = document.createElement('div'); ov.id = 'challengeModal'; document.body.appendChild(ov); }
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9999;display:flex;align-items:flex-end;justify-content:center;';
+    ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+    ov.innerHTML = '<div style="background:#fff;width:100%;max-width:480px;max-height:82vh;overflow:auto;border-radius:20px 20px 0 0;padding:22px;">'
+      + '<div style="display:flex;justify-content:space-between;align-items:flex-start;">'
+      + '<div><div style="font-size:20px;font-weight:800;color:#191f28;">' + d.emoji + ' ' + d.name + '</div>'
+      + '<div style="font-size:13px;color:#8b95a1;margin-top:3px;">' + d.desc + '</div>'
+      + '<div style="margin-top:8px;">현재 <b style="color:#7c3aed;">' + v + d.unit + '</b> · ' + tierLine + '</div></div>'
+      + '<div onclick="document.getElementById(\'challengeModal\').remove()" style="font-size:26px;color:#b0b8c1;cursor:pointer;line-height:1;">×</div></div>'
+      + '<div style="margin-top:14px;">' + rows + '</div>'
+      + '<button onclick="document.getElementById(\'challengeModal\').remove()" style="width:100%;margin-top:18px;padding:15px;border:none;background:#f2f4f6;color:#4e5968;border-radius:14px;font-weight:700;font-size:15px;cursor:pointer;">닫기</button>'
+      + '</div>';
+  }
+
+  // 새로 달성한 티어 → 축하 팝업 (localStorage에 마지막 확인 티어 저장)
+  function checkChallengeCelebration() {
+    if (!currentUser || !currentUser.id || !gChallengeStats) return;
+    var lsKey = 'math_ch_tiers_' + currentUser.id;
+    var prev = {};
+    try { prev = JSON.parse(localStorage.getItem(lsKey) || '{}'); } catch(_) {}
+    var curT = {}, ups = [];
+    CHALLENGE_DEFS.forEach(function(d){
+      var val = chValue(d.key);
+      if (val === null) { if (prev[d.key] !== undefined) curT[d.key] = prev[d.key]; return; } // 도장 로딩 전 보류
+      var t = chTier(d, val);
+      curT[d.key] = t;
+      if (t > (prev[d.key] || 0)) ups.push({ def: d, tier: t });
+    });
+    localStorage.setItem(lsKey, JSON.stringify(curT));
+    if (ups.length) showChallengeCongrats(ups);
+  }
+
+  function showChallengeCongrats(ups) {
+    var items = ups.map(function(u){
+      var st = TIER_STYLE[u.tier - 1];
+      return '<div style="display:flex;align-items:center;gap:10px;background:#faf5ff;border:1px solid #f0e5ff;border-radius:12px;padding:12px 14px;margin-bottom:8px;">'
+        + '<span style="font-size:26px;">' + u.def.emoji + '</span>'
+        + '<div style="flex:1;text-align:left;"><div style="font-size:14px;font-weight:800;color:#334155;">' + u.def.name + '</div>'
+        + '<div style="font-size:12px;color:#8b95a1;">' + u.def.desc + '</div></div>'
+        + '<span style="background:' + st.bg + ';color:' + st.fg + ';font-size:11px;font-weight:800;padding:3px 10px;border-radius:10px;">' + TIER_NAMES[u.tier - 1] + '</span>'
+        + '</div>';
+    }).join('');
+    var ov = document.getElementById('congratsModal');
+    if (!ov) { ov = document.createElement('div'); ov.id = 'congratsModal'; document.body.appendChild(ov); }
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;';
+    ov.onclick = function(e){ if (e.target === ov) ov.remove(); };
+    ov.innerHTML = '<div style="background:#fff;width:100%;max-width:400px;max-height:80vh;overflow:auto;border-radius:24px;padding:26px 22px;text-align:center;">'
+      + '<div style="font-size:44px;line-height:1;">🎉</div>'
+      + '<div style="font-size:19px;font-weight:900;color:#7c3aed;margin:10px 0 4px;">도전과제 달성!</div>'
+      + '<div style="font-size:13px;color:#8b95a1;margin-bottom:16px;">새로운 배지를 획득했어요</div>'
+      + items
+      + '<button onclick="document.getElementById(\'congratsModal\').remove()" style="width:100%;margin-top:12px;padding:15px;border:none;background:#7c3aed;color:#fff;border-radius:14px;font-weight:800;font-size:15px;cursor:pointer;">확인 🎯</button>'
+      + '</div>';
+  }
+
+  // 기능 첫 사용 기록 (탐험가) — localStorage로 중복 호출 차단
+  function logFeat(key) {
+    if (!currentUser || !currentUser.id) return;
+    var lsKey = 'math_feats_' + currentUser.id;
+    var logged = (localStorage.getItem(lsKey) || '').split(',').filter(Boolean);
+    if (logged.indexOf(key) >= 0) return;
+    logged.push(key);
+    localStorage.setItem(lsKey, logged.join(','));
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success && r.features && gChallengeStats) {
+        var feats = gChallengeStats.features || [];
+        r.features.forEach(function(f){ if (feats.indexOf(f) < 0) feats.push(f); });
+        gChallengeStats.features = feats;
+        renderChallenges();
+        checkChallengeCelebration();
+      }
+    }).logFeatureUse(currentUser.id, key);
   }
 
   function renderTaskSummary(data) {
@@ -559,7 +786,7 @@
     var submitted = 0, scoredVals = [], bestCount = 0;
     allTasks.forEach(function(t){
       var item = latestMap[t];
-      if (item && item.status !== '재제출요청' && item.status !== '반려검토') submitted++;
+      if (item && item.status !== '재제출요청' && item.status !== '피드백요청' && item.status !== '반려검토') submitted++;
       if (item && item.status === '채점완료' && item.score && !isNaN(parseFloat(item.score))) scoredVals.push(parseFloat(item.score));
       if (item && item.isMyBest) bestCount++;
     });
@@ -574,11 +801,14 @@
       var si = _statusInfo(item);
       var scoreCell = '-';
       if (item && item.status === '채점완료') {
-        scoreCell = item.score ? '<b style="color:#0284c7;">' + item.score + '</b>' : '<span style="color:#94a3b8;font-size:11px;">비공개</span>';
+        var denom = (item.maxScore && item.maxScore > 0 && item.score && !isNaN(parseFloat(item.score))) ? (' / ' + item.maxScore) : '';
+        scoreCell = item.score ? '<b style="color:#0284c7;">' + item.score + denom + '</b>' : '<span style="color:#94a3b8;font-size:11px;">비공개</span>';
       }
+      var canResub = (data.voluntaryTasks || []).some(function(v){ return v.name === t; });
       var actionCell;
       if (item) {
         actionCell = '<button onclick="showTaskDetail(' + item.rowIdx + ')" style="background:#e0e7ff;color:#4338ca;border:none;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">피드백 확인하기</button>';
+        if (canResub) actionCell += '<button onclick="goToResubmit(\'' + String(t).replace(/'/g, "\\'") + '\')" style="background:#fef3c7;color:#b45309;border:none;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;margin-left:4px;">🔄 다시 제출</button>';
       } else {
         actionCell = '<button onclick="goToSubmit(\'' + String(t).replace(/'/g, "\\'") + '\')" style="background:#fee2e2;color:#dc2626;border:none;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;">제출하기</button>';
       }
@@ -697,6 +927,25 @@
 
   var gDashData = null;
   var gMyDojang = null;
+  function loadMyGrades() {
+    google.script.run.withSuccessHandler(function(res){
+      var box = document.getElementById('myGrades');
+      if (!box) return;
+      if (!res || !res.success || !res.grades || !res.grades.length) { box.innerHTML = ''; return; }
+      var cards = res.grades.map(function(g){
+        var denom = (g.max ? (' <span style="font-size:14px;color:#8b95a1;font-weight:600;">/ ' + escDj(g.max) + '</span>') : '');
+        var avgLine = (g.avg !== undefined && g.avg !== null)
+          ? '<div style="font-size:12px;color:#8b95a1;font-weight:600;margin-top:6px;">반평균 ' + escDj(g.avg) + '</div>' : '';
+        return '<div style="flex:1;min-width:120px;background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.04);">'
+          + '<div style="font-size:13px;color:#4e5968;font-weight:600;margin-bottom:4px;">' + escDj(g.name) + '</div>'
+          + '<div style="font-size:26px;font-weight:800;color:#2563eb;line-height:1.2;">' + escDj(g.score) + denom + '</div>' + avgLine + '</div>';
+      }).join('');
+      box.innerHTML = '<div style="background:#eff6ff;border-radius:20px;padding:18px;">'
+        + '<div style="font-size:16px;font-weight:800;color:#1e3a8a;margin-bottom:12px;">📋 내 성적</div>'
+        + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + cards + '</div></div>';
+    }).getMyGrades(currentUser.id);
+  }
+
   function loadMyDojang() {
     if (!currentUser || !currentUser.id) return;
     google.script.run
@@ -707,6 +956,9 @@
         gMyDojang = d;
         var cats = d.categories || [];
         var totalCount = cats.reduce(function(s,c){ return s + (c.count||0); }, 0);
+        gStampTotal = totalCount; // 🏅 도장 부자 도전과제 반영
+        renderChallenges();
+        checkChallengeCelebration();
         if (!totalCount) { box.innerHTML=''; return; }
         var cards = cats.map(function(c, i){
           var rank = (d.showRank && c.count>0)
@@ -725,6 +977,7 @@
 
   function openDojangCat(i) {
     if (!gMyDojang) return;
+    logFeat('도장확인'); // 🧭 탐험가
     var c = gMyDojang.categories[i];
     var recs = (gMyDojang.records||[]).filter(function(r){ return r.kind === c.name; });
     var rows = recs.length
@@ -751,25 +1004,27 @@
 
   function renderDashboard(data) {
     gDashData = data;
+    loadMyGrades();
     loadMyDojang();
     if (data.fcmRegisterUrl) FCM_REGISTER_URL = data.fcmRegisterUrl;
     if (data.mathAppUrl) FCM_MATH_APP_URL = data.mathAppUrl;
     gMissingTasks = data.missingTasks;
     gResubmitTasks = data.resubmitTasks;
+    gVoluntaryTasks = data.voluntaryTasks || [];
 
     var select = document.getElementById('taskName');
     select.innerHTML = '<option value="">선택하세요</option>';
 
     if (data.resubmitTasks.length > 0) {
       var g1 = document.createElement('optgroup');
-      g1.label = "🚨 반려된 과제 (다시 제출 요망)";
+      g1.label = "🔄 다시 제출할 과제 (반려·피드백)";
       data.resubmitTasks.forEach(function(t) {
         var ddayInfo = t.deadline ? getDdayText(t.deadline) : null;
         if (ddayInfo && ddayInfo.passed) return; // 기한 지난 항목은 드롭다운에서도 제외
         var opt = document.createElement('option');
         opt.value = t.name; opt.dataset.isResubmit = "true";
         var ddaySuffix = ddayInfo ? (' ⏰' + ddayInfo.text) : '';
-        opt.innerText = '[재제출] ' + t.name + ddaySuffix;
+        opt.innerText = (t.isFeedback ? '[📩 피드백 보완] ' : '[🚨 재제출] ') + t.name + ddaySuffix;
         g1.appendChild(opt);
       });
       select.appendChild(g1);
@@ -791,6 +1046,21 @@
         g2.appendChild(opt);
       });
       select.appendChild(g2);
+    }
+
+    if (gVoluntaryTasks.length > 0) {
+      var g3 = document.createElement('optgroup');
+      g3.label = "🔄 다시 제출 (마감 전 수정 가능)";
+      gVoluntaryTasks.forEach(function(t) {
+        var ddayInfo = t.deadline ? getDdayText(t.deadline) : null;
+        if (ddayInfo && ddayInfo.passed) return;
+        var opt = document.createElement('option');
+        opt.value = t.name; opt.dataset.isResubmit = "false"; opt.dataset.voluntary = "true";
+        var ddaySuffix = ddayInfo ? (' ⏰' + ddayInfo.text) : '';
+        opt.innerText = '[다시 제출] ' + t.name + ddaySuffix;
+        g3.appendChild(opt);
+      });
+      select.appendChild(g3);
     }
 
     if (select.options.length <= 1) {
@@ -833,12 +1103,18 @@
                      '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
                    '</div>';
         } else {
-          mHtml += '<div onclick="goToSubmit(\'' + escapedName + '\')" style="background:#fff7ed; border:1px solid #fed7aa; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02); cursor:pointer; transition:0.2s;" onmouseover="this.style.background=\'#ffedd5\'; this.style.transform=\'translateX(-2px)\'" onmouseout="this.style.background=\'#fff7ed\'; this.style.transform=\'translateX(0)\'">' +
+          var fbMode = !!t.isFeedback;
+          var cardBg = fbMode ? '#fffbeb' : '#fef2f2';
+          var cardBorder = fbMode ? '#fde68a' : '#fecaca';
+          var cardIcon = fbMode ? '📩' : '🚨';
+          var cardLabel = fbMode ? '피드백 보완 · 클릭하여 다시 제출 ▶' : '반려 · 처음부터 다시 제출 ▶';
+          var cardLabelCol = fbMode ? '#b45309' : '#dc2626';
+          mHtml += '<div onclick="goToSubmit(\'' + escapedName + '\')" style="background:' + cardBg + '; border:1px solid ' + cardBorder + '; border-radius:10px; padding:12px 14px; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; gap:10px; box-shadow:0 2px 4px rgba(0,0,0,0.02); cursor:pointer; transition:0.2s;">' +
                      '<div style="display:flex; align-items:center; gap:10px; min-width:0;">' +
-                       '<span style="font-size:18px; flex-shrink:0;">🚨</span>' +
+                       '<span style="font-size:18px; flex-shrink:0;">' + cardIcon + '</span>' +
                        '<div style="min-width:0;">' +
-                         '<div style="font-size:11px; font-weight:800; color:#ea580c; margin-bottom:3px;">재제출 요망 · 클릭하여 제출 ▶</div>' +
-                         '<div style="font-size:14px; font-weight:700; color:#9a3412; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+                         '<div style="font-size:11px; font-weight:800; color:' + cardLabelCol + '; margin-bottom:3px;">' + cardLabel + '</div>' +
+                         '<div style="font-size:14px; font-weight:700; color:#9a3412; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + (fbMode && t.prevScore ? ' · 이전 점수 ' + t.prevScore : '') + '</div>' +
                        '</div>' +
                      '</div>' +
                      '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
@@ -912,12 +1188,14 @@
         var badge = '';
         var newBadge = isNew ? '<span class="new-badge">NEW ✓</span>' : '';
         
-        if (item.status === '재제출요청') badge = '<span style="color:#ef4444; font-size:12px; font-weight:bold; margin-left:8px;">(재제출 대기중)</span>';
+        if (item.status === '재제출요청') badge = '<span style="color:#ef4444; font-size:12px; font-weight:bold; margin-left:8px;">(🚨 재제출 대기중)</span>';
+        else if (item.status === '피드백요청') badge = '<span style="color:#d97706; font-size:12px; font-weight:bold; margin-left:8px;">(📩 피드백 보완 대기중)</span>';
+        else if (item.status === '완료') badge = '<span style="color:#0f172a; font-size:12px; font-weight:bold; margin-left:8px;">(🔒 최종 완료)</span>';
         else if (item.status === '이전기록채점완료') badge = '<span style="color:#64748b; font-size:12px; font-weight:bold; margin-left:8px;">(이전 기록)</span>';
 
         // ✅ 등수 배지 생성 (반 등수 강조)
         var rankBadge = '';
-        if (item.classRank > 0 && item.status !== '재제출요청' && item.status !== '반려검토' && item.status !== '이전기록채점완료') {
+        if (item.classRank > 0 && item.status !== '재제출요청' && item.status !== '피드백요청' && item.status !== '반려검토' && item.status !== '이전기록채점완료') {
            var emoji = item.classRank === 1 ? '🥇' : item.classRank === 2 ? '🥈' : item.classRank === 3 ? '🥉' : item.classRank <= 5 ? '🏅' : item.classRank <= 10 ? '🎖️' : '👍';
            var bg = item.classRank <= 3 ? '#fef08a' : item.classRank <= 10 ? '#d1fae5' : '#f1f5f9';
            var col = item.classRank <= 3 ? '#a16207' : item.classRank <= 10 ? '#047857' : '#475569';
@@ -929,8 +1207,16 @@
         }
 
         var rejectBox = '';
-        if (item.status === '재제출요청' && item.feedback) {
-          rejectBox = '<div class="reject-reason-box"><div class="reject-reason-text">' + item.feedback + '</div></div>';
+        if ((item.status === '재제출요청' || item.status === '피드백요청') && item.feedback) {
+          var isFb2 = item.status === '피드백요청';
+          var dlTxt = item.resubDeadline ? ' · 기한 ' + item.resubDeadline.slice(0,10) : '';
+          var boxStyle = isFb2
+            ? 'background:#fffbeb; border:2px solid #f59e0b; border-radius:12px; padding:12px 14px; margin-top:8px;'
+            : 'background:#fef2f2; border:2px solid #ef4444; border-radius:12px; padding:12px 14px; margin-top:8px;';
+          var rbTitle = isFb2
+            ? '<div style="font-size:13px; font-weight:800; color:#b45309; margin-bottom:6px;">📩 선생님 피드백 — 보완해서 다시 제출하세요' + dlTxt + '</div>'
+            : '<div style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:6px;">🚨 반려 — 처음부터 다시 제출하세요' + dlTxt + '</div>';
+          rejectBox = '<div style="' + boxStyle + '">' + rbTitle + '<div style="font-size:14px; color:#1f2937; line-height:1.6; white-space:pre-wrap;">' + item.feedback + '</div></div>';
         }
 
         var hasPqData = item.perQuestionData && Object.keys(item.perQuestionData).length > 0;
@@ -953,10 +1239,12 @@
           });
           feedHtml += '</div>';
           if (item.feedback) feedHtml += '<div class="teacher-feedback">' + item.feedback + '</div>';
-          if (item.score) scoreBadge = '<span class="score-badge">💯 합계: ' + item.score + '</span>';
+          var dn1 = (item.maxScore && item.maxScore > 0) ? (' / ' + item.maxScore) : '';
+          if (item.score) scoreBadge = '<span class="score-badge">💯 합계: ' + item.score + dn1 + '</span>';
         } else {
           feedHtml = item.feedback ? '<div class="teacher-feedback">' + item.feedback + '</div>' : '';
-          scoreBadge = item.score ? '<span class="score-badge">💯 평가: ' + item.score + '</span>' : '';
+          var dn2 = (item.maxScore && item.maxScore > 0 && !isNaN(parseFloat(item.score))) ? (' / ' + item.maxScore) : '';
+          scoreBadge = item.score ? '<span class="score-badge">💯 평가: ' + item.score + dn2 + '</span>' : '';
         }
         var carouselHtml = buildCarouselHtml(item.urls, item.annoUrls, item.rowIdx);
         var replySection = '';
@@ -1235,17 +1523,28 @@
       return;
     }
 
-    // ✨ 현재 선택한 항목이 '재제출'인지 확인
+    // ✨ 현재 선택한 항목이 '재제출/자발적 다시 제출'인지 확인
     var isResub = sel.options[sel.selectedIndex].getAttribute('data-is-resubmit') === 'true';
+    var isVoluntary = sel.options[sel.selectedIndex].getAttribute('data-voluntary') === 'true';
 
-    currentTargetTask = gMissingTasks.find(function(t) { return t.name === sel.value; }) || gResubmitTasks.find(function(t) { return t.name === sel.value; });
+    currentTargetTask = gMissingTasks.find(function(t) { return t.name === sel.value; }) || gResubmitTasks.find(function(t) { return t.name === sel.value; }) || gVoluntaryTasks.find(function(t) { return t.name === sel.value; });
     if (!currentTargetTask) return;
-    
+
     // 객체에도 재제출 여부 저장 (나중을 위해)
     currentTargetTask.isResubmit = isResub;
+    currentTargetTask.voluntary = isVoluntary;
     selectedChoices = [];
 
     if (currentTargetTask.isResubmit && currentTargetTask.rejectionFeedback && rejBox) {
+      var isFb = !!currentTargetTask.isFeedback;
+      var titleEl = document.getElementById('rejectionReasonTitle');
+      if (isFb) {
+        rejBox.style.background = '#fffbeb'; rejBox.style.borderColor = '#f59e0b';
+        if (titleEl) { titleEl.style.color = '#b45309'; titleEl.innerText = '📩 선생님 피드백 — 보완해서 다시 제출하세요' + (currentTargetTask.prevScore ? ' (이전 점수 ' + currentTargetTask.prevScore + ')' : ''); }
+      } else {
+        rejBox.style.background = '#fef2f2'; rejBox.style.borderColor = '#ef4444';
+        if (titleEl) { titleEl.style.color = '#dc2626'; titleEl.innerText = '🚨 선생님의 반려 사유'; }
+      }
       document.getElementById('rejectionReasonText').innerText = currentTargetTask.rejectionFeedback;
       rejBox.style.display = 'block';
     }
@@ -1413,6 +1712,7 @@
   function sendToServer(isResubmitStr, base64FilesArray) {
     var s = document.getElementById('taskName');
     var taskNameVal = s.value;
+    var voluntaryStr = (s.options[s.selectedIndex] && s.options[s.selectedIndex].getAttribute('data-voluntary') === 'true') ? "true" : "false";
     document.getElementById('submitStatus').innerText = "서버에 전송 중... ☁️";
     
     google.script.run
@@ -1587,7 +1887,7 @@
       })
       .processForm({
         studentId: currentUser.id, studentName: currentUser.name,
-        taskName: taskNameVal, isResubmit: isResubmitStr,
+        taskName: taskNameVal, isResubmit: isResubmitStr, voluntary: voluntaryStr,
         level: document.querySelector('input[name="level"]:checked').value,
         message: document.getElementById('message').value,
         filesData: base64FilesArray

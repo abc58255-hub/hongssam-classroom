@@ -26,6 +26,16 @@ function saveFcmToken(studentId, token, pwHash, deviceId) {
   return StudentAuth.saveFcmToken(studentId, token, pwHash, deviceId);
 }
 
+// 교사 푸시 — 학생 제출/재제출/답글 시 선생님 폰으로 알림 (실패해도 본 기능에 영향 없음)
+// kind별 on/off: 설정 시트 '교사알림_<kind>' Y/N ('제출'만 기본 N)
+function _notifyTeacher_(kind, title, body) {
+  try {
+    var url = '';
+    try { url = (StudentAuth.getAppUrls() || {})['과제채점'] || ''; } catch(_) {}
+    StudentAuth.sendTeacherPush(kind, title, body, url);
+  } catch(_) {}
+}
+
 
 // 이 앱의 배포 URL을 ClassCore 앱 URL 레지스트리에 자동 기록 (포털 카드용)
 function _registerAppUrl_(key) {
@@ -45,8 +55,10 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.action) return ContentService.createTextOutput(JSON.stringify({ success: false, message: "앱이 아직 설정되지 않았어요." })).setMimeType(ContentService.MimeType.JSON);
     return _setupPage_();
   }
-  if (e && e.parameter && e.parameter.action === "saveFcmToken") {
-    var result = saveFcmToken(e.parameter.studentId, e.parameter.token, e.parameter.pwHash || null, e.parameter.deviceId || '');
+  if (e && e.parameter && (e.parameter.action === "saveFcmToken" || e.parameter.action === "saveTeacherFcmToken")) {
+    var result = (e.parameter.action === "saveTeacherFcmToken")
+      ? StudentAuth.saveTeacherFcmToken(e.parameter.token, e.parameter.pwHash || null, e.parameter.deviceId || '')
+      : saveFcmToken(e.parameter.studentId, e.parameter.token, e.parameter.pwHash || null, e.parameter.deviceId || '');
     var output = JSON.stringify(result);
     if (e.parameter.callback) {
       return ContentService.createTextOutput(e.parameter.callback + '(' + output + ')')
@@ -128,16 +140,52 @@ function getSecureFileBase64(url) {
 // =====================================================
 // ✅ 학생용: getDashboardData 전체 덮어쓰기 (재제출 마감일 기능 포함)
 // =====================================================
+// ⚡ 제출현황(점점 커지는 로그) 캐시 — 수업 중 동시접속 시 시트 읽기 1회로 공유. TTL 45초.
+//   학생 본인 제출/상태변경 시 _clearHistoryCache()로 즉시 무효화 → 방금 한 건 바로 반영.
+var _HIST_TTL_ = 45;
+function _getHistoryValues() {
+  var cache = CacheService.getScriptCache();
+  try {
+    var meta = cache.get('histN');
+    if (meta) {
+      var n = parseInt(meta, 10), keys = [];
+      for (var i = 0; i < n; i++) keys.push('hist' + i);
+      var got = cache.getAll(keys), parts = [], ok = true;
+      for (var j = 0; j < n; j++) { var p = got['hist' + j]; if (p == null) { ok = false; break; } parts.push(p); }
+      if (ok) return JSON.parse(parts.join(''));
+    }
+  } catch (_) {}
+  var vals = _taskSs_().getSheetByName('제출현황').getDataRange().getValues();
+  try {
+    var s = JSON.stringify(vals), CH = 90000, n2 = Math.ceil(s.length / CH);
+    if (n2 <= 20) {
+      var obj = {};
+      for (var k = 0; k < n2; k++) obj['hist' + k] = s.substr(k * CH, CH);
+      cache.putAll(obj, _HIST_TTL_);
+      cache.put('histN', String(n2), _HIST_TTL_);
+    }
+  } catch (_) {}
+  return vals;
+}
+function _clearHistoryCache() {
+  try {
+    var cache = CacheService.getScriptCache();
+    var meta = cache.get('histN'), keys = ['histN'];
+    if (meta) { var n = parseInt(meta, 10); for (var i = 0; i < n; i++) keys.push('hist' + i); }
+    cache.removeAll(keys);
+  } catch (_) {}
+}
+
 function getDashboardData(studentId, studentName) {
   try {
-    const ss = SpreadsheetApp.openById(SHEET_ID); 
-    const now = new Date(); 
+    const now = new Date();
     let safeId = String(studentId || "").trim();
     let className = safeId.length >= 2 ? `${safeId.substring(0, 1)}학년 ${safeId.substring(1, 2)}반` : "기타";
     
     const taskData = _taskSs_().getSheetByName("과제설정").getDataRange().getValues();
-    let allBaseTasks = []; 
-    let validMissingTasksSet = new Set(); 
+    let allBaseTasks = [];
+    let assignedBaseTasks = []; // 이 학생 반에 배정된 과제만 (갤러리/노출용)
+    let validMissingTasksSet = new Set();
     let taskSettingsMap = {};
     let taskDeadlineMap = {};
 
@@ -160,13 +208,16 @@ function getDashboardData(studentId, studentName) {
       allBaseTasks.push(tName);
       let choices = String(taskData[i][7] || "").trim();
       let choiceArray = choices ? choices.split(',').map(s => s.trim()).filter(s => s) : [];
-      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray };
+      var maxScore = taskData[i][8] ? Number(taskData[i][8]) : 0; // col9 = 만점
+      var taskPub = (function(){ var v = String(taskData[i][5] || '').trim(); return v === '일괄공개' || v === '공개'; })(); // col6 = 과제 단위 공개
+      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray, maxScore: maxScore, isPublicTask: taskPub };
 
       let isExpired = false;
       let hasDeadline = false;
       let myDeadline = null;
       let resubDeadline = null;
       let openDeadline = null;
+      let assignedToMe = true; // 기본: 마감일 미설정(전체 공통) 과제는 모두에게 배정
 
       if (dStr && dStr.startsWith("{")) {
         try {
@@ -178,9 +229,10 @@ function getDashboardData(studentId, studentName) {
             myDeadline = dl;
             if (new Date(dl) < now) isExpired = true;
           } else if (hasClassSpecificKeys) {
-            // 다른 반에만 마감일이 설정된 경우 → 이 학생에겐 과제 숨김
+            // 다른 반에만 마감일이 설정된 경우 → 이 학생에겐 과제 숨김(미배정)
             hasDeadline = true;
             isExpired = true;
+            assignedToMe = false;
           }
           resubDeadline = deadlines["resub_" + className] || deadlines["resub_all"] || myDeadline;
           openDeadline = deadlines["open_" + className] || deadlines["open_all"] || null;
@@ -193,10 +245,11 @@ function getDashboardData(studentId, studentName) {
         open: openDeadline
       };
 
+      if (assignedToMe) assignedBaseTasks.push(tName);
       if (!hasDeadline || !isExpired) { validMissingTasksSet.add(tName); }
     }
 
-    const historyData = _taskSs_().getSheetByName("제출현황").getDataRange().getValues();
+    const historyData = _getHistoryValues();
     let history = []; 
     let taskStatusMap = {}; 
     let unreadFeedbacks = []; 
@@ -214,7 +267,7 @@ function getDashboardData(studentId, studentName) {
 
       let myTotalRank = 0;
       let myClassRank = 0;
-      if (status !== '재제출요청' && status !== '반려검토' && status !== '이전기록채점완료') {
+      if (status !== '재제출요청' && status !== '피드백요청' && status !== '반려검토' && status !== '이전기록채점완료') {
         if (!rankCounters[baseName]) rankCounters[baseName] = { total: 0, classes: {} };
         if (!rankCounters[baseName].classes[rowClass]) rankCounters[baseName].classes[rowClass] = 0;
         
@@ -259,8 +312,8 @@ function getDashboardData(studentId, studentName) {
       if (rowId === safeId && String(historyData[i][2] || "").trim() === String(studentName || "").trim()) {
         let fb = historyData[i][7] ? String(historyData[i][7]).trim() : ""; 
         let isSeen = historyData[i][9] ? String(historyData[i][9]).trim() : ""; 
-        let isPublic = String(historyData[i][13]).trim() === "공개" || String(historyData[i][13]).trim() === "일괄공개"; 
-        let score = isPublic && historyData[i][12] ? String(historyData[i][12]).trim() : ""; 
+        let isPublic = String(historyData[i][13]).trim() === "공개" || String(historyData[i][13]).trim() === "일괄공개" || !!(taskSettingsMap[baseName] && taskSettingsMap[baseName].isPublicTask); // 과제 단위 공개도 인정
+        let score = isPublic && historyData[i][12] ? String(historyData[i][12]).trim() : "";
         let reply = historyData[i][15] ? String(historyData[i][15]).trim() : ""; 
         let isMyBest = (historyData[i][16] ? String(historyData[i][16]).trim() : "") !== "";
         let ts = taskSettingsMap[baseName] || {reqPics:1, choiceArray:[]};
@@ -293,13 +346,16 @@ function getDashboardData(studentId, studentName) {
           task: rawTaskName, baseName: baseName, level: historyData[i][4] || "",
           urls: urls, feedback: fb, status: status, annoUrls: annoUrls,
           score: score, reply: reply, isMyBest: isMyBest,
+          maxScore: ts.maxScore || 0,
           reqPics: ts.reqPics, choices: ts.choiceArray,
           perQuestionData: perQuestionData,
           isUnread: (fb !== "" || isMyBest) && isSeen === "",
           aiGradeTemp: aiGradeTemp,
           totalRank: myTotalRank,
           classRank: myClassRank,
-          deadline: taskDeadlineMap[baseName] ? taskDeadlineMap[baseName].main : null
+          deadline: taskDeadlineMap[baseName] ? taskDeadlineMap[baseName].main : null,
+          resubDeadline: historyData[i][24] ? (historyData[i][24] instanceof Date ? historyData[i][24].toISOString() : String(historyData[i][24])) : null,
+          returnType: historyData[i][25] ? String(historyData[i][25]).trim() : ""
         };
         history.push(item); 
         if (status !== "이전기록채점완료") {
@@ -311,8 +367,9 @@ function getDashboardData(studentId, studentName) {
       }
     }
     
-    let missingTasks = []; 
+    let missingTasks = [];
     let resubmitTasks = [];
+    let voluntaryTasks = []; // 제출 완료 + 마감 전 → 학생이 자발적으로 다시 제출 가능
 
     allBaseTasks.forEach(t => {
       let ts = taskSettingsMap[t] || {reqPics:1, choiceArray:[]};
@@ -327,14 +384,17 @@ function getDashboardData(studentId, studentName) {
         }
       } else {
         let st = taskStatusMap[t].status;
-        let submittedCount = 0; 
+        let submittedCount = 0;
         let currentUrls = taskStatusMap[t].urls;
-        for (let k in currentUrls) { 
-          if (currentUrls[k] && currentUrls[k] !== "" && currentUrls[k] !== "첨부파일 없음") submittedCount++; 
+        for (let k in currentUrls) {
+          if (currentUrls[k] && currentUrls[k] !== "" && currentUrls[k] !== "첨부파일 없음") submittedCount++;
         }
 
-        if (st === "재제출요청") {
-          let resubDl = dMap.resub || dMap.main;
+        if (st === "재제출요청" || st === "피드백요청") {
+          let isFeedback = (st === "피드백요청");
+          // 개별 재제출마감(교사가 반려/피드백 누른 날 + 과제별 기한일)만 기준.
+          // 없으면(레거시) 마감 없이 열어둠 — 원래 과제 마감일로 폴백하면 마감 후 피드백이 사라짐
+          let resubDl = taskStatusMap[t].resubDeadline || null;
           let resubExpired = resubDl && new Date(resubDl) < now;
           if (!resubExpired) {
             let rejectionFeedback = taskStatusMap[t].feedback || "";
@@ -345,7 +405,10 @@ function getDashboardData(studentId, studentName) {
             resubmitTasks.push({
               name: t, reqPics: ts.reqPics, choices: ts.choiceArray,
               submittedUrls: {}, isResubmit: true,
-              deadline: dMap.resub,
+              isFeedback: isFeedback,
+              returnType: taskStatusMap[t].returnType || (isFeedback ? "피드백" : "반려"),
+              prevScore: (isFeedback && taskStatusMap[t].score) ? taskStatusMap[t].score : "",
+              deadline: resubDl,
               rejectionFeedback: rejectionFeedback, completedKeys: completedKeys
             });
           }
@@ -354,24 +417,57 @@ function getDashboardData(studentId, studentName) {
             name: t, reqPics: ts.reqPics, choices: ts.choiceArray,
             submittedUrls: currentUrls, deadline: dMap.main, openDate: dMap.open
           });
+        } else if (st !== "완료") {
+          // 제출 완료(채점완료/미채점 모두, 단 최종완료 잠금 제외) → 본 마감 전이면 자발적 다시 제출 허용
+          let mdl = dMap.main;
+          if (mdl && new Date(mdl) > now) {
+            voluntaryTasks.push({
+              name: t, reqPics: ts.reqPics, choices: ts.choiceArray,
+              submittedUrls: {}, voluntary: true, deadline: mdl, openDate: dMap.open
+            });
+          }
         }
       }
     });
 
-    // 🏆 내 업적 (학급·전체 등수 포함)
+    // 과제설정에서 삭제됐거나 목록에서 누락돼도, 되돌린(반려/피드백) 상태면 학생이 다시 제출할 수 있게 보강
+    let resubNames = {};
+    resubmitTasks.forEach(t => { resubNames[t.name] = true; });
+    Object.keys(taskStatusMap).forEach(t => {
+      let it = taskStatusMap[t];
+      if (!it || resubNames[t]) return;
+      if (it.status !== '재제출요청' && it.status !== '피드백요청') return;
+      let resubDl = it.resubDeadline || null;
+      if (resubDl && new Date(resubDl) < now) return; // 기한 지남
+      let isFeedback = (it.status === '피드백요청');
+      let ts2 = taskSettingsMap[t] || { reqPics: 1, choiceArray: [] };
+      resubmitTasks.push({
+        name: t, reqPics: ts2.reqPics, choices: ts2.choiceArray,
+        submittedUrls: {}, isResubmit: true, isFeedback: isFeedback,
+        returnType: it.returnType || (isFeedback ? '피드백' : '반려'),
+        prevScore: (isFeedback && it.score) ? it.score : '',
+        deadline: resubDl,
+        rejectionFeedback: it.feedback || '', completedKeys: []
+      });
+      resubNames[t] = true;
+    });
+
+    // 🏆 내 업적 (학급·전체 등수 포함) + 🎯 도전과제 (접속기록 포함)
     let myStats = null;
     try {
+      const activity = _logVisitAndGetActivity_(safeId); // 오늘 첫 접속이면 +1 기록
       const rosterData = StudentAuth.getRosterValues();
-      myStats = _computeAchievements(historyData, taskData, rosterData, safeId, className);
+      myStats = _computeAchievements(historyData, taskData, rosterData, safeId, className, activity);
     } catch(e) { Logger.log('업적 계산 오류: ' + e.message); }
 
     return {
       history: history.reverse(),
       missingTasks: missingTasks,
       resubmitTasks: resubmitTasks,
+      voluntaryTasks: voluntaryTasks,
       unreadFeedbacks: unreadFeedbacks,
       bestWorksMap: bestWorksMap,
-      taskOrder: allBaseTasks, // 과제 부여 순서 (갤러리 정렬용)
+      taskOrder: assignedBaseTasks, // 이 학생 반에 배정된 과제만 (갤러리 정렬용)
       myStats: myStats,
       seenBestKeys: _getSeenBestKeys(safeId), // 서버 저장 "본 우수작" (localStorage 불안정 대비)
       fcmRegisterUrl: _getSysStudent('FCM_REGISTER_URL'),
@@ -427,141 +523,229 @@ function markBestSeen(studentId, keys) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-// 학생 업적 계산 — 평균 제출순위, 우수작, 등급평균, 점수평균 + 학급/전체 등수
-function _computeAchievements(historyData, taskData, rosterData, myId, myClass) {
-  // 1) 과제 분류 (점수제/등급제) + 반별 배정 여부 (학생 대시보드와 동일 판정)
+// ── 🎯 도전과제: 활동기록 (접속일수·기능사용) ───────────────────
+// 시트: 활동기록 (학번|접속일수|마지막접속일|사용기능CSV) — 과제 스프레드시트에 자동 생성
+var _FEATURE_KEYS_ = ['과제제출','재제출','피드백답글','우수작갤러리','도장확인','업적확인'];
+
+function _activitySheet_() {
+  var ss = _taskSs_();
+  var sh = ss.getSheetByName('활동기록');
+  if (!sh) {
+    sh = ss.insertSheet('활동기록');
+    sh.getRange(1,1,1,4).setValues([['학번','접속일수','마지막접속일','사용기능']]);
+    sh.getRange(1,1,1,4).setFontWeight('bold').setBackground('#6366f1').setFontColor('white');
+    sh.setFrozenRows(1);
+  }
+  return sh;
+}
+
+// 대시보드 열 때 호출 — 오늘 첫 접속이면 접속일수 +1 (학생당 하루 최대 1회 쓰기). 실패해도 무시.
+function _logVisitAndGetActivity_(studentId) {
+  var res = { visits: 0, features: [] };
+  try {
+    var sid = String(studentId || '').trim();
+    if (!sid) return res;
+    var sh = _activitySheet_();
+    var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+    var last = sh.getLastRow();
+    var rows = last >= 2 ? sh.getRange(2, 1, last - 1, 4).getValues() : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === sid) {
+        var visits = Number(rows[i][1] || 0);
+        res.features = String(rows[i][3] || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        if (String(rows[i][2] || '').trim() !== today) {
+          visits++;
+          sh.getRange(i + 2, 2, 1, 2).setValues([[visits, today]]);
+        }
+        res.visits = visits;
+        return res;
+      }
+    }
+    sh.appendRow([sid, 1, today, '']);
+    res.visits = 1;
+    return res;
+  } catch (e) { return res; }
+}
+
+// 기능 첫 사용 기록 (클라이언트에서 localStorage로 중복 호출 차단, 서버도 CSV 중복 방지)
+function logFeatureUse(studentId, featureKey) {
+  try {
+    var sid = String(studentId || '').trim();
+    var key = String(featureKey || '').trim();
+    if (!sid || _FEATURE_KEYS_.indexOf(key) < 0) return { success: false };
+    var sh = _activitySheet_();
+    var last = sh.getLastRow();
+    var rows = last >= 2 ? sh.getRange(2, 1, last - 1, 4).getValues() : [];
+    for (var i = 0; i < rows.length; i++) {
+      if (String(rows[i][0]).trim() === sid) {
+        var feats = String(rows[i][3] || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
+        if (feats.indexOf(key) < 0) { feats.push(key); sh.getRange(i + 2, 4).setValue(feats.join(',')); }
+        return { success: true, features: feats };
+      }
+    }
+    sh.appendRow([sid, 0, '', key]);
+    return { success: true, features: [key] };
+  } catch (e) { return { success: false }; }
+}
+
+// 학생 업적 계산 — 평균제출순위(제출률≥50%만)·등급평균(채점된 등급과제)·점수평균(채점된 5점과제)
+//                 + 자동 배지(연속제출·완주·만점왕·우수작) + 도전과제 카운터. 공개된 채점만 반영.
+function _computeAchievements(historyData, taskData, rosterData, myId, myClass, activity) {
   var nowTime = new Date();
-  var taskInfo = {}; // name → { isGrade, isScore, deadlines, restrictClasses }
+  var gpaMap = { 'A':4, 'B':3, 'C':2, 'D':1 };
+
+  // 1) 과제 분류 (생성 순서 보존)
+  var taskInfo = {};          // name → { isGrade, isScore5, isPublicTask, deadlines, restrict }
+  var taskOrder = [];         // 생성 순서 (연속제출 streak용)
   for (var i = 1; i < taskData.length; i++) {
     var tName = String(taskData[i][1] || '').trim();
     if (!tName) continue;
     var evalType = String(taskData[i][4] || '').trim();
-    var isGrade = evalType.indexOf('A-B-C-D') >= 0;
-    var isScore = evalType.indexOf('점수') >= 0;
+    var pub = String(taskData[i][5] || '').trim();
+    var maxv = Number(taskData[i][8] || 0);
     var dl = {}; var restrict = null;
     try {
       dl = JSON.parse(taskData[i][3] || '{}');
       if (Array.isArray(dl['_classes']) && dl['_classes'].length > 0) restrict = dl['_classes'];
     } catch(_) { dl = {}; }
-    taskInfo[tName] = { isGrade: isGrade, isScore: isScore, deadlines: dl, restrict: restrict };
+    taskInfo[tName] = {
+      isGrade: evalType.indexOf('A-B-C-D') >= 0,
+      isScore5: (evalType.indexOf('점수') >= 0 && maxv === 5),
+      isPublicTask: (pub === '일괄공개' || pub === '공개'),
+      deadlines: dl, restrict: restrict
+    };
+    taskOrder.push(tName);
   }
-  // 이 반에 실제로 부여된 과제인지: _classes 제한 통과 + (해당 반/all 마감일 존재) + 공개일 지남
   function assignedToClass(tName, cls) {
     var ti = taskInfo[tName]; if (!ti) return false;
-    if (ti.restrict && ti.restrict.indexOf(cls) < 0) return false; // 다른 반 전용
+    if (ti.restrict && ti.restrict.indexOf(cls) < 0) return false;
     var d = ti.deadlines || {};
-    var myDl = d[cls] || d['all'];
-    if (!myDl) return false; // 이 반에 마감일 없음 = 미부여
-    // 공개일이 미래면 아직 부여 전
+    if (!(d[cls] || d['all'])) return false;
     var openDl = d['open_' + cls] || d['open_all'];
     if (openDl && new Date(openDl) > nowTime) return false;
     return true;
   }
 
-  // 2) 전체 학생 목록 (반 포함)
-  var students = {}; // id → { id, cls }
-  var classStudents = {}; // cls → [sid]
+  // 2) 학생 목록
+  var students = {}, classStudents = {};
   for (var r = 1; r < rosterData.length; r++) {
     var sid = String(rosterData[r][1] || '').trim();
     if (!sid) continue;
     var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '기타';
-    students[sid] = { id: sid, cls: cls };
+    students[sid] = { cls: cls };
     if (!classStudents[cls]) classStudents[cls] = [];
     classStudents[cls].push(sid);
   }
 
-  // 3) 제출 데이터 집계 — 과제별 최종/최초 제출
-  var latest = {}; // task → sid → row
-  var earliest = {}; // task → sid → row (제출순위용)
+  // 3) 제출 집계 (최종/최초). 공개여부(col14)도 기록. + 내 답글/재제출 흔적(도전과제용)
+  var latest = {}, earliest = {}, allRows = {};
+  var myReplies = 0, myResubmitted = false;
   for (var h = 1; h < historyData.length; h++) {
     var hid = String(historyData[h][1] || '').trim();
     if (!hid || !students[hid]) continue;
     var hTask = String(historyData[h][3] || '').split(' (')[0];
     if (!hTask) continue;
     var hStatus = String(historyData[h][10] || '').trim();
-    if (hStatus === '이전기록채점완료') continue;
-    var rowObj = { rowIdx: h, status: hStatus, score: String(historyData[h][12] || '').trim(),
-                   bestType: String(historyData[h][16] || '').trim() };
+    if (hid === myId) {
+      var rpl = String(historyData[h][15] || '').trim();
+      if (rpl && rpl !== '[재제출요청]') myReplies++;
+      if (String(historyData[h][3] || '').indexOf('(재제출)') >= 0) myResubmitted = true;
+    }
+    var pubv = String(historyData[h][13] || '').trim();
+    var rowObj = {
+      rowIdx: h,
+      score: String(historyData[h][12] || '').trim(),
+      bestType: String(historyData[h][16] || '').trim(),
+      pub: (pubv === '공개' || pubv === '일괄공개')
+    };
+    // 모든 차수(이전기록 포함) → 최고 점수 산출용
+    if (!allRows[hTask]) allRows[hTask] = {};
+    if (!allRows[hTask][hid]) allRows[hTask][hid] = [];
+    allRows[hTask][hid].push(rowObj);
+    if (hStatus === '이전기록채점완료') continue; // 최신/최초·제출집계에서는 제외
     if (!latest[hTask]) latest[hTask] = {};
     if (!latest[hTask][hid] || h > latest[hTask][hid].rowIdx) latest[hTask][hid] = rowObj;
     if (!earliest[hTask]) earliest[hTask] = {};
     if (!earliest[hTask][hid] || h < earliest[hTask][hid].rowIdx) earliest[hTask][hid] = rowObj;
   }
+  // 공개 채점 판정: 제출이 공개거나(col14) 과제가 공개(col6)
+  function isOpen(tName, lt) { return !!(lt && (lt.pub || (taskInfo[tName] && taskInfo[tName].isPublicTask))); }
 
-  // 4) 학생별 지표 계산
-  var gpaMap = { 'A':4, 'B':3, 'C':2, 'D':1 };
-  var stat = {}; // sid → { cls, submitRanks:[], best, gradeSum, gradeN, scoreSum, scoreN }
+  // 4) 학생별 지표
+  var stat = {};
   Object.keys(students).forEach(function(sid){
-    stat[sid] = { cls: students[sid].cls, submitRanks: [], best: 0, gradeSum: 0, gradeN: 0, scoreSum: 0, scoreN: 0 };
+    stat[sid] = { cls: students[sid].cls, assigned: 0, submitted: 0, posSum: 0, posN: 0,
+                  best: 0, gradeSum: 0, gradeN: 0, scoreSum: 0, scoreN: 0 };
   });
 
   Object.keys(taskInfo).forEach(function(tName){
     var ti = taskInfo[tName];
-    // 제출순위: 학급 내 최초 제출 순서 (전체 부여 과제 분모, 미제출=꼴등=반 인원수)
     Object.keys(classStudents).forEach(function(cls){
       if (!assignedToClass(tName, cls)) return;
       var clsSids = classStudents[cls];
-      var clsCount = clsSids.length;
+      // 제출 순위 (최초 제출 순서) — 제출자끼리만
       var submitters = clsSids.filter(function(sid){ return earliest[tName] && earliest[tName][sid]; })
         .sort(function(a,b){ return earliest[tName][a].rowIdx - earliest[tName][b].rowIdx; });
-      var rankOf = {};
-      submitters.forEach(function(sid, idx){ rankOf[sid] = idx + 1; });
-      clsSids.forEach(function(sid){
-        if (!stat[sid]) return;
-        stat[sid].submitRanks.push(rankOf[sid] || clsCount); // 미제출 = 꼴등
-      });
-    });
+      var posOf = {};
+      submitters.forEach(function(sid, idx){ posOf[sid] = idx + 1; });
 
-    // 우수작 + 등급/점수 (배정된 학생 전체 분모, 미제출=0)
-    Object.keys(students).forEach(function(sid){
-      var cls = students[sid].cls;
-      if (!assignedToClass(tName, cls)) return;
-      var lt = latest[tName] ? latest[tName][sid] : null;
-      // 우수작
-      if (lt && lt.bestType) stat[sid].best++;
-      // 등급
-      if (ti.isGrade) {
-        stat[sid].gradeN++;
-        var g = lt ? gpaMap[lt.score] : undefined;
-        stat[sid].gradeSum += (g !== undefined ? g : 0);
-      }
-      // 점수
-      if (ti.isScore) {
-        stat[sid].scoreN++;
-        var sc = lt && lt.score && !isNaN(parseFloat(lt.score)) ? parseFloat(lt.score) : 0;
-        stat[sid].scoreSum += sc;
-      }
+      clsSids.forEach(function(sid){
+        var st = stat[sid]; if (!st) return;
+        st.assigned++;
+        var lt = latest[tName] ? latest[tName][sid] : null;
+        if (lt) st.submitted++;
+        // 제출순위: 제출한 과제만 누적
+        if (posOf[sid]) { st.posSum += posOf[sid]; st.posN++; }
+        // 우수작
+        if (lt && lt.bestType) st.best++;
+        var rowsAll = (allRows[tName] && allRows[tName][sid]) ? allRows[tName][sid] : [];
+        // 등급 평균: 공개 채점된 등급(A-D) 중 최고(A>B>C>D)
+        if (ti.isGrade) {
+          var bestG = null;
+          rowsAll.forEach(function(ro){
+            if (gpaMap[ro.score] !== undefined && isOpen(tName, ro))
+              if (bestG === null || gpaMap[ro.score] > bestG) bestG = gpaMap[ro.score];
+          });
+          if (bestG !== null) { st.gradeSum += bestG; st.gradeN++; }
+        }
+        // 점수 평균: 5점만점 공개 채점 중 최고 점수
+        if (ti.isScore5) {
+          var bestS = null;
+          rowsAll.forEach(function(ro){
+            var v = parseFloat(ro.score);
+            if (ro.score !== '' && !isNaN(v) && isOpen(tName, ro))
+              if (bestS === null || v > bestS) bestS = v;
+          });
+          if (bestS !== null) { st.scoreSum += bestS; st.scoreN++; }
+        }
+      });
     });
   });
 
-  // 5) 지표값 산출
+  // 5) 지표값 + 제출률(50% 게이트)
   var arr = Object.keys(stat).map(function(sid){
     var st = stat[sid];
+    var rate = st.assigned ? (st.submitted / st.assigned) : 0;
+    var eligible = (st.assigned > 0 && rate >= 0.5 && st.posN > 0);
     return {
-      id: sid, cls: st.cls,
-      submitRank: st.submitRanks.length ? (st.submitRanks.reduce(function(a,b){return a+b;},0)/st.submitRanks.length) : null,
+      id: sid, cls: st.cls, rate: rate, assigned: st.assigned, submitted: st.submitted,
+      submitRank: eligible ? (st.posSum / st.posN) : null,  // 제출률 50% 미만은 순위 제외
       best: st.best,
-      grade: st.gradeN ? (st.gradeSum/st.gradeN) : null,
-      score: st.scoreN ? (st.scoreSum/st.scoreN) : null
+      grade: st.gradeN ? (st.gradeSum / st.gradeN) : null,
+      score: st.scoreN ? (st.scoreSum / st.scoreN) : null
     };
   });
 
-  // 6) 등수 계산 헬퍼 (값 비교; lowerBetter면 작을수록 1등)
   function ranks(metric, lowerBetter, excludeZero) {
     var pool = arr.filter(function(x){
       if (x[metric] === null || x[metric] === undefined) return false;
       if (excludeZero && x[metric] === 0) return false;
       return true;
     });
-    function rankIn(list, val) {
-      var better = list.filter(function(x){
-        return lowerBetter ? x[metric] < val : x[metric] > val;
-      }).length;
-      return better + 1;
-    }
-    return { pool: pool, rankIn: rankIn };
+    return { pool: pool, rankIn: function(list, val){
+      return list.filter(function(x){ return lowerBetter ? x[metric] < val : x[metric] > val; }).length + 1;
+    }};
   }
-
   var me = arr.filter(function(x){ return x.id === myId; })[0];
   if (!me) return null;
 
@@ -572,25 +756,90 @@ function _computeAchievements(historyData, taskData, rosterData, myId, myClass) 
     var classPool = R.pool.filter(function(x){ return x.cls === myClass; });
     return {
       value: Math.round(me[metric] * Math.pow(10, decimals)) / Math.pow(10, decimals),
-      classRank: R.rankIn(classPool, me[metric]),
-      classTotal: classPool.length,
-      overallRank: R.rankIn(R.pool, me[metric]),
-      overallTotal: R.pool.length
+      classRank: R.rankIn(classPool, me[metric]), classTotal: classPool.length,
+      overallRank: R.rankIn(R.pool, me[metric]), overallTotal: R.pool.length
     };
   }
 
+  // 6) 내 배지 (연속제출·완주·만점왕·우수작) + 도전과제 카운터(스피드러너·불사조)
+  // 점수 서열화: A-D 등급 > 통과/미통과 > 숫자 (불사조 비교용)
+  function scoreVal(s) {
+    if (gpaMap[s] !== undefined) return gpaMap[s];
+    if (s === '통과') return 1;
+    if (s === '미통과') return 0;
+    var f = parseFloat(s);
+    return (s !== '' && !isNaN(f)) ? f : null;
+  }
+  var streak = 0, cur = 0, perfect = 0, fast = 0, phoenix = 0;
+  taskOrder.forEach(function(tName){
+    if (!assignedToClass(tName, myClass)) return;
+    var lt = latest[tName] ? latest[tName][myId] : null;
+    if (lt) { cur++; if (cur > streak) streak = cur; } else { cur = 0; }
+    if (taskInfo[tName].isScore5 && lt && parseFloat(lt.score) === 5 && isOpen(tName, lt)) perfect++;
+    // ⚡ 스피드러너: 우리 반에서 1~3번째로 제출한 과제
+    if (earliest[tName] && earliest[tName][myId]) {
+      var myRow = earliest[tName][myId].rowIdx, fasterCnt = 0;
+      (classStudents[myClass] || []).forEach(function(sid){
+        if (sid !== myId && earliest[tName][sid] && earliest[tName][sid].rowIdx < myRow) fasterCnt++;
+      });
+      if (fasterCnt < 3) fast++;
+    }
+    // 🔄 불사조: 재제출(2차 이상 채점)로 첫 공개 점수보다 오른 과제 (과제당 1회)
+    var rows = (allRows[tName] && allRows[tName][myId]) ? allRows[tName][myId] : [];
+    if (rows.length >= 2) {
+      var vals = [];
+      rows.slice().sort(function(a,b){ return a.rowIdx - b.rowIdx; }).forEach(function(ro){
+        if (!isOpen(tName, ro)) return;
+        var v = scoreVal(ro.score);
+        if (v !== null) vals.push(v);
+      });
+      if (vals.length >= 2 && Math.max.apply(null, vals.slice(1)) > vals[0]) phoenix++;
+    }
+  });
+  var submitRankResult = build('submitRank', true, false, 1);
+  if (!submitRankResult && me.assigned > 0) {
+    submitRankResult = { lowParticipation: true, rate: Math.round(me.rate * 100) };
+  }
+
+  // 🧭 탐험가: 저장된 기능사용 + 시트 흔적으로 소급 (과제제출/재제출/피드백답글)
+  var act = activity || { visits: 0, features: [] };
+  var feats = (act.features || []).slice();
+  function addFeat(k){ if (feats.indexOf(k) < 0) feats.push(k); }
+  if (me.submitted > 0) addFeat('과제제출');
+  if (myResubmitted) addFeat('재제출');
+  if (myReplies > 0) addFeat('피드백답글');
+
   return {
-    submitRank: build('submitRank', true, false, 1),
+    submitRank: submitRankResult,
     best:       build('best', false, true, 0),
     grade:      build('grade', false, false, 2),
-    score:      build('score', false, false, 1)
+    score:      build('score', false, false, 1),
+    badges: {
+      submissionRate: Math.round(me.rate * 100),
+      complete: (me.assigned > 0 && me.submitted === me.assigned),
+      streak: streak,
+      perfect: perfect,
+      bestCount: me.best
+    },
+    challenges: {
+      submitted: me.submitted,
+      streak: streak,
+      perfect: perfect,
+      best: me.best,
+      fast: fast,
+      phoenix: phoenix,
+      replies: myReplies,
+      visits: act.visits || 0,
+      features: feats
+    }
   };
 }
 
 function markFeedbacksAsSeen(rowIndices) { 
   const sheet = _taskSs_().getSheetByName("제출현황"); 
-  rowIndices.forEach(idx => sheet.getRange(idx, 10).setValue("확인")); 
-  return true; 
+  rowIndices.forEach(idx => sheet.getRange(idx, 10).setValue("확인"));
+  _clearHistoryCache();
+  return true;
 }
 
 // 행 소유자 검증: 제출현황 시트와 rowIdx를 받아 학번(B열) 일치 확인 (sheet 재활용)
@@ -601,11 +850,24 @@ function _verifyRowOwner_(sheet, rowIdx, studentId) {
   return rowSid === String(studentId).trim();
 }
 
+// 제출현황 행에서 "X학년 Y반 이름 — 과제명" 요약 (교사 푸시 본문용)
+function _rowSummary_(sheet, rowIdx) {
+  try {
+    var r = sheet.getRange(rowIdx, 2, 1, 3).getValues()[0]; // 학번·이름·과제명
+    var sid = String(r[0] || '').trim();
+    var cls = sid.length >= 2 ? (sid.substring(0, 1) + '학년 ' + sid.substring(1, 2) + '반') : '';
+    return (cls ? cls + ' ' : '') + String(r[1] || '').trim() + ' — ' + String(r[2] || '').split(' (')[0].trim();
+  } catch(_) { return ''; }
+}
+
 function saveStudentReply(rowIdx, replyText, studentId) {
   try {
     var sheet = _taskSs_().getSheetByName("제출현황");
     if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return false;
     sheet.getRange(rowIdx, 16).setValue(replyText);
+    var snip = String(replyText || '').replace(/\s+/g, ' ').trim();
+    if (snip.length > 40) snip = snip.substring(0, 40) + '…';
+    _notifyTeacher_('답글', '💬 학생 답글', _rowSummary_(sheet, rowIdx) + (snip ? ' : ' + snip : ''));
     return true;
   } catch(e) {
     return false;
@@ -617,6 +879,8 @@ function requestResubmission(rowIdx, studentId) {
     var sheet = _taskSs_().getSheetByName("제출현황");
     if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return { success: false };
     sheet.getRange(rowIdx, 16).setValue("[재제출요청]");
+    _clearHistoryCache();
+    _notifyTeacher_('답글', '🙋 재제출 요청', _rowSummary_(sheet, rowIdx) + ' — 다시 풀고 싶어해요');
     return { success: true };
   } catch(e) {
     return { success: false };
@@ -624,6 +888,7 @@ function requestResubmission(rowIdx, studentId) {
 }
 
 function processForm(formData) {
+  if (String(formData.voluntary) === "true") return _voluntaryResubmit(formData);
   try {
     const ss = SpreadsheetApp.openById(SHEET_ID);
     const sheet = _taskSs_().getSheetByName("제출현황");
@@ -654,7 +919,17 @@ function processForm(formData) {
             try {
               const dl = JSON.parse(dStr);
               if (isResubmit) {
-                const resubDl = dl["resub_" + className] || dl["resub_all"] || dl[className] || dl["all"];
+                // 개별 재제출마감(col25, 교사가 반려/피드백 누른 날+과제별 기한) 우선
+                let perRowDl = null;
+                for (let k = records.length - 1; k >= 1; k--) {
+                  if (String(records[k][1] || "").trim() === inputId &&
+                      String(records[k][3] || "").split(' (')[0].trim() === baseTaskName &&
+                      (String(records[k][10] || "").trim() === "재제출요청" || String(records[k][10] || "").trim() === "피드백요청")) {
+                    if (records[k][24]) perRowDl = new Date(records[k][24]);
+                    break;
+                  }
+                }
+                const resubDl = perRowDl || dl["resub_" + className] || dl["resub_all"] || dl[className] || dl["all"];
                 if (resubDl && new Date(resubDl) < now) {
                   return { success: false, message: "⏰ 재제출 기한이 지났습니다. 선생님께 문의하세요." };
                 }
@@ -694,12 +969,12 @@ function processForm(formData) {
       }
     }
 
-    // ✅ 재제출인 경우 기존 재제출요청 행을 재제출완료로 변경
+    // ✅ 재제출인 경우 기존 재제출요청/피드백요청 행을 재제출완료로 변경
     if (isResubmit) {
       for (let i = records.length - 1; i >= 1; i--) {
-        if (String(records[i][1] || "").trim() === inputId && 
-            String(records[i][3] || "").startsWith(baseTaskName) && 
-            String(records[i][10] || "").trim() === "재제출요청") {
+        if (String(records[i][1] || "").trim() === inputId &&
+            String(records[i][3] || "").startsWith(baseTaskName) &&
+            (String(records[i][10] || "").trim() === "재제출요청" || String(records[i][10] || "").trim() === "피드백요청")) {
           sheet.getRange(i + 1, 11).setValue("재제출완료");
           sheet.getRange(i + 1, 24).setValue(new Date()); // X열 = 상태변경일시
           break;
@@ -730,15 +1005,97 @@ function processForm(formData) {
     });
 
     sheet.appendRow([
-      now, inputId, inputName, finalTaskName, formData.level, formData.message, 
+      now, inputId, inputName, finalTaskName, formData.level, formData.message,
       JSON.stringify(finalUrls), "", JSON.stringify(fileHashObj), "", "", "", "", "", "", ""
     ]);
-    
+    _clearHistoryCache();
+
+    // 📣 교사 푸시 — 재제출은 기본 켜짐(교사가 재채점해야 함), 첫 제출은 기본 꺼짐
+    if (isResubmit) _notifyTeacher_('재제출', '🔄 재제출 도착', className + ' ' + inputName + ' — ' + baseTaskName);
+    else _notifyTeacher_('제출', '📥 과제 제출', className + ' ' + inputName + ' — ' + baseTaskName);
+
     // ✅ 방금 추가한 행 번호를 반환 (AI 자동 채점 호출용)
     const newRowIdx = sheet.getLastRow();
     return { success: true, rowIdx: newRowIdx };
-  } catch (error) { 
-    return { success: false, message: error.toString() }; 
+  } catch (error) {
+    return { success: false, message: error.toString() };
+  }
+}
+
+// ── 자발적 다시 제출 (마감 전, 본인) — 기존 최신 행을 새 제출로 덮어쓰고 채점 초기화 → 재채점 ──
+function _voluntaryResubmit(formData) {
+  try {
+    var sheet = _taskSs_().getSheetByName("제출현황");
+    var now = new Date();
+    var inputId = String(formData.studentId || "").trim();
+    var inputName = String(formData.studentName || "").trim();
+    var baseTaskName = String(formData.taskName || "").split(' (')[0].trim();
+    var className = inputId.length >= 2 ? (inputId.substring(0,1) + '학년 ' + inputId.substring(1,2) + '반') : "기타";
+
+    // 1) 마감 검증 — 본 마감 전이어야 함
+    var taskSheet = _taskSs_().getSheetByName("과제설정");
+    var td = taskSheet.getDataRange().getValues();
+    for (var k = 1; k < td.length; k++) {
+      if (String(td[k][1] || "").trim() === baseTaskName) {
+        var dStr = String(td[k][3] || "").trim();
+        if (dStr && dStr.startsWith("{")) {
+          try {
+            var dl = JSON.parse(dStr);
+            var mainDl = dl[className] || dl["all"];
+            if (mainDl && new Date(mainDl) < now) return { success: false, message: "⏰ 마감이 지나 다시 제출할 수 없어요." };
+          } catch(_) {}
+        }
+        break;
+      }
+    }
+
+    // 2) 내 최신 제출 행 찾기
+    var data = sheet.getDataRange().getValues();
+    var targetRow = -1;
+    for (var i = data.length - 1; i >= 1; i--) {
+      if (String(data[i][1] || "").trim() === inputId &&
+          String(data[i][3] || "").split(' (')[0].trim() === baseTaskName) { targetRow = i + 1; break; }
+    }
+    if (targetRow < 0) return { success: false, message: "제출 기록이 없어요." };
+
+    // 3) 새 파일 업로드
+    var incomingFiles = formData.filesData || [];
+    var fileHashObj = {};
+    try { incomingFiles.forEach(function(f){ fileHashObj[f.key] = getHash(Utilities.base64Decode(f.b64)); }); }
+    catch(e) { return { success: false, message: '이미지 처리 오류: ' + e.message }; }
+
+    var parentFolder = DriveApp.getFolderById(_getParentFolderId_());
+    var taskFolder = parentFolder.getFoldersByName(baseTaskName).hasNext() ? parentFolder.getFoldersByName(baseTaskName).next() : parentFolder.createFolder(baseTaskName);
+    var classFolder = taskFolder.getFoldersByName(className).hasNext() ? taskFolder.getFoldersByName(className).next() : taskFolder.createFolder(className);
+    var finalUrls = {};
+    incomingFiles.forEach(function(f){
+      var blob = Utilities.newBlob(Utilities.base64Decode(f.b64), f.mime || 'image/jpeg',
+        '[' + inputId + '] ' + inputName + '_' + baseTaskName + '_다시제출_' + f.key + '.jpg');
+      finalUrls[f.key] = classFolder.createFile(blob).getUrl();
+    });
+
+    // 4) 기존 행 갱신 + 채점 관련 필드 초기화 (재채점 대기)
+    sheet.getRange(targetRow, 1).setValue(now);                       // 날짜
+    sheet.getRange(targetRow, 4).setValue(baseTaskName);             // 과제명(재제출 표기 제거)
+    sheet.getRange(targetRow, 5).setValue(formData.level || "");     // 난이도
+    sheet.getRange(targetRow, 6).setValue(formData.message || "");   // 메모
+    sheet.getRange(targetRow, 7).setValue(JSON.stringify(finalUrls));// 파일URL
+    sheet.getRange(targetRow, 8).setValue("");                       // 피드백
+    sheet.getRange(targetRow, 9).setValue(JSON.stringify(fileHashObj)); // 해시
+    sheet.getRange(targetRow, 10).setValue("");                      // 읽음
+    sheet.getRange(targetRow, 11).setValue("");                      // 상태(미채점)
+    sheet.getRange(targetRow, 12).setValue("");                      // 첨삭URL
+    sheet.getRange(targetRow, 13).setValue("");                      // 점수
+    sheet.getRange(targetRow, 14).setValue("");                      // 공개여부
+    sheet.getRange(targetRow, 16).setValue("");                      // 답글
+    sheet.getRange(targetRow, 17).setValue("");                      // 우수작유형
+    sheet.getRange(targetRow, 22).setValue("");                      // 문항별JSON
+    sheet.getRange(targetRow, 23).setValue("");                      // AI채점JSON
+    sheet.getRange(targetRow, 24).setValue(now);                     // 상태변경일시
+    _clearHistoryCache();
+    return { success: true, rowIdx: targetRow };
+  } catch (error) {
+    return { success: false, message: error.toString() };
   }
 }
 
@@ -746,42 +1103,33 @@ function processForm(formData) {
 // =====================================================
 // ✅ 제출 순위 계산 (같은 과제에서 몇 번째 제출인지) - 반려/재제출 반영 버전
 // =====================================================
-// 특정 학생의 특정 과제 제출 등수 계산
+// 특정 학생의 특정 과제 제출 등수 — 학생별 "최초 제출" 기준(재제출 중복 제거)
 function getSubmitRank(studentId, taskName) {
   try {
     const sheet = _taskSs_().getSheetByName("제출현황");
     const data = sheet.getDataRange().getValues();
-    const baseTaskName = String(taskName).split(' (')[0].trim(); // (재제출) 등 제외한 기본 과제명
-    
-    let safeId = String(studentId).trim();
-    let myClass = safeId.substring(0, 1) + '학년 ' + safeId.substring(1, 2) + '반';
+    const baseTaskName = String(taskName).split(' (')[0].trim();
+    var safeId = String(studentId).trim();
+    var myClass = safeId.substring(0, 1) + '학년 ' + safeId.substring(1, 2) + '반';
 
-    let totalRank = 0;
-    let classRank = 0;
-    let found = false;
-
-    // 1행(헤더) 제외하고 전수 조사
-    for (let i = 1; i < data.length; i++) {
-      let rowTask = String(data[i][3] || '').split(' (')[0].trim();
-      let rowStatus = String(data[i][10] || '').trim();
-      let rowId = String(data[i][1] || '').trim();
-      let rowClass = rowId.substring(0, 1) + '학년 ' + rowId.substring(1, 2) + '반';
-
-      if (rowTask === baseTaskName) {
-        // 반려되거나 이전 기록인 경우는 등수에서 제외 (선택 사항)
-        if (rowStatus === '재제출요청' || rowStatus === '이전기록채점완료') continue;
-
-        totalRank++;
-        if (rowClass === myClass) classRank++;
-
-        // 현재 학생의 행을 찾으면 카운트 중단 (해당 시점까지의 제출 순서가 등수)
-        if (rowId === safeId) {
-          found = true;
-          break;
-        }
-      }
+    // 학생별 최초 제출 행 번호 (한 학생당 1번만)
+    var firstRow = {};
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][3] || '').split(' (')[0].trim() !== baseTaskName) continue;
+      if (String(data[i][10] || '').trim() === '이전기록채점완료') continue;
+      var sid = String(data[i][1] || '').trim();
+      if (!sid) continue;
+      if (firstRow[sid] === undefined || i < firstRow[sid]) firstRow[sid] = i;
     }
-    
+    if (firstRow[safeId] === undefined) return { success: false, message: '제출 기록 없음' };
+
+    var myFirst = firstRow[safeId];
+    var totalRank = 1, classRank = 1; // 나보다 먼저 낸 사람 수 + 1
+    Object.keys(firstRow).forEach(function(sid){
+      if (sid === safeId || firstRow[sid] >= myFirst) return;
+      totalRank++;
+      if (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반' === myClass) classRank++;
+    });
     return { success: true, totalRank: totalRank, classRank: classRank };
   } catch(e) {
     return { success: false, message: e.toString() };
@@ -822,6 +1170,20 @@ function _getApiSettingsForStudent() {
   };
 }
 
+// 단일 출처: 과제설정의 채점유형(col5)·만점(col9)을 우선 사용
+function _taskScaleFromSettings(taskName) {
+  try {
+    var sh = _taskSs_().getSheetByName('과제설정');
+    if (!sh || sh.getLastRow() < 2) return {};
+    var d = sh.getRange(2, 1, sh.getLastRow() - 1, 9).getValues();
+    for (var i = 0; i < d.length; i++) {
+      if (String(d[i][1] || '').trim() === taskName)
+        return { evalType: String(d[i][4] || '').trim(), maxScore: Number(d[i][8] || 0) };
+    }
+  } catch(_) {}
+  return {};
+}
+
 function _getRubricByTaskName(taskName) {
   try {
     const sh = _taskSs_().getSheetByName('AI채점기준');
@@ -832,10 +1194,15 @@ function _getRubricByTaskName(taskName) {
         let files = [], questions = {};
         try { if (data[i][4]) files = JSON.parse(data[i][4]); } catch(e) {}
         try { if (data[i][5]) questions = JSON.parse(data[i][5]); } catch(e) {}
+        var et = String(data[i][1] || '점수제').trim();
+        var mx = Number(data[i][2] || 0);
+        var ov = _taskScaleFromSettings(taskName); // 과제설정 우선
+        if (ov.evalType) et = ov.evalType;
+        if (ov.maxScore) mx = ov.maxScore;
         return {
           taskName: String(data[i][0]).trim(),
-          evalType: String(data[i][1] || '점수제').trim(),
-          maxScore: Number(data[i][2] || 0),
+          evalType: et,
+          maxScore: mx,
           criteria: String(data[i][3] || '').trim(),
           files: files,
           questions: questions
@@ -968,7 +1335,7 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
     const rankData = getSubmitRank(studentId, baseTask);
     if (rankData.success) {
       result.classRank = rankData.classRank;
-      result.totalRank = rankData.rank;
+      result.totalRank = rankData.totalRank;
 
       let praiseMsg = "";
       if (rankData.classRank === 1) praiseMsg = "🎉 와우! 우리 반에서 가장 먼저 제출했어요! 1등! 🥇 훌륭합니다!";
@@ -977,7 +1344,7 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
       else if (rankData.classRank <= 5) praiseMsg = "🏃‍♂️ 엄청 빨라요! 우리 반 TOP 5 안에 들었네요! 🏅 잘했어요!";
       else if (rankData.classRank <= 10) praiseMsg = "🏃‍♀️ 부지런하네요! 우리 반 TOP 10 안에 들었어요! 🎖️";
       
-      if (rankData.rank === 1) praiseMsg = "🏆 세상에! 전체 학년에서 당당히 1등으로 제출했어요! 엄청난 열정 최고예요! 🔥";
+      if (rankData.totalRank === 1) praiseMsg = "🏆 세상에! 전체 학년에서 당당히 1등으로 제출했어요! 엄청난 열정 최고예요! 🔥";
       result.rankMessage = praiseMsg; 
     }
 
@@ -987,73 +1354,6 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
   }
 }
 
-// =====================================================
-// 🧪 AI 자동 채점 디버그 테스트 (직접 실행해보기)
-// =====================================================
-function testAutoGrade() {
-  // 1. 설정 확인
-  const cfg = _getApiSettingsForStudent();
-  Logger.log('📌 API 키 앞 10자: ' + cfg.openrouterKey.substring(0, 10));
-  Logger.log('📌 모델: ' + cfg.model);
-  
-  if (!cfg.openrouterKey) {
-    Logger.log('❌ OpenRouter API 키가 없습니다! 시스템설정 OpenRouter키 항목 확인!');
-    return;
-  }
-  
-  // 2. 채점기준 시트 확인
-  const sh = _taskSs_().getSheetByName('AI채점기준');
-  if (!sh) {
-    Logger.log('❌ "AI채점기준" 시트가 없습니다!');
-    return;
-  }
-  const rubricCount = sh.getLastRow() - 1;
-  Logger.log('📌 등록된 채점기준 개수: ' + rubricCount);
-  
-  if (rubricCount < 1) {
-    Logger.log('❌ 등록된 채점기준이 없습니다. 교사 대시보드에서 먼저 등록하세요!');
-    return;
-  }
-  
-  // 3. 첫 번째 채점기준 정보 출력
-  const firstRubric = sh.getRange(2, 1, 1, 6).getValues()[0];
-  Logger.log('📌 첫 번째 채점기준 과제명: ' + firstRubric[0]);
-  Logger.log('📌 채점유형: ' + firstRubric[1]);
-  Logger.log('📌 파일 개수: ' + (firstRubric[4] ? JSON.parse(firstRubric[4]).length : 0));
-  
-  // 4. 최근 제출된 행을 기준으로 실제 채점 시도
-  const sub = _taskSs_().getSheetByName('제출현황');
-  const lastRow = sub.getLastRow();
-  Logger.log('📌 제출현황 마지막 행: ' + lastRow);
-  
-  if (lastRow < 2) {
-    Logger.log('❌ 제출된 과제가 하나도 없습니다.');
-    return;
-  }
-  
-  const rowData = sub.getRange(lastRow, 1, 1, 8).getValues()[0];
-  const sid = String(rowData[1] || '').trim();
-  const sname = String(rowData[2] || '').trim();
-  const tname = String(rowData[3] || '').trim();
-  
-  Logger.log('📌 마지막 제출 학생: ' + sid + ' ' + sname);
-  Logger.log('📌 과제명: ' + tname);
-  
-  // 5. 해당 과제의 채점기준 찾기
-  const baseTask = tname.split(' (')[0];
-  const rubric = _getRubricByTaskName(baseTask);
-  if (!rubric) {
-    Logger.log('❌ 해당 과제(' + baseTask + ')의 채점기준이 없습니다!');
-    Logger.log('👉 교사 대시보드 → AI 채점기준 관리에서 "' + baseTask + '" 과제 추가하세요.');
-    return;
-  }
-  Logger.log('✅ 채점기준 발견!');
-  
-  // 6. 실제 채점 실행
-  Logger.log('🤖 AI 채점 시작...');
-  const result = autoGradeNewSubmission(lastRow, tname, sid, sname);
-  Logger.log('📌 결과: ' + JSON.stringify(result));
-}
 
 // =====================================================
 // 🏅 내 도장 (항목별 누적 + 등수)
@@ -1068,12 +1368,25 @@ function _getDojangCategories_(ss) {
            type:(c.type==='sheet'?'sheet':'reason') }; }).filter(function(c){ return c.name; });
 }
 
+// 도장 전용 시트 (ClassCore 도장시트ID). 미설정 시 마스터 폴백.
+var _dojangSsCache = null;
+function _dojangSs_() {
+  if (_dojangSsCache) return _dojangSsCache;
+  var id = '';
+  try { id = StudentAuth.getConfig('도장시트ID', ''); } catch(_) {}
+  var ss;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  if (!ss) ss = SpreadsheetApp.openById(SHEET_ID);
+  _dojangSsCache = ss;
+  return ss;
+}
+
 function getMyDojang(studentId) {
   try {
     var sid = String(studentId || '').trim();
     if (!sid) return { success: false };
     var myCls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
-    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var ss = _dojangSs_();
     var logSh = ss.getSheetByName('도장기록');
     var carrySh = ss.getSheetByName('도장_이월');
     if (!logSh) return { success: true, categories: [], recent: [], showRank: true };
@@ -1148,12 +1461,145 @@ function _getDojangSetting_(ss, key, def) {
   } catch(_) { return def; }
 }
 
-// 🔐 외부 API 권한 승인용 (한 번만 실행)
-function grantPermissions() {
-  // 이 함수 실행 시 구글이 권한 요청 창을 띄워줘요
-  UrlFetchApp.fetch('https://www.google.com');
-  Logger.log('✅ 권한 승인 완료! 이제 AI 자동 채점이 작동합니다.');
+// ══════════════════════════════════════════════════════════════
+//  📋 성적 (시험·수행평가) — 전용 시트 [데이터] 성적, ClassCore 성적시트ID
+//  시트 구조: 1행=평가명, 2행=만점, 3행=공개(Y/N), 4행=반평균(Y/N), 5행=학번·이름 헤더, 6행~=데이터
+//  A열=학번, B열=이름, C열~=평가별 점수 (구 레이아웃: 4행=헤더 — setupGradeSheet 재실행 시 자동 마이그레이션)
+// ══════════════════════════════════════════════════════════════
+var _gradeSsCache = null;
+function _gradeSs_() {
+  if (_gradeSsCache) return _gradeSsCache;
+  var id = '';
+  try { id = StudentAuth.getConfig('성적시트ID', ''); } catch(_) {}
+  var ss = null;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  _gradeSsCache = ss;
+  return ss;
 }
+
+// [교사 1회 실행] 성적 시트 생성 + 학생명부(학번·이름) 자동 채우기 + 헤더 3행
+function setupGradeSheet() {
+  var id = '';
+  try { id = StudentAuth.getConfig('성적시트ID', ''); } catch(_) {}
+  var ss;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  if (!ss) {
+    ss = SpreadsheetApp.create('성적 데이터');
+    try { StudentAuth.setConfig('성적시트ID', ss.getId()); } catch(_) {}
+  }
+  var sh = ss.getSheetByName('성적') || ss.insertSheet('성적');
+  var def = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
+  if (def && ss.getSheets().length > 1) { try { ss.deleteSheet(def); } catch(_) {} }
+  // 헤더 4행 (예시 열 포함)
+  if (sh.getLastRow() < 3) {
+    sh.getRange(1, 1, 4, 3).setValues([
+      ['평가 →', '', '1차 지필평가'],   // 1행: A1/B1 안내, C1~ 평가명
+      ['만점 →', '', 100],              // 2행: C2~ 만점
+      ['공개 → (Y/N 또는 7/10~7/20)', '', 'N'],  // 3행: Y=항상, 기간=그때만, 빈칸/N=숨김
+      ['반평균 → (Y/N)', '', 'N']       // 4행: Y=학생에게 반평균 표시
+    ]);
+    sh.getRange(5, 1, 1, 2).setValues([['학번', '이름']]);
+    sh.getRange(1, 1, 5, 3).setFontWeight('bold');
+    sh.setFrozenRows(5); sh.setFrozenColumns(2);
+  } else if (String(sh.getRange(4, 1).getValue()).trim() === '학번') {
+    // 구 레이아웃(4행=헤더) → 반평균 행 삽입 마이그레이션
+    sh.insertRowBefore(4);
+    sh.getRange(4, 1).setValue('반평균 → (Y/N)').setFontWeight('bold');
+    sh.setFrozenRows(5);
+  }
+  // 학생명부 → 6행부터 학번·이름 채우기 (기존 학번 있으면 스킵)
+  var roster = StudentAuth.getRosterValues();
+  var existing = {};
+  if (sh.getLastRow() >= 6) {
+    sh.getRange(6, 1, sh.getLastRow() - 5, 1).getValues().forEach(function(r){ existing[String(r[0]).trim()] = true; });
+  }
+  var rows = [];
+  for (var i = 1; i < roster.length; i++) {
+    var sid = String(roster[i][1] || '').trim();
+    if (!sid || existing[sid]) continue;
+    rows.push([sid, String(roster[i][2] || '').trim()]);
+  }
+  if (rows.length) sh.getRange(Math.max(sh.getLastRow(), 5) + 1, 1, rows.length, 2).setValues(rows);
+  Logger.log('✅ 성적 시트 준비 완료: ' + ss.getUrl() + '  (학생 ' + rows.length + '명 추가)');
+  return ss.getUrl();
+}
+
+// 공개 셀 판정: Y=항상 / 빈칸·N=비공개 / 기간(7/10~7/20, 7/10~, ~7/20) = 오늘이 범위 안이면 공개
+function _gradeVisible(openVal) {
+  var s = String(openVal || '').trim();
+  if (!s) return false;
+  var up = s.toUpperCase();
+  if (up === 'Y') return true;
+  if (up === 'N') return false;
+  var today = new Date(); today.setHours(0, 0, 0, 0);
+  if (s.indexOf('~') >= 0) {
+    var parts = s.split('~');
+    var start = _parseGradeDate(parts[0]);
+    var end   = _parseGradeDate(parts[1]);
+    if (start && today < start) return false;
+    if (end) { var e = new Date(end); e.setHours(23, 59, 59, 999); if (today > e) return false; }
+    return (start || end) ? true : false;
+  }
+  // '~' 없는 단일 날짜 → 그 날부터 공개(시작일)
+  var d = _parseGradeDate(s);
+  return d ? (today >= d) : false;
+}
+function _parseGradeDate(str) {
+  str = String(str || '').trim();
+  if (!str) return null;
+  var m = str.match(/(\d{4})[.\-\/\s]+(\d{1,2})[.\-\/\s]+(\d{1,2})/); // yyyy.mm.dd
+  if (m) return new Date(+m[1], +m[2] - 1, +m[3]);
+  m = str.match(/(\d{1,2})[.\-\/\s]+(\d{1,2})/); // mm.dd (올해)
+  if (m) return new Date((new Date()).getFullYear(), +m[1] - 1, +m[2]);
+  return null;
+}
+
+// [학생] 내 성적 — 공개된(Y 또는 기간 내) 평가만. 반평균은 4행 플래그 Y인 평가만 계산해 함께 반환
+function getMyGrades(studentId) {
+  try {
+    var ss = _gradeSs_();
+    if (!ss) return { success: true, grades: [] };
+    var sh = ss.getSheetByName('성적');
+    if (!sh || sh.getLastRow() < 5 || sh.getLastColumn() < 3) return { success: true, grades: [] };
+    var sid = String(studentId || '').trim();
+    var lastCol = sh.getLastColumn();
+    // 레이아웃 감지: 5행 A열=학번이면 신(4행=반평균 플래그), 4행 A열=학번이면 구(반평균 없음)
+    var hasAvgRow = String(sh.getRange(5, 1).getValue()).trim() === '학번';
+    var dataStart = hasAvgRow ? 6 : 5;
+    if (sh.getLastRow() < dataStart) return { success: true, grades: [] };
+    var names   = sh.getRange(1, 3, 1, lastCol - 2).getValues()[0];         // 평가명
+    var maxes   = sh.getRange(2, 3, 1, lastCol - 2).getValues()[0];         // 만점
+    var opens   = sh.getRange(3, 3, 1, lastCol - 2).getDisplayValues()[0];  // 공개(Y/N/기간)
+    var avgOns  = hasAvgRow ? sh.getRange(4, 3, 1, lastCol - 2).getDisplayValues()[0] : []; // 반평균(Y/N)
+    // 내 행 찾기
+    var body = sh.getRange(dataStart, 1, sh.getLastRow() - dataStart + 1, lastCol).getValues();
+    var myRow = null;
+    for (var i = 0; i < body.length; i++) { if (String(body[i][0]).trim() === sid) { myRow = body[i]; break; } }
+    if (!myRow) return { success: true, grades: [] };
+    var myCls = sid.substring(0, 2); // 학년+반
+    var grades = [];
+    for (var c = 0; c < names.length; c++) {
+      var nm = String(names[c] || '').trim();
+      if (!nm || !_gradeVisible(opens[c])) continue; // 이름 없거나 (기간상) 비공개 → 스킵
+      var val = myRow[c + 2];                      // C열 = 인덱스 2
+      if (val === '' || val === null || val === undefined) continue; // 점수 없으면 스킵
+      var g = { name: nm, score: val, max: (maxes[c] !== '' ? maxes[c] : '') };
+      // 반평균: 플래그 Y면 같은 반(학번 앞 2자리) 학생들의 숫자 점수만 평균 (개별 점수는 노출 안 함)
+      if (hasAvgRow && String(avgOns[c] || '').trim().toUpperCase() === 'Y') {
+        var sum = 0, n = 0;
+        for (var r = 0; r < body.length; r++) {
+          if (String(body[r][0] || '').trim().substring(0, 2) !== myCls) continue;
+          var v = parseFloat(body[r][c + 2]);
+          if (isFinite(v)) { sum += v; n++; }
+        }
+        if (n > 0) g.avg = Math.round(sum / n * 10) / 10;
+      }
+      grades.push(g);
+    }
+    return { success: true, grades: grades };
+  } catch(e) { return { success: false, message: e.toString(), grades: [] }; }
+}
+
 // ── 초기 설정 (SHEET_ID 미설정 시 setup 화면) ──────────
 function _setupPage_() {
   return HtmlService.createHtmlOutputFromFile('setup')

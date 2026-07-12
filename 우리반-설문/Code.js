@@ -49,6 +49,7 @@ function _registerAppUrl_(key) {
 
 function doGet() {
   _registerAppUrl_('바로가기_설문');
+  try { StudentAuth.registerAppUrl('설문관리', ScriptApp.getService().getUrl()); } catch(_) {}
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('우리 반 설문')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -156,56 +157,5 @@ function deleteSurvey(svId) {
       }
     }
     return { success: false, message: '해당 설문을 찾을 수 없습니다.' };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
-
-// 최초 1회: 설문 시트 생성 확인 (편집기에서 실행)
-function setup() {
-  var ss = _surveySs();
-  Logger.log('✅ 설문 시트 준비 완료: ' + ss.getUrl());
-  return ss.getUrl();
-}
-
-// 데이터 이전: 기존 홍쌤 공유시트의 설문목록·설문응답 → 설문 시트 (1회 실행)
-function importFromBoard() {
-  try {
-    var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
-    if (!it.hasNext()) return { success: false, message: '홍쌤 연결 파일(마커)을 찾을 수 없습니다. importFromSheet("시트ID")로 직접 지정하세요.' };
-    return importFromSheet(String(it.next().getBlob().getDataAsString() || '').trim());
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
-
-// 진단 — 마커가 가리키는 원본 시트와 설문목록 상태 확인
-function diagSurvey() {
-  var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
-  if (!it.hasNext()) { Logger.log('❌ 마커(홍쌤교실시스템_SHEET_ID) 없음'); return; }
-  var srcId = String(it.next().getBlob().getDataAsString() || '').trim();
-  var src = SpreadsheetApp.openById(srcId);
-  Logger.log('원본 시트: ' + src.getName() + '  (' + srcId + ')');
-  Logger.log('탭 목록: ' + src.getSheets().map(function(s){ return s.getName(); }).join(', '));
-  var sv = src.getSheetByName('설문목록');
-  Logger.log('설문목록 행수: ' + (sv ? sv.getLastRow() : '시트 없음'));
-  var sr = src.getSheetByName('설문응답');
-  Logger.log('설문응답 행수: ' + (sr ? sr.getLastRow() : '시트 없음'));
-}
-
-function importFromSheet(srcId) {
-  try {
-    var src = SpreadsheetApp.openById(srcId);
-    var dst = _surveySs();
-    var names = ['설문목록', '설문응답'];
-    var report = [];
-    names.forEach(function(name) {
-      var s = src.getSheetByName(name);
-      var d = dst.getSheetByName(name);
-      if (!s || s.getLastRow() < 2 || !d) { report.push(name + ': 0행'); return; }
-      var cols = Math.min(s.getLastColumn(), d.getLastColumn());
-      var data = s.getRange(2, 1, s.getLastRow() - 1, cols).getValues();
-      if (d.getLastRow() > 1) d.getRange(2, 1, d.getLastRow() - 1, d.getLastColumn()).clearContent();
-      d.getRange(2, 1, data.length, cols).setValues(data);
-      report.push(name + ': ' + data.length + '행');
-    });
-    Logger.log('✅ 이전 완료 — ' + report.join(' / '));
-    return { success: true, report: report.join(' / ') };
   } catch(e) { return { success: false, message: e.toString() }; }
 }

@@ -49,15 +49,27 @@ function _registerAppUrl_(key) {
 function doGet() {
   if (!SHEET_ID) return _setupPage_();
   _registerAppUrl_('바로가기_도장데이터');
+  try { StudentAuth.registerAppUrl('도장데이터', ScriptApp.getService().getUrl()); } catch(_) {}
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('홍쌤 도장-데이터')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-// 필요한 시트가 없으면 생성
+// 도장 전용 시트 (ClassCore 도장시트ID). 없으면 생성+등록. 도장-데이터가 소유 앱.
+var _cachedDojangSs = null;
 function _ensureSheets_() {
-  var ss = SpreadsheetApp.openById(SHEET_ID);
+  if (_cachedDojangSs) return _cachedDojangSs;
+  var id = '';
+  try { id = StudentAuth.getConfig('도장시트ID', ''); } catch(_) {}
+  var ss;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  if (!ss) {
+    ss = SpreadsheetApp.create('도장 데이터');
+    try { StudentAuth.setConfig('도장시트ID', ss.getId()); } catch(_) {}
+  } else {
+    try { if (StudentAuth.getConfig('도장시트ID', '') !== ss.getId()) StudentAuth.setConfig('도장시트ID', ss.getId()); } catch(_) {}
+  }
   function mk(name, headers, color) {
     var sh = ss.getSheetByName(name);
     if (!sh) {
@@ -70,7 +82,11 @@ function _ensureSheets_() {
   }
   mk('도장기록', ['일시','학번','이름','종류','사유','차시','학습지','문제'], '#7c3aed');
   mk('도장_이월', ['학번','이름','칭찬이월','발표이월'], '#0d9488');
-  mk('도장_학습지', ['학습지명','발표문제JSON'], '#1e3a8a');
+  mk('도장_학습지', ['학습지명','발표문제JSON','숨김'], '#1e3a8a');
+  mk('도장_설정', ['키','값'], '#475569');
+  var def = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
+  if (def && ss.getSheets().length > 1) { try { ss.deleteSheet(def); } catch(_) {} }
+  _cachedDojangSs = ss;
   return ss;
 }
 

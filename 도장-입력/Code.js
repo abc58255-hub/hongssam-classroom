@@ -19,10 +19,6 @@ function _resolveSheetId_() {
 }
 
 // 🔐 외부 요청(푸시) 권한 승인용 — 에디터에서 한 번 실행하면 됨
-function grantPermissions() {
-  UrlFetchApp.fetch('https://www.google.com');
-  Logger.log('✅ 외부요청 권한 승인 완료 — 이제 도장 알림이 발송됩니다.');
-}
 
 // 이 앱의 배포 URL을 시스템설정 '바로가기_*' 키에 자동 기록 → 대시보드 메뉴가 읽어 자동 연결
 function _registerAppUrl_(key) {
@@ -52,6 +48,7 @@ function _registerAppUrl_(key) {
 function doGet() {
   if (!SHEET_ID) return _setupPage_();
   _registerAppUrl_('바로가기_도장입력');
+  try { StudentAuth.registerAppUrl('도장입력', ScriptApp.getService().getUrl()); } catch(_) {}
   var t = HtmlService.createTemplateFromFile('index');
   // QR용 배포 URL 자동 주입 — 권한 문제 등으로 실패하면 시스템설정 바로가기 폴백
   var appUrl = '';
@@ -90,8 +87,20 @@ function saveSheetId(input) {
   }
 }
 
+// 마스터 시트 (진도·시스템설정·인증용). 도장 데이터는 _dojangSs() 사용.
 function _ensureSheets_() {
-  var ss = SpreadsheetApp.openById(SHEET_ID);
+  return SpreadsheetApp.openById(SHEET_ID);
+}
+
+// 도장 전용 시트 (ClassCore 도장시트ID). 미설정 시 마스터 폴백. 탭 보장.
+var _cachedDojangSs2 = null;
+function _dojangSs() {
+  if (_cachedDojangSs2) return _cachedDojangSs2;
+  var id = '';
+  try { id = StudentAuth.getConfig('도장시트ID', ''); } catch(_) {}
+  var ss;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  if (!ss) ss = SpreadsheetApp.openById(SHEET_ID);
   function mk(name, headers, color) {
     var sh = ss.getSheetByName(name);
     if (!sh) {
@@ -100,12 +109,12 @@ function _ensureSheets_() {
       sh.getRange(1, 1, 1, headers.length).setFontWeight('bold').setBackground(color || '#1e3a8a').setFontColor('white');
       sh.setFrozenRows(1);
     }
-    return sh;
   }
   mk('도장기록', ['일시','학번','이름','종류','사유','차시','학습지','문제'], '#7c3aed');
-  mk('도장_학습지', ['학습지명','발표문제JSON'], '#1e3a8a');
-  mk('도장_설정', ['키','값'], '#0d9488');
+  mk('도장_학습지', ['학습지명','발표문제JSON','숨김'], '#1e3a8a');
+  mk('도장_설정', ['키','값'], '#475569');
   mk('도장_이월', ['학번','이름','칭찬이월','발표이월'], '#0d9488');
+  _cachedDojangSs2 = ss;
   return ss;
 }
 
@@ -175,7 +184,7 @@ function _getRosterCached_() {
 
 // 설정 읽기/쓰기 (도장_설정: 키-값, 값은 JSON 문자열)
 function _getSetting_(ss, key, def) {
-  var sh = ss.getSheetByName('도장_설정');
+  var sh = _dojangSs().getSheetByName('도장_설정');
   if (!sh || sh.getLastRow() < 2) return def;
   var rows = sh.getRange(2, 1, sh.getLastRow()-1, 2).getValues();
   for (var i = 0; i < rows.length; i++) {
@@ -236,7 +245,7 @@ function getInputData(cls, tok) {
 
     // 오늘 카운트 (카테고리별) — 꼬리만 읽어 속도 유지
     var today = _todayStr_();
-    var logSh = ss.getSheetByName('도장기록');
+    var logSh = _dojangSs().getSheetByName('도장기록');
     var log = _tailLog_(logSh);
     var idx = {}; students.forEach(function(s){ idx[s.sid] = s; });
     for (var r = 0; r < log.length; r++) {
@@ -249,7 +258,7 @@ function getInputData(cls, tok) {
     }
 
     // 학습지 목록 (숨김 처리된 건 제외)
-    var wsSh = ss.getSheetByName('도장_학습지');
+    var wsSh = _dojangSs().getSheetByName('도장_학습지');
     var worksheets = [];
     if (wsSh.getLastRow() > 1) {
       var wd = wsSh.getRange(2, 1, wsSh.getLastRow()-1, 3).getValues();
@@ -344,7 +353,7 @@ function recordStamp(p) {
     if (isSheet && !reason) reason = kind;
     var count = Math.max(1, Math.min(20, parseInt(p.count) || 1)); // 한 학생에게 여러 개
 
-    var logSh = ss.getSheetByName('도장기록');
+    var logSh = _dojangSs().getSheetByName('도장기록');
     var name = String(p.name||'').trim();
     // 동시 입력(여러 태블릿) 시 행 덮어쓰기 방지
     var lock = LockService.getScriptLock();
@@ -388,7 +397,7 @@ function recordStampBatch(p) {
     var rows = sids.map(function(sid, i){
       return [now, String(sid).trim(), String(names[i]||'').trim(), kind, reason, '', '', ''];
     });
-    var logSh = ss.getSheetByName('도장기록');
+    var logSh = _dojangSs().getSheetByName('도장기록');
     var lock = LockService.getScriptLock();
     try {
       lock.waitLock(10000);
@@ -400,7 +409,7 @@ function recordStampBatch(p) {
 
 function _upsertWorksheetProblem_(ss, sheet, problem) {
   try {
-    var wsSh = ss.getSheetByName('도장_학습지');
+    var wsSh = _dojangSs().getSheetByName('도장_학습지');
     var rows = wsSh.getLastRow() > 1 ? wsSh.getRange(2, 1, wsSh.getLastRow()-1, 2).getValues() : [];
     for (var i = 0; i < rows.length; i++) {
       if (String(rows[i][0]).trim() === sheet) {
@@ -424,7 +433,7 @@ function getTodayRecords(cls, tok) {
     var ss = _ensureSheets_();
     if (!_tokOk_(ss, tok)) return NEED_AUTH;
     var today = _todayStr_();
-    var logSh = ss.getSheetByName('도장기록');
+    var logSh = _dojangSs().getSheetByName('도장기록');
     var log = _tailLog_(logSh); // 오늘 기록은 항상 꼬리에 있음
     var items = [];
     for (var r = 0; r < log.length; r++) {
@@ -531,7 +540,7 @@ function deleteRecord(ts, sid, tok) {
   try {
     var ss = _ensureSheets_();
     if (!_tokOk_(ss, tok)) return NEED_AUTH;
-    var logSh = ss.getSheetByName('도장기록');
+    var logSh = _dojangSs().getSheetByName('도장기록');
     var last = logSh.getLastRow();
     if (last < 2) return { success: false, message: '기록 없음' };
     // 오늘 기록만 정정 대상이라 꼬리만 스캔

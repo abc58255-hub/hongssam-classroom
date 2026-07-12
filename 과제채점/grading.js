@@ -398,7 +398,9 @@ function parseTasks(ss) {
       evalType: taskData[i][4] ? String(taskData[i][4] || "").trim() : "점수제 (직접 입력)",
       isPublic: String(taskData[i][5] || "").trim() === "일괄공개",
       reqPics: reqPics,
-      choiceList: choiceList
+      choiceList: choiceList,
+      rejectDays:   taskData[i][9]  !== '' && taskData[i][9]  != null ? parseInt(taskData[i][9])  : 7,
+      feedbackDays: taskData[i][10] !== '' && taskData[i][10] != null ? parseInt(taskData[i][10]) : 7
     });
   }
   tasks.reverse();
@@ -409,8 +411,8 @@ function parseSubmissions(ss) {
   const sheet = ss.getSheetByName('제출현황');
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  // getDataRange 대신 필요한 열만 읽기 (A~W = 1~23열)
-  const subData = sheet.getRange(2, 1, lastRow - 1, 23).getValues();
+  // getDataRange 대신 필요한 열만 읽기 (A~AA = 1~27열)
+  const subData = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
   const submissions = [];
 
   // ✅ [추가] 과제별 실시간 등수 계산용 객체
@@ -428,7 +430,7 @@ function parseSubmissions(ss) {
     // ✅ [추가] 반려나 이전기록이 아니면 등수 카운트 증가
     let myTotalRank = 0;
     let myClassRank = 0;
-    if (rowStatus !== '재제출요청' && rowStatus !== '반려검토' && rowStatus !== '이전기록채점완료') {
+    if (rowStatus !== '재제출요청' && rowStatus !== '피드백요청' && rowStatus !== '반려검토' && rowStatus !== '이전기록채점완료') {
       if (!rankCounters[baseTaskName]) rankCounters[baseTaskName] = { total: 0, classes: {} };
       if (!rankCounters[baseTaskName].classes[rowClass]) rankCounters[baseTaskName].classes[rowClass] = 0;
       
@@ -487,6 +489,10 @@ function parseSubmissions(ss) {
       cheatFlag:   String(subData[i][20] || '').trim() || undefined,
       perQuestionData: Object.keys(perQuestionData).length ? perQuestionData : undefined,
       aiGradeTemp: String(subData[i][22] || '').trim() || undefined,
+      // 재제출 루프
+      resubDeadline: subData[i][24] instanceof Date ? Utilities.formatDate(subData[i][24], 'Asia/Seoul', 'yyyy-MM-dd') : (String(subData[i][24] || '').trim() || undefined),
+      returnType:    String(subData[i][25] || '').trim() || undefined,
+      returnCount:   subData[i][26] !== '' && subData[i][26] != null ? parseInt(subData[i][26]) : 0,
       // ✅ [추가] 계산된 등수를 데이터에 포함
       totalRank: myTotalRank,
       classRank: myClassRank
@@ -495,9 +501,33 @@ function parseSubmissions(ss) {
   submissions.reverse();
   return submissions;
 }
+// 재제출 기한(col25)이 지났는데 학생이 안 낸 반려/피드백 행 → 직전 점수 유지한 채 자동 완료(잠금)
+function _autoCompleteExpiredReturns_() {
+  try {
+    const s = _taskSs().getSheetByName('제출현황');
+    const last = s.getLastRow();
+    if (last < 2) return 0;
+    const d = s.getRange(2, 11, last - 1, 15).getValues(); // K(11=상태)~Y(25=재제출마감)
+    const now = new Date();
+    let changed = 0;
+    for (let i = 0; i < d.length; i++) {
+      const st = String(d[i][0] || '').trim(); // col11
+      if (st !== '재제출요청' && st !== '피드백요청') continue;
+      const dl = d[i][14]; // col25
+      if (!dl) continue;
+      const dlDate = (dl instanceof Date) ? dl : new Date(dl);
+      if (isNaN(dlDate.getTime()) || dlDate >= now) continue;
+      _setSubmissionStatus_(s, i + 2, '완료'); // 직전 점수 그대로 두고 잠금
+      changed++;
+    }
+    return changed;
+  } catch(e) { return 0; }
+}
+
 function getGradeData() {
   try {
     const ss = _taskSs();
+    _autoCompleteExpiredReturns_();
     const { roster, classList } = parseRosterAndClasses(ss);
     const tasks = parseTasks(ss);
     const submissions = parseSubmissions(ss);
@@ -561,6 +591,8 @@ function updateTaskSettings(t) {
     s.getRange(r, 4).setValue(t.deadlines);
     s.getRange(r, 5).setValue(t.evalType);
     s.getRange(r, 6).setValue(t.isPublic ? "일괄공개" : "비공개");
+    if (t.rejectDays != null)   s.getRange(r, 10).setValue(parseInt(t.rejectDays)   || 7);
+    if (t.feedbackDays != null) s.getRange(r, 11).setValue(parseInt(t.feedbackDays) || 7);
     clearCache();
     // 🔔 마감일 변경/신규 반 추가 시 해당 학생만 알림
     var pushed = _notifyTaskDeadlineChange_(t.originalName, oldDeadlines, t.deadlines);
@@ -628,6 +660,35 @@ function getTasksOnly() {
     return { tasks: parseTasks(ss) };
   } catch(e) { return { tasks: [] }; }
 }
+// ── 재제출 루프 헬퍼 ──
+// 과제별 반려/피드백 재제출기한(일수) 조회 (미설정 시 7일)
+function _taskResubDays_(taskName) {
+  try {
+    var base = String(taskName || '').split(' (')[0].trim();
+    var d = _taskSs().getSheetByName('과제설정').getDataRange().getValues();
+    for (var i = 1; i < d.length; i++) {
+      if (String(d[i][1] || '').trim() === base) {
+        return {
+          reject:   d[i][9]  !== '' && d[i][9]  != null ? parseInt(d[i][9])  : 7,
+          feedback: d[i][10] !== '' && d[i][10] != null ? parseInt(d[i][10]) : 7
+        };
+      }
+    }
+  } catch(e) {}
+  return { reject: 7, feedback: 7 };
+}
+// 이 학생·이 과제의 지금까지 되돌린(반려+피드백) 횟수 = 이전기록채점완료 행 수
+function _returnCountFor_(sheet, studentId, baseTask) {
+  var d = sheet.getDataRange().getValues();
+  var cnt = 0;
+  for (var i = 1; i < d.length; i++) {
+    if (String(d[i][1]).trim() === studentId &&
+        String(d[i][3]).split(' (')[0].trim() === baseTask &&
+        String(d[i][10] || '').trim() === '이전기록채점완료') cnt++;
+  }
+  return cnt;
+}
+
 function saveFeedback(r, f, a, sc, p, m, bestType, bestAnon, bestComment) {
   try {
     const s = _taskSs().getSheetByName("제출현황");
@@ -635,6 +696,47 @@ function saveFeedback(r, f, a, sc, p, m, bestType, bestAnon, bestComment) {
     let rowData = s.getRange(r, 1, 1, 4).getValues()[0];
     let studentId = String(rowData[1] || "").trim();
     let taskName = String(rowData[3] || "").trim();
+    let baseTaskName2 = taskName.split(" (")[0].trim();
+    // ── 재제출 루프: 반려/피드백/최종완료 ──
+    if (a === "반려요청" || a === "피드백요청") {
+      // 2회 제한: 이미 2회 되돌렸으면 차단
+      if (_returnCountFor_(s, studentId, baseTaskName2) >= 2) {
+        return { success: false, message: "이미 2회 되돌렸습니다. 더 이상 재제출을 요청할 수 없어요. (완료로 마무리해 주세요)" };
+      }
+      var days = _taskResubDays_(taskName);
+      var isFb = (a === "피드백요청");
+      var dl = new Date(); dl.setDate(dl.getDate() + (isFb ? days.feedback : days.reject));
+      _setSubmissionStatus_(s, r, isFb ? "피드백요청" : "재제출요청");
+      s.getRange(r, 8).setValue(f);                                   // 피드백 내용
+      if (sc !== undefined && sc !== null && sc !== "")
+        s.getRange(r, 13, 1, 3).setValues([[sc, p ? "공개" : "비공개", m || ""]]); // 점수(이전 점수 보존용)
+      s.getRange(r, 25).setValue(dl);                                 // 재제출 개별마감
+      s.getRange(r, 26).setValue(isFb ? "피드백" : "반려");            // 되돌림유형
+      s.getRange(r, 27).setValue(_returnCountFor_(s, studentId, baseTaskName2) + 1); // 되돌림횟수
+      return { success: true, deadline: Utilities.formatDate(dl, "Asia/Seoul", "yyyy-MM-dd") };
+    }
+    if (a === "완료해제") {
+      _setSubmissionStatus_(s, r, "채점완료");
+      s.getRange(r, 25, 1, 3).clearContent(); // 재제출마감/유형/횟수 초기화
+      return { success: true };
+    }
+    if (a === "최종완료") {
+      _setSubmissionStatus_(s, r, "완료");
+      s.getRange(r, 8).setValue(f);
+      if (sc !== undefined && sc !== null && sc !== "")
+        s.getRange(r, 13, 1, 3).setValues([[sc, p ? "공개" : "비공개", m || ""]]);
+      // 이전 차수 행 정리
+      let records = s.getDataRange().getValues();
+      for (let i = records.length - 1; i >= 1; i--) {
+        if (String(records[i][1]).trim() === studentId &&
+            String(records[i][3]).split(' (')[0].trim() === baseTaskName2 &&
+            (i + 1) !== r) {
+          let oldStatus = String(records[i][10] || "").trim();
+          if (oldStatus !== "이전기록채점완료") _setSubmissionStatus_(s, i + 1, "이전기록채점완료");
+        }
+      }
+      return { success: true };
+    }
     if (a === "완료") {
       _setSubmissionStatus_(s, r, "채점완료");
       if (taskName.includes("(재제출)")) {
@@ -831,7 +933,29 @@ function saveMultiAnnotatedImages(rowIdx, payloadArray, studentId, studentName, 
     // =====================================================
     // ✅ 상태 저장
     // =====================================================
-    if (finalStatus === '완료') {
+    if (finalStatus === '최종완료') {
+      _setSubmissionStatus_(sheet, rowIdx, '완료');
+      let recF = sheet.getDataRange().getValues();
+      for (let i = recF.length - 1; i >= 1; i--) {
+        if (String(recF[i][1]||'').trim() === safeStudentId &&
+            String(recF[i][3]||'').split(' (')[0].trim() === baseTask && (i+1) !== rowIdx) {
+          let oldSt = String(recF[i][10]||'').trim();
+          if (oldSt !== '이전기록채점완료') _setSubmissionStatus_(sheet, i+1, '이전기록채점완료');
+        }
+      }
+    } else if (finalStatus === '반려요청' || finalStatus === '피드백요청') {
+      var isFbA = (finalStatus === '피드백요청');
+      if (_returnCountFor_(sheet, safeStudentId, baseTask) >= 2) {
+        _setSubmissionStatus_(sheet, rowIdx, '채점완료'); // 2회 초과 → 그냥 채점완료
+      } else {
+        var daysA = _taskResubDays_(taskName);
+        var dlA = new Date(); dlA.setDate(dlA.getDate() + (isFbA ? daysA.feedback : daysA.reject));
+        _setSubmissionStatus_(sheet, rowIdx, isFbA ? '피드백요청' : '재제출요청');
+        sheet.getRange(rowIdx, 25).setValue(dlA);
+        sheet.getRange(rowIdx, 26).setValue(isFbA ? '피드백' : '반려');
+        sheet.getRange(rowIdx, 27).setValue(_returnCountFor_(sheet, safeStudentId, baseTask) + 1);
+      }
+    } else if (finalStatus === '완료') {
       _setSubmissionStatus_(sheet, rowIdx, '채점완료');
       if (String(taskName).includes('(재제출)')) {
         let records = sheet.getDataRange().getValues();
@@ -1052,119 +1176,6 @@ function getOpenRouterBalance() {
     return { success: true, usage: d.usage, limit: d.limit, isFreeTier: d.is_free_tier };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
-function analyzeTaskText(text, fileAttachment) {
-  try {
-    const cfg = getApiSettings();
-    if (!cfg.openrouterKey) return { success: false, message: '시스템설정 OpenRouter키 항목에 API 키를 입력해주세요.' };
-
-    const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy년 MM월 dd일 (E)');
-
-    const systemPrompt = '너는 한국 교사의 업무를 도와주는 AI야. 공문, 메시지, 일정이 적힌 사진, 첨부파일을 분석해서 반드시 유효한 JSON만 반환해. 사진이 첨부되면 사진 속 텍스트를 꼼꼼히 읽어서 날짜·시간·할 일을 모두 추출해. 다른 텍스트, 마크다운 코드블록, 설명은 절대 포함하지 마.';
-
-    const userPrompt = '오늘 날짜: ' + today + '\n\n'
-      + '아래 공문/메시지를 분석하고 정확히 다음 JSON 형식으로 반환해.\n\n'
-      + '⚠️ 문체 규칙 (반드시 준수):\n'
-      + '- 모든 텍스트 필드는 개조식으로 작성\n'
-      + '- "합니다/입니다/됩니다/있습니다" 등 문장형 종결어미 절대 금지\n'
-      + '- 명사형 또는 동사 원형으로 짧게 끝낼 것 (예: "제출", "확인 필요", "양식 작성")\n\n'
-      + '기타 규칙:\n'
-      + '- deadline: 날짜 언급 있으면 yyyy-MM-dd, 없으면 null\n'
-      + '- time: 시간 언급 있으면 HH:mm (24시간), 없으면 null\n'
-      + '- priority: 5=매우긴급, 3=보통, 1=낮음\n'
-      + '- project: 학교업무/연수/학급운영/행사/제출/회의/기타 중 하나\n'
-      + '- tags: 핵심 키워드 최대 3개 (명사, 한글)\n'
-      + '- checklist: 세부 단계 있으면 배열, 없으면 빈 배열\n'
-      + '- repeat: 반복 언급 있으면 RRULE 형식, 없으면 null\n\n'
-      + '{\n'
-      + '  "summary": "핵심 내용 2~3줄 개조식 요약 (문장 아닌 항목 나열)",\n'
-      + '  "tasks": [\n'
-      + '    {\n'
-      + '      "title": "할 일 제목 (10자 이내, 명사형)",\n'
-      + '      "deadline": "yyyy-MM-dd 또는 null",\n'
-      + '      "time": "HH:mm 또는 null",\n'
-      + '      "detail": "핵심 내용만 개조식으로 (2~3항목, 각 항목 20자 이내)",\n'
-      + '      "priority": 1~5,\n'
-      + '      "project": "분류명",\n'
-      + '      "tags": ["태그1", "태그2"],\n'
-      + '      "checklist": ["단계1", "단계2"],\n'
-      + '      "repeat": "RRULE 또는 null"\n'
-      + '    }\n'
-      + '  ],\n'
-      + '  "cautions": ["주의사항 개조식"]\n'
-      + '}\n\n'
-      + '[분석할 내용]\n' + text;
-
-    // 파일 첨부 처리 (OpenRouter OpenAI 호환 형식 사용)
-    let userContent;
-    if (fileAttachment && fileAttachment.data) {
-      const ext = String(fileAttachment.name || '').split('.').pop().toLowerCase();
-      const isImage = ['png','jpg','jpeg','gif','webp','heic','heif'].includes(ext);
-      const isPdf   = ext === 'pdf';
-      if (isImage) {
-        const mimeType = fileAttachment.mimeType && fileAttachment.mimeType.startsWith('image/')
-          ? fileAttachment.mimeType : 'image/jpeg';
-        userContent = [
-          { type: 'image_url', image_url: { url: 'data:' + mimeType + ';base64,' + fileAttachment.data } },
-          { type: 'text', text: userPrompt + (text ? '\n\n[추가 텍스트]\n' + text : '') }
-        ];
-      } else if (isPdf) {
-        // PDF는 URL 방식으로 전달 불가능 → 텍스트 추출 시도 후 실패 시 안내
-        userContent = userPrompt + '\n\n[PDF 첨부: ' + fileAttachment.name + ' - 텍스트 내용을 직접 붙여넣어 주세요]';
-      } else {
-        try {
-          const decoded = Utilities.newBlob(Utilities.base64Decode(fileAttachment.data)).getDataAsString('UTF-8');
-          userContent = userPrompt + '\n\n[첨부 파일: ' + fileAttachment.name + ']\n' + decoded.substring(0, 8000);
-        } catch(e) {
-          userContent = userPrompt + '\n\n[파일 첨부됨: ' + fileAttachment.name + ' - 텍스트 추출 실패]';
-        }
-      }
-    } else {
-      userContent = userPrompt;
-    }
-
-    const payload = {
-      model: cfg.model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user',   content: userContent }
-      ],
-      max_tokens: 8000,
-      temperature: 0.3
-    };
-
-    const res = UrlFetchApp.fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'post',
-      headers: {
-        'Authorization':  'Bearer ' + cfg.openrouterKey,
-        'Content-Type':   'application/json',
-        'HTTP-Referer':   'https://script.google.com',
-        'X-Title':        'Teacher Dashboard'
-      },
-      payload:           JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-
-    const code = res.getResponseCode();
-    if (code !== 200) {
-      const errBody = JSON.parse(res.getContentText());
-      const errMsg  = (errBody.error && errBody.error.message) ? errBody.error.message : res.getContentText();
-      return { success: false, message: 'API 오류 (' + code + '): ' + errMsg };
-    }
-
-    const body    = JSON.parse(res.getContentText());
-    let   content = body.choices[0].message.content.trim();
-
-    // 마크다운 코드블록 제거 후 느슨한 JSON 파싱 (앞뒤 설명 텍스트 대응)
-    content = content.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/,'').trim();
-
-    const parsed = _parseAiJsonLoose_(content);
-    if (!parsed) return { success: false, message: 'JSON 파싱 실패: ' + content.substring(0, 150) };
-    return { success: true, result: parsed, model: cfg.model };
-
-  } catch(e) {
-    return { success: false, message: '분석 오류: ' + e.toString() };
-  }
-}
 function getOrCreateRubricSheet() {
   const ss = _taskSs();
   let sh = ss.getSheetByName('AI채점기준');
@@ -1251,8 +1262,26 @@ function saveRubric(data) {
       }
       sh.appendRow(row);
     }
+    _syncTaskScale(data.taskName, data.evalType, data.maxScore); // 과제설정 단일출처 동기화
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 채점기준 저장 시 과제설정의 채점유형(5열)·만점(9열)을 함께 맞춤 (SSOT 유지)
+function _syncTaskScale(taskName, evalType, maxScore) {
+  try {
+    if (!taskName) return;
+    var ts = _taskSs().getSheetByName('과제설정');
+    var d = ts.getDataRange().getValues();
+    for (var i = 1; i < d.length; i++) {
+      if (String(d[i][1]).trim() === String(taskName).trim()) {
+        if (evalType) ts.getRange(i + 1, 5).setValue(evalType);
+        if (maxScore && Number(maxScore) > 0) ts.getRange(i + 1, 9).setValue(Number(maxScore));
+        clearCache();
+        return;
+      }
+    }
+  } catch(_) {}
 }
 function saveAiGradeTempResult(rowIdx, aiResultJson) {
   try {
@@ -1360,6 +1389,22 @@ function aiGradeSubmission(params) {
     if (!rubricRes.success) return { success: false, message: '채점기준 조회 실패' };
     const rubric = rubricRes.rubrics.find(r => r.taskName === params.taskName || r.rowIdx === params.rubricRowIdx);
     if (!rubric) return { success: false, message: '해당 과제의 채점기준이 없습니다.' };
+
+    // 단일 출처: 과제설정의 채점유형(col5)·만점(col9)이 있으면 우선 사용 (없으면 AI채점기준 폴백)
+    try {
+      var _ts = _taskSs().getSheetByName('과제설정');
+      if (_ts && _ts.getLastRow() >= 2) {
+        var _td = _ts.getRange(2, 1, _ts.getLastRow() - 1, 9).getValues();
+        for (var _i = 0; _i < _td.length; _i++) {
+          if (String(_td[_i][1] || '').trim() === rubric.taskName) {
+            var _et = String(_td[_i][4] || '').trim(), _mx = Number(_td[_i][8] || 0);
+            if (_et) rubric.evalType = _et;
+            if (_mx) rubric.maxScore = _mx;
+            break;
+          }
+        }
+      }
+    } catch(_) {}
 
     // 메시지 구성
     const today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');

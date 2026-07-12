@@ -3211,3 +3211,12 @@ function approveResubmitRequest(rowIdx) {
 // ✅ 시스템설정 시트 마이그레이션 (GAS 에디터에서 1회 직접 실행)
 // 기존 셀 주소 기반 → 행 기반 키-값 구조로 변환
 // =====================================================
+
+
+// 이 대시보드의 모든 자동 트리거 제거 (분리 후 잔여 알림 차단용) — 편집기에서 1회 실행
+function removeAllTriggers() {
+  var ts = ScriptApp.getProjectTriggers();
+  ts.forEach(function(t) { ScriptApp.deleteTrigger(t); });
+  Logger.log("✅ 트리거 " + ts.length + "개 전부 삭제");
+  return ts.length;
+}

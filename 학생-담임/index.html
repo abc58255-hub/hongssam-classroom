@@ -364,8 +364,11 @@
         var opts = (d.candidates||[]).map(function(c){ return '<option value="' + c.id + '">' + c.name + '</option>'; }).join('');
         var pickLabel = d.mode==='random' ? '🎲 랜덤으로 뽑힌 친구' : '칭찬할 친구 선택';
         if (d.mode === 'random') {
+          var resetMsg = d.allPraised ? '<div style="font-size:12px;color:#16a34a;font-weight:700;margin-bottom:8px;">🎉 친구들을 모두 한 번씩 칭찬했어요! 처음부터 다시 시작해요.</div>' : '';
           targetHtml = '<div style="text-align:center;margin-bottom:12px;">'
+            + resetMsg
             + '<button onclick="rollRandom()" style="background:#7c3aed;color:white;border:none;padding:12px 22px;border-radius:12px;font-weight:800;font-size:15px;cursor:pointer;">🎲 랜덤 친구 뽑기</button>'
+            + '<div style="font-size:11px;color:#94a3b8;margin-top:6px;">아직 칭찬 안 한 친구 중에서 뽑혀요</div>'
             + '<div id="randomResult" style="margin-top:12px;"></div>'
             + '<input type="hidden" id="praiseTargetId" value=""></div>';
           window._randomCandidates = d.candidates || [];
@@ -389,7 +392,8 @@
     html += '<div style="margin-top:18px;"><div style="font-weight:800;font-size:15px;color:#0f172a;margin-bottom:8px;">💌 내가 받은 칭찬 (' + (d.received||[]).length + ')</div>';
     if ((d.received||[]).length === 0) html += '<div style="color:#94a3b8;font-size:13px;padding:8px;">아직 받은 칭찬이 없어요.</div>';
     else html += d.received.map(function(r){
-      return '<div style="background:#fdf4ff;border:1px solid #f0abfc;border-radius:12px;padding:12px;margin-bottom:6px;"><div style="font-size:14px;color:#1e293b;">' + escHtml(r.content) + '</div><div style="font-size:11px;color:#a855f7;margin-top:4px;">— ' + (r.anon?'익명':r.fromName) + ' · ' + r.time + '</div></div>';
+      var heartBtn = '<button onclick="toggleHeart(' + r.rowIdx + ', this)" data-hearted="' + (r.hearted?'1':'0') + '" style="background:' + (r.hearted?'#fce7f3':'#f8fafc') + ';border:1px solid ' + (r.hearted?'#f9a8d4':'#e2e8f0') + ';border-radius:20px;padding:5px 12px;font-size:14px;cursor:pointer;white-space:nowrap;">' + (r.hearted?'❤️':'🤍') + '</button>';
+      return '<div style="background:#fdf4ff;border:1px solid #f0abfc;border-radius:12px;padding:12px;margin-bottom:6px;display:flex;align-items:center;gap:10px;"><div style="flex:1;"><div style="font-size:14px;color:#1e293b;">' + escHtml(r.content) + '</div><div style="font-size:11px;color:#a855f7;margin-top:4px;">— ' + (r.anon?'익명':r.fromName) + ' · ' + r.time + '</div></div>' + heartBtn + '</div>';
     }).join('');
     html += '</div>';
 
@@ -414,6 +418,20 @@
   }
 
   function escHtml(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function toggleHeart(rowIdx, btn) {
+    btn.disabled = true;
+    google.script.run.withSuccessHandler(function(res){
+      btn.disabled = false;
+      if (res && res.success) {
+        btn.setAttribute('data-hearted', res.hearted ? '1' : '0');
+        btn.innerHTML = res.hearted ? '❤️' : '🤍';
+        btn.style.background = res.hearted ? '#fce7f3' : '#f8fafc';
+        btn.style.borderColor = res.hearted ? '#f9a8d4' : '#e2e8f0';
+      } else if (res && res.message) { alert(res.message); }
+    }).withFailureHandler(function(e){ btn.disabled = false; alert('오류: ' + e.message); })
+      .togglePraiseHeart(rowIdx, currentUser.id);
+  }
 
   function rollRandom() {
     var cands = window._randomCandidates || [];

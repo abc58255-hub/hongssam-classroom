@@ -46,6 +46,7 @@ function _registerAppUrl_(key) {
 function doGet() {
   if (!SHEET_ID) return _setupPage_();
   _registerAppUrl_('바로가기_칭찬');
+  try { StudentAuth.registerAppUrl('칭찬', ScriptApp.getService().getUrl()); } catch(_) {}
   return HtmlService.createHtmlOutputFromFile('index')
     .setTitle('교실 칭찬 관리')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
@@ -212,7 +213,7 @@ function getEventResults(eventId) {
   try {
     var sh = _recSheet();
     if (sh.getLastRow() < 2) return { success: true, records: [] };
-    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 9).getValues();
+    var rows = sh.getRange(2, 1, sh.getLastRow()-1, 10).getValues(); // 10열=하트
     var records = [];
     rows.forEach(function(r, i) {
       if (String(r[1]) !== String(eventId)) return;
@@ -222,7 +223,8 @@ function getEventResults(eventId) {
         fromId: String(r[2]), fromName: String(r[3]),
         toId: String(r[4]), toName: String(r[5]),
         content: String(r[6]), anon: String(r[7]).toUpperCase() === 'Y',
-        hidden: String(r[8]).toUpperCase() === 'Y'
+        hidden: String(r[8]).toUpperCase() === 'Y',
+        hearted: String(r[9]).toUpperCase() === 'Y'
       });
     });
     records.reverse();
@@ -249,13 +251,17 @@ function getEventStats(eventId) {
     if (ev) roster = getRoster(ev.cls).roster;
     var nameOf = {}; roster.forEach(function(s){ nameOf[s.id] = s.name; });
 
-    var givenCount = {}, recvCount = {};
+    var givenCount = {}, recvCount = {}, heartGivenCount = {}, heartRecvCount = {};
     var gaveSet = {}; // 숨김 포함, 한 번이라도 보낸 학생(실시자)
     recs.forEach(function(r) {
       if (r.fromId) gaveSet[r.fromId] = true;
       if (r.hidden) return;
       givenCount[r.fromId] = (givenCount[r.fromId] || 0) + 1;
       recvCount[r.toId]   = (recvCount[r.toId]   || 0) + 1;
+      if (r.hearted) {
+        heartGivenCount[r.toId]  = (heartGivenCount[r.toId]  || 0) + 1; // 하트 누른 사람(받은 학생) = 선물한 하트
+        heartRecvCount[r.fromId] = (heartRecvCount[r.fromId] || 0) + 1; // 하트 달린 칭찬의 작성자 = 받은 하트
+      }
     });
     function toRank(countMap) {
       return Object.keys(countMap).map(function(id){
@@ -274,8 +280,12 @@ function getEventStats(eventId) {
     return {
       success: true,
       total: recs.filter(function(r){ return !r.hidden; }).length,
-      topGivers: toRank(givenCount).slice(0, 10),
-      topReceivers: toRank(recvCount).slice(0, 10),
+      topGivers: toRank(givenCount),
+      topReceivers: toRank(recvCount),
+      topHeartsGiven: toRank(heartGivenCount),
+      topHeartsRecv: toRank(heartRecvCount),
+      topHearts: toRank(heartGivenCount), // 하위호환
+      heartTotal: Object.keys(heartGivenCount).reduce(function(s,k){ return s + heartGivenCount[k]; }, 0),
       noReceive: noReceive,
       notGiven: notGiven,
       doneCount: partIds.length - notGiven.length,

@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<title>관찰·신고 관리</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; background: #f1f5f9; color: #0f172a; }
+  .hidden { display: none !important; }
+
+  #login { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #10b981, #059669); }
+  .login-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); width: 340px; text-align: center; }
+  .login-card h1 { font-size: 22px; margin-bottom: 6px; }
+  .login-card p { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+  .login-card input { width: 100%; padding: 13px 15px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; margin-bottom: 14px; }
+  .login-card input:focus { outline: none; border-color: #10b981; }
+
+  .btn { background: #10b981; color: white; border: none; padding: 13px 20px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; transition: 0.2s; }
+  .btn:hover { background: #059669; }
+  .btn.sm { width: auto; padding: 8px 14px; font-size: 13px; }
+  .btn.gray { background: #64748b; } .btn.gray:hover { background: #475569; }
+  .btn.red { background: #ef4444; } .btn.red:hover { background: #dc2626; }
+  .btn.blue { background: #0284c7; } .btn.blue:hover { background: #0369a1; }
+
+  header { background: white; padding: 16px 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 18px; }
+  header .spacer { flex: 1; }
+  .tabs { display: flex; gap: 8px; padding: 16px 24px 0; }
+  .tab { padding: 10px 18px; border-radius: 12px 12px 0 0; background: #e2e8f0; color: #64748b; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .tab.active { background: white; color: #10b981; }
+  .tab .badge { background: #ef4444; color: white; font-size: 11px; font-weight: 900; padding: 1px 7px; border-radius: 10px; margin-left: 6px; }
+  main { padding: 0 24px 40px; }
+  .panel { background: white; border-radius: 0 12px 12px 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  label { display: block; font-size: 13px; font-weight: 700; color: #475569; margin: 12px 0 5px; }
+  input[type=text], input[type=date], textarea, select { width: 100%; padding: 11px 13px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: #10b981; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  th { background: #f8fafc; font-size: 12px; color: #64748b; }
+  tr:hover td { background: #f8fafc; }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .tag.hr { background: #ccfbf1; color: #0f766e; }
+  .tag.math { background: #dbeafe; color: #1d4ed8; }
+  .tag.done { background: #dcfce7; color: #16a34a; }
+  .tag.todo { background: #fee2e2; color: #dc2626; }
+  .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 14px; }
+  .muted { color: #64748b; font-size: 13px; }
+  .filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-bar select { width: auto; min-width: 150px; }
+  .roster-box { border: 2px solid #e2e8f0; border-radius: 10px; padding: 10px; max-height: 200px; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; }
+  .roster-box label { display: flex; align-items: center; gap: 6px; margin: 0; font-weight: 500; font-size: 13px; cursor: pointer; }
+  .roster-box input { width: auto; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 12px 22px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 100; opacity: 0; transition: 0.3s; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-card">
+    <h1>📓 관찰·신고 관리</h1>
+    <p>교사 비밀번호로 로그인하세요</p>
+    <input type="password" id="pw" placeholder="교사 비밀번호" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" onclick="doLogin()">로그인</button>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>📓 관찰·신고 관리</h1>
+    <div class="spacer"></div>
+    <button class="btn sm gray" onclick="doLogout()">로그아웃</button>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="observe" onclick="switchTab('observe')">📝 관찰기록</div>
+    <div class="tab" data-tab="report" onclick="switchTab('report')">🚨 신고접수함<span class="badge hidden" id="reportBadge">0</span></div>
+  </div>
+
+  <main>
+    <!-- 관찰기록 -->
+    <div class="panel" id="tab-observe">
+      <h2 id="obsFormTitle" style="font-size:16px;">새 관찰 기록</h2>
+      <p class="muted">여러 학생을 선택해 같은 내용을 한 번에 기록할 수 있어요.</p>
+      <div class="row">
+        <div style="flex:1; min-width:150px;">
+          <label>날짜</label>
+          <input type="date" id="o-date">
+        </div>
+        <div style="flex:1; min-width:150px;">
+          <label>구분</label>
+          <select id="o-type"><option>담임학급</option><option>수학수업</option></select>
+        </div>
+        <div style="flex:1; min-width:150px;">
+          <label>카테고리</label>
+          <input type="text" id="o-category" placeholder="예: 생활태도, 학습">
+        </div>
+      </div>
+      <label>관찰 대상 학생 <span class="muted" id="rosterHint"></span></label>
+      <div class="roster-box" id="rosterBox"><span class="muted">명부 불러오는 중...</span></div>
+      <label>내용</label>
+      <textarea id="o-content" placeholder="관찰 내용"></textarea>
+      <input type="hidden" id="o-rowIdx" value="">
+      <div style="margin-top:16px; display:flex; gap:10px;">
+        <button class="btn sm" onclick="saveObs()">저장</button>
+        <button class="btn sm gray hidden" id="obsCancel" onclick="resetObsForm()">취소</button>
+      </div>
+
+      <hr style="margin:24px 0; border:none; border-top:1px solid #e2e8f0;">
+
+      <div class="filter-bar">
+        <span class="muted">구분 필터:</span>
+        <select id="obsFilter" onchange="renderObs()"><option value="">전체</option><option>담임학급</option><option>수학수업</option></select>
+        <button class="btn sm gray" onclick="loadObs()">새로고침</button>
+      </div>
+      <div id="obsTable"></div>
+    </div>
+
+    <!-- 신고접수함 -->
+    <div class="panel hidden" id="tab-report">
+      <div class="filter-bar">
+        <span class="muted">상태 필터:</span>
+        <select id="repFilter" onchange="renderReports()"><option value="">전체</option><option>미처리</option><option>처리완료</option></select>
+        <button class="btn sm gray" onclick="loadReports()">새로고침</button>
+      </div>
+      <div id="repTable"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var TOKEN = localStorage.getItem('obs_token') || '';
+  var ROSTER = [];
+  var OBS = [];
+  var REPORTS = [];
+
+  // ── 인증 ──
+  function doLogin() {
+    var pw = document.getElementById('pw').value;
+    if (!pw) return;
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success && res.token) {
+        TOKEN = res.token; localStorage.setItem('obs_token', TOKEN); showApp();
+      } else { toast(res && res.message ? res.message : '비밀번호가 틀렸습니다'); }
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).teacherLogin(pw);
+  }
+  function doLogout() {
+    google.script.run.teacherLogout(TOKEN);
+    localStorage.removeItem('obs_token'); TOKEN = '';
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('login').classList.remove('hidden');
+  }
+  function checkSession() {
+    if (!TOKEN) return;
+    google.script.run.withSuccessHandler(function(res){ if (res && res.success) showApp(); }).validateTeacherSession(TOKEN);
+  }
+  function showApp() {
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    var d = new Date(); document.getElementById('o-date').value = d.toISOString().slice(0,10);
+    loadRoster(); loadObs(); loadReports();
+  }
+
+  // ── 탭 ──
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
+    document.getElementById('tab-observe').classList.toggle('hidden', name !== 'observe');
+    document.getElementById('tab-report').classList.toggle('hidden', name !== 'report');
+  }
+
+  // ── 명부 ──
+  function loadRoster() {
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) return;
+      var rows = res.roster || [];
+      ROSTER = [];
+      for (var i = 1; i < rows.length; i++) {
+        var sid = String(rows[i][1] || '').trim();
+        if (!sid) continue;
+        ROSTER.push({ id: sid, name: String(rows[i][2] || '').trim() });
+      }
+      ROSTER.sort(function(a,b){ return a.id.localeCompare(b.id); });
+      renderRoster();
+    }).getRoster();
+  }
+  function renderRoster() {
+    var box = document.getElementById('rosterBox');
+    if (!ROSTER.length) { box.innerHTML = '<span class="muted">명부가 비어 있습니다.</span>'; return; }
+    box.innerHTML = ROSTER.map(function(s) {
+      return '<label><input type="checkbox" class="stu-chk" value="'+esc(s.id)+'" data-name="'+esc(s.name)+'">'+esc(s.id)+' '+esc(s.name)+'</label>';
+    }).join('');
+    document.getElementById('rosterHint').textContent = '(' + ROSTER.length + '명)';
+  }
+  function selectedStudents() {
+    var out = [];
+    document.querySelectorAll('.stu-chk:checked').forEach(function(c){ out.push({ id: c.value, name: c.getAttribute('data-name') }); });
+    return out;
+  }
+
+  // ── 관찰 기록 ──
+  function loadObs() {
+    google.script.run.withSuccessHandler(function(res) {
+      OBS = (res && res.success) ? res.records : [];
+      renderObs();
+    }).getObserveRecords();
+  }
+  function renderObs() {
+    var filter = document.getElementById('obsFilter').value;
+    var rows = OBS.filter(function(r){ return !filter || r.type === filter; });
+    if (!rows.length) { document.getElementById('obsTable').innerHTML = '<p class="empty">관찰 기록이 없습니다.</p>'; return; }
+    var html = '<table><thead><tr><th>날짜</th><th>구분</th><th>학생</th><th>카테고리</th><th>내용</th><th></th></tr></thead><tbody>';
+    html += rows.map(function(r) {
+      var tag = r.type === '수학수업' ? '<span class="tag math">수학</span>' : '<span class="tag hr">담임</span>';
+      return '<tr><td>'+esc(r.date)+'</td><td>'+tag+'</td><td>'+esc(r.studentId)+' '+esc(r.studentName)+'</td>' +
+        '<td>'+esc(r.category)+'</td><td>'+esc(r.content)+'</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn sm gray" onclick=\'editObs('+JSON.stringify(r).replace(/\'/g,"&#39;")+')\'>수정</button> ' +
+          '<button class="btn sm red" onclick="delObs('+r.rowIdx+')">삭제</button>' +
+        '</td></tr>';
+    }).join('');
+    document.getElementById('obsTable').innerHTML = html + '</tbody></table>';
+  }
+  function saveObs() {
+    var date = document.getElementById('o-date').value;
+    var type = document.getElementById('o-type').value;
+    var category = document.getElementById('o-category').value.trim();
+    var content = document.getElementById('o-content').value.trim();
+    var rowIdx = document.getElementById('o-rowIdx').value;
+    if (!content) { toast('내용을 입력하세요'); return; }
+
+    if (rowIdx) {
+      // 수정 모드 — 단일
+      var rec = OBS.filter(function(r){ return r.rowIdx == rowIdx; })[0] || {};
+      var data = { rowIdx: Number(rowIdx), date: date, studentId: rec.studentId, studentName: rec.studentName, category: category, content: content, type: type };
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) { toast('수정됨'); resetObsForm(); loadObs(); } else toast('저장 실패');
+      }).saveObserveRecord(data);
+      return;
+    }
+    var students = selectedStudents();
+    if (!students.length) { toast('관찰 대상 학생을 선택하세요'); return; }
+    var arr = students.map(function(s) {
+      return { date: date, studentId: s.id, studentName: s.name, category: category, content: content, type: type };
+    });
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { toast(students.length + '명 저장됨'); resetObsForm(); loadObs(); } else toast('저장 실패');
+    }).saveMultipleObserveRecords(arr);
+  }
+  function editObs(r) {
+    document.getElementById('o-rowIdx').value = r.rowIdx;
+    document.getElementById('o-date').value = r.date || '';
+    document.getElementById('o-type').value = r.type || '담임학급';
+    document.getElementById('o-category').value = r.category || '';
+    document.getElementById('o-content').value = r.content || '';
+    document.getElementById('obsFormTitle').textContent = '관찰 기록 수정 (' + r.studentId + ' ' + r.studentName + ')';
+    document.getElementById('obsCancel').classList.remove('hidden');
+    document.getElementById('rosterBox').style.opacity = '0.4';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function resetObsForm() {
+    document.getElementById('o-rowIdx').value = '';
+    document.getElementById('o-category').value = '';
+    document.getElementById('o-content').value = '';
+    document.getElementById('obsFormTitle').textContent = '새 관찰 기록';
+    document.getElementById('obsCancel').classList.add('hidden');
+    document.getElementById('rosterBox').style.opacity = '1';
+    document.querySelectorAll('.stu-chk:checked').forEach(function(c){ c.checked = false; });
+  }
+  function delObs(rowIdx) {
+    if (!confirm('이 관찰 기록을 삭제할까요?')) return;
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { toast('삭제됨'); loadObs(); } else toast('삭제 실패');
+    }).deleteObserveRecord(rowIdx);
+  }
+
+  // ── 신고접수함 ──
+  function loadReports() {
+    google.script.run.withSuccessHandler(function(res) {
+      REPORTS = (res && res.success) ? res.reports : [];
+      var todo = REPORTS.filter(function(r){ return r.status !== '처리완료'; }).length;
+      var b = document.getElementById('reportBadge');
+      b.textContent = todo; b.classList.toggle('hidden', todo === 0);
+      renderReports();
+    }).getReportInbox();
+  }
+  function renderReports() {
+    var filter = document.getElementById('repFilter').value;
+    var rows = REPORTS.filter(function(r){ return !filter || r.status === filter; });
+    if (!rows.length) { document.getElementById('repTable').innerHTML = '<p class="empty">신고 내역이 없습니다.</p>'; return; }
+    var html = '<table><thead><tr><th>접수일시</th><th>학생</th><th>유형</th><th>내용</th><th>상태</th><th></th></tr></thead><tbody>';
+    html += rows.map(function(r) {
+      var done = r.status === '처리완료';
+      var stag = done ? '<span class="tag done">처리완료</span>' : '<span class="tag todo">미처리</span>';
+      var btn = done ? '' : '<button class="btn sm blue" onclick="markDone('+r.rowIdx+')">처리완료</button>';
+      return '<tr><td>'+esc(r.date)+'</td><td>'+esc(r.studentId)+' '+esc(r.studentName)+'</td>' +
+        '<td>'+esc(r.category)+'</td><td>'+esc(r.content)+'</td><td>'+stag+'</td><td>'+btn+'</td></tr>';
+    }).join('');
+    document.getElementById('repTable').innerHTML = html + '</tbody></table>';
+  }
+  function markDone(rowIdx) {
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { toast('처리완료'); loadReports(); } else toast('처리 실패');
+    }).markReportDone(rowIdx);
+  }
+
+  // ── 유틸 ──
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  checkSession();
+</script>
+</body>
+</html>

@@ -36,11 +36,41 @@ function _ensureTaskSheets(ss) {
       .setFontWeight('bold').setBackground(color).setFontColor('white');
     sh.setFrozenRows(1);
   }
-  mk('과제설정', ['날짜','과제명','설명','마감일','채점유형','공개여부','사진수','선택지'], '#1e3a8a');
-  mk('제출현황', ['날짜','학번','이름','과제명','난이도','메모','파일URL','피드백','해시','읽음여부','상태','첨삭URL','점수','공개여부','메모2','답글','우수작유형','익명여부','우수작멘트','우수작키','부정행위','문항별JSON','AI채점JSON','상태변경일시'], '#1e3a8a');
+  mk('과제설정', ['날짜','과제명','설명','마감일','채점유형','공개여부','사진수','선택지','만점','반려기한일','피드백기한일'], '#1e3a8a');
+  mk('제출현황', ['날짜','학번','이름','과제명','난이도','메모','파일URL','피드백','해시','읽음여부','상태','첨삭URL','점수','공개여부','메모2','답글','우수작유형','익명여부','우수작멘트','우수작키','부정행위','문항별JSON','AI채점JSON','상태변경일시','재제출개별마감','되돌림유형','되돌림횟수'], '#1e3a8a');
   mk('AI채점기준', ['과제명','채점유형','만점','기준','파일JSON','문항JSON'], '#1e3a8a');
   var def = ss.getSheetByName('시트1') || ss.getSheetByName('Sheet1');
   if (def && ss.getSheets().length > 1) { try { ss.deleteSheet(def); } catch(_) {} }
+}
+
+// ── [1회 실행] 피드백/재제출 루프용 컬럼 추가 (기존 시트에 헤더·기본값 보강) ──
+// 과제설정: J=반려기한일, K=피드백기한일 (비어있으면 7일 기본) / 제출현황: Y·Z·AA 헤더
+function setupFeedbackLoop() {
+  var ss = _taskSs();
+  var ts = ss.getSheetByName('과제설정');
+  if (ts) {
+    ts.getRange(1, 10).setValue('반려기한일');
+    ts.getRange(1, 11).setValue('피드백기한일');
+    var last = ts.getLastRow();
+    if (last > 1) {
+      var rng = ts.getRange(2, 10, last - 1, 2);
+      var vals = rng.getValues();
+      var changed = false;
+      for (var i = 0; i < vals.length; i++) {
+        if (vals[i][0] === '' || vals[i][0] === null) { vals[i][0] = 7; changed = true; }
+        if (vals[i][1] === '' || vals[i][1] === null) { vals[i][1] = 7; changed = true; }
+      }
+      if (changed) rng.setValues(vals);
+    }
+  }
+  var sub = ss.getSheetByName('제출현황');
+  if (sub) {
+    sub.getRange(1, 25).setValue('재제출개별마감');
+    sub.getRange(1, 26).setValue('되돌림유형');
+    sub.getRange(1, 27).setValue('되돌림횟수');
+  }
+  clearCache();
+  return { success: true, message: '피드백 루프 컬럼 설정 완료 (기본 기한 7일)' };
 }
 
 // 과제 데이터용 드라이브 폴더 (제출 파일·첨삭 이미지) — 폴더ID는 ClassCore 공통 설정 사용
@@ -73,6 +103,27 @@ function teacherLogin(pw)        { return ClassCore.teacherLogin(pw); }
 function verifyTeacher(token)    { return ClassCore.verifyTeacher(token); }
 function teacherLogout(token)    { return ClassCore.teacherLogout(token); }
 function validateTeacherSession(token) { return ClassCore.verifyTeacher(token); }
+
+// ── 학생 비밀번호 초기화 (ClassCore 위임) — 빈 비번으로 리셋 → 학생이 다음 로그인 때 재설정 ──
+function resetStudentPassword(studentId) {
+  try { return ClassCore.resetStudentPw(studentId, ''); }
+  catch (e) { return { success: false, message: e.toString() }; }
+}
+
+// ── 앱 바로가기 URL (ClassCore 앱URL 레지스트리 위임) — 클라이언트는 '바로가기_*' 키로 호출 ──
+function getAppLinkUrl(cell) {
+  try {
+    var key = String(cell || '').replace('바로가기_', '');
+    var urls = ClassCore.getAppUrls() || {};
+    return { url: urls[key] || '' };
+  } catch (e) { return { url: '' }; }
+}
+function saveAppLinkUrl(cell, url) {
+  try {
+    ClassCore.registerAppUrl(String(cell || '').replace('바로가기_', ''), String(url || '').trim());
+    return { success: true };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
 
 // ── 초기 데이터 로드 (과제·제출·명부 — 비과제 필드는 빈 배열) ──
 function getDashboardData() {
@@ -134,40 +185,3 @@ function _sendAndPrune_(sheet, rowIdx, title, body, clickUrl, tag) {
   } catch(_) { return false; }
 }
 
-// 최초 1회: 과제 시트 생성 확인 (편집기에서 실행)
-function setup() {
-  var ss = _taskSs();
-  Logger.log('✅ 과제 시트 준비 완료: ' + ss.getUrl());
-  return ss.getUrl();
-}
-
-// ── 데이터 이전 (기존 홍쌤 공유시트 → 과제 시트, 1회 실행) ──
-// 과제설정·제출현황·AI채점기준을 그대로 복사. 과제 시트의 기존 데이터는 덮어쓴다.
-function importFromBoard() {
-  try {
-    var it = DriveApp.getFilesByName('홍쌤교실시스템_SHEET_ID');
-    if (!it.hasNext()) return { success: false, message: '홍쌤 연결 파일(마커)을 찾을 수 없습니다. importFromSheet("시트ID")로 직접 지정하세요.' };
-    return importFromSheet(String(it.next().getBlob().getDataAsString() || '').trim());
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
-
-function importFromSheet(srcId) {
-  try {
-    var src = SpreadsheetApp.openById(srcId);
-    var dst = _taskSs();
-    var names = ['과제설정', '제출현황', 'AI채점기준'];
-    var report = [];
-    names.forEach(function(name) {
-      var s = src.getSheetByName(name);
-      var d = dst.getSheetByName(name);
-      if (!s || s.getLastRow() < 2 || !d) { report.push(name + ': 0행(원본 없음/비어있음)'); return; }
-      var cols = Math.min(s.getLastColumn(), d.getLastColumn()); // 대상 컬럼 초과 방지
-      var data = s.getRange(2, 1, s.getLastRow() - 1, cols).getValues();
-      if (d.getLastRow() > 1) d.getRange(2, 1, d.getLastRow() - 1, d.getLastColumn()).clearContent();
-      d.getRange(2, 1, data.length, cols).setValues(data);
-      report.push(name + ': ' + data.length + '행');
-    });
-    Logger.log('✅ 이전 완료 — ' + report.join(' / ') + '  (원본: ' + src.getName() + ')');
-    return { success: true, report: report.join(' / ') };
-  } catch(e) { return { success: false, message: e.toString() }; }
-}
