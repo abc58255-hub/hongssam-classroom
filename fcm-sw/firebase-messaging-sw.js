@@ -10,19 +10,9 @@ const messaging = firebase.messaging();
 self.addEventListener('install', function() { self.skipWaiting(); });
 self.addEventListener('activate', function(e) { e.waitUntil(self.clients.claim()); });
 
-// 알림 표시: 서버가 data-only로 보내므로 표시는 여기서 딱 1번
-// (notification 필드를 함께 보내면 브라우저 자동표시와 겹쳐 2번 뜸 — iOS는 tag 병합이 안 됨)
-messaging.onBackgroundMessage(function(payload) {
-  const d = payload.data || {};
-  const base = self.location.origin + self.location.pathname.replace('firebase-messaging-sw.js', '');
-  return self.registration.showNotification(d.title || '홍쌤 교실', {
-    body: d.body || '',
-    icon: d.icon || (base + 'icon-192.png'),
-    tag: d.tag || 'hongssam',
-    renotify: false,
-    data: d
-  });
-});
+// 알림 표시는 FCM SDK가 notification 페이로드로 자동 1회 수행 — 여기서 또 표시하면 2번 뜸.
+// (data-only + 수동 표시 방식은 iOS가 서비스워커를 늦게 깨우면 빈 알림이 떠서 폐기)
+// 클릭 동작도 SDK가 fcm_options.link로 처리하고, 아래 핸들러는 구형 알림용 폴백.
 
 // 알림 클릭 시 앱 열기
 self.addEventListener('notificationclick', function(event) {
