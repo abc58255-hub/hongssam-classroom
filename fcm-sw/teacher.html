@@ -93,6 +93,21 @@
     return Array.from(new Uint8Array(hashBuf)).map(function(b) { return b.toString(16).padStart(2, '0'); }).join('');
   }
 
+  // GAS 호출 — fetch(JSON) 우선, 안 되면 JSONP 폴백. 둘 다 실패하면 실제 원인을 표시
+  async function callGas(url) {
+    var fetchErr;
+    try {
+      var res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return await res.json();
+    } catch (e) { fetchErr = e; }
+    try {
+      return await callGasJsonp(url);
+    } catch (e2) {
+      throw new Error('fetch: ' + (fetchErr && fetchErr.message || '?') + ' / jsonp: ' + e2.message);
+    }
+  }
+
   // JSONP 방식으로 GAS 호출 (응답 읽기 가능)
   function callGasJsonp(url) {
     return new Promise(function(resolve, reject) {
@@ -153,7 +168,7 @@
         + '&token=' + encodeURIComponent(token)
         + '&pwHash=' + encodeURIComponent(pwHash)
         + '&deviceId=' + encodeURIComponent(deviceId);
-      var result = await callGasJsonp(url);
+      var result = await callGas(url);
       if (!result.success) { setStatus('❌ ' + (result.message || '저장 실패'), true); return; }
     } catch(e) { setStatus('저장 오류: ' + e.message, true); return; }
 
