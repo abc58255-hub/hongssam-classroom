@@ -82,6 +82,13 @@
   if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
   var messaging = firebase.messaging();
 
+  // 페이지를 열 때마다 서비스워커 최신화 (재등록 없이 알림 표시 로직 업데이트 반영)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./firebase-messaging-sw.js').then(function(reg) {
+      try { reg.update(); } catch(_) {}
+    }).catch(function(){});
+  }
+
   function setStatus(msg, isError) {
     var el = document.getElementById('status');
     el.textContent = msg;
