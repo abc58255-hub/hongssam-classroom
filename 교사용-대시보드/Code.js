@@ -382,164 +382,32 @@ function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
   }
 }
 
-// ② 매시간 트리거 — 지난 1시간 내 채점/반려된 학생에게 알림
+// ② 매시간 채점 알림 — ⚠️ 발송은 과제채점 앱이 단일 소유 (여기서도 보내면 학생에게 2번씩 감)
+// 예전에 이 프로젝트에 설치된 트리거가 남아 있으면 다음 실행 때 스스로 제거하고 끝낸다.
 function notifyGradedHourly() {
-  // 동시 실행 방지 (트리거 중복 설치 시 한 번만 실행되도록)
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) {
-    Logger.log('notifyGradedHourly: 이미 실행 중, 건너뜀');
-    return { skipped: true };
-  }
-  try {
-    var props = PropertiesService.getScriptProperties();
-    var lastTs = parseInt(props.getProperty('last_grade_notify_ts') || '0');
-    var now = Date.now();
-    if (!lastTs) lastTs = now - 3600 * 1000;
-
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sheet = ss.getSheetByName('제출현황');
-    var data = sheet.getDataRange().getValues();
-    var rosterSheet = _authRoster_();
-    var roster = rosterSheet.getDataRange().getValues();
-    var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
-
-    var tokenMap = {}, rowMap = {};
-    for (var r = 1; r < roster.length; r++) {
-      var rsid = String(roster[r][1] || '').trim();
-      if (rsid) { tokenMap[rsid] = _parseTokens_(roster[r][4]); rowMap[rsid] = r + 1; }
-    }
-
-    var sent = 0;
-    for (var i = 1; i < data.length; i++) {
-      var changeTs = data[i][23]; // X열
-      if (!changeTs) continue;
-      var changeTime = new Date(changeTs).getTime();
-      if (changeTime <= lastTs || changeTime > now) continue;
-
-      var status = String(data[i][10] || '').trim();
-      var sid = String(data[i][1] || '').trim();
-      var taskName = String(data[i][3] || '').split(' (')[0];
-      var tokens = tokenMap[sid] || [];
-      if (!tokens.length) continue;
-
-      var title, body;
-      if (status === '채점완료') {
-        title = '✅ 채점 완료: ' + taskName;
-        body  = '선생님의 피드백을 확인하세요';
-      } else if (status === '재제출요청') {
-        title = '🔄 재제출 요청: ' + taskName;
-        body  = '과제를 다시 제출해주세요';
-      } else {
-        continue;
-      }
-      if (_sendAndPrune_(rosterSheet, rowMap[sid], title, body, clickUrl, 'graded')) sent++;
-    }
-    props.setProperty('last_grade_notify_ts', String(now));
-    Logger.log('notifyGradedHourly: ' + sent + '건 발송');
-    if (sent > 0) _logNotify_('✅ 채점/반려 알림', '지난 1시간 채점·반려 학생', sent);
-    return { sent: sent };
-  } catch(e) {
-    Logger.log('notifyGradedHourly 오류: ' + e.message);
-    return { error: e.message };
-  } finally {
-    lock.releaseLock();
-  }
+  var removed = _removeLegacyNotifyTriggers_();
+  Logger.log('notifyGradedHourly: 발송은 과제채점 앱 담당 — 이 프로젝트의 낡은 트리거 ' + removed + '개 자체 제거');
+  return { skipped: true, removedTriggers: removed };
 }
 
-// ③ 매일 8:20 — 마감 안 된 미제출 과제 알림 (한 학생당 한 번)
+// ③ 매일 미제출 알림 — ⚠️ 발송은 과제채점 앱이 단일 소유 (여기서도 보내면 학생에게 2번씩 감)
 function notifyUnsubmittedDaily() {
-  // 동시/중복 실행 방지 (트리거 중복 설치 대비)
-  var lock = LockService.getScriptLock();
-  if (!lock.tryLock(5000)) { Logger.log('notifyUnsubmittedDaily: 이미 실행 중, 건너뜀'); return { skipped: true }; }
-  try {
-    var props0 = PropertiesService.getScriptProperties();
-    var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
-    if (props0.getProperty('last_unsub_notify_day') === today) {
-      Logger.log('notifyUnsubmittedDaily: 오늘 이미 발송됨, 건너뜀');
-      return { skipped: true };
+  var removed = _removeLegacyNotifyTriggers_();
+  Logger.log('notifyUnsubmittedDaily: 발송은 과제채점 앱 담당 — 이 프로젝트의 낡은 트리거 ' + removed + '개 자체 제거');
+  return { skipped: true, removedTriggers: removed };
+}
+
+// 이 프로젝트에 남아 있는 알림 트리거 제거 (과거 이중 설치 정리용)
+function _removeLegacyNotifyTriggers_() {
+  var removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    var fn = t.getHandlerFunction();
+    if (fn === 'notifyGradedHourly' || fn === 'notifyUnsubmittedDaily') {
+      ScriptApp.deleteTrigger(t);
+      removed++;
     }
-    var ss = SpreadsheetApp.openById(SHEET_ID);
-    var tasks = ss.getSheetByName('과제설정').getDataRange().getValues();
-    var subs  = ss.getSheetByName('제출현황').getDataRange().getValues();
-    var rosterSheet = _authRoster_();
-    var roster = rosterSheet.getDataRange().getValues();
-    var clickUrl = _getSys(ss, '바로가기_수학교실') || '';
-    var now = new Date();
-
-    var tokenMap = {}, rowMap = {};
-    for (var r = 1; r < roster.length; r++) {
-      var rsid = String(roster[r][1] || '').trim();
-      if (rsid) { tokenMap[rsid] = _parseTokens_(roster[r][4]); rowMap[rsid] = r + 1; }
-    }
-
-    // 학번 → {과제명 → true}
-    var submittedMap = {};
-    for (var s = 1; s < subs.length; s++) {
-      var ssid = String(subs[s][1] || '').trim();
-      var stask = String(subs[s][3] || '').split(' (')[0];
-      if (!ssid || !stask) continue;
-      if (!submittedMap[ssid]) submittedMap[ssid] = {};
-      submittedMap[ssid][stask] = true;
-    }
-
-    // 학생별 미제출 과제 모음
-    var studentMissing = {}; // sid → [{name, deadline}, ...]
-
-    for (var i = 1; i < tasks.length; i++) {
-      var tName = String(tasks[i][1] || '').trim();
-      if (!tName) continue;
-      var deadlines;
-      try { deadlines = JSON.parse(tasks[i][3] || '{}'); } catch(_) { continue; }
-
-      for (var r2 = 1; r2 < roster.length; r2++) {
-        var rsid2 = String(roster[r2][1] || '').trim();
-        if (!rsid2) continue;
-        var cls = rsid2.length >= 2 ? (rsid2.substring(0,1) + '학년 ' + rsid2.substring(1,2) + '반') : '';
-        var dl = deadlines[cls] || deadlines['all'];
-        if (!dl) continue;
-        var dlDate = new Date(dl);
-        if (dlDate < now) continue;
-        if ((submittedMap[rsid2] || {})[tName]) continue;
-
-        if (!studentMissing[rsid2]) studentMissing[rsid2] = [];
-        studentMissing[rsid2].push({ name: tName, deadline: dlDate });
-      }
-    }
-
-    var sent = 0, studentCount = 0;
-    Object.keys(studentMissing).forEach(function(sid) {
-      var tokens = tokenMap[sid] || [];
-      if (!tokens.length) return;
-      var missing = studentMissing[sid];
-      missing.sort(function(a, b) { return a.deadline - b.deadline; });
-      studentCount++;
-
-      var title, body;
-      if (missing.length === 1) {
-        var m = missing[0];
-        title = '📌 미제출 과제: ' + m.name;
-        body  = _dDayText_(m.deadline, now);
-      } else {
-        title = '📌 미제출 과제 ' + missing.length + '개';
-        body  = missing.slice(0, 4).map(function(m){
-          return m.name + ' (' + _dDayText_(m.deadline, now) + ')';
-        }).join(', ');
-        if (missing.length > 4) body += ' 외 ' + (missing.length - 4) + '개';
-      }
-
-      if (_sendAndPrune_(rosterSheet, rowMap[sid], title, body, clickUrl, 'unsub')) sent++;
-    });
-
-    props0.setProperty('last_unsub_notify_day', today);
-    Logger.log('notifyUnsubmittedDaily: 학생 ' + studentCount + '명, ' + sent + '건 발송');
-    if (sent > 0) _logNotify_('📌 미제출 알림', '미제출자 ' + studentCount + '명', sent);
-    return { sent: sent, students: studentCount };
-  } catch(e) {
-    Logger.log('notifyUnsubmittedDaily 오류: ' + e.message);
-    return { error: e.message };
-  } finally {
-    lock.releaseLock();
-  }
+  });
+  return removed;
 }
 
 // 트리거 설치 (GAS 에디터에서 1회 실행)
@@ -556,23 +424,11 @@ function getTriggerStatus() {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
+// ⚠️ 알림 트리거는 과제채점 앱에서만 설치·관리 — 여기서는 남은 트리거를 지우기만 한다
+// (양쪽에 설치되면 학생 알림이 2번씩 가는 사고가 있었음, 2026-07)
 function installAutoNotifyTriggers() {
-  var deleted = 0;
-  ScriptApp.getProjectTriggers().forEach(function(t) {
-    var fn = t.getHandlerFunction();
-    if (fn === 'notifyGradedHourly' || fn === 'notifyUnsubmittedDaily') {
-      ScriptApp.deleteTrigger(t);
-      deleted++;
-    }
-  });
-
-  ScriptApp.newTrigger('notifyGradedHourly')
-    .timeBased().everyHours(1).nearMinute(0).create();
-
-  ScriptApp.newTrigger('notifyUnsubmittedDaily')
-    .timeBased().atHour(8).nearMinute(20).everyDays(1).create();
-
-  return { success: true, message: '기존 ' + deleted + '개 정리 후 트리거 2개 설치 완료' };
+  var deleted = _removeLegacyNotifyTriggers_();
+  return { success: true, message: '이 프로젝트의 트리거 ' + deleted + '개 제거 완료. 알림 트리거는 과제채점 앱에서 설치하세요.' };
 }
 
 // =====================================================

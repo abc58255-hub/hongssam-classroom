@@ -4633,15 +4633,15 @@
         var counts = r.counts || {};
         var graded  = counts['notifyGradedHourly'] || 0;
         var unsub   = counts['notifyUnsubmittedDaily'] || 0;
-        var hasIssue = graded !== 1 || unsub !== 1;
+        // 알림 트리거는 과제채점 앱이 단일 소유 — 대시보드에 남아있으면 학생 알림이 2번씩 감
+        var hasIssue = graded !== 0 || unsub !== 0;
         var icon = hasIssue ? '⚠️' : '✅';
-        var html = icon + ' <b>채점 알림 트리거:</b> ' + graded + '개'
-          + ' &nbsp;|&nbsp; <b>미제출 알림 트리거:</b> ' + unsub + '개';
+        var html = icon + ' <b>대시보드에 남은 알림 트리거:</b> 채점 ' + graded + '개, 미제출 ' + unsub + '개';
         if (hasIssue) {
-          html += '<br><span style="color:#dc2626;font-size:11px;">정상은 각 1개입니다. 아래 버튼으로 정리하세요.</span>'
-            + '<br><button onclick="fixTriggers()" style="margin-top:8px;background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;">🔧 트리거 정리하기</button>';
+          html += '<br><span style="color:#dc2626;font-size:11px;">알림 발송은 과제채점 앱이 담당해요. 여기 남은 트리거는 알림이 2번씩 가는 원인이니 지워야 합니다.</span>'
+            + '<br><button onclick="fixTriggers()" style="margin-top:8px;background:#dc2626;color:white;border:none;padding:6px 14px;border-radius:7px;font-weight:700;font-size:12px;cursor:pointer;">🔧 남은 트리거 제거하기</button>';
         } else {
-          html += '<br><span style="color:#10b981;font-size:11px;">정상입니다.</span>';
+          html += '<br><span style="color:#10b981;font-size:11px;">정상입니다. (알림 트리거는 과제채점 앱에서 관리)</span>';
         }
         res.innerHTML = html;
       })
