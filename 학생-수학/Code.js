@@ -73,7 +73,32 @@ function doGet(e) {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
-function getHash(text) { 
+// ✅ GitHub Pages 프론트(PWA)용 RPC 엔드포인트
+// - 본문: text/plain JSON {fn:'함수명', args:[...]} (text/plain이라 CORS preflight 없음)
+// - GAS exec 응답에는 Access-Control-Allow-Origin:* 이 자동으로 붙어 크로스오리진 fetch 가능
+// - 화이트리스트에 있는 함수만 실행. 반환값은 {ok:true, result:...} / 오류는 {ok:false, error:...}
+var RPC_WHITELIST = [
+  'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
+  'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
+  'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
+  'logFeatureUse'
+];
+
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    var fn = globalThis[req.fn];
+    if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
+    out = { ok: true, result: fn.apply(null, req.args || []) };
+  } catch (err) {
+    out = { ok: false, error: String(err && err.message || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function getHash(text) {
   return Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, text)
     .map(e => (e < 0 ? e + 256 : e).toString(16).padStart(2, '0'))
     .join(''); 
