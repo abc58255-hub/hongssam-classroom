@@ -205,6 +205,9 @@ function notifyGradedHourly() {
       } else if (status === '재제출요청') {
         title = '🔄 재제출 요청: ' + taskName;
         body  = '과제를 다시 제출해주세요';
+      } else if (status === '피드백요청') {
+        title = '📩 피드백 도착: ' + taskName;
+        body  = '선생님 피드백을 보고 보완해서 다시 제출해주세요';
       } else {
         continue;
       }
