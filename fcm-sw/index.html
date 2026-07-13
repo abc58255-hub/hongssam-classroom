@@ -119,6 +119,21 @@
     <button class="secondary" onclick="goToMathApp()">📚 수학 과제 제출기로 이동 ▶</button>
   </div>
 
+  <!-- 수학교실 이사 안내 (옛 수학 앱에서 넘어온 경우) -->
+  <div id="mathMigration" class="hidden" style="text-align:center;">
+    <div class="icon">📦</div>
+    <h2>수학교실이 새 앱으로 이사했어요!</h2>
+    <p style="line-height:1.6;">이 페이지에서는 더 이상 등록하지 않아요.<br>새 앱은 홈 화면에 한 번만 추가하면<br><b>앱 안에서 알림까지 바로</b> 켤 수 있어요.</p>
+    <div style="background:#f3f4f6;border-radius:10px;padding:10px;font-size:11px;word-break:break-all;color:#374151;margin:10px 0;">https://abc58255-hub.github.io/hongssam-classroom/math/</div>
+    <button class="primary" onclick="copyNewMathUrl()">📋 새 주소 복사하기</button>
+    <p style="font-size:12px;color:#6b7280;line-height:1.7;text-align:left;background:#eff6ff;border-radius:10px;padding:10px 12px;">
+      1️⃣ 주소 복사 → <b>Safari</b>(아이폰)나 <b>크롬</b> 주소창에 붙여넣기<br>
+      2️⃣ 공유 버튼 → <b>홈 화면에 추가</b><br>
+      3️⃣ 새 아이콘으로 로그인 → 앱 안의 🔔 알림 설정<br>
+      4️⃣ 옛 아이콘은 삭제!
+    </p>
+  </div>
+
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
@@ -133,11 +148,27 @@
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
 
-  if (isIOS && !isStandalone) {
+  // 수학교실은 새 PWA(math/)로 이사 — 옛 수학 앱에서 넘어온 경우 등록 대신 이사 안내
+  var isFromMathApp = GAS_URL.indexOf('AKfycbyR1whn6f90') >= 0;
+
+  if (isFromMathApp) {
+    document.getElementById('mathMigration').classList.remove('hidden');
+  } else if (isIOS && !isStandalone) {
     document.getElementById('iosGuide').classList.remove('hidden');
   } else {
     document.getElementById('formSection').classList.remove('hidden');
     if (prefilledId) document.getElementById('studentId').value = prefilledId;
+  }
+
+  var NEW_MATH_PWA_URL = 'https://abc58255-hub.github.io/hongssam-classroom/math/';
+  function copyNewMathUrl() {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(NEW_MATH_PWA_URL).then(function () {
+        alert('✅ 주소가 복사됐어요!\nSafari(또는 크롬)를 직접 열고 주소창에 붙여넣어 주세요.\n※ 이 화면 안에서 열면 홈 화면에 추가할 수 없어요.');
+      }, function () { prompt('아래 주소를 길게 눌러 복사하세요', NEW_MATH_PWA_URL); });
+    } else {
+      prompt('아래 주소를 길게 눌러 복사하세요', NEW_MATH_PWA_URL);
+    }
   }
 
   if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);

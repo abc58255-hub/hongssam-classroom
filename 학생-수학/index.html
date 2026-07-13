@@ -154,7 +154,7 @@
   <div class="banner-img" style="height: 100px;"><div class="banner-overlay"><div class="banner-title" id="welcomeMsg" style="font-size: 20px;">환영합니다!</div><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div>
   <div class="card-content" style="padding-top: 15px;">
     <button class="logout-btn" onclick="clearLoginInfo()">🔒 다른 기기인가요? 로그아웃하기</button>
-    <button id="notifSetupBtn" onclick="openNotifSetup()" style="display:none;width:100%;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:9px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:10px;">🔔 알림 설정하기</button>
+    <button id="notifSetupBtn" onclick="openNotifSetup()" style="display:none;width:100%;background:#fef3c7;color:#92400e;border:1.5px solid #fcd34d;padding:9px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:10px;">📦 새 수학교실 앱으로 이사했어요 — 안내 보기</button>
     <div class="tab-container">
       <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">📝 과제 제출</button>
       <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">🔍 내 제출현황</button>
@@ -2080,24 +2080,52 @@
     }
   });
 
+  // ✅ 수학교실은 새 PWA로 이사 완료 — 옛 앱에서는 알림 등록 대신 이사 안내만 표시
+  var NEW_MATH_APP_URL = 'https://abc58255-hub.github.io/hongssam-classroom/math/';
+
   function openNotifSetup() {
-    var sid = (currentUser && currentUser.id) || '';
-    if (!FCM_REGISTER_URL) {
-      alert('⚠️ 알림 등록 URL이 설정되지 않았습니다.\n선생님께 시스템설정 시트의 FCM_REGISTER_URL 항목 확인을 요청해주세요.');
-      return;
-    }
-    // register.html은 UI 없는 iframe 전용 페이지 → 항상 루트 index.html 사용
-    var base = FCM_REGISTER_URL.replace(/\/register\.html$/, '/').replace(/\/$/, '') + '/';
-    var url = base + '?sid=' + encodeURIComponent(sid) + (FCM_MATH_APP_URL ? '&gas=' + encodeURIComponent(FCM_MATH_APP_URL) : '');
-    window.open(url, '_blank');
-    // 등록 성공 여부를 알 수 없으므로 localStorage 설정하지 않음 — 새로고침하면 버튼 다시 표시
+    showMigrationGuide();
   }
 
-  // 로그인 성공 후 FCM 초기화 (doLogin 함수의 성공 핸들러에서 호출됨)
+  function showMigrationGuide() {
+    if (document.getElementById('migrationGuide')) return;
+    var wrap = document.createElement('div');
+    wrap.id = 'migrationGuide';
+    wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px;';
+    wrap.innerHTML = '<div style="background:white;border-radius:16px;padding:22px 20px;max-width:340px;width:100%;text-align:center;">'
+      + '<div style="font-size:34px;">📦</div>'
+      + '<div style="font-weight:800;font-size:17px;margin:8px 0 6px;color:#1e3a8a;">수학교실이 새 앱으로 이사했어요!</div>'
+      + '<div style="font-size:13px;color:#4b5563;line-height:1.6;margin-bottom:12px;">새 앱은 홈 화면에 한 번만 추가하면<br><b>앱 안에서 알림까지 바로</b> 켤 수 있어요.</div>'
+      + '<div style="background:#f3f4f6;border-radius:10px;padding:10px;font-size:11px;word-break:break-all;color:#374151;margin-bottom:10px;">' + NEW_MATH_APP_URL + '</div>'
+      + '<button onclick="copyNewAppUrl()" style="width:100%;background:#1e3a8a;color:white;border:none;padding:12px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;margin-bottom:8px;">📋 새 주소 복사하기</button>'
+      + '<div style="font-size:12px;color:#6b7280;line-height:1.7;text-align:left;background:#eff6ff;border-radius:10px;padding:10px 12px;margin-bottom:10px;">'
+      + '1️⃣ 주소 복사 → <b>Safari</b>(아이폰)나 <b>크롬</b> 주소창에 붙여넣기<br>'
+      + '2️⃣ 공유 버튼 → <b>홈 화면에 추가</b><br>'
+      + '3️⃣ 새 아이콘으로 로그인 → 앱 안의 🔔 알림 설정<br>'
+      + '4️⃣ 옛 아이콘은 삭제!</div>'
+      + '<button onclick="document.getElementById(\'migrationGuide\').remove()" style="width:100%;background:none;border:none;color:#9ca3af;font-size:13px;cursor:pointer;padding:6px;">닫기</button>'
+      + '</div>';
+    document.body.appendChild(wrap);
+  }
+
+  function copyNewAppUrl() {
+    function done() { alert('✅ 주소가 복사됐어요!\nSafari(또는 크롬)를 직접 열고 주소창에 붙여넣어 주세요.\n※ 이 화면 안에서 열면 홈 화면에 추가할 수 없어요.'); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(NEW_MATH_APP_URL).then(done, function () { prompt('아래 주소를 길게 눌러 복사하세요', NEW_MATH_APP_URL); });
+    } else {
+      prompt('아래 주소를 길게 눌러 복사하세요', NEW_MATH_APP_URL);
+    }
+  }
+
+  // 로그인 성공 후 이사 안내 (doLogin 함수의 성공 핸들러에서 호출됨)
   function onLoginSuccess(studentId) {
-    // 알림 안내는 상단 '🔔 알림 설정하기' 버튼 하나로 통일 (배너 중복 제거)
     var notifBtn = document.getElementById('notifSetupBtn');
     if (notifBtn) notifBtn.style.display = 'block';
+    // 이사 안내는 기기당 1회 자동 표시 — 이후엔 상단 버튼으로 다시 볼 수 있음
+    if (!localStorage.getItem('math_migration_seen')) {
+      localStorage.setItem('math_migration_seen', '1');
+      showMigrationGuide();
+    }
   }
 
 </script>
