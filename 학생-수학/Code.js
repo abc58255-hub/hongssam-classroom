@@ -37,15 +37,15 @@ function _notifyTeacher_(kind, title, body) {
 }
 
 
-// 이 앱의 배포 URL을 ClassCore 앱 URL 레지스트리에 자동 기록 (포털 카드용)
+// 포털 카드·알림 클릭이 열 주소를 ClassCore 앱 URL 레지스트리에 자동 기록
+// ✅ 2026-07부터 새 PWA 주소를 등록 (기존: 이 앱의 exec 주소) — 포털·알림이 새 앱을 열게 됨
+var PWA_APP_URL = 'https://abc58255-hub.github.io/hongssam-classroom/math/';
 function _registerAppUrl_(key) {
   try {
     var cache = CacheService.getScriptCache();
-    var ck = 'appUrlReg_' + key;
+    var ck = 'appUrlReg_pwa_' + key; // 캐시 키 변경 → 배포 직후 1회는 반드시 새로 등록
     if (cache && cache.get(ck)) return;
-    var url = ScriptApp.getService().getUrl() || '';
-    if (!url || url.indexOf('/dev') >= 0) return;
-    StudentAuth.registerAppUrl(key.replace('바로가기_', ''), url);
+    StudentAuth.registerAppUrl(key.replace('바로가기_', ''), PWA_APP_URL);
     if (cache) cache.put(ck, '1', 21600);
   } catch (e) {}
 }
