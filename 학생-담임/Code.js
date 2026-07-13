@@ -111,6 +111,20 @@ function _changcheSs_() {
   return ss;
 }
 
+// 설문 시트 — ClassCore 공용 설정(설문시트ID)에서. 미설정 시 마스터 폴백.
+// (우리반-설문 앱이 전용 '설문 데이터' 시트에 저장하므로 반드시 같은 시트를 봐야 함)
+var _svSsCache_ = null;
+function _surveySs_() {
+  if (_svSsCache_) return _svSsCache_;
+  var id = '';
+  try { id = StudentAuth.getConfig('설문시트ID', ''); } catch(_) {}
+  var ss;
+  if (id) { try { ss = SpreadsheetApp.openById(id); } catch(_) {} }
+  if (!ss) ss = SpreadsheetApp.openById(SHEET_ID);
+  _svSsCache_ = ss;
+  return ss;
+}
+
 function getHomeroomData(studentId) {
   const ss = SpreadsheetApp.openById(SHEET_ID);
   const ccSs = _changcheSs_();
@@ -154,12 +168,12 @@ function getHomeroomData(studentId) {
     if (`${sid.substring(0,1)}학년 ${sid.substring(1,2)}반` === hrStr) roster.push({ id: sid, name: String(rosterData[i][2]).trim() });
   }
 
-  let activeSurvey = null; const svSheet = ss.getSheetByName("설문목록");
+  let activeSurvey = null; const svSheet = _surveySs_().getSheetByName("설문목록");
   if(svSheet) { let svData = svSheet.getDataRange().getValues(); for(let i=1; i<svData.length; i++) { if(svData[i][3] === "진행중") { activeSurvey = { id: svData[i][0], title: svData[i][2], questions: svData[i][4] }; break; } } }
-  
+
   let hasSubmittedSurvey = false;
   if(activeSurvey) {
-    const srSheet = ss.getSheetByName("설문응답");
+    const srSheet = _surveySs_().getSheetByName("설문응답");
     if(srSheet) {
       let srData = srSheet.getDataRange().getValues();
       for(let i=1; i<srData.length; i++) { if(srData[i][1] === activeSurvey.id && String(srData[i][2]).trim() === String(studentId).trim()) { hasSubmittedSurvey = true; break; } }
@@ -199,7 +213,7 @@ function getHomeroomData(studentId) {
 // 설문 중복 제출 방지
 function submitSurveyResponse(payload) {
   try {
-    const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName("설문응답");
+    const sheet = _surveySs_().getSheetByName("설문응답");
     const data = sheet.getDataRange().getValues();
     for(let i = 1; i < data.length; i++) {
       if(data[i][1] === payload.svId && String(data[i][2]).trim() === String(payload.stuId).trim()) {
