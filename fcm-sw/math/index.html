@@ -246,6 +246,19 @@
     .theme-dark { --bg:#0f172a; --banner-a:rgba(31,41,55,.5); --banner-b:rgba(3,7,18,.88); --accent:#4f46e5; --tab-accent:#3730a3; }
     .theme-dark .banner-img { background-image: linear-gradient(135deg,#1f2937,#0f172a); }
 
+    /* ══════════ 통일 UI 토큰 ══════════
+       색: 제목 네이비(#1e3a8a) / 값 파랑(#2563eb) / 본문 회색 계열 / 상태색만 예외(성공·경고·위험·우수작 앰버)
+       크기: 캡션 11px, 본문 13px, 제목 15px, 값 17px / 모서리: 카드 16px, 내부 10px */
+    .sec-card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 16px; margin-bottom: 12px; }
+    .sec-title { font-size: 15px; font-weight: 800; color: #1e3a8a; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+    .sec-sub { font-size: 11px; font-weight: 700; color: #94a3b8; }
+    .stat-tile { background: #f8fafc; border: 1px solid #eef2f7; border-radius: 10px; padding: 10px 12px; }
+    .stat-label { font-size: 11px; color: #64748b; font-weight: 700; margin-bottom: 3px; }
+    .stat-value { font-size: 17px; font-weight: 900; color: #2563eb; line-height: 1.2; }
+    .subtab-bar { display: flex; background: #f3f4f6; padding: 5px; border-radius: 12px; margin-bottom: 14px; gap: 4px; }
+    .subtab-btn { flex: 1; padding: 9px 0; border: none; background: transparent; border-radius: 9px; font-size: 12px; font-weight: 800; color: #6b7280; cursor: pointer; white-space: nowrap; }
+    .subtab-btn.active { background: white; color: #1e3a8a; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
+
     /* 테마 선택 모달 */
     #themeModal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,.6); z-index: 9600; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
     .theme-card { background: white; width: 100%; max-width: 380px; border-radius: 20px; padding: 22px; box-sizing: border-box; max-height: 82vh; overflow-y: auto; }
@@ -278,7 +291,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.00.00</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.01.00</span>
     </div>
   </div>
 </div>
@@ -343,14 +356,23 @@
     </div>
 
     <div id="tab2" class="tab-content">
-      <!-- 요약 테이블 (기본 화면) -->
+      <!-- 내 기록 (기본 화면): 요약 한 줄 + 서브탭 3개 -->
       <div id="taskSummaryView">
-        <div id="myGrades" style="margin-bottom:14px;"></div>
-        <div id="myDojang" style="margin-bottom:14px;"></div>
-        <div id="myAchievements" style="margin-bottom:14px;"></div>
-        <div id="myChallenges" style="margin-bottom:14px;"></div>
-        <div id="taskSummaryStat" style="margin-bottom:14px;"></div>
-        <div id="taskSummaryTable"></div>
+        <div id="taskSummaryStat"></div>
+        <div class="subtab-bar">
+          <button class="subtab-btn active" id="btnSub1" onclick="switchSubTab(1)">📋 제출현황</button>
+          <button class="subtab-btn" id="btnSub2" onclick="switchSubTab(2)">📊 성적·도장</button>
+          <button class="subtab-btn" id="btnSub3" onclick="switchSubTab(3)">🎯 도전과제</button>
+        </div>
+        <div id="subTab1"><div id="taskSummaryTable"></div></div>
+        <div id="subTab2" style="display:none;">
+          <div id="myGrades"></div>
+          <div id="myDojang"></div>
+        </div>
+        <div id="subTab3" style="display:none;">
+          <div id="myAchievements"></div>
+          <div id="myChallenges"></div>
+        </div>
       </div>
 
       <!-- 상세 보기 (확인해보기 클릭 시) -->
@@ -773,6 +795,17 @@
     }
   }
 
+  // 내 기록 탭 안의 서브탭 (제출현황 | 성적·도장 | 도전과제)
+  function switchSubTab(n) {
+    for (var i = 1; i <= 3; i++) {
+      var b = document.getElementById('btnSub' + i);
+      var p = document.getElementById('subTab' + i);
+      if (b) b.classList.toggle('active', i === n);
+      if (p) p.style.display = (i === n) ? 'block' : 'none';
+    }
+    if (n === 3) logFeat('업적확인'); // 🧭 탐험가
+  }
+
   function switchTab(t) {
     for (var i = 1; i <= 3; i++) {
       var btn = document.getElementById('btnTab' + i);
@@ -827,15 +860,15 @@
     function card(icon, label, m, valFmt, emptyText) {
       var valHtml, sub;
       if (m && m.lowParticipation) {
-        valHtml = '<span style="color:#f59e0b;font-size:14px;font-weight:800;">제출률 ' + m.rate + '%</span>';
+        valHtml = '<span style="color:#b45309;font-size:13px;font-weight:800;">제출률 ' + m.rate + '%</span>';
         sub = '<span style="font-size:10px;color:#94a3b8;">50% 이상 제출 시 순위 표시</span>';
       }
-      else if (!m) { valHtml = '<span style="color:#cbd5e1;font-size:15px;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">' + (emptyText||'기록 없음') + '</span>'; }
-      else if (m.none) { valHtml = '<span style="color:#cbd5e1;font-size:15px;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">아직 없음</span>'; }
+      else if (!m) { valHtml = '<span style="color:#cbd5e1;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">' + (emptyText||'기록 없음') + '</span>'; }
+      else if (m.none) { valHtml = '<span style="color:#cbd5e1;">-</span>'; sub = '<span style="font-size:10px;color:#cbd5e1;">아직 없음</span>'; }
       else { valHtml = valFmt(m.value); sub = rankText(m); }
-      return '<div style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;">'
-        + '<div style="font-size:11px;color:#64748b;font-weight:700;margin-bottom:3px;">' + icon + ' ' + label + '</div>'
-        + '<div style="font-size:18px;font-weight:900;color:#1e3a8a;line-height:1.1;margin-bottom:2px;">' + valHtml + '</div>'
+      return '<div class="stat-tile">'
+        + '<div class="stat-label">' + icon + ' ' + label + '</div>'
+        + '<div class="stat-value">' + valHtml + '</div>'
         + '<div>' + sub + '</div>'
         + '</div>';
     }
@@ -843,10 +876,10 @@
     // 자동 배지
     var b = myStats.badges || {};
     var chips = [];
-    if (b.complete) chips.push(['🏁','완주! 100% 제출','#dcfce7','#16a34a']);
-    if (b.streak >= 2) chips.push(['🔥','연속 제출 ' + b.streak,'#ffedd5','#c2410c']);
-    if (b.perfect > 0) chips.push(['💯','만점 ' + b.perfect + '회','#fef9c3','#a16207']);
-    if (b.bestCount > 0) chips.push(['🌟','우수작 ' + b.bestCount + '회','#e0e7ff','#4338ca']);
+    if (b.complete) chips.push(['🏁','완주! 100% 제출','#f1f5f9','#334155']);
+    if (b.streak >= 2) chips.push(['🔥','연속 제출 ' + b.streak,'#f1f5f9','#334155']);
+    if (b.perfect > 0) chips.push(['💯','만점 ' + b.perfect + '회','#f1f5f9','#334155']);
+    if (b.bestCount > 0) chips.push(['🌟','우수작 ' + b.bestCount + '회','#fef3c7','#b45309']);
     var badgeHtml = '';
     if (chips.length) {
       badgeHtml = '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;">'
@@ -856,8 +889,8 @@
       badgeHtml = '<div style="margin-top:10px;font-size:11px;color:#94a3b8;">📈 제출률 ' + b.submissionRate + '% — 꾸준히 제출하면 배지를 받아요!</div>';
     }
 
-    box.innerHTML = '<div style="background:linear-gradient(135deg,#eef2ff,#faf5ff);border:1px solid #e0e7ff;border-radius:16px;padding:14px;">'
-      + '<div style="font-size:14px;font-weight:800;color:#4338ca;margin-bottom:10px;">🏆 내 업적</div>'
+    box.innerHTML = '<div class="sec-card">'
+      + '<div class="sec-title">🏆 내 업적</div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">'
         + card('⚡', '평균 제출순위', myStats.submitRank, function(v){ return v + '등'; }, '부여 과제 없음')
         + card('🌟', '우수작', myStats.best, function(v){ return v + '개'; }, '아직 없음')
@@ -929,25 +962,22 @@
       } else {
         var next = d.tiers[tier];
         var pct = Math.min(100, Math.round(v / next * 100));
-        var barColor = tier > 0 ? TIER_STYLE[Math.min(tier, TIER_STYLE.length - 1)].bar : '#a5b4fc';
+        var barColor = tier > 0 ? TIER_STYLE[Math.min(tier, TIER_STYLE.length - 1)].bar : '#93c5fd';
         prog = '<div style="margin-top:6px;">'
           + '<div style="display:flex;justify-content:space-between;font-size:10px;color:#64748b;font-weight:700;margin-bottom:3px;"><span>' + v + ' / ' + next + d.unit + '</span><span>' + pct + '%</span></div>'
           + '<div style="height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:3px;"></div></div>'
           + '</div>';
       }
       var dim = tier === 0 ? 'opacity:.75;' : '';
-      return '<div onclick="openChallengeDetail(' + i + ')" style="background:white;border:1px solid #e5e7eb;border-radius:12px;padding:10px 12px;cursor:pointer;' + dim + '">'
+      return '<div onclick="openChallengeDetail(' + i + ')" class="stat-tile" style="cursor:pointer;' + dim + '">'
         + '<div style="display:flex;align-items:center;justify-content:space-between;gap:4px;">'
         + '<span style="font-size:12px;font-weight:800;color:#334155;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">' + d.emoji + ' ' + d.name + '</span>' + chip
         + '</div>' + prog + '</div>';
     }).join('');
-    box.innerHTML = '<div style="background:linear-gradient(135deg,#fdf4ff,#eff6ff);border:1px solid #f0e5ff;border-radius:16px;padding:14px;">'
-      + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">'
-      + '<div style="font-size:14px;font-weight:800;color:#7c3aed;">🎯 도전과제</div>'
-      + '<div style="font-size:11px;font-weight:800;color:#a78bfa;">' + achieved + ' / ' + CHALLENGE_DEFS.length + ' 달성</div>'
-      + '</div>'
+    box.innerHTML = '<div class="sec-card">'
+      + '<div class="sec-title">🎯 도전과제 <span class="sec-sub">' + achieved + ' / ' + CHALLENGE_DEFS.length + ' 달성</span></div>'
       + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">' + cards + '</div>'
-      + '<div style="font-size:10px;color:#a78bfa;margin-top:8px;text-align:center;">카드를 누르면 모든 단계를 볼 수 있어요</div>'
+      + '<div style="font-size:10px;color:#94a3b8;margin-top:8px;text-align:center;">카드를 누르면 모든 단계를 볼 수 있어요</div>'
       + '</div>';
   }
 
@@ -1079,10 +1109,14 @@
       if (item && item.status === '채점완료' && item.score && !isNaN(parseFloat(item.score))) scoredVals.push(parseFloat(item.score));
       if (item && item.isMyBest) bestCount++;
     });
-    var avgTxt = scoredVals.length > 0 ? ' · 평균 ' + Math.round(scoredVals.reduce(function(a,b){return a+b;},0)/scoredVals.length*10)/10 + '점' : '';
-    var bestTxt = bestCount > 0 ? ' · <span style="color:#f59e0b;">🌟 우수작 ' + bestCount + '개</span>' : '';
-    statDiv.innerHTML = '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:12px 16px;font-size:14px;font-weight:700;color:#1e3a8a;">'
-      + '📊 제출 ' + submitted + '/' + allTasks.length + '개' + avgTxt + bestTxt + '</div>';
+    var avgVal = scoredVals.length > 0 ? Math.round(scoredVals.reduce(function(a,b){return a+b;},0)/scoredVals.length*10)/10 : null;
+    statDiv.innerHTML = '<div class="sec-card" style="display:flex;text-align:center;padding:12px 8px;">'
+      + '<div style="flex:1;"><div class="stat-label">제출</div><div style="font-size:17px;font-weight:900;color:#1e3a8a;">' + submitted + '<span style="font-size:12px;color:#94a3b8;font-weight:700;"> / ' + allTasks.length + '</span></div></div>'
+      + '<div style="width:1px;background:#e5e7eb;"></div>'
+      + '<div style="flex:1;"><div class="stat-label">점수 평균</div><div style="font-size:17px;font-weight:900;color:#2563eb;">' + (avgVal === null ? '-' : avgVal + '점') + '</div></div>'
+      + '<div style="width:1px;background:#e5e7eb;"></div>'
+      + '<div style="flex:1;"><div class="stat-label">우수작</div><div style="font-size:17px;font-weight:900;color:#b45309;">' + (bestCount > 0 ? '🌟 ' + bestCount : '-') + '</div></div>'
+      + '</div>';
 
     // 테이블
     var rows = allTasks.map(function(t) {
@@ -1114,7 +1148,7 @@
         + '</tr>';
     }).join('');
 
-    tableDiv.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:14px;overflow:hidden;">'
+    tableDiv.innerHTML = '<div style="background:white;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">'
       + '<table style="width:100%;border-collapse:collapse;">'
         + '<thead><tr style="background:#f8fafc;">'
           + '<th style="padding:10px 8px;text-align:left;font-size:11px;color:#64748b;font-weight:700;">과제</th>'
@@ -1226,13 +1260,13 @@
         var denom = (g.max ? (' <span style="font-size:14px;color:#8b95a1;font-weight:600;">/ ' + escDj(g.max) + '</span>') : '');
         var avgLine = (g.avg !== undefined && g.avg !== null)
           ? '<div style="font-size:12px;color:#8b95a1;font-weight:600;margin-top:6px;">반평균 ' + escDj(g.avg) + '</div>' : '';
-        return '<div style="flex:1;min-width:120px;background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.04);">'
-          + '<div style="font-size:13px;color:#4e5968;font-weight:600;margin-bottom:4px;">' + escDj(g.name) + '</div>'
-          + '<div style="font-size:26px;font-weight:800;color:#2563eb;line-height:1.2;">' + escDj(g.score) + denom + '</div>' + avgLine + '</div>';
+        return '<div class="stat-tile" style="flex:1;min-width:120px;">'
+          + '<div class="stat-label">' + escDj(g.name) + '</div>'
+          + '<div style="font-size:20px;font-weight:900;color:#2563eb;line-height:1.2;">' + escDj(g.score) + denom + '</div>' + avgLine + '</div>';
       }).join('');
-      box.innerHTML = '<div style="background:#eff6ff;border-radius:20px;padding:18px;">'
-        + '<div style="font-size:16px;font-weight:800;color:#1e3a8a;margin-bottom:12px;">📋 내 성적</div>'
-        + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + cards + '</div></div>';
+      box.innerHTML = '<div class="sec-card">'
+        + '<div class="sec-title">📋 내 성적</div>'
+        + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + cards + '</div></div>';
     }).getMyGrades(currentUser.id);
   }
 
@@ -1253,14 +1287,14 @@
         var cards = cats.map(function(c, i){
           var rank = (d.showRank && c.count>0)
             ? '<div style="font-size:11px;color:#8b95a1;margin-top:3px;">전체 '+c.rankAll+'위 · 반 '+c.rankClass+'위</div>' : '';
-          return '<div onclick="openDojangCat('+i+')" style="flex:1;min-width:90px;background:#fff;border-radius:16px;padding:16px 12px;text-align:center;cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.04);">'
-            + '<div style="font-size:13px;color:#4e5968;font-weight:600;">'+c.emoji+' '+escDj(c.name)+'</div>'
-            + '<div style="font-size:28px;font-weight:800;color:#191f28;line-height:1.3;">'+(c.count||0)+'</div>'+rank
-            + '<div style="font-size:11px;color:#b0b8c1;margin-top:4px;">자세히 ›</div></div>';
+          return '<div onclick="openDojangCat('+i+')" class="stat-tile" style="flex:1;min-width:90px;text-align:center;cursor:pointer;">'
+            + '<div class="stat-label">'+c.emoji+' '+escDj(c.name)+'</div>'
+            + '<div style="font-size:20px;font-weight:900;color:#2563eb;line-height:1.3;">'+(c.count||0)+'</div>'+rank
+            + '<div style="font-size:11px;color:#94a3b8;margin-top:4px;">자세히 ›</div></div>';
         }).join('');
-        box.innerHTML = '<div style="background:#f2f4f6;border-radius:20px;padding:18px;">'
-          + '<div style="font-size:16px;font-weight:800;color:#191f28;margin-bottom:12px;">🏅 내 도장</div>'
-          + '<div style="display:flex;gap:10px;flex-wrap:wrap;">' + cards + '</div></div>';
+        box.innerHTML = '<div class="sec-card">'
+          + '<div class="sec-title">🏅 내 도장</div>'
+          + '<div style="display:flex;gap:8px;flex-wrap:wrap;">' + cards + '</div></div>';
       }).getMyDojang(currentUser.id);
   }
   function escDj(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
