@@ -189,8 +189,10 @@
     .refresh-btn { white-space: nowrap; flex-shrink: 0; }
     .tab-btn { white-space: nowrap; }
 
-    /* 장식 레이어(#themeFx)는 뒤로, 콘텐츠는 앞으로 */
-    body > div:not(#themeFx) { position: relative; z-index: 1; }
+    /* 장식 레이어(#themeFx)는 뒤로, 콘텐츠(oncontextmenu 래퍼)는 앞으로
+       주의: :not(#id) 셀렉터는 ID 특이도가 붙어 #themeModal의 position:fixed까지
+       덮어쓴다 — 반드시 래퍼만 콕 집어서 지정할 것 (팝업이 본문을 밀어내는 사고 원인) */
+    body > div[oncontextmenu] { position: relative; z-index: 1; }
     #themeFx { position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; pointer-events: none; z-index: 0; }
     #themeFx span { position: absolute; top: -10vh; will-change: transform; }
     @keyframes fxFall { from { transform: translateY(-10vh) rotate(0deg); } to { transform: translateY(115vh) rotate(360deg); } }
