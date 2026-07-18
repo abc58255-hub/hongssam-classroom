@@ -184,9 +184,14 @@
     button.primary-btn { background: var(--accent); border-radius: var(--radius-btn); }
     .tab-btn.active { color: var(--tab-accent); }
 
+    /* 줄바꿈 방지 — 배너 제목·버튼·탭이 좁은 화면에서 어색하게 꺾이지 않게 */
+    .banner-title { word-break: keep-all; }
+    .refresh-btn { white-space: nowrap; flex-shrink: 0; }
+    .tab-btn { white-space: nowrap; }
+
     /* 장식 레이어(#themeFx)는 뒤로, 콘텐츠는 앞으로 */
     body > div:not(#themeFx) { position: relative; z-index: 1; }
-    #themeFx { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+    #themeFx { position: fixed; top: 0; left: 0; right: 0; bottom: 0; overflow: hidden; pointer-events: none; z-index: 0; }
     #themeFx span { position: absolute; top: -10vh; will-change: transform; }
     @keyframes fxFall { from { transform: translateY(-10vh) rotate(0deg); } to { transform: translateY(115vh) rotate(360deg); } }
     @keyframes fxRise { from { transform: translateY(115vh); opacity: .9; } to { transform: translateY(-15vh); opacity: 0; } }
@@ -216,7 +221,7 @@
     .theme-space #themeFx span { color: #fff; text-shadow: 0 0 6px rgba(199,210,254,.9); }
     /* 📓 노트 */
     .theme-note { --banner-a:rgba(87,83,78,.55); --banner-b:rgba(41,37,36,.88); --accent:#b45309; --tab-accent:#78350f; --radius-card:12px; --radius-btn:10px; --font:'Gaegu','Pretendard',sans-serif; }
-    body.theme-note { background-color: #fffdf7; background-image: linear-gradient(#eceae4 1px, transparent 1px), linear-gradient(90deg,#eceae4 1px, transparent 1px); background-size: 24px 24px; font-size: 105%; }
+    body.theme-note { background-color: #fffdf7; background-image: linear-gradient(#eceae4 1px, transparent 1px), linear-gradient(90deg,#eceae4 1px, transparent 1px); background-size: 24px 24px; }
     .theme-note .banner-img { background-image: linear-gradient(135deg,#a8a29e,#57534e); }
     .theme-note .card { border: 1.5px solid #d6d3d1; box-shadow: 0 4px 10px rgba(0,0,0,.05); }
     /* 🌙 다크 (1단계: 카드 주변만 다크, 카드 안은 밝게 유지) */
@@ -224,7 +229,7 @@
     .theme-dark .banner-img { background-image: linear-gradient(135deg,#1f2937,#0f172a); }
 
     /* 테마 선택 모달 */
-    #themeModal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.6); z-index: 9600; justify-content: center; align-items: center; padding: 20px; }
+    #themeModal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15,23,42,.6); z-index: 9600; justify-content: center; align-items: center; padding: 20px; box-sizing: border-box; }
     .theme-card { background: white; width: 100%; max-width: 380px; border-radius: 20px; padding: 22px; box-sizing: border-box; max-height: 82vh; overflow-y: auto; }
     .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
     .theme-item { border: 2px solid #e5e7eb; border-radius: 14px; padding: 12px 8px; text-align: center; cursor: pointer; background: #f9fafb; transition: .15s; }
@@ -281,7 +286,7 @@
 </div>
 
 <div class="card" id="dashboardScreen">
-  <div class="banner-img" style="height: 100px;"><div class="banner-overlay"><div class="banner-title" id="welcomeMsg" style="font-size: 20px;">환영합니다!</div><div style="display:flex;gap:6px;align-items:center;"><button class="refresh-btn" onclick="openThemePicker()" style="padding:8px 10px;">🎨</button><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div></div>
+  <div class="banner-img" style="height: 100px;"><div class="banner-overlay" style="padding:0 16px;"><div class="banner-title" id="welcomeMsg" style="font-size:17px; flex:1; min-width:0; margin-right:8px;">환영합니다!</div><div style="display:flex;gap:5px;align-items:center;flex-shrink:0;"><button class="refresh-btn" onclick="openThemePicker()" style="padding:8px 9px;">🎨</button><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div></div>
   <div class="card-content" style="padding-top: 15px;">
     <button class="logout-btn" onclick="clearLoginInfo()">🔒 다른 기기인가요? 로그아웃하기</button>
     <button id="notifSetupBtn" onclick="openNotifSetup()" style="display:none;width:100%;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:9px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:10px;">🔔 알림 설정하기</button>
@@ -652,10 +657,27 @@
       + '<button onclick="closeThemePicker()" style="width:100%;margin-top:16px;padding:13px;border:none;background:#f1f5f9;color:#475569;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;">닫기</button>'
       + '</div>';
     m.style.display = 'flex';
+    _lockScroll();
   }
   function closeThemePicker() {
     var m = document.getElementById('themeModal');
     if (m) m.style.display = 'none';
+    _unlockScroll();
+  }
+
+  // 팝업 열린 동안 뒤 페이지 스크롤 잠금 (iOS에서 배경이 따라 움직이는 문제 방지)
+  var _scrollLockY = 0;
+  function _lockScroll() {
+    _scrollLockY = window.scrollY || document.documentElement.scrollTop || 0;
+    var b = document.body;
+    b.style.position = 'fixed';
+    b.style.top = (-_scrollLockY) + 'px';
+    b.style.left = '0'; b.style.right = '0'; b.style.width = '100%';
+  }
+  function _unlockScroll() {
+    var b = document.body;
+    b.style.position = ''; b.style.top = ''; b.style.left = ''; b.style.right = ''; b.style.width = '';
+    window.scrollTo(0, _scrollLockY);
   }
 
   // 저장된 테마 즉시 적용 (화면 뜨기 전)
