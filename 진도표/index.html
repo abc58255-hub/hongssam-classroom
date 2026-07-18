@@ -168,7 +168,8 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
     <!-- 탭1: 진도표 -->
     <div id="tab-content-1">
-      <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
+        <button onclick="openBulkModal()" style="background:#fff7ed;color:#b45309;border:1px solid #fed7aa;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📅 기간 일괄 변동</button>
         <button onclick="expandAllSylMonths()" style="background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▼ 모두 펼치기</button>
         <button onclick="collapseAllSylMonths()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▶ 모두 접기</button>
       </div>
@@ -245,6 +246,45 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
       <button class="btn btn-gray" onclick="closePlanEdit()">취소</button>
       <button class="btn btn-primary" onclick="savePlan()" id="savePlanBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- 기간 일괄 변동 모달 -->
+<div id="bulkModal" class="modal-bg">
+  <div class="modal-box" style="max-width:440px;">
+    <h3 style="margin:0 0 6px;font-size:17px;font-weight:800;color:#0f172a;">📅 기간 일괄 변동</h3>
+    <div style="font-size:12px;color:#64748b;margin-bottom:14px;">시험·행사 등으로 여러 날 수업이 빠질 때 한 번에 처리해요.<br>이미 기록했거나 이동 처리한 날은 건드리지 않아요.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">시작일</div>
+        <input type="date" id="bulkStart" class="form-input">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">종료일</div>
+        <input type="date" id="bulkEnd" class="form-input">
+      </div>
+    </div>
+    <div style="margin-bottom:10px;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">대상 반</div>
+      <div id="bulkClasses" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+    <div style="margin-bottom:14px;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">사유 (취소 적용 시)</div>
+      <select id="bulkReason" class="form-input">
+        <option value="시험">📝 시험 기간</option>
+        <option value="학교행사">🎉 학교 행사</option>
+        <option value="체험학습">🏕️ 체험학습</option>
+        <option value="휴교">🤒 임시 휴교</option>
+        <option value="공휴일">🏖️ 공휴일</option>
+        <option value="">🚫 사유 없음</option>
+      </select>
+    </div>
+    <div id="bulkStatus" style="font-size:13px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+      <button class="btn btn-gray" onclick="closeBulkModal()">닫기</button>
+      <button class="btn btn-gray" onclick="applyBulk('restore')" style="color:#15803d;">↩ 취소 해제</button>
+      <button class="btn btn-danger" onclick="applyBulk('cancel')" id="bulkApplyBtn">🚫 기간 취소 적용</button>
     </div>
   </div>
 </div>
@@ -760,6 +800,7 @@ function renderSylTable() {
       + '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;background:' + dateCellBg + ';' + weekBorder + '">'
         + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')'
         + (isHoliday ? ' <span style="font-size:11px;">🏖️</span>' : '') + '</span>'
+        + (isHoliday ? '' : ' <span data-date="' + dateStr + '" onclick="bulkCompleteDayUI(this.dataset.date)" title="이 날 수업 전부 완료 처리" style="font-size:10px;background:#dcfce7;color:#15803d;padding:2px 7px;border-radius:9px;cursor:pointer;font-weight:800;margin-left:4px;">✓완료</span>')
       + '</td>';
 
     cols.forEach(function(cls) {
@@ -957,6 +998,87 @@ function renderSylTable() {
     + '<span>☐ = 미기록</span>'
     + '<span style="color:#94a3b8;">&nbsp;셀 클릭 → 기록 · 열 [+] → 수업 추가</span></div>';
   wrap.innerHTML = html;
+}
+
+// ─── 📅 기간 일괄 변동 ───
+function openBulkModal() {
+  var cols = getActiveClasses().filter(function(x){ return x && x !== 'undefined'; });
+  document.getElementById('bulkClasses').innerHTML = cols.length === 0
+    ? '<span style="font-size:12px;color:#94a3b8;">반 목록이 없어요.</span>'
+    : cols.map(function(c) {
+        return '<label style="display:inline-flex;align-items:center;gap:4px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;color:#334155;cursor:pointer;">'
+          + '<input type="checkbox" class="bulk-cls" value="' + escapeHtml(c) + '" checked> ' + escapeHtml(c) + '</label>';
+      }).join('');
+  document.getElementById('bulkStatus').textContent = '';
+  document.getElementById('bulkModal').classList.add('open');
+}
+function closeBulkModal() { document.getElementById('bulkModal').classList.remove('open'); }
+
+function applyBulk(mode) {
+  var start = document.getElementById('bulkStart').value;
+  var end = document.getElementById('bulkEnd').value;
+  var reason = document.getElementById('bulkReason').value;
+  var classes = [];
+  document.querySelectorAll('#bulkClasses .bulk-cls:checked').forEach(function(c){ classes.push(c.value); });
+  var statusEl = document.getElementById('bulkStatus');
+  if (!start || !end) return alert('기간을 입력하세요.');
+  if (start > end) return alert('시작일이 종료일보다 늦어요.');
+  if (classes.length === 0) return alert('대상 반을 최소 1개 선택하세요.');
+  var label = mode === 'cancel'
+    ? start + ' ~ ' + end + ' 기간의 수업 예정일을 전부 "취소' + (reason ? '(' + reason + ')' : '') + '" 처리할까요?'
+    : start + ' ~ ' + end + ' 기간의 취소 기록을 전부 해제(삭제)할까요?\n수업 예정일로 되돌아갑니다.';
+  if (!confirm('📅 ' + classes.join(', ') + '\n\n' + label)) return;
+  statusEl.style.color = '#64748b';
+  statusEl.textContent = '처리 중...';
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) { statusEl.style.color = '#ef4444'; statusEl.textContent = '❌ ' + (res.message || '오류'); return; }
+      statusEl.style.color = '#16a34a';
+      statusEl.textContent = '✅ ' + res.applied + '건 처리 완료' + (res.skipped ? ' (기록·이동된 ' + res.skipped + '건은 보호)' : '');
+      loadSyllabusData(1);
+    })
+    .withFailureHandler(function(e) { statusEl.style.color = '#ef4444'; statusEl.textContent = '❌ ' + e.message; })
+    .bulkChangeLessons(currentGroupId, mode, start, end, classes, reason);
+}
+
+// ─── ✓ 하루 일괄 완료 ───
+// 반의 다음 차시 = 지금까지 기록된 실제 차시(이동받은 수업 포함)의 최댓값 + 1
+function _nextLessonFor(cls) {
+  var maxLn = 0;
+  Object.keys(sylCheckCache).forEach(function(k) {
+    if (k.substring(11) !== cls) return; // key = 'yyyy-MM-dd_반'
+    var c = sylCheckCache[k];
+    if (c && c.lessonNo > maxLn) maxLn = c.lessonNo;
+  });
+  Object.keys(sylMovedInCache).forEach(function(k) {
+    if (k.substring(11) !== cls) return;
+    (sylMovedInCache[k] || []).forEach(function(mi) { if (mi.lessonNo > maxLn) maxLn = mi.lessonNo; });
+  });
+  return maxLn + 1;
+}
+
+function bulkCompleteDayUI(dateStr) {
+  var cols = getActiveClasses().filter(function(x){ return x && x !== 'undefined'; });
+  var entries = [], lines = [];
+  cols.forEach(function(cls) {
+    if ((sylScheduleCache[cls] || []).indexOf(dateStr) < 0) return; // 이 날 수업 없는 반
+    var check = sylCheckCache[dateStr + '_' + cls];
+    if (check && (check.lessonNo > 0 || (check.status || '') !== '')) return; // 기록·취소·이동됨
+    var ln = (check && check.plannedLessonNo) ? check.plannedLessonNo : _nextLessonFor(cls);
+    entries.push({ cls: cls, lessonNo: ln, plannedLessonNo: ln });
+    var plan = sylPlanCache.find(function(p){ return p.lessonNo === ln; });
+    lines.push('· ' + cls + ' → ' + ln + '차시' + (plan && plan.content ? ' (' + plan.content.substring(0, 14) + ')' : ''));
+  });
+  if (entries.length === 0) return alert('이 날 완료 처리할 수업이 없어요.\n(이미 기록됐거나 예정된 수업이 없습니다)');
+  var d = new Date(dateStr + 'T09:00:00');
+  if (!confirm('✅ ' + (d.getMonth()+1) + '/' + d.getDate() + ' 수업을 한 번에 완료 처리할까요?\n\n' + lines.join('\n') + '\n\n(이미 기록된 반은 건드리지 않아요)')) return;
+  google.script.run
+    .withSuccessHandler(function(res) {
+      if (!res.success) return alert('오류: ' + (res.message || ''));
+      loadSyllabusData(1);
+    })
+    .withFailureHandler(function(e) { alert('오류: ' + e.message); })
+    .bulkCompleteDay(dateStr, entries, currentGroupId);
 }
 
 // ─── 수업 기록 모달 ───
@@ -2046,6 +2168,6 @@ function deleteCurrentGroup() {
 </script>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
-<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.01.00</span></div>
+<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.02.00</span></div>
 </body>
 </html>

@@ -947,6 +947,102 @@ function deleteMovedInLesson(date, cls, sourceDate, groupId) {
 }
 
 
+// =====================================================
+// 일괄 처리 (기간 취소/해제, 하루 완료)
+// =====================================================
+
+// 진도체크 시트의 기존 행 목록 ('받음:' 행 제외 — 이동받은 수업은 별도 관리)
+function _checkRowList_(sh) {
+  var list = [];
+  if (sh.getLastRow() < 2) return list;
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+  for (var i = 0; i < rows.length; i++) {
+    var st = String(rows[i][4] || '').trim();
+    if (st.indexOf('받음:') === 0) continue;
+    var ds = rows[i][0] instanceof Date
+      ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
+      : String(rows[i][0]).trim();
+    list.push({ row: i + 2, date: ds, cls: String(rows[i][1] || '').trim(), ln: parseInt(rows[i][2]) || 0, status: st });
+  }
+  return list;
+}
+
+// 기간 일괄 변동 — mode: 'cancel'(기간 내 예정 수업 일괄 취소) | 'restore'(기간 내 취소 행 일괄 삭제)
+// 이미 차시가 기록됐거나 이동 처리된 날은 보호(건너뜀)
+function bulkChangeLessons(groupId, mode, start, end, classes, reason) {
+  try {
+    var gid = groupId || '기본';
+    if (!start || !end) return { success: false, message: '기간을 입력하세요.' };
+    if (start > end) return { success: false, message: '시작일이 종료일보다 늦습니다.' };
+    var targets = (classes || []).filter(Boolean);
+    if (targets.length === 0) return { success: false, message: '대상 반을 선택하세요.' };
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
+    var existing = _checkRowList_(sh);
+    var applied = 0, skipped = 0;
+
+    if (mode === 'restore') {
+      var delRows = [];
+      existing.forEach(function(e) {
+        if (e.date >= start && e.date <= end && targets.indexOf(e.cls) >= 0 && e.status.indexOf('취소') === 0) delRows.push(e.row);
+      });
+      delRows.sort(function(a, b) { return b - a; }).forEach(function(r) { sh.deleteRow(r); applied++; });
+      return { success: true, applied: applied, skipped: 0 };
+    }
+
+    var status = '취소' + (reason ? ':' + reason : '');
+    var map = {};
+    existing.forEach(function(e) { map[e.date + '||' + e.cls] = e; });
+    var schedule = _computeSchedule_(gid, ss);
+    var appendRows = [];
+    targets.forEach(function(cls) {
+      (schedule[cls] || []).forEach(function(ds) {
+        if (ds < start || ds > end) return;
+        var e = map[ds + '||' + cls];
+        if (e) {
+          if (e.ln > 0 || e.status.indexOf('이동:') === 0) { skipped++; return; }
+          sh.getRange(e.row, 1, 1, 6).setValues([[ds, cls, 0, '', status, 0]]);
+          applied++;
+        } else {
+          appendRows.push([ds, cls, 0, '', status, 0]);
+          applied++;
+        }
+      });
+    });
+    if (appendRows.length > 0) sh.getRange(sh.getLastRow() + 1, 1, appendRows.length, 6).setValues(appendRows);
+    return { success: true, applied: applied, skipped: skipped };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 하루 일괄 완료 — entries: [{cls, lessonNo, plannedLessonNo}] (이미 기록된 반은 보호)
+function bulkCompleteDay(date, entries, groupId) {
+  try {
+    var gid = groupId || '기본';
+    if (!date || !entries || entries.length === 0) return { success: false, message: '완료 처리할 수업이 없습니다.' };
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
+    var map = {};
+    _checkRowList_(sh).forEach(function(e) { if (e.date === date) map[e.cls] = e; });
+    var applied = 0, appendRows = [];
+    entries.forEach(function(en) {
+      var cls = String(en.cls || '').trim();
+      var ln = parseInt(en.lessonNo) || 0;
+      if (!cls || !ln) return;
+      var pln = parseInt(en.plannedLessonNo) || ln;
+      var e = map[cls];
+      if (e) {
+        if (e.ln > 0 || e.status) return; // 기록·취소·이동된 반은 건너뜀
+        sh.getRange(e.row, 1, 1, 6).setValues([[date, cls, ln, '', '', pln]]);
+      } else {
+        appendRows.push([date, cls, ln, '', '', pln]);
+      }
+      applied++;
+    });
+    if (appendRows.length > 0) sh.getRange(sh.getLastRow() + 1, 1, appendRows.length, 6).setValues(appendRows);
+    return { success: true, applied: applied };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 // ── 초기 설정 (SHEET_ID 미설정 시 setup 화면) ──────────
 function _setupPage_() {
   return HtmlService.createHtmlOutputFromFile('setup')
