@@ -90,6 +90,12 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .tt-period-input { width: 100%; padding: 7px 6px; border: 1px solid #e2e8f0; border-radius: 7px; font-size: 14px; text-align: center; outline: none; font-weight: 700; }
 .tt-period-input:focus { border-color: #3b82f6; }
 .tt-period-input.has-val { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+/* 요일 칩(select) — 탭 한 번으로 교시 선택. 없음=회색 점선, 선택=파랑 칩 */
+.tt-period-sel { -webkit-appearance: none; appearance: none; width: 62px; padding: 8px 4px; border: 1.5px dashed #cbd5e1; border-radius: 8px; font-size: 13px; font-weight: 800; text-align: center; text-align-last: center; color: #94a3b8; background: #f8fafc; cursor: pointer; outline: none; }
+.tt-period-sel.has-val { border: 1.5px solid #93c5fd; background: #eff6ff; color: #1d4ed8; border-style: solid; }
+.tt-copy-btn { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; border-radius: 7px; padding: 6px 9px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+.hol-chip { display: inline-flex; align-items: center; gap: 5px; background: #fff1f2; color: #be123c; border: 1px solid #fecdd3; border-radius: 16px; padding: 5px 10px; font-size: 12px; font-weight: 700; }
+.hol-chip b { cursor: pointer; color: #f43f5e; font-size: 14px; line-height: 1; }
 
 /* Preview table */
 .preview-table { border-collapse: collapse; font-size: 12px; }
@@ -201,8 +207,14 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
           </div>
         </div>
         <div style="margin-bottom:14px;">
-          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">공휴일 <span style="font-weight:400;">(날짜를 쉼표로 구분, 예: 2026-03-01, 2026-05-05)</span></div>
-          <textarea id="ttSemHolidays" class="form-input" rows="2" placeholder="2026-03-01, 2026-05-05, 2026-06-06" style="resize:vertical;"></textarea>
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">공휴일·휴업일 <span style="font-weight:400;">(달력에서 골라 추가 — 재량휴업일·개교기념일도 여기에)</span></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+            <input type="date" id="ttHolPick" class="form-input" style="max-width:165px;">
+            <button type="button" class="btn btn-gray" style="font-size:12px;padding:8px 12px;" onclick="addHoliday()">+ 추가</button>
+            <button type="button" class="btn btn-gray" style="font-size:12px;padding:8px 12px;" onclick="addKrHolidays()">🇰🇷 법정공휴일 자동 추가</button>
+          </div>
+          <div id="ttHolChips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          <input type="hidden" id="ttSemHolidays">
         </div>
         <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:8px;">반별 수업 요일 <span style="font-weight:400;color:#64748b;">(교시 번호 입력, 수업 없는 날은 빈칸)</span></div>
         <div id="ttClassGrid" style="overflow-x:auto;margin-bottom:14px;"></div>
@@ -1619,22 +1631,102 @@ function renderClassGrid(semName) {
   DAYS.forEach(function(d) {
     html += '<th style="padding:8px;text-align:center;font-size:12px;font-weight:800;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;min-width:60px;">' + DAY_KR[d] + '</th>';
   });
-  html += '</tr></thead><tbody>';
-  cols.forEach(function(cls) {
+  html += '<th style="background:#f8fafc;border:1px solid #e2e8f0;"></th></tr></thead><tbody>';
+  cols.forEach(function(cls, rowIdx) {
     var ex = semName ? (timetableCache.find(function(e){ return e.cls===cls && e.semester===semName; }) || {}) : {};
     html += '<tr><td style="padding:8px 12px;font-weight:700;font-size:13px;color:#1e3a8a;border:1px solid #e2e8f0;white-space:nowrap;">' + escapeHtml(cls) + '</td>';
     DAYS.forEach(function(d) {
-      var val = ex[d] || 0;
+      var val = parseInt(ex[d]) || 0;
+      var opts = '<option value="0">−</option>';
+      for (var p = 1; p <= 9; p++) opts += '<option value="' + p + '"' + (val === p ? ' selected' : '') + '>' + p + '교시</option>';
       html += '<td style="padding:5px 6px;border:1px solid #e2e8f0;text-align:center;">'
-        + '<input type="number" min="0" max="9" class="tt-period-input' + (val>0?' has-val':'') + '" '
-        + 'data-cls="' + escapeHtml(cls) + '" data-day="' + d + '" value="' + (val||'') + '" '
-        + 'placeholder="0" style="width:50px;" oninput="this.classList.toggle(\'has-val\',parseInt(this.value)>0)">'
+        + '<select class="tt-period-sel' + (val > 0 ? ' has-val' : '') + '" '
+        + 'data-cls="' + escapeHtml(cls) + '" data-day="' + d + '" '
+        + 'onchange="this.classList.toggle(\'has-val\', parseInt(this.value) > 0)">' + opts + '</select>'
         + '</td>';
     });
+    // 첫 행 제외: 바로 위 반의 요일 패턴 복사 버튼
+    html += '<td style="padding:5px 6px;border:1px solid #e2e8f0;">'
+      + (rowIdx > 0 ? '<button type="button" class="tt-copy-btn" onclick="copyTtRowAbove(this)">⬇ 위 반과 동일</button>' : '')
+      + '</td>';
     html += '</tr>';
   });
-  html += '</tbody></table><div style="font-size:11px;color:#94a3b8;margin-top:6px;">수업 없는 날은 빈칸 또는 0. 교시 번호는 1~9.</div>';
+  html += '</tbody></table><div style="font-size:11px;color:#94a3b8;margin-top:6px;">칸을 누르면 교시를 고를 수 있어요. 수업 없는 날은 − 그대로.</div>';
   grid.innerHTML = html;
+  renderHolChips(); // 그리드와 함께 공휴일 칩도 초기 표시
+}
+
+// 바로 윗 행의 요일 선택을 그대로 복사
+function copyTtRowAbove(btn) {
+  var tr = btn.closest('tr');
+  var prev = tr && tr.previousElementSibling;
+  if (!prev) return;
+  var mySel = tr.querySelectorAll('.tt-period-sel');
+  var upSel = prev.querySelectorAll('.tt-period-sel');
+  mySel.forEach(function(s, i) {
+    if (!upSel[i]) return;
+    s.value = upSel[i].value;
+    s.classList.toggle('has-val', parseInt(s.value) > 0);
+  });
+}
+
+// ── 공휴일 칩 관리 (저장 형식은 기존 그대로: #ttSemHolidays에 쉼표 문자열) ──
+function _holList() {
+  var raw = document.getElementById('ttSemHolidays').value.trim();
+  return raw ? raw.split(',').map(function(d){ return d.trim(); }).filter(Boolean) : [];
+}
+function _holSave(list) {
+  var uniq = [];
+  list.forEach(function(d){ if (uniq.indexOf(d) < 0) uniq.push(d); });
+  uniq.sort();
+  document.getElementById('ttSemHolidays').value = uniq.join(', ');
+  renderHolChips();
+}
+// 2026학년도 법정공휴일 (평일에 걸리는 날만 — 주말 공휴일은 수업일 계산과 무관)
+var KR_HOLIDAYS = {
+  '2026-01-01': '신정', '2026-02-16': '설연휴', '2026-02-17': '설날', '2026-02-18': '설연휴',
+  '2026-03-02': '삼일절 대체', '2026-05-05': '어린이날', '2026-05-25': '석가탄신일 대체',
+  '2026-06-03': '지방선거', '2026-08-17': '광복절 대체', '2026-09-24': '추석연휴',
+  '2026-09-25': '추석', '2026-10-05': '개천절 대체', '2026-10-09': '한글날',
+  '2026-12-25': '성탄절', '2027-01-01': '신정'
+};
+function renderHolChips() {
+  var box = document.getElementById('ttHolChips');
+  if (!box) return;
+  var list = _holList();
+  box.innerHTML = list.length === 0
+    ? '<span style="font-size:12px;color:#94a3b8;">아직 추가한 날이 없어요.</span>'
+    : list.map(function(d, i) {
+        var label = KR_HOLIDAYS[d] ? d.substring(5).replace('-', '/') + ' ' + KR_HOLIDAYS[d] : d.substring(5).replace('-', '/');
+        return '<span class="hol-chip" title="' + d + '">' + label + '<b onclick="removeHoliday(' + i + ')">×</b></span>';
+      }).join('');
+}
+function addHoliday() {
+  var v = document.getElementById('ttHolPick').value;
+  if (!v) return alert('날짜를 먼저 선택하세요.');
+  var list = _holList();
+  list.push(v);
+  _holSave(list);
+  document.getElementById('ttHolPick').value = '';
+}
+function removeHoliday(i) {
+  var list = _holList();
+  list.splice(i, 1);
+  _holSave(list);
+}
+function addKrHolidays() {
+  var start = document.getElementById('ttSemStart').value;
+  var end = document.getElementById('ttSemEnd').value;
+  if (!start || !end) return alert('학기 시작일과 종료일을 먼저 입력하세요.\n(그 기간 안의 공휴일만 추가합니다)');
+  var list = _holList();
+  var added = 0;
+  Object.keys(KR_HOLIDAYS).forEach(function(d) {
+    if (d >= start && d <= end && list.indexOf(d) < 0) { list.push(d); added++; }
+  });
+  _holSave(list);
+  alert(added > 0
+    ? '✅ 공휴일 ' + added + '일을 추가했어요.\n재량휴업일·개교기념일은 달력에서 직접 추가해 주세요.'
+    : '기간 안에 추가할 공휴일이 없어요. (이미 추가됐거나 기간 밖)');
 }
 
 function cancelTtEdit() {
@@ -1644,6 +1736,7 @@ function cancelTtEdit() {
   document.getElementById('ttSemStart').value = '';
   document.getElementById('ttSemEnd').value = '';
   document.getElementById('ttSemHolidays').value = '';
+  renderHolChips();
   document.getElementById('ttFormTitleText').textContent = '📝 시간표 등록';
   document.getElementById('ttCancelEditBtn').style.display = 'none';
   document.getElementById('ttSaveBtn').textContent = '💾 시간표 저장';
@@ -1659,6 +1752,7 @@ function editTimetableEntry(semName) {
   document.getElementById('ttSemStart').value = sem ? sem.start : '';
   document.getElementById('ttSemEnd').value = sem ? sem.end : '';
   document.getElementById('ttSemHolidays').value = sem ? (sem.holidays||[]).join(', ') : '';
+  renderHolChips();
   document.getElementById('ttFormTitleText').textContent = '✏️ 수정: ' + semName;
   document.getElementById('ttCancelEditBtn').style.display = 'inline-block';
   document.getElementById('ttSaveStatus').textContent = '';
@@ -1677,7 +1771,7 @@ function saveAndGenerateSchedule() {
   if (!semStart || !semEnd) return alert('시작일과 종료일을 입력하세요.');
 
   var ttMap = {};
-  document.querySelectorAll('#ttClassGrid .tt-period-input').forEach(function(inp) {
+  document.querySelectorAll('#ttClassGrid .tt-period-sel').forEach(function(inp) {
     var cls = inp.dataset.cls;
     if (!ttMap[cls]) ttMap[cls] = { cls: cls, mon:0, tue:0, wed:0, thu:0, fri:0 };
     ttMap[cls][inp.dataset.day] = parseInt(inp.value) || 0;
@@ -1952,6 +2046,6 @@ function deleteCurrentGroup() {
 </script>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
-<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.00.01</span></div>
+<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.01.00</span></div>
 </body>
 </html>
