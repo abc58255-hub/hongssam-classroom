@@ -198,25 +198,41 @@
     @keyframes fxFall { from { transform: translateY(-10vh) rotate(0deg); } to { transform: translateY(115vh) rotate(360deg); } }
     @keyframes fxRise { from { transform: translateY(115vh); opacity: .9; } to { transform: translateY(-15vh); opacity: 0; } }
     @keyframes fxTwinkle { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+    @keyframes fxSwimL { from { transform: translateX(110vw); } to { transform: translateX(-15vw); } }   /* 물고기: 오른쪽→왼쪽 */
+    @keyframes fxSwimR { from { transform: translate(-15vw, 8vh); } to { transform: translate(110vw, -8vh); } } /* 로켓: 왼쪽→오른쪽 상승 */
     @media (prefers-reduced-motion: reduce) { #themeFx span { display: none; } }
 
     /* 🌸 벚꽃 */
     .theme-sakura { --bg:#fdf2f8; --banner-a:rgba(190,24,93,.6); --banner-b:rgba(131,24,67,.88); --accent:#db2777; --tab-accent:#9d174d; --radius-card:26px; --radius-btn:16px; }
+    body.theme-sakura { background: linear-gradient(180deg, #fdf2f8 0%, #fce7f3 60%, #fbcfe8 100%) fixed; }
     .theme-sakura .banner-img { background-image: linear-gradient(135deg,#fbcfe8,#f472b6); }
     /* 🌊 바다 */
     .theme-ocean { --banner-a:rgba(8,145,178,.65); --banner-b:rgba(22,78,99,.92); --accent:#0891b2; --tab-accent:#155e75; --radius-card:22px; }
     body.theme-ocean { background: linear-gradient(180deg,#ecfeff 0%,#a5f3fc 100%) fixed; }
     .theme-ocean .banner-img { background-image: linear-gradient(135deg,#67e8f9,#0e7490); }
-    /* 🧱 레고 */
-    .theme-lego { --bg:#fef9c3; --banner-a:rgba(0,0,0,.12); --banner-b:rgba(0,0,0,.38); --accent:#dc2626; --tab-accent:#b91c1c; --radius-card:10px; --radius-btn:8px; }
+    /* 🧱 레고 — 바닥판 배경 + 카드 위 브릭 돌기 줄 + 노란 브릭 탭 */
+    .theme-lego { --bg:#fef3c7; --banner-a:rgba(0,0,0,.12); --banner-b:rgba(0,0,0,.38); --accent:#dc2626; --tab-accent:#7c2d12; --radius-card:10px; --radius-btn:8px; }
+    body.theme-lego { background-color: #fef3c7; background-image: radial-gradient(circle at 9px 9px, rgba(180,83,9,.12) 5px, transparent 6px); background-size: 30px 30px; }
     .theme-lego .banner-img { background-image: radial-gradient(circle at 14px 14px, rgba(255,255,255,.4) 7px, transparent 8px), linear-gradient(135deg,#ef4444,#b91c1c); background-size: 36px 36px, cover; }
-    .theme-lego .card { border: 2px solid #1f2937; box-shadow: 0 6px 0 rgba(31,41,55,.25); }
-    .theme-lego button.primary-btn { box-shadow: 0 4px 0 #991b1b; border: 2px solid #7f1d1d; }
-    /* 👾 도트 */
+    .theme-lego .card { border: 3px solid #111827; box-shadow: 0 8px 0 rgba(17,24,39,.25); }
+    .theme-lego .card::before { content: ''; display: block; height: 13px; background-color: #fbbf24; background-image: radial-gradient(circle at 12px 6px, #f59e0b 5px, transparent 6px); background-size: 26px 13px; background-repeat: repeat-x; border-bottom: 2px solid #d97706; }
+    .theme-lego button.primary-btn { box-shadow: 0 5px 0 #7f1d1d; border: 2px solid #7f1d1d; text-shadow: 0 1px 0 rgba(0,0,0,.3); }
+    .theme-lego .tab-btn.active { background: #fde047; color: #7c2d12; box-shadow: 0 3px 0 #ca8a04; }
+    .theme-lego .refresh-btn { border: 2px solid rgba(255,255,255,.6); }
+    /* 👾 도트 — CRT 주사선 배경 + 픽셀폰트 (폭이 넓어 주요 글자 크기 보정) */
     .theme-pixel { --bg:#1a1b26; --banner-a:rgba(49,46,129,.5); --banner-b:rgba(17,24,39,.92); --accent:#16a34a; --tab-accent:#166534; --radius-card:0px; --radius-btn:0px; --font:'NeoDunggeunmo','Pretendard',sans-serif; }
+    body.theme-pixel { background-color: #1a1b26; background-image: repeating-linear-gradient(0deg, rgba(255,255,255,.035) 0px, rgba(255,255,255,.035) 1px, transparent 1px, transparent 3px); }
     .theme-pixel .banner-img { background-image: linear-gradient(180deg,#312e81,#1e1b4b); }
     .theme-pixel .card { box-shadow: 0 0 0 3px #000, 10px 10px 0 rgba(0,0,0,.55); }
     .theme-pixel button.primary-btn { box-shadow: 4px 4px 0 #14532d; border: 2px solid #052e16; }
+    /* 픽셀폰트 줄바꿈 방지: 폭 넓은 요소들 크기·자간 축소 */
+    .theme-pixel { letter-spacing: -0.02em; }
+    .theme-pixel .tab-btn { font-size: 11px; letter-spacing: -0.5px; padding-left: 0; padding-right: 0; }
+    .theme-pixel .banner-title { letter-spacing: -1px; font-size: 92%; }
+    .theme-pixel .radio-group span { font-size: 12px; letter-spacing: -0.5px; }
+    .theme-pixel .choice-chip { font-size: 12px; padding: 10px 12px; }
+    .theme-pixel label { font-size: 14px; }
+    .theme-pixel button.primary-btn { font-size: 15px; }
     /* 🚀 우주 */
     .theme-space { --bg:#0b1026; --banner-a:rgba(49,46,129,.4); --banner-b:rgba(2,6,23,.85); --accent:#6366f1; --tab-accent:#4338ca; --radius-card:18px; }
     .theme-space .banner-img { background-image: linear-gradient(135deg,#1e1b4b,#0b1026); }
@@ -570,15 +586,23 @@
   function applyGalleryFilter() { renderGallery(); }
 
   // ══════════ 🎨 테마 시스템 ══════════
+  // fx: 움직이는 장식 목록 — ch=이모지, mode=fall(낙하)/rise(상승)/twinkle(반짝)/swimL(좌로 헤엄)/swimR(우로 비행), n=개수, s1~s2=크기(px)
   var THEMES = [
     { key: 'default', name: '기본',  emoji: '💙', cls: '',             dots: ['#2563eb', '#f3f4f6', '#1e3a8a'] },
-    { key: 'sakura',  name: '벚꽃',  emoji: '🌸', cls: 'theme-sakura', dots: ['#db2777', '#fdf2f8', '#fbcfe8'], fx: { ch: '🌸', mode: 'fall', n: 12 } },
-    { key: 'ocean',   name: '바다',  emoji: '🌊', cls: 'theme-ocean',  dots: ['#0891b2', '#ecfeff', '#67e8f9'], fx: { ch: '🫧', mode: 'rise', n: 10 } },
-    { key: 'lego',    name: '레고',  emoji: '🧱', cls: 'theme-lego',   dots: ['#dc2626', '#fef9c3', '#1d4ed8'] },
-    { key: 'pixel',   name: '도트',  emoji: '👾', cls: 'theme-pixel',  dots: ['#16a34a', '#1a1b26', '#a3e635'], font: 'pixel' },
-    { key: 'space',   name: '우주',  emoji: '🚀', cls: 'theme-space',  dots: ['#6366f1', '#0b1026', '#c7d2fe'], fx: { ch: '✦', mode: 'twinkle', n: 22 } },
-    { key: 'note',    name: '노트',  emoji: '📓', cls: 'theme-note',   dots: ['#b45309', '#fffdf7', '#d6d3d1'], font: 'note' },
-    { key: 'dark',    name: '다크',  emoji: '🌙', cls: 'theme-dark',   dots: ['#4f46e5', '#0f172a', '#1f2937'] }
+    { key: 'sakura',  name: '벚꽃',  emoji: '🌸', cls: 'theme-sakura', dots: ['#db2777', '#fdf2f8', '#fbcfe8'],
+      fx: [ { ch: '🌸', mode: 'fall', n: 12, s1: 12, s2: 26 }, { ch: '🌷', mode: 'fall', n: 3, s1: 14, s2: 20 } ] },
+    { key: 'ocean',   name: '바다',  emoji: '🌊', cls: 'theme-ocean',  dots: ['#0891b2', '#ecfeff', '#67e8f9'],
+      fx: [ { ch: '🫧', mode: 'rise', n: 10, s1: 10, s2: 22 }, { ch: '🐠', mode: 'swimL', n: 2, s1: 20, s2: 28 }, { ch: '🐟', mode: 'swimL', n: 2, s1: 15, s2: 22 }, { ch: '🐢', mode: 'swimL', n: 1, s1: 18, s2: 24 } ] },
+    { key: 'lego',    name: '레고',  emoji: '🧱', cls: 'theme-lego',   dots: ['#dc2626', '#fde047', '#1d4ed8'],
+      fx: [ { ch: '🧱', mode: 'fall', n: 8, s1: 14, s2: 24 } ] },
+    { key: 'pixel',   name: '도트',  emoji: '👾', cls: 'theme-pixel',  dots: ['#16a34a', '#1a1b26', '#a3e635'], font: 'pixel',
+      fx: [ { ch: '👾', mode: 'fall', n: 6, s1: 12, s2: 20 }, { ch: '🕹️', mode: 'fall', n: 2, s1: 14, s2: 18 } ] },
+    { key: 'space',   name: '우주',  emoji: '🚀', cls: 'theme-space',  dots: ['#6366f1', '#0b1026', '#c7d2fe'],
+      fx: [ { ch: '✦', mode: 'twinkle', n: 22, s1: 8, s2: 18 }, { ch: '🚀', mode: 'swimR', n: 1, s1: 22, s2: 26 }, { ch: '💫', mode: 'fall', n: 2, s1: 13, s2: 17 } ] },
+    { key: 'note',    name: '노트',  emoji: '📓', cls: 'theme-note',   dots: ['#b45309', '#fffdf7', '#d6d3d1'], font: 'note',
+      fx: [ { ch: '✏️', mode: 'fall', n: 4, s1: 13, s2: 19 }, { ch: '📐', mode: 'fall', n: 2, s1: 12, s2: 17 }, { ch: '➗', mode: 'fall', n: 2, s1: 11, s2: 15 } ] },
+    { key: 'dark',    name: '다크',  emoji: '🌙', cls: 'theme-dark',   dots: ['#4f46e5', '#0f172a', '#1f2937'],
+      fx: [ { ch: '✨', mode: 'twinkle', n: 8, s1: 8, s2: 13 } ] }
   ];
 
   // 테마 폰트는 선택했을 때만 로드 (평소 로딩 속도에 영향 없음)
@@ -598,28 +622,40 @@
     }
   }
 
-  function _spawnThemeFx(fx) {
+  function _spawnThemeFx(fxList) {
     var box = document.getElementById('themeFx');
     if (!box) return;
     box.innerHTML = '';
-    if (!fx) return;
-    for (var i = 0; i < fx.n; i++) {
-      var s = document.createElement('span');
-      s.textContent = fx.ch;
-      s.style.left = (Math.random() * 100) + 'vw';
-      s.style.fontSize = (12 + Math.random() * 14) + 'px';
-      if (fx.mode === 'fall') {
-        var df = 8 + Math.random() * 8;
-        s.style.animation = 'fxFall ' + df + 's linear ' + (-Math.random() * df) + 's infinite';
-      } else if (fx.mode === 'rise') {
-        var dr = 6 + Math.random() * 7;
-        s.style.animation = 'fxRise ' + dr + 's linear ' + (-Math.random() * dr) + 's infinite';
-      } else { // twinkle — 고정 위치에서 반짝임
-        s.style.top = (Math.random() * 100) + 'vh';
-        s.style.animation = 'fxTwinkle ' + (2 + Math.random() * 3) + 's ease-in-out ' + (-Math.random() * 3) + 's infinite';
+    if (!fxList) return;
+    if (!Array.isArray(fxList)) fxList = [fxList];
+    fxList.forEach(function (fx) {
+      for (var i = 0; i < fx.n; i++) {
+        var s = document.createElement('span');
+        s.textContent = fx.ch;
+        var sz1 = fx.s1 || 12, sz2 = fx.s2 || 26;
+        s.style.fontSize = (sz1 + Math.random() * (sz2 - sz1)) + 'px';
+        if (fx.mode === 'fall') {
+          s.style.left = (Math.random() * 100) + 'vw';
+          var df = 8 + Math.random() * 8;
+          s.style.animation = 'fxFall ' + df + 's linear ' + (-Math.random() * df) + 's infinite';
+        } else if (fx.mode === 'rise') {
+          s.style.left = (Math.random() * 100) + 'vw';
+          var dr = 6 + Math.random() * 7;
+          s.style.animation = 'fxRise ' + dr + 's linear ' + (-Math.random() * dr) + 's infinite';
+        } else if (fx.mode === 'swimL' || fx.mode === 'swimR') {
+          // 가로 이동(물고기·로켓) — 세로 위치 고정, 개체마다 속도 다르게
+          s.style.left = '0';
+          s.style.top = (8 + Math.random() * 80) + 'vh';
+          var ds = 16 + Math.random() * 14;
+          s.style.animation = (fx.mode === 'swimL' ? 'fxSwimL ' : 'fxSwimR ') + ds + 's linear ' + (-Math.random() * ds) + 's infinite';
+        } else { // twinkle — 고정 위치에서 반짝임
+          s.style.left = (Math.random() * 100) + 'vw';
+          s.style.top = (Math.random() * 100) + 'vh';
+          s.style.animation = 'fxTwinkle ' + (2 + Math.random() * 3) + 's ease-in-out ' + (-Math.random() * 3) + 's infinite';
+        }
+        box.appendChild(s);
       }
-      box.appendChild(s);
-    }
+    });
   }
 
   function applyTheme(key) {
