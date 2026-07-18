@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -24,72 +26,67 @@ jobs:
       - name: Write clasp credentials
         run: echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
 
-      - name: Deploy 교사용-대시보드
-        continue-on-error: true
+      # 바뀐 앱 디렉토리만 배포한다.
+      # 이전에는 매 푸시마다 전 앱을 강제 재배포했는데, GAS는 스크립트당 버전이
+      # 200개로 제한돼 있어 배포 버전이 계속 쌓이면 한도에 걸린다
+      # (2026-07-18 진도표가 200개 도달로 배포 실패).
+      - name: Deploy changed apps
         run: |
-          cd "교사용-대시보드"
-          clasp push --force
-          clasp deploy -i "AKfycbw3vgIohq3lmByYtYPW6VBK7shvp84GwPsn_h9ZtdNXtD6Vm2kSEnrhfMD2BZkYbz6AvA"
+          declare -A IDS
+          IDS["교사용-대시보드"]="AKfycbw3vgIohq3lmByYtYPW6VBK7shvp84GwPsn_h9ZtdNXtD6Vm2kSEnrhfMD2BZkYbz6AvA"
+          IDS["학생-수학"]="AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA"
+          IDS["학생-담임"]="AKfycbyur2cLLWQp-kEpgyYhJ0wOSmvVgbuEcFC7btI0DblyyPLsINygtOZvglb1xDFmOeTWmA"
+          IDS["회원가입"]="AKfycbzA_D6nyZplLSka3YNoq8ynHBn1NxnHj7FXoFjS6WpqY8e_mZArdFoBq6nSPRr63Gcg"
+          IDS["교실-알림판"]="AKfycbyl9-rX1YY4hrkEMdGT5uasMF1c38R7qu5I7YpN9vlPl95CYJpXG0ptkNDz0Wlj73jK"
+          IDS["진도표"]="AKfycbwn_9wAf1Qyb744x-t3b46CkuikXhg748qryip_tMQYpYUDVz65nPuK_rxVN7LUBkHf9g"
+          IDS["교실-칭찬"]="AKfycbxijB3f7zDKLxKDnSyoHIu0cTOpC2HWEkuVhq8VcogbgEizKuhoi-AVQzEEFV6KxdV3tQ"
+          IDS["우리반-설문"]="AKfycbx9zDpMWjN8gadHPPnMQg4peWQZdtW_40SBjsvG6A5w3evbi0-NyKlrotX2iIQsTtp8Zw"
+          IDS["도장-데이터"]="AKfycbyLUVZ5gd5Vru9DQ-TQIVCcQafqlRAy1VvmUQxb1XI65gBTSUOqgTu9AtoUctlsuSrRSQ"
+          IDS["도장-입력"]="AKfycbyw2zd72G2D2QXFVOV-4wELVHjiDqadpRoNyUKj7t9U2NXnJcSSsvTcKvBf3j9bC7BOwQ"
+          IDS["과제채점"]="AKfycbxwz13drEZk49iRIym1rUMKluedwwSZmo9P0ZcNRZEOgKtxMpljK0j_dG7ryjuDNcqTdw"
+          IDS["교사포털"]="AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v"
+          IDS["알림관리"]="AKfycbzpJFEvuLwIiMZMH5AFpHgAbNuNNkMVFFRpxnN34BPb_wTcKznYXFV9XojLGsRNQLtiHQ"
+          IDS["창체관리"]="AKfycbx-4x3u4lfmoVydcQId4J8_GgJOB8ut80ryJCasYzWshdLZQYjENyo9SBtBUMyJFPpMag"
+          IDS["관찰신고"]="AKfycbzNdd0WgHcFegpFFNkDiRPtUdXf2FnOe2tdxepjoiE_oJMIxlNNhPyW4NG0VCqyc3R7"
+          IDS["AI업무분석"]="AKfycbyr9AOmkCM9BE1yh_dL8Ed1yGwRAHIRE-6hebdLWFe6GBJytIPF7bLkVYV9e-wdQ8Id"
 
-      - name: Deploy 학생-수학
-        continue-on-error: true
-        run: |
-          cd "학생-수학"
-          clasp push --force
-          clasp deploy -i "AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA"
+          BEFORE="${{ github.event.before }}"
+          if [[ "$BEFORE" =~ ^0+$ ]] || ! git cat-file -e "$BEFORE" 2>/dev/null; then
+            CHANGED="__ALL__"   # 이전 커밋을 알 수 없으면(최초 푸시·강제 푸시) 전체 배포
+          else
+            CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}" | cut -d/ -f1 | sort -u)
+          fi
 
-      - name: Deploy 학생-담임
-        continue-on-error: true
-        run: |
-          cd "학생-담임"
-          clasp push --force
-          clasp deploy -i "AKfycbyur2cLLWQp-kEpgyYhJ0wOSmvVgbuEcFC7btI0DblyyPLsINygtOZvglb1xDFmOeTWmA"
+          # 커밋 메시지 태그로 강제 배포 지정 가능:
+          #   [deploy-all] = 전체 재배포, [deploy:앱1,앱2] = 지정 앱 추가 배포
+          MSG=$(git log -1 --pretty=%B)
+          if [[ "$MSG" == *"[deploy-all]"* ]]; then
+            CHANGED="__ALL__"
+          fi
+          EXTRA=$(sed -n 's/.*\[deploy:\([^]]*\)\].*/\1/p' <<< "$MSG" | tr ',' '\n' | sed 's/^ *//;s/ *$//')
+          if [ -n "$EXTRA" ] && [ "$CHANGED" != "__ALL__" ]; then
+            CHANGED=$(printf "%s\n%s" "$CHANGED" "$EXTRA" | sort -u)
+          fi
 
-      - name: Deploy 회원가입
-        continue-on-error: true
-        run: |
-          cd "회원가입"
-          clasp push --force
-          clasp deploy -i "AKfycbzA_D6nyZplLSka3YNoq8ynHBn1NxnHj7FXoFjS6WpqY8e_mZArdFoBq6nSPRr63Gcg"
+          echo "배포 대상 디렉토리:"
+          echo "$CHANGED"
 
-      - name: Deploy 교실-알림판
-        continue-on-error: true
-        run: |
-          cd "교실-알림판"
-          clasp push --force
-          clasp deploy -i "AKfycbyl9-rX1YY4hrkEMdGT5uasMF1c38R7qu5I7YpN9vlPl95CYJpXG0ptkNDz0Wlj73jK"
+          FAILED=""
+          for d in "${!IDS[@]}"; do
+            if [[ "$CHANGED" != "__ALL__" ]] && ! grep -qx "$d" <<< "$CHANGED"; then
+              echo "--- $d: 변경 없음, 건너뜀"
+              continue
+            fi
+            echo "=== $d 배포 ==="
+            if (cd "$d" && clasp push --force && clasp deploy -i "${IDS[$d]}"); then
+              echo "✅ $d 완료"
+            else
+              echo "::error::$d 배포 실패"
+              FAILED="$FAILED $d"
+            fi
+          done
 
-      - name: Deploy 진도표
-        continue-on-error: true
-        run: |
-          cd "진도표"
-          clasp push --force
-          clasp deploy -i "AKfycbwn_9wAf1Qyb744x-t3b46CkuikXhg748qryip_tMQYpYUDVz65nPuK_rxVN7LUBkHf9g"
-
-      - name: Deploy 교실-칭찬
-        continue-on-error: true
-        run: |
-          cd "교실-칭찬"
-          clasp push --force
-          clasp deploy -i "AKfycbxijB3f7zDKLxKDnSyoHIu0cTOpC2HWEkuVhq8VcogbgEizKuhoi-AVQzEEFV6KxdV3tQ"
-
-      - name: Deploy 우리반-설문
-        continue-on-error: true
-        run: |
-          cd "우리반-설문"
-          clasp push --force
-          clasp deploy -i "AKfycbx9zDpMWjN8gadHPPnMQg4peWQZdtW_40SBjsvG6A5w3evbi0-NyKlrotX2iIQsTtp8Zw"
-
-      - name: Deploy 도장-데이터
-        continue-on-error: true
-        run: |
-          cd "도장-데이터"
-          clasp push --force
-          clasp deploy -i "AKfycbyLUVZ5gd5Vru9DQ-TQIVCcQafqlRAy1VvmUQxb1XI65gBTSUOqgTu9AtoUctlsuSrRSQ"
-
-      - name: Deploy 도장-입력
-        continue-on-error: true
-        run: |
-          cd "도장-입력"
-          clasp push --force
-          clasp deploy -i "AKfycbyw2zd72G2D2QXFVOV-4wELVHjiDqadpRoNyUKj7t9U2NXnJcSSsvTcKvBf3j9bC7BOwQ"
+          if [ -n "$FAILED" ]; then
+            echo "배포 실패 앱:$FAILED"
+            exit 1
+          fi
