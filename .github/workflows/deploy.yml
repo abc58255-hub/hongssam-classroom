@@ -63,9 +63,9 @@ jobs:
             CHANGED=$(git diff --name-only "$BEFORE" "${{ github.sha }}" | cut -d/ -f1 | sort -u)
           fi
 
-          # 커밋 메시지 태그로 강제 배포 지정 가능:
+          # 커밋 "제목 줄" 태그로 강제 배포 지정 가능 (본문은 무시 — 설명 문구 오인식 방지):
           #   [deploy-all] = 전체 재배포, [deploy:앱1,앱2] = 지정 앱 추가 배포
-          MSG=$(git log -1 --pretty=%B)
+          MSG=$(git log -1 --pretty=%s)
           if [[ "$MSG" == *"[deploy-all]"* ]]; then
             CHANGED="__ALL__"
           fi
