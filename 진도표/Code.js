@@ -72,7 +72,6 @@ function verifyTeacher(password) {
 
 function getClassList() {
   try {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
     const rosterSheet = _authRoster_();
     if (!rosterSheet || rosterSheet.getLastRow() < 2) return { success: true, classes: [] };
     const data = rosterSheet.getRange(2, 1, rosterSheet.getLastRow() - 1, 3).getValues();
@@ -848,8 +847,11 @@ function saveSyllabusCheck(data, groupId) {
     var pln = data.plannedLessonNo || 0;
     var found = false;
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+      // 5열(상태)까지 읽어 '받음:' 행(이동받은 수업)은 건너뜀 — 날짜+반만 비교하면
+      // 같은 날 공존하는 이동 수업 행을 일반 기록으로 덮어써 수업이 사라진다
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
       for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][4] || '').trim().indexOf('받음:') === 0) continue;
         var rowDate = rows[i][0] instanceof Date
           ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
           : String(rows[i][0]).trim();
@@ -869,8 +871,10 @@ function deleteSyllabusCheck(date, cls, groupId) {
     var gid = groupId || '기본';
     var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(_sn('진도체크', gid));
     if (!sh || sh.getLastRow() < 2) return { success: true };
-    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+    // '받음:' 행은 deleteMovedInLesson 전용 — 여기서 같이 지우면 이동받은 수업이 사라진다
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
     for (var i = rows.length - 1; i >= 0; i--) {
+      if (String(rows[i][4] || '').trim().indexOf('받음:') === 0) continue;
       var rowDate = rows[i][0] instanceof Date
         ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
         : String(rows[i][0]).trim();
