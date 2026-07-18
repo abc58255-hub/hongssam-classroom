@@ -163,14 +163,90 @@
     .choice-chip.locked { background: #ecfdf5; color: #10b981; border-color: #10b981; pointer-events: none; opacity: 0.7;}
 
     #dashboardScreen, #successMsg { display: none; }
+
+    /* ══════════ 🎨 테마 시스템 (1단계: 셸 테마) ══════════
+       배경·배너·탭·주요 버튼·폰트·장식만 테마 적용. 카드 안쪽 세부 색은 중립 유지.
+       기본값 = 기존 파랑 디자인. 테마는 body.theme-* 클래스로 전환, localStorage 저장. */
+    :root {
+      --bg: #f3f4f6;
+      --banner-a: rgba(30,58,138,0.7);
+      --banner-b: rgba(15,23,42,0.9);
+      --accent: #2563eb;
+      --tab-accent: #1e3a8a;
+      --radius-card: 20px;
+      --radius-btn: 12px;
+      --font: 'Pretendard', sans-serif;
+    }
+    body { background: var(--bg); font-family: var(--font); }
+    input, select, textarea, button { font-family: inherit; }
+    .card { border-radius: var(--radius-card); }
+    .banner-overlay { background: linear-gradient(to bottom, var(--banner-a), var(--banner-b)); }
+    button.primary-btn { background: var(--accent); border-radius: var(--radius-btn); }
+    .tab-btn.active { color: var(--tab-accent); }
+
+    /* 장식 레이어(#themeFx)는 뒤로, 콘텐츠는 앞으로 */
+    body > div:not(#themeFx) { position: relative; z-index: 1; }
+    #themeFx { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+    #themeFx span { position: absolute; top: -10vh; will-change: transform; }
+    @keyframes fxFall { from { transform: translateY(-10vh) rotate(0deg); } to { transform: translateY(115vh) rotate(360deg); } }
+    @keyframes fxRise { from { transform: translateY(115vh); opacity: .9; } to { transform: translateY(-15vh); opacity: 0; } }
+    @keyframes fxTwinkle { 0%, 100% { opacity: .15; } 50% { opacity: 1; } }
+    @media (prefers-reduced-motion: reduce) { #themeFx span { display: none; } }
+
+    /* 🌸 벚꽃 */
+    .theme-sakura { --bg:#fdf2f8; --banner-a:rgba(190,24,93,.6); --banner-b:rgba(131,24,67,.88); --accent:#db2777; --tab-accent:#9d174d; --radius-card:26px; --radius-btn:16px; }
+    .theme-sakura .banner-img { background-image: linear-gradient(135deg,#fbcfe8,#f472b6); }
+    /* 🌊 바다 */
+    .theme-ocean { --banner-a:rgba(8,145,178,.65); --banner-b:rgba(22,78,99,.92); --accent:#0891b2; --tab-accent:#155e75; --radius-card:22px; }
+    body.theme-ocean { background: linear-gradient(180deg,#ecfeff 0%,#a5f3fc 100%) fixed; }
+    .theme-ocean .banner-img { background-image: linear-gradient(135deg,#67e8f9,#0e7490); }
+    /* 🧱 레고 */
+    .theme-lego { --bg:#fef9c3; --banner-a:rgba(0,0,0,.12); --banner-b:rgba(0,0,0,.38); --accent:#dc2626; --tab-accent:#b91c1c; --radius-card:10px; --radius-btn:8px; }
+    .theme-lego .banner-img { background-image: radial-gradient(circle at 14px 14px, rgba(255,255,255,.4) 7px, transparent 8px), linear-gradient(135deg,#ef4444,#b91c1c); background-size: 36px 36px, cover; }
+    .theme-lego .card { border: 2px solid #1f2937; box-shadow: 0 6px 0 rgba(31,41,55,.25); }
+    .theme-lego button.primary-btn { box-shadow: 0 4px 0 #991b1b; border: 2px solid #7f1d1d; }
+    /* 👾 도트 */
+    .theme-pixel { --bg:#1a1b26; --banner-a:rgba(49,46,129,.5); --banner-b:rgba(17,24,39,.92); --accent:#16a34a; --tab-accent:#166534; --radius-card:0px; --radius-btn:0px; --font:'NeoDunggeunmo','Pretendard',sans-serif; }
+    .theme-pixel .banner-img { background-image: linear-gradient(180deg,#312e81,#1e1b4b); }
+    .theme-pixel .card { box-shadow: 0 0 0 3px #000, 10px 10px 0 rgba(0,0,0,.55); }
+    .theme-pixel button.primary-btn { box-shadow: 4px 4px 0 #14532d; border: 2px solid #052e16; }
+    /* 🚀 우주 */
+    .theme-space { --bg:#0b1026; --banner-a:rgba(49,46,129,.4); --banner-b:rgba(2,6,23,.85); --accent:#6366f1; --tab-accent:#4338ca; --radius-card:18px; }
+    .theme-space .banner-img { background-image: linear-gradient(135deg,#1e1b4b,#0b1026); }
+    .theme-space #themeFx span { color: #fff; text-shadow: 0 0 6px rgba(199,210,254,.9); }
+    /* 📓 노트 */
+    .theme-note { --banner-a:rgba(87,83,78,.55); --banner-b:rgba(41,37,36,.88); --accent:#b45309; --tab-accent:#78350f; --radius-card:12px; --radius-btn:10px; --font:'Gaegu','Pretendard',sans-serif; }
+    body.theme-note { background-color: #fffdf7; background-image: linear-gradient(#eceae4 1px, transparent 1px), linear-gradient(90deg,#eceae4 1px, transparent 1px); background-size: 24px 24px; font-size: 105%; }
+    .theme-note .banner-img { background-image: linear-gradient(135deg,#a8a29e,#57534e); }
+    .theme-note .card { border: 1.5px solid #d6d3d1; box-shadow: 0 4px 10px rgba(0,0,0,.05); }
+    /* 🌙 다크 (1단계: 카드 주변만 다크, 카드 안은 밝게 유지) */
+    .theme-dark { --bg:#0f172a; --banner-a:rgba(31,41,55,.5); --banner-b:rgba(3,7,18,.88); --accent:#4f46e5; --tab-accent:#3730a3; }
+    .theme-dark .banner-img { background-image: linear-gradient(135deg,#1f2937,#0f172a); }
+
+    /* 테마 선택 모달 */
+    #themeModal { display: none; position: fixed; inset: 0; background: rgba(15,23,42,.6); z-index: 9600; justify-content: center; align-items: center; padding: 20px; }
+    .theme-card { background: white; width: 100%; max-width: 380px; border-radius: 20px; padding: 22px; box-sizing: border-box; max-height: 82vh; overflow-y: auto; }
+    .theme-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+    .theme-item { border: 2px solid #e5e7eb; border-radius: 14px; padding: 12px 8px; text-align: center; cursor: pointer; background: #f9fafb; transition: .15s; }
+    .theme-item.selected { border-color: #2563eb; background: #eff6ff; box-shadow: 0 2px 8px rgba(37,99,235,.2); }
+    .theme-item .t-emoji { font-size: 26px; }
+    .theme-item .t-name { font-size: 13px; font-weight: 800; color: #334155; margin: 4px 0 6px; }
+    .theme-item .t-dots { display: flex; justify-content: center; gap: 4px; }
+    .theme-item .t-dots i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; border: 1px solid rgba(0,0,0,.08); }
   </style>
 </head>
 <body>
 
+<!-- 🎨 테마 장식 레이어 (꽃잎·기포·별 등) -->
+<div id="themeFx"></div>
+
+<!-- 🎨 테마 선택 모달 (내용은 JS가 채움) -->
+<div id="themeModal" onclick="if(event.target===this) closeThemePicker()"></div>
+
 <div oncontextmenu="return false;" style="width:100%; display:flex; flex-direction:column; align-items:center;">
 
 <div class="card" id="loginScreen">
-  <div class="banner-img"><div class="banner-overlay" style="justify-content: center;"><div class="banner-title">📐 수학 교실 로그인</div></div></div>
+  <div class="banner-img"><div class="banner-overlay" style="justify-content: center;"><div class="banner-title">📐 수학 교실 로그인</div></div><button onclick="openThemePicker()" style="position:absolute;top:10px;right:10px;background:rgba(255,255,255,.25);border:1px solid rgba(255,255,255,.4);color:white;border-radius:8px;padding:6px 9px;font-size:15px;cursor:pointer;line-height:1;">🎨</button></div>
   <div class="card-content">
     <div class="field"><label>학번</label><input type="number" id="loginId" placeholder="학번 4자리 (예: 1305)"></div>
     <div class="field"><label>이름</label><input type="text" id="loginName" placeholder="홍길동"></div>
@@ -205,7 +281,7 @@
 </div>
 
 <div class="card" id="dashboardScreen">
-  <div class="banner-img" style="height: 100px;"><div class="banner-overlay"><div class="banner-title" id="welcomeMsg" style="font-size: 20px;">환영합니다!</div><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div>
+  <div class="banner-img" style="height: 100px;"><div class="banner-overlay"><div class="banner-title" id="welcomeMsg" style="font-size: 20px;">환영합니다!</div><div style="display:flex;gap:6px;align-items:center;"><button class="refresh-btn" onclick="openThemePicker()" style="padding:8px 10px;">🎨</button><button id="refreshBtn" class="refresh-btn" onclick="refreshData()">🔄 새로고침</button></div></div></div>
   <div class="card-content" style="padding-top: 15px;">
     <button class="logout-btn" onclick="clearLoginInfo()">🔒 다른 기기인가요? 로그아웃하기</button>
     <button id="notifSetupBtn" onclick="openNotifSetup()" style="display:none;width:100%;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:9px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:10px;">🔔 알림 설정하기</button>
@@ -485,6 +561,105 @@
   }
 
   function applyGalleryFilter() { renderGallery(); }
+
+  // ══════════ 🎨 테마 시스템 ══════════
+  var THEMES = [
+    { key: 'default', name: '기본',  emoji: '💙', cls: '',             dots: ['#2563eb', '#f3f4f6', '#1e3a8a'] },
+    { key: 'sakura',  name: '벚꽃',  emoji: '🌸', cls: 'theme-sakura', dots: ['#db2777', '#fdf2f8', '#fbcfe8'], fx: { ch: '🌸', mode: 'fall', n: 12 } },
+    { key: 'ocean',   name: '바다',  emoji: '🌊', cls: 'theme-ocean',  dots: ['#0891b2', '#ecfeff', '#67e8f9'], fx: { ch: '🫧', mode: 'rise', n: 10 } },
+    { key: 'lego',    name: '레고',  emoji: '🧱', cls: 'theme-lego',   dots: ['#dc2626', '#fef9c3', '#1d4ed8'] },
+    { key: 'pixel',   name: '도트',  emoji: '👾', cls: 'theme-pixel',  dots: ['#16a34a', '#1a1b26', '#a3e635'], font: 'pixel' },
+    { key: 'space',   name: '우주',  emoji: '🚀', cls: 'theme-space',  dots: ['#6366f1', '#0b1026', '#c7d2fe'], fx: { ch: '✦', mode: 'twinkle', n: 22 } },
+    { key: 'note',    name: '노트',  emoji: '📓', cls: 'theme-note',   dots: ['#b45309', '#fffdf7', '#d6d3d1'], font: 'note' },
+    { key: 'dark',    name: '다크',  emoji: '🌙', cls: 'theme-dark',   dots: ['#4f46e5', '#0f172a', '#1f2937'] }
+  ];
+
+  // 테마 폰트는 선택했을 때만 로드 (평소 로딩 속도에 영향 없음)
+  function _loadThemeFont(kind) {
+    var id = 'themeFont_' + kind;
+    if (document.getElementById(id)) return;
+    if (kind === 'pixel') {
+      var st = document.createElement('style');
+      st.id = id;
+      st.textContent = "@font-face { font-family:'NeoDunggeunmo'; src:url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.3/NeoDunggeunmo.woff') format('woff'); font-display:swap; }";
+      document.head.appendChild(st);
+    } else if (kind === 'note') {
+      var lk = document.createElement('link');
+      lk.id = id; lk.rel = 'stylesheet';
+      lk.href = 'https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap';
+      document.head.appendChild(lk);
+    }
+  }
+
+  function _spawnThemeFx(fx) {
+    var box = document.getElementById('themeFx');
+    if (!box) return;
+    box.innerHTML = '';
+    if (!fx) return;
+    for (var i = 0; i < fx.n; i++) {
+      var s = document.createElement('span');
+      s.textContent = fx.ch;
+      s.style.left = (Math.random() * 100) + 'vw';
+      s.style.fontSize = (12 + Math.random() * 14) + 'px';
+      if (fx.mode === 'fall') {
+        var df = 8 + Math.random() * 8;
+        s.style.animation = 'fxFall ' + df + 's linear ' + (-Math.random() * df) + 's infinite';
+      } else if (fx.mode === 'rise') {
+        var dr = 6 + Math.random() * 7;
+        s.style.animation = 'fxRise ' + dr + 's linear ' + (-Math.random() * dr) + 's infinite';
+      } else { // twinkle — 고정 위치에서 반짝임
+        s.style.top = (Math.random() * 100) + 'vh';
+        s.style.animation = 'fxTwinkle ' + (2 + Math.random() * 3) + 's ease-in-out ' + (-Math.random() * 3) + 's infinite';
+      }
+      box.appendChild(s);
+    }
+  }
+
+  function applyTheme(key) {
+    var t = null;
+    for (var i = 0; i < THEMES.length; i++) if (THEMES[i].key === key) t = THEMES[i];
+    if (!t) t = THEMES[0];
+    // 기존 theme-* 클래스 제거 후 적용
+    document.body.className = document.body.className.split(' ').filter(function(c){ return c.indexOf('theme-') !== 0; }).join(' ');
+    if (t.cls) document.body.classList.add(t.cls);
+    if (t.font) _loadThemeFont(t.font);
+    _spawnThemeFx(t.fx || null);
+    try { localStorage.setItem('math_theme', t.key); } catch(_) {}
+    // 모달이 열려 있으면 선택 표시 갱신
+    var items = document.querySelectorAll('.theme-item');
+    items.forEach(function(el){ el.classList.toggle('selected', el.getAttribute('data-theme') === t.key); });
+  }
+
+  function openThemePicker() {
+    var m = document.getElementById('themeModal');
+    if (!m) return;
+    var cur = localStorage.getItem('math_theme') || 'default';
+    var grid = THEMES.map(function(t){
+      var dots = t.dots.map(function(c){ return '<i style="background:' + c + '"></i>'; }).join('');
+      return '<div class="theme-item' + (t.key === cur ? ' selected' : '') + '" data-theme="' + t.key + '" onclick="applyTheme(\'' + t.key + '\')">'
+        + '<div class="t-emoji">' + t.emoji + '</div>'
+        + '<div class="t-name">' + t.name + '</div>'
+        + '<div class="t-dots">' + dots + '</div>'
+        + '</div>';
+    }).join('');
+    m.innerHTML = '<div class="theme-card">'
+      + '<div style="display:flex;justify-content:space-between;align-items:center;">'
+      + '<div style="font-size:17px;font-weight:800;color:#1e293b;">🎨 나만의 테마</div>'
+      + '<div onclick="closeThemePicker()" style="font-size:24px;color:#94a3b8;cursor:pointer;line-height:1;">×</div>'
+      + '</div>'
+      + '<div style="font-size:12px;color:#94a3b8;margin-top:4px;">누르면 바로 바뀌어요. 이 기기에 저장됩니다.</div>'
+      + '<div class="theme-grid">' + grid + '</div>'
+      + '<button onclick="closeThemePicker()" style="width:100%;margin-top:16px;padding:13px;border:none;background:#f1f5f9;color:#475569;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;">닫기</button>'
+      + '</div>';
+    m.style.display = 'flex';
+  }
+  function closeThemePicker() {
+    var m = document.getElementById('themeModal');
+    if (m) m.style.display = 'none';
+  }
+
+  // 저장된 테마 즉시 적용 (화면 뜨기 전)
+  applyTheme(localStorage.getItem('math_theme') || 'default');
 
   window.onload = function() {
     var sId = localStorage.getItem("math_student_id");
