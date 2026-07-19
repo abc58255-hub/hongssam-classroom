@@ -76,9 +76,9 @@ GAS (기존)             ← 명부·비번해시의 원본. 주기 동기화로
 1. ✅ 설계 (이 문서)
 2. ✅ 사용자: Supabase 프로젝트 생성 완료 (lqjrrqhrnxctyrqccmch)
 3. ✅ 스키마 적용 완료 (사용자가 SQL Editor로 실행, 2026-07-19)
-4. ⬜ 명부 동기화 (GAS에서 1회 내보내기 + 이후 주기 동기화)
-5. 🔶 Edge Function: login 코드 작성 완료 — 배포 대기 (ai-proxy는 보류)
+4. ✅ 명부 동기화 완료 (106명, 2026-07-19) — 매주 월 8시 자동 재동기화(keepalive.yml)
+5. ✅ Edge Function 배포 완료: login, sync-roster (ai-proxy는 보류)
 6. ✅ 공용 JS(fcm-sw/lessons/lessons-common.js): 로그인 UI·점수저장·등수판·실시간 완료
 7. ⬜ 템플릿 단원 페이지 + 시범 게임 1개
 8. ⬜ 수학교실 앱에 "이번 주 활동" 안내 연결
-9. ⬜ GitHub Actions 주간 핑 (무료 티어 일시정지 방지)
+9. ✅ GitHub Actions 주간 핑 + 명부 동기화 (keepalive.yml)
