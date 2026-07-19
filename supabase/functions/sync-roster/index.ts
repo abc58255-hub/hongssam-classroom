@@ -21,14 +21,25 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 게임 등록 모드: {games:[{unit,game,title,scope,active}]}
+    // 게임 목록 조회 (교사 관리용 — hidden 포함 전체)
+    if (body.op === "listGames") {
+      const { data, error: lErr } = await admin0.from("games")
+        .select("unit, game, title, url, scope, status, created_at")
+        .order("created_at", { ascending: false });
+      if (lErr) return Response.json({ success: false, message: lErr.message }, { status: 500 });
+      return Response.json({ success: true, games: data });
+    }
+
+    // 게임 등록/수정 모드: {games:[{unit,game,title,url,scope,status}]}
     if (Array.isArray(body.games)) {
+      const okStatus = ["hidden", "open", "free"];
       const gRows = body.games.map((g: Record<string, unknown>) => ({
         unit: String(g.unit ?? "").trim(),
         game: String(g.game ?? "").trim(),
         title: String(g.title ?? "").trim(),
+        url: String(g.url ?? "").trim(),
         scope: g.scope === "grade" ? "grade" : "class",
-        active: g.active !== false,
+        status: okStatus.includes(String(g.status)) ? String(g.status) : "hidden",
       })).filter((g: { unit: string; game: string }) => g.unit && g.game);
       const { error: gErr } = await admin0.from("games").upsert(gRows, { onConflict: "unit,game" });
       if (gErr) return Response.json({ success: false, message: gErr.message }, { status: 500 });

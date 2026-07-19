@@ -19,7 +19,8 @@ function _serviceUrl_() {
 // 아래 목록은 fcm-sw/portal/index.html 어댑터의 FNS와 반드시 일치해야 함
 var RPC_WHITELIST = [
   'teacherLogin', 'teacherLogout', 'validateTeacherSession',
-  'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword'
+  'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
+  'getLessonGames', 'setLessonGame'
 ];
 
 function doPost(e) {
@@ -96,6 +97,32 @@ function getPortalData() {
 }
 
 function _cfg(k, d) { try { return ClassCore.getConfig(k, d); } catch(_) { return d; } }
+
+// ── 🎮 수업활동(Supabase 게임) 관리 — sync-roster 함수를 SYNC_KEY로 호출 ──
+var LESSON_SYNC_URL = 'https://lqjrrqhrnxctyrqccmch.supabase.co/functions/v1/sync-roster';
+function _lessonCall_(payload) {
+  var key = _cfg('수업활동동기화키', '');
+  if (!key) return { success: false, message: '시스템설정에 수업활동동기화키가 없습니다' };
+  try {
+    var res = UrlFetchApp.fetch(LESSON_SYNC_URL, {
+      method: 'post', contentType: 'application/json',
+      headers: { 'X-Sync-Key': key },
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+    return JSON.parse(res.getContentText());
+  } catch (e) { return { success: false, message: String(e) }; }
+}
+function getLessonGames(token) {
+  var v = ClassCore.verifyTeacher(token);
+  if (!v || !v.success) return { success: false, message: '로그인이 만료됐어요' };
+  return _lessonCall_({ op: 'listGames' });
+}
+// g = {unit, game, title, url, scope, status}
+function setLessonGame(token, g) {
+  var v = ClassCore.verifyTeacher(token);
+  if (!v || !v.success) return { success: false, message: '로그인이 만료됐어요' };
+  return _lessonCall_({ games: [g] });
+}
 
 // 카드 URL 수동 등록(미연결 카드 보정용) — 이름은 카드 keys[0]
 function setAppUrl(name, url) {
