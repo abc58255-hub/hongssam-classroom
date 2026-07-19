@@ -79,6 +79,6 @@ GAS (기존)             ← 명부·비번해시의 원본. 주기 동기화로
 4. ✅ 명부 동기화 완료 (106명, 2026-07-19) — 매주 월 8시 자동 재동기화(keepalive.yml)
 5. ✅ Edge Function 배포 완료: login, sync-roster (ai-proxy는 보류)
 6. ✅ 공용 JS(fcm-sw/lessons/lessons-common.js): 로그인 UI·점수저장·등수판·실시간 완료
-7. ⬜ 템플릿 단원 페이지 + 시범 게임 1개
+7. ✅ 시범 게임: lessons/speed-battle.html (연산 스피드 배틀, 학년 공개) — 템플릿 겸용
 8. ⬜ 수학교실 앱에 "이번 주 활동" 안내 연결
 9. ✅ GitHub Actions 주간 핑 + 명부 동기화 (keepalive.yml)

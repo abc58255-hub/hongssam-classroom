@@ -15,7 +15,27 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { students } = await req.json(); // [{sid, name, pwHash}]
+    const body = await req.json();
+    const admin0 = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    // 게임 등록 모드: {games:[{unit,game,title,scope,active}]}
+    if (Array.isArray(body.games)) {
+      const gRows = body.games.map((g: Record<string, unknown>) => ({
+        unit: String(g.unit ?? "").trim(),
+        game: String(g.game ?? "").trim(),
+        title: String(g.title ?? "").trim(),
+        scope: g.scope === "grade" ? "grade" : "class",
+        active: g.active !== false,
+      })).filter((g: { unit: string; game: string }) => g.unit && g.game);
+      const { error: gErr } = await admin0.from("games").upsert(gRows, { onConflict: "unit,game" });
+      if (gErr) return Response.json({ success: false, message: gErr.message }, { status: 500 });
+      return Response.json({ success: true, games: gRows.length });
+    }
+
+    const { students, partial } = body; // [{sid, name, pwHash}] / partial=true면 비활성화 생략
     if (!Array.isArray(students) || students.length === 0) {
       return Response.json({ success: false, message: "빈 명부" }, { status: 400 });
     }
@@ -29,17 +49,16 @@ Deno.serve(async (req) => {
         synced_at: new Date().toISOString(),
       }));
 
-    const admin = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-    );
+    const admin = admin0;
 
-    // 명부에서 사라진 학생(전출 등)은 삭제 대신 비활성화
-    const ids = rows.map((r) => r.student_id);
-    const { error: dErr } = await admin.from("students")
-      .update({ active: false })
-      .not("student_id", "in", `(${ids.join(",")})`);
-    if (dErr) return Response.json({ success: false, message: "비활성화 오류: " + dErr.message }, { status: 500 });
+    // 명부에서 사라진 학생(전출 등)은 삭제 대신 비활성화 — partial 모드에선 생략
+    if (!partial) {
+      const ids = rows.map((r) => r.student_id);
+      const { error: dErr } = await admin.from("students")
+        .update({ active: false })
+        .not("student_id", "in", `(${ids.join(",")})`);
+      if (dErr) return Response.json({ success: false, message: "비활성화 오류: " + dErr.message }, { status: 500 });
+    }
 
     const { error } = await admin.from("students")
       .upsert(rows, { onConflict: "student_id" });

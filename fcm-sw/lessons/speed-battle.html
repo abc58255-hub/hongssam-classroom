@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>⚡ 연산 스피드 배틀</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase-config.js"></script>
+<script src="./lessons-common.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif; background: #f3f4f6; margin: 0; padding: 16px; color: #1f2937; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+  .wrap { width: 100%; max-width: 440px; }
+  .card { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 20px; margin-bottom: 12px; }
+  .title { font-size: 22px; font-weight: 900; color: #1e3a8a; text-align: center; }
+  .sub { font-size: 13px; color: #94a3b8; text-align: center; margin-top: 4px; }
+  .btn { width: 100%; padding: 15px; background: #2563eb; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; }
+  .btn:active { transform: scale(0.98); }
+  .hidden { display: none !important; }
+
+  /* 게임 화면 */
+  .hud { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .hud .score { font-size: 20px; font-weight: 900; color: #2563eb; }
+  .hud .time { font-size: 20px; font-weight: 900; color: #0f172a; }
+  .timebar { height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden; margin-bottom: 18px; }
+  .timebar > div { height: 100%; background: #2563eb; border-radius: 4px; transition: width 0.2s linear; }
+  .problem { font-size: 40px; font-weight: 900; color: #0f172a; text-align: center; padding: 26px 0 30px; letter-spacing: 1px; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .choice { padding: 20px 0; font-size: 24px; font-weight: 900; background: #f8fafc; border: 2px solid #e5e7eb; border-radius: 14px; cursor: pointer; text-align: center; color: #1e3a8a; }
+  .choice:active { transform: scale(0.97); }
+  .choice.ok { background: #dcfce7; border-color: #4ade80; }
+  .choice.no { background: #fee2e2; border-color: #f87171; }
+  .flash-wrong { animation: shake .25s; }
+  @keyframes shake { 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+
+  /* 결과·등수판 */
+  .big-score { font-size: 48px; font-weight: 900; color: #2563eb; text-align: center; }
+  .stat-row { display: flex; text-align: center; margin: 14px 0; }
+  .stat-row > div { flex: 1; }
+  .stat-label { font-size: 11px; color: #64748b; font-weight: 700; }
+  .stat-val { font-size: 17px; font-weight: 900; color: #0f172a; }
+  .lb-title { font-size: 15px; font-weight: 800; color: #1e3a8a; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+  .lb-row { display: flex; align-items: center; gap: 10px; padding: 9px 6px; border-bottom: 1px solid #f1f5f9; font-size: 14px; }
+  .lb-row.me { background: #eff6ff; border-radius: 8px; }
+  .lb-rank { width: 30px; text-align: center; font-weight: 900; color: #64748b; }
+  .lb-name { flex: 1; font-weight: 700; color: #0f172a; }
+  .lb-cls { font-size: 11px; color: #94a3b8; }
+  .lb-score { font-weight: 900; color: #2563eb; }
+  .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #1e3a8a; color: white; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 700; opacity: 0; transition: .3s; pointer-events: none; z-index: 50; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- 시작 화면 -->
+  <div id="startView" class="hidden">
+    <div class="card">
+      <div class="title">⚡ 연산 스피드 배틀</div>
+      <div class="sub" id="greet"></div>
+      <div style="background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:14px;margin:16px 0;font-size:13px;color:#475569;line-height:1.8;">
+        ⏱️ <b>60초</b> 동안 최대한 많이 풀어요<br>
+        ✅ 정답 1개 = 1점 · 오답 감점 없음<br>
+        🏆 최고 기록이 등수판에 올라가요
+      </div>
+      <button class="btn" onclick="startGame()">🚀 시작하기</button>
+      <button onclick="LessonHub.logout()" style="width:100%;background:none;border:none;color:#9ca3af;font-size:12px;margin-top:10px;cursor:pointer;text-decoration:underline;">다른 계정으로 로그인</button>
+    </div>
+    <div class="card">
+      <div class="lb-title">🏆 등수판 <span style="font-size:11px;color:#94a3b8;font-weight:600;">실시간</span></div>
+      <div id="lbStart">불러오는 중...</div>
+    </div>
+  </div>
+
+  <!-- 게임 화면 -->
+  <div id="gameView" class="hidden">
+    <div class="card">
+      <div class="hud"><div class="score" id="score">0점</div><div class="time" id="time">60</div></div>
+      <div class="timebar"><div id="timebarFill" style="width:100%"></div></div>
+      <div class="problem" id="problem"></div>
+      <div class="choices" id="choices"></div>
+    </div>
+  </div>
+
+  <!-- 결과 화면 -->
+  <div id="endView" class="hidden">
+    <div class="card">
+      <div class="title">🏁 결과</div>
+      <div class="big-score" id="finalScore"></div>
+      <div class="stat-row">
+        <div><div class="stat-label">정답</div><div class="stat-val" id="stCorrect" style="color:#16a34a;"></div></div>
+        <div><div class="stat-label">오답</div><div class="stat-val" id="stWrong" style="color:#dc2626;"></div></div>
+        <div><div class="stat-label">내 최고</div><div class="stat-val" id="stBest"></div></div>
+      </div>
+      <div id="saveMsg" style="text-align:center;font-size:12px;color:#94a3b8;margin-bottom:12px;"></div>
+      <button class="btn" onclick="startGame()">🔄 다시 도전</button>
+    </div>
+    <div class="card">
+      <div class="lb-title">🏆 등수판 <span style="font-size:11px;color:#94a3b8;font-weight:600;">실시간</span></div>
+      <div id="lbEnd">불러오는 중...</div>
+    </div>
+  </div>
+
+  <div style="text-align:center;color:#9ca3af;font-size:11px;padding:8px 0 16px;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.00.00</span></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+var GAME_LEN = 60; // 초
+var state = { score: 0, correct: 0, wrong: 0, timeLeft: 0, answer: null, timer: null, busy: false };
+
+// ── 문제 생성 (덧셈·뺄셈·곱셈·간단한 방정식) ──
+function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function makeProblem() {
+  var type = rnd(0, 3), text, ans;
+  if (type === 0) { var a = rnd(11, 89), b = rnd(11, 89); text = a + ' + ' + b; ans = a + b; }
+  else if (type === 1) { var c = rnd(30, 99), d = rnd(11, c - 1); text = c + ' − ' + d; ans = c - d; }
+  else if (type === 2) { var e = rnd(3, 9), f = rnd(4, 19); text = e + ' × ' + f; ans = e * f; }
+  else { var x = rnd(3, 25), g = rnd(2, 30); text = '𝑥 + ' + g + ' = ' + (x + g) + ',  𝑥 = ?'; ans = x; }
+  // 보기 4개 (정답 + 근접 오답 3개)
+  var opts = [ans];
+  while (opts.length < 4) {
+    var cand = ans + (Math.random() < 0.5 ? -1 : 1) * rnd(1, 9);
+    if (cand >= 0 && opts.indexOf(cand) < 0) opts.push(cand);
+  }
+  opts.sort(function () { return Math.random() - 0.5; });
+  return { text: text, ans: ans, opts: opts };
+}
+
+function showProblem() {
+  var p = makeProblem();
+  state.answer = p.ans;
+  state.busy = false;
+  document.getElementById('problem').textContent = p.text;
+  document.getElementById('choices').innerHTML = p.opts.map(function (o) {
+    return '<div class="choice" onclick="pick(this,' + o + ')">' + o + '</div>';
+  }).join('');
+}
+
+function pick(el, val) {
+  if (state.busy) return;
+  state.busy = true;
+  if (val === state.answer) {
+    state.score++; state.correct++;
+    document.getElementById('score').textContent = state.score + '점';
+    el.classList.add('ok');
+    setTimeout(showProblem, 120);
+  } else {
+    state.wrong++;
+    el.classList.add('no');
+    document.getElementById('problem').classList.add('flash-wrong');
+    setTimeout(function () {
+      document.getElementById('problem').classList.remove('flash-wrong');
+      showProblem();
+    }, 300);
+  }
+}
+
+function show(view) {
+  ['startView', 'gameView', 'endView'].forEach(function (v) {
+    document.getElementById(v).classList.toggle('hidden', v !== view);
+  });
+}
+
+function startGame() {
+  state.score = 0; state.correct = 0; state.wrong = 0; state.timeLeft = GAME_LEN;
+  document.getElementById('score').textContent = '0점';
+  show('gameView');
+  showProblem();
+  clearInterval(state.timer);
+  state.timer = setInterval(function () {
+    state.timeLeft--;
+    document.getElementById('time').textContent = state.timeLeft;
+    document.getElementById('timebarFill').style.width = (state.timeLeft / GAME_LEN * 100) + '%';
+    if (state.timeLeft <= 0) { clearInterval(state.timer); endGame(); }
+  }, 1000);
+}
+
+async function endGame() {
+  show('endView');
+  document.getElementById('finalScore').textContent = state.score + '점';
+  document.getElementById('stCorrect').textContent = state.correct;
+  document.getElementById('stWrong').textContent = state.wrong;
+  var msg = document.getElementById('saveMsg');
+  msg.textContent = '기록 저장 중...';
+  try {
+    await LessonHub.saveScore(state.score, { correct: state.correct, wrong: state.wrong });
+    msg.textContent = '✅ 기록 저장 완료';
+  } catch (e) { msg.textContent = '저장 실패: ' + e.message; }
+  refreshBoards();
+}
+
+// ── 등수판 ──
+async function refreshBoards() {
+  try {
+    var rows = await LessonHub.leaderboard(30);
+    var myBest = null;
+    var html = rows.map(function (r, i) {
+      var isMe = LessonHub.user && r.student_id === LessonHub.user.studentId;
+      if (isMe) myBest = r.best_score;
+      var medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      return '<div class="lb-row' + (isMe ? ' me' : '') + '">'
+        + '<div class="lb-rank">' + medal + '</div>'
+        + '<div class="lb-name">' + esc(r.name) + ' <span class="lb-cls">' + esc(r.class_name) + ' · ' + r.attempts + '회 도전</span></div>'
+        + '<div class="lb-score">' + r.best_score + '점</div>'
+        + '</div>';
+    }).join('') || '<div style="color:#94a3b8;font-size:13px;text-align:center;padding:14px;">아직 기록이 없어요 — 1등을 노려보세요!</div>';
+    document.getElementById('lbStart').innerHTML = html;
+    document.getElementById('lbEnd').innerHTML = html;
+    var bestEl = document.getElementById('stBest');
+    if (bestEl) bestEl.textContent = (myBest === null ? state.score : myBest) + '점';
+  } catch (e) {
+    document.getElementById('lbStart').innerHTML = '<div style="color:#ef4444;font-size:13px;">등수판 오류: ' + esc(e.message) + '</div>';
+  }
+}
+
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+function toast(m) {
+  var t = document.getElementById('toast');
+  t.textContent = m; t.classList.add('show');
+  setTimeout(function () { t.classList.remove('show'); }, 2500);
+}
+
+// ── 시작 ──
+LessonHub.init({
+  unit: '테스트', game: 'speed-battle',
+  onReady: function (user) {
+    document.getElementById('greet').textContent = user.className + ' ' + user.name + ' — 준비됐나요?';
+    show('startView');
+    refreshBoards();
+    LessonHub.onNewScore(function (row) {
+      if (LessonHub.user && row.student_id === LessonHub.user.studentId) return;
+      toast('⚡ 새 기록! ' + row.score + '점 등장');
+      refreshBoards();
+    });
+  }
+});
+</script>
+</body>
+</html>
