@@ -55,6 +55,11 @@ function doGet(e) {
     if (e && e.parameter && e.parameter.action) return ContentService.createTextOutput(JSON.stringify({ success: false, message: "앱이 아직 설정되지 않았어요." })).setMimeType(ContentService.MimeType.JSON);
     return _setupPage_();
   }
+  // 수업활동 플랫폼(Supabase) 명부 동기화 — 시스템설정 '수업활동동기화키' 일치 시에만
+  if (e && e.parameter && e.parameter.action === "syncRoster") {
+    return ContentService.createTextOutput(JSON.stringify(_syncRosterToSupabase_(e.parameter.key)))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
   if (e && e.parameter && (e.parameter.action === "saveFcmToken" || e.parameter.action === "saveTeacherFcmToken")) {
     var result = (e.parameter.action === "saveTeacherFcmToken")
       ? StudentAuth.saveTeacherFcmToken(e.parameter.token, e.parameter.pwHash || null, e.parameter.deviceId || '')
@@ -96,6 +101,35 @@ function doPost(e) {
     out = { ok: false, error: String(err && err.message || err) };
   }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── 수업활동 플랫폼(Supabase) 명부 동기화 ──────────────────────
+// 학번·이름·비번해시를 Supabase students 테이블로 푸시 (원문 비밀번호는 어디에도 없음)
+// 호출: <exec>?action=syncRoster&key=<시스템설정 '수업활동동기화키' 값>
+var SUPABASE_SYNC_URL = 'https://lqjrrqhrnxctyrqccmch.supabase.co/functions/v1/sync-roster';
+function _syncRosterToSupabase_(key) {
+  try {
+    var expect = StudentAuth.getConfig('수업활동동기화키', '');
+    if (!expect || String(key || '') !== expect) return { success: false, message: '키가 올바르지 않습니다' };
+    var rows = StudentAuth.getRosterValues(); // B=학번, C=이름, D=비번해시
+    var students = [];
+    for (var i = 1; i < rows.length; i++) {
+      var sid = String(rows[i][1] || '').trim();
+      if (!sid) continue;
+      students.push({ sid: sid, name: String(rows[i][2] || '').trim(), pwHash: String(rows[i][3] || '').trim() });
+    }
+    if (students.length === 0) return { success: false, message: '명부가 비어 있습니다' };
+    var res = UrlFetchApp.fetch(SUPABASE_SYNC_URL, {
+      method: 'post', contentType: 'application/json',
+      headers: { 'X-Sync-Key': expect },
+      payload: JSON.stringify({ students: students }),
+      muteHttpExceptions: true
+    });
+    var out;
+    try { out = JSON.parse(res.getContentText()); } catch (_) { out = { success: false, message: 'HTTP ' + res.getResponseCode() }; }
+    out.sent = students.length;
+    return out;
+  } catch (err) { return { success: false, message: String(err) }; }
 }
 
 function getHash(text) {
