@@ -14,6 +14,28 @@ function _serviceUrl_() {
   try { return ScriptApp.getService().getUrl() || ''; } catch(_) { return ''; }
 }
 
+// ✅ GitHub Pages 프론트(PWA)용 RPC 엔드포인트 — 수학교실 PWA와 동일 패턴
+// text/plain JSON {fn, args} → 화이트리스트 함수만 실행 → {ok, result|error}
+// 아래 목록은 fcm-sw/portal/index.html 어댑터의 FNS와 반드시 일치해야 함
+var RPC_WHITELIST = [
+  'teacherLogin', 'teacherLogout', 'validateTeacherSession',
+  'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword'
+];
+
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    var fn = globalThis[req.fn];
+    if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
+    out = { ok: true, result: fn.apply(null, req.args || []) };
+  } catch (err) {
+    out = { ok: false, error: String(err && err.message || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 // ── 교사 인증 (ClassCore 위임) ──
 function teacherLogin(pw)            { return ClassCore.teacherLogin(pw); }
 function teacherLogout(token)        { return ClassCore.teacherLogout(token); }

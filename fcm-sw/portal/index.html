@@ -1,9 +1,70 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<base target="_top">
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>교사 포털</title>
+
+<!-- iOS 홈 화면 아이콘은 반드시 PNG 파일 (data URI·SVG는 무시됨) -->
+<link rel="apple-touch-icon" href="./icon-portal-180.png">
+<link rel="icon" type="image/png" href="./icon-portal-192.png">
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#0f172a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="교사포털">
+
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
+<script src="../config.js"></script>
+<script>
+  // ✅ GAS 백엔드 (교사포털 고정 배포 — 재배포해도 주소 동일)
+  var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  // ✅ 교사 푸시 토큰 저장 엔드포인트 (학생-수학 GAS의 ?action=saveTeacherFcmToken — teacher.html과 동일)
+  var TOKEN_GAS_URL = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+
+  // ✅ google.script.run 호환 어댑터 — 교사포털 doPost RPC를 fetch로 호출
+  //    FNS는 교사포털/Code.js의 RPC_WHITELIST와 반드시 일치해야 함
+  (function () {
+    var FNS = [
+      'teacherLogin', 'teacherLogout', 'validateTeacherSession',
+      'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword'
+    ];
+    function makeRunner() {
+      var ok = function () {}, fail = function (e) { console.error('[GAS RPC]', e); };
+      var runner = {};
+      runner.withSuccessHandler = function (fn) { if (fn) ok = fn; return runner; };
+      runner.withFailureHandler = function (fn) { if (fn) fail = fn; return runner; };
+      FNS.forEach(function (name) {
+        runner[name] = function () {
+          var args = Array.prototype.slice.call(arguments);
+          fetch(GAS_EXEC_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({ fn: name, args: args })
+          }).then(function (res) {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.json();
+          }).then(function (data) {
+            if (data && data.ok) return data.result;
+            throw new Error((data && data.error) || '서버 오류');
+          }).then(function (result) { ok(result); }, function (e) { fail(e); });
+        };
+      });
+      return runner;
+    }
+    var scriptObj = {};
+    Object.defineProperty(scriptObj, 'run', { get: makeRunner });
+    window.google = { script: scriptObj };
+  })();
+
+  // PWA 셸 서비스워커 (네트워크 우선 + HTTP 캐시 재검증)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(function (reg) {
+      try { reg.update(); } catch (_) {}
+    }).catch(function () {});
+  }
+</script>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
@@ -20,23 +81,23 @@
   .btn:hover { background: #1d4ed8; }
 
   /* 헤더 */
-  header { padding: 28px 32px 8px; display: flex; align-items: center; gap: 14px; }
-  header h1 { font-size: 24px; font-weight: 900; }
+  header { padding: 28px 20px 8px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  header h1 { font-size: 22px; font-weight: 900; white-space: nowrap; }
   header .spacer { flex: 1; }
-  header .small { background: #1e293b; color: #94a3b8; border: none; padding: 9px 15px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  header .small { background: #1e293b; color: #94a3b8; border: none; padding: 9px 13px; border-radius: 10px; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
   header .small:hover { background: #334155; color: white; }
   .hr-chip { background: #1e3a8a; color: #bfdbfe; font-size: 13px; font-weight: 700; padding: 4px 12px; border-radius: 20px; }
 
-  main { padding: 12px 32px 50px; max-width: 1100px; margin: 0 auto; }
+  main { padding: 12px 20px 50px; max-width: 1100px; margin: 0 auto; }
   .group { margin-top: 28px; }
   .group h2 { font-size: 15px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; font-weight: 800; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
 
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 22px; cursor: pointer; transition: 0.2s; text-decoration: none; color: inherit; display: block; position: relative; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 18px; cursor: pointer; transition: 0.2s; text-decoration: none; color: inherit; display: block; position: relative; }
   .card:hover { transform: translateY(-3px); border-color: #3b82f6; box-shadow: 0 12px 30px rgba(37,99,235,0.25); }
-  .card .icon { font-size: 34px; margin-bottom: 12px; display: block; }
-  .card h3 { font-size: 17px; font-weight: 800; margin-bottom: 5px; }
-  .card p { font-size: 13px; color: #94a3b8; line-height: 1.4; }
+  .card .icon { font-size: 32px; margin-bottom: 10px; display: block; }
+  .card h3 { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+  .card p { font-size: 12px; color: #94a3b8; line-height: 1.4; }
   .card.off { cursor: default; opacity: 0.55; }
   .card.off:hover { transform: none; border-color: #334155; box-shadow: none; }
   .card .off-tag { position: absolute; top: 14px; right: 14px; font-size: 11px; font-weight: 800; color: #f87171; background: #450a0a; padding: 3px 9px; border-radius: 20px; }
@@ -45,7 +106,7 @@
   .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #2563eb; color: white; padding: 12px 22px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 100; opacity: 0; transition: 0.3s; }
   .toast.show { opacity: 1; }
   .loading { text-align: center; color: #64748b; padding: 60px; }
-  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 60; }
+  .modal-bg { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 60; padding: 16px; }
   .modal { background: #1e293b; border: 1px solid #334155; border-radius: 16px; padding: 24px; width: 440px; max-width: 92vw; max-height: 88vh; overflow-y: auto; }
   .modal h2 { font-size: 18px; }
   .modal input { width: 100%; padding: 11px 13px; border: 2px solid #334155; border-radius: 10px; font-size: 14px; background: #0f172a; color: white; }
@@ -70,6 +131,7 @@
     <h1>🏫 교사 포털</h1>
     <span class="hr-chip hidden" id="hrChip"></span>
     <div class="spacer"></div>
+    <button class="small" id="pushBtn" onclick="openPushSetup()">🔔 알림</button>
     <button class="small" onclick="openPwReset()">🔑 비번 초기화</button>
     <button class="small" onclick="loadPortal()">↻ 새로고침</button>
     <button class="small" onclick="doLogout()">로그아웃</button>
@@ -181,6 +243,101 @@
     }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).resetStudentPassword(sid, '');
   }
 
+  // ══════════ 🔔 교사 푸시 알림 등록 (앱 내 통합 — teacher.html과 동일 흐름) ══════════
+  var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+  var isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+
+  try { if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG); } catch(_) {}
+
+  function openPushSetup() {
+    var done = localStorage.getItem('portal_push_done') === '1';
+    var body;
+    if (isIOS && !isStandalone) {
+      // iOS는 홈 화면에 설치된 앱에서만 푸시 가능
+      body = '<p style="color:#94a3b8;font-size:14px;line-height:1.7;margin:10px 0 4px;">'
+        + ' 아이폰·아이패드는 <b style="color:#e2e8f0;">홈 화면에 추가한 앱에서만</b> 알림을 받을 수 있어요.<br><br>'
+        + '1️⃣ Safari 하단 <b style="color:#e2e8f0;">공유 버튼(□↑)</b> 탭<br>'
+        + '2️⃣ <b style="color:#e2e8f0;">"홈 화면에 추가"</b> 선택<br>'
+        + '3️⃣ 홈 화면의 <b style="color:#e2e8f0;">교사포털 아이콘</b>으로 다시 열기<br>'
+        + '4️⃣ 이 버튼을 다시 누르면 등록 완료!</p>';
+    } else {
+      body = (done ? '<p style="color:#4ade80;font-size:13px;margin:8px 0;">✅ 이 기기는 이미 등록돼 있어요. 다시 등록해도 괜찮아요.</p>' : '')
+        + '<p style="color:#94a3b8;font-size:13px;margin:8px 0 12px;">학생 제출·재제출·답글 알림을 이 기기로 받아요.<br>확인을 위해 교사 비밀번호를 입력해주세요.</p>'
+        + '<input type="password" id="pushPw" placeholder="교사 비밀번호">'
+        + '<div id="pushStatus" style="font-size:13px;color:#94a3b8;margin-top:10px;min-height:18px;"></div>'
+        + '<button class="btn" style="margin-top:12px;" onclick="registerTeacherPush()">🔔 알림 등록하기</button>';
+    }
+    document.getElementById('modalArea').innerHTML =
+      '<div class="modal-bg" onclick="if(event.target===this)closePw()"><div class="modal">'
+      + '<h2>🔔 알림 설정</h2>' + body
+      + '<div style="text-align:right;margin-top:14px;"><button class="small" onclick="closePw()">닫기</button></div>'
+      + '</div></div>';
+  }
+
+  function _pushStatus(msg, isErr) {
+    var el = document.getElementById('pushStatus');
+    if (el) { el.textContent = msg; el.style.color = isErr ? '#f87171' : '#94a3b8'; }
+  }
+
+  async function sha256(text) {
+    var buf = new TextEncoder().encode(text);
+    var hashBuf = await crypto.subtle.digest('SHA-256', buf);
+    return Array.from(new Uint8Array(hashBuf)).map(function(b){ return b.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  async function registerTeacherPush() {
+    var password = document.getElementById('pushPw').value;
+    if (!password) { _pushStatus('교사 비밀번호를 입력해주세요', true); return; }
+
+    // ⚠️ 알림 권한은 사용자 제스처 유지를 위해 가장 먼저 요청
+    _pushStatus('알림 권한 요청 중...');
+    var permissionPromise;
+    try { permissionPromise = Notification.requestPermission(); }
+    catch(e) { permissionPromise = new Promise(function(res){ Notification.requestPermission(res); }); }
+
+    var pwHash;
+    try { pwHash = await sha256(password); }
+    catch(e) { _pushStatus('암호화 오류: ' + e.message, true); return; }
+
+    var permission = await permissionPromise;
+    if (permission !== 'granted') { _pushStatus('❌ 알림이 거부됐어요. 기기 설정에서 알림을 허용해주세요.', true); return; }
+
+    _pushStatus('알림 워커 등록 중...');
+    var reg;
+    try { reg = await navigator.serviceWorker.register('../firebase-messaging-sw.js'); }
+    catch(e) { _pushStatus('서비스워커 오류: ' + e.message, true); return; }
+
+    _pushStatus('토큰 발급 중...');
+    var token;
+    try {
+      var messaging = firebase.messaging();
+      token = await messaging.getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg });
+      if (!token) throw new Error('토큰을 받지 못했습니다');
+    } catch(e) { _pushStatus('토큰 오류: ' + e.message, true); return; }
+
+    _pushStatus('서버에 저장 중...');
+    try {
+      var deviceId = localStorage.getItem('fcm_device_id');
+      if (!deviceId) {
+        deviceId = 'D' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+        localStorage.setItem('fcm_device_id', deviceId);
+      }
+      var url = TOKEN_GAS_URL
+        + '?action=saveTeacherFcmToken'
+        + '&token=' + encodeURIComponent(token)
+        + '&pwHash=' + encodeURIComponent(pwHash)
+        + '&deviceId=' + encodeURIComponent(deviceId);
+      var res = await fetch(url);
+      var result = await res.json();
+      if (!result.success) { _pushStatus('❌ ' + (result.message || '저장 실패'), true); return; }
+    } catch(e) { _pushStatus('저장 오류: ' + e.message, true); return; }
+
+    localStorage.setItem('portal_push_done', '1');
+    _pushStatus('');
+    closePw();
+    toast('🔔 알림 등록 완료! 학생 활동 알림이 이 기기로 와요');
+  }
+
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
   function toast(msg) {
     var t = document.getElementById('toast');
@@ -192,6 +349,6 @@
 </script>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
-<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.01.00</span></div>
+<div style="text-align:center; color:#475569; font-size:11px; padding:12px 0 18px;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.01.00</span></div>
 </body>
 </html>
