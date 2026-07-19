@@ -74,11 +74,11 @@ GAS (기존)             ← 명부·비번해시의 원본. 주기 동기화로
 ## 구축 순서
 
 1. ✅ 설계 (이 문서)
-2. ⬜ 사용자: Supabase 프로젝트 생성 (서울 리전)
-3. ⬜ 스키마 적용 (migrations/0001_init.sql — CLI 또는 대시보드 SQL Editor)
+2. ✅ 사용자: Supabase 프로젝트 생성 완료 (lqjrrqhrnxctyrqccmch)
+3. ✅ 스키마 적용 완료 (사용자가 SQL Editor로 실행, 2026-07-19)
 4. ⬜ 명부 동기화 (GAS에서 1회 내보내기 + 이후 주기 동기화)
-5. ⬜ Edge Function: login, ai-proxy
-6. ⬜ 공용 JS 조각 (lessons-common.js): 로그인 UI + 점수 저장 + 등수판 위젯
+5. 🔶 Edge Function: login 코드 작성 완료 — 배포 대기 (ai-proxy는 보류)
+6. ✅ 공용 JS(fcm-sw/lessons/lessons-common.js): 로그인 UI·점수저장·등수판·실시간 완료
 7. ⬜ 템플릿 단원 페이지 + 시범 게임 1개
 8. ⬜ 수학교실 앱에 "이번 주 활동" 안내 연결
 9. ⬜ GitHub Actions 주간 핑 (무료 티어 일시정지 방지)
