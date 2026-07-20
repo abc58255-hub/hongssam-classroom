@@ -257,53 +257,58 @@
   ];
 
   function openLessonAdmin() {
-    document.getElementById('modalArea').innerHTML =
-      '<div class="modal-bg" onclick="if(event.target===this)closePw()"><div class="modal" style="width:520px;">'
-      + '<h2>🎮 수업활동 관리</h2>'
-      + '<p style="color:#94a3b8;font-size:13px;margin:6px 0 14px;">상태를 누르면 바로 적용돼요. <b style="color:#e2e8f0;">숨김</b>=학생에게 안 보임 · <b style="color:#fbbf24;">진행 중</b>=수업 활동 · <b style="color:#4ade80;">자유 도전</b>=종료 후 기록경쟁</p>'
-      + '<div id="lgList" style="max-height:56vh;overflow-y:auto;">불러오는 중...</div>'
-      + '<div style="text-align:right;margin-top:14px;"><button class="small" onclick="closePw()">닫기</button></div>'
-      + '</div></div>';
-    google.script.run.withSuccessHandler(function (res) {
-      if (!res || !res.success) { document.getElementById('lgList').innerHTML = '오류: ' + esc(res && res.message || ''); return; }
+    var main = document.getElementById('portalMain');
+    main.innerHTML = '<div class="loading">불러오는 중...</div>';
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { main.innerHTML = '<div class="loading">오류: ' + esc(res && res.message || '') + '</div>'; return; }
       LG_CACHE = res.games || [];
-      renderLG();
-    }).withFailureHandler(function (e) { document.getElementById('lgList').innerHTML = '오류: ' + esc(e.message); }).getLessonGames(TOKEN);
+      renderLessonView();
+    }).withFailureHandler(function(e){ main.innerHTML = '<div class="loading">오류: ' + esc(e.message) + '</div>'; }).getLessonGames(TOKEN);
   }
 
-  function renderLG() {
-    var box = document.getElementById('lgList');
-    if (!box) return;
-    if (LG_CACHE.length === 0) { box.innerHTML = '<p style="color:#64748b;font-size:13px;padding:10px;">등록된 활동이 없어요. 활동 페이지를 만들 때 자동 등록됩니다.</p>'; return; }
-    box.innerHTML = LG_CACHE.map(function (g, i) {
-      var statusBtns = LG_STATUS.map(function (s) {
+  var LESSONS_BASE = 'https://abc58255-hub.github.io/hongssam-classroom/lessons/';
+  function renderLessonView() {
+    var main = document.getElementById('portalMain');
+    var cards = LG_CACHE.map(function(g, i) {
+      var statusBtns = LG_STATUS.map(function(s) {
         var on = g.status === s.v;
-        return '<button onclick="lgSet(' + i + ',\'status\',\'' + s.v + '\')" style="border:none;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;'
-          + (on ? s.on : 'background:#0f172a;color:#64748b;') + '">' + s.label + '</button>';
+        return '<button onclick="lgSet(' + i + ',\'status\',\'' + s.v + '\')" style="flex:1;border:none;padding:9px 4px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;' + (on ? s.on : 'background:#0f172a;color:#64748b;') + '">' + s.label + '</button>';
       }).join('');
-      var scopeBtns = [['class', '반 등수'], ['grade', '학년 등수']].map(function (sc) {
+      var scopeBtns = [['class','반 등수'],['grade','학년 등수']].map(function(sc) {
         var on = g.scope === sc[0];
-        return '<button onclick="lgSet(' + i + ',\'scope\',\'' + sc[0] + '\')" style="border:none;padding:7px 10px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;'
-          + (on ? 'background:#2563eb;color:white;' : 'background:#0f172a;color:#64748b;') + '">' + sc[1] + '</button>';
+        return '<button onclick="lgSet(' + i + ',\'scope\',\'' + sc[0] + '\')" style="flex:1;border:none;padding:9px 4px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;' + (on ? 'background:#2563eb;color:white;' : 'background:#0f172a;color:#64748b;') + '">' + sc[1] + '</button>';
       }).join('');
-      return '<div style="background:#0f172a;border:1px solid #334155;border-radius:12px;padding:14px;margin-bottom:10px;">'
-        + '<div style="font-size:15px;font-weight:800;margin-bottom:2px;">' + esc(g.title || g.game) + '</div>'
-        + '<div style="font-size:11px;color:#64748b;margin-bottom:10px;">' + esc(g.unit) + ' · ' + esc(g.game) + (g.url ? ' · ' + esc(g.url) : '') + '</div>'
-        + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;">' + statusBtns + '</div>'
-        + '<div style="display:flex;gap:6px;flex-wrap:wrap;">' + scopeBtns + '</div>'
+      var stInfo = { hidden: ['#94a3b8','⚫ 숨김 상태'], open: ['#fbbf24','🔥 학생에게 진행 중'], free: ['#4ade80','🏁 자유 도전 공개 중'] }[g.status] || ['#94a3b8',''];
+      var openLink = g.url ? '<a href="' + LESSONS_BASE + esc(g.url) + '" target="_blank" style="font-size:12px;color:#60a5fa;text-decoration:none;font-weight:700;">↗ 열어보기</a>' : '';
+      return '<div class="card" style="cursor:default;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;"><span class="icon">🎮</span>' + openLink + '</div>'
+        + '<h3>' + esc(g.title || g.game) + '</h3>'
+        + '<p style="margin-bottom:6px;">' + esc(g.unit) + ' · ' + esc(g.game) + '</p>'
+        + '<div style="font-size:12px;font-weight:800;color:' + stInfo[0] + ';margin-bottom:12px;">' + stInfo[1] + '</div>'
+        + '<div style="font-size:10px;color:#64748b;font-weight:800;margin-bottom:4px;">노출 상태</div>'
+        + '<div style="display:flex;gap:5px;margin-bottom:10px;">' + statusBtns + '</div>'
+        + '<div style="font-size:10px;color:#64748b;font-weight:800;margin-bottom:4px;">등수판 범위</div>'
+        + '<div style="display:flex;gap:5px;">' + scopeBtns + '</div>'
         + '</div>';
     }).join('');
+    if (!cards) cards = '<div class="card off" style="cursor:default;"><span class="icon">🎮</span><h3>아직 활동이 없어요</h3><p>활동 페이지를 만들면 여기에 카드가 자동으로 추가됩니다.</p></div>';
+    main.innerHTML = '<div class="group">'
+      + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;">'
+      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🎮 수업활동 관리</span></h2>'
+      + '<div class="grid">' + cards + '</div>'
+      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">⚫ 숨김 = 학생에게 안 보임 · 🔥 진행 중 = 수업 시간 활동 · 🏁 자유 도전 = 종료 후 기록경쟁 — 버튼을 누르면 바로 적용돼요</p>'
+      + '</div>';
   }
 
   function lgSet(i, field, val) {
     var g = LG_CACHE[i];
     if (!g || g[field] === val) return;
     g[field] = val;
-    renderLG(); // 낙관적 반영
-    google.script.run.withSuccessHandler(function (res) {
+    renderLessonView(); // 낙관적 반영
+    google.script.run.withSuccessHandler(function(res) {
       if (!res || !res.success) { toast('저장 실패: ' + (res && res.message || '')); openLessonAdmin(); return; }
       toast('✅ 적용됨');
-    }).withFailureHandler(function (e) { toast('오류: ' + e.message); openLessonAdmin(); })
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); openLessonAdmin(); })
       .setLessonGame(TOKEN, { unit: g.unit, game: g.game, title: g.title, url: g.url, scope: g.scope, status: g.status });
   }
 
@@ -413,6 +418,6 @@
 </script>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
-<div style="text-align:center; color:#475569; font-size:11px; padding:12px 0 18px;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.03.00</span></div>
+<div style="text-align:center; color:#475569; font-size:11px; padding:12px 0 18px;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.04.00</span></div>
 </body>
 </html>
