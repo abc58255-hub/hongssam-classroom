@@ -70,7 +70,6 @@
     <h1>🏫 교사 포털</h1>
     <span class="hr-chip hidden" id="hrChip"></span>
     <div class="spacer"></div>
-    <button class="small" onclick="openLessonAdmin()">🎮 수업활동</button>
     <button class="small" onclick="openPwReset()">🔑 비번 초기화</button>
     <button class="small" onclick="loadPortal()">↻ 새로고침</button>
     <button class="small" onclick="doLogout()">로그아웃</button>
@@ -122,6 +121,10 @@
   function render(groups) {
     var html = groups.map(function(g) {
       var cards = g.cards.map(function(c) {
+        if (c.action === 'lessonAdmin') {
+          return '<div class="card" onclick="openLessonAdmin()">' +
+            '<span class="icon">'+c.icon+'</span><h3>'+esc(c.name)+'</h3><p>'+esc(c.desc)+'</p></div>';
+        }
         if (c.url) {
           return '<a class="card" href="'+esc(c.url)+'" target="_blank">' +
             '<span class="icon">'+c.icon+'</span><h3>'+esc(c.name)+'</h3><p>'+esc(c.desc)+'</p></a>';

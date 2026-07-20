@@ -59,7 +59,8 @@ function getPortalData() {
   var groups = [
     { title: '수업·평가', cards: [
       { name: '과제채점',  icon: '📝', desc: '수학 과제 출제·채점·첨삭',     keys: ['과제채점'] },
-      { name: '진도표',    icon: '📋', desc: '진도 계획·기록',              keys: ['진도표'] }
+      { name: '진도표',    icon: '📋', desc: '진도 계획·기록',              keys: ['진도표'] },
+      { name: '수업활동',  icon: '🎮', desc: '단원 게임·자유 도전 공개 관리', keys: [], action: 'lessonAdmin' }
     ]},
     { title: '학급운영', cards: [
       { name: '알림관리',  icon: '🔔', desc: '학급알림 작성·푸시 알림 전송',    keys: ['알림관리'] },
@@ -112,15 +113,21 @@ function _lessonCall_(payload) {
     return JSON.parse(res.getContentText());
   } catch (e) { return { success: false, message: String(e) }; }
 }
+// ClassCore.verifyTeacher의 반환 형식이 버전에 따라 달라 관대하게 판정
+// (true / {success} / {valid} / {ok} 모두 허용 — 형식 불일치로 "로그인 만료" 오탐났던 이력)
+function _teacherOk_(token) {
+  try {
+    var v = ClassCore.verifyTeacher(token);
+    return v === true || !!(v && (v.success || v.valid || v.ok));
+  } catch (_) { return false; }
+}
 function getLessonGames(token) {
-  var v = ClassCore.verifyTeacher(token);
-  if (!v || !v.success) return { success: false, message: '로그인이 만료됐어요' };
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
   return _lessonCall_({ op: 'listGames' });
 }
 // g = {unit, game, title, url, scope, status}
 function setLessonGame(token, g) {
-  var v = ClassCore.verifyTeacher(token);
-  if (!v || !v.success) return { success: false, message: '로그인이 만료됐어요' };
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
   return _lessonCall_({ games: [g] });
 }
 
