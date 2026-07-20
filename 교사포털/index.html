@@ -208,19 +208,19 @@
     var cards = LG_CACHE.map(function(g, i) {
       var statusBtns = LG_STATUS.map(function(s) {
         var on = g.status === s.v;
-        return '<button onclick="lgSet(' + i + ',\'status\',\'' + s.v + '\')" style="flex:1;border:none;padding:9px 4px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;' + (on ? s.on : 'background:#0f172a;color:#64748b;') + '">' + s.label + '</button>';
+        return '<button onclick="lgSet(' + i + ',\'status\',\'' + s.v + '\')" style="flex:1;border:none;padding:8px 2px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;' + (on ? s.on : 'background:#0f172a;color:#64748b;') + '">' + s.label + '</button>';
       }).join('');
       var scopeBtns = [['class','반 등수'],['grade','학년 등수']].map(function(sc) {
         var on = g.scope === sc[0];
-        return '<button onclick="lgSet(' + i + ',\'scope\',\'' + sc[0] + '\')" style="flex:1;border:none;padding:9px 4px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;' + (on ? 'background:#2563eb;color:white;' : 'background:#0f172a;color:#64748b;') + '">' + sc[1] + '</button>';
+        return '<button onclick="lgSet(' + i + ',\'scope\',\'' + sc[0] + '\')" style="flex:1;border:none;padding:8px 2px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;white-space:nowrap;' + (on ? 'background:#2563eb;color:white;' : 'background:#0f172a;color:#64748b;') + '">' + sc[1] + '</button>';
       }).join('');
       var stInfo = { hidden: ['#94a3b8','⚫ 숨김 상태'], open: ['#fbbf24','🔥 학생에게 진행 중'], free: ['#4ade80','🏁 자유 도전 공개 중'] }[g.status] || ['#94a3b8',''];
-      var openLink = g.url ? '<a href="' + LESSONS_BASE + esc(g.url) + '" target="_blank" style="font-size:12px;color:#60a5fa;text-decoration:none;font-weight:700;">↗ 열어보기</a>' : '';
+      var openLink = g.url ? '<a href="' + LESSONS_BASE + esc(g.url) + '" target="_blank" style="font-size:11px;color:#60a5fa;text-decoration:none;font-weight:700;">↗ 열어보기</a>' : '';
       return '<div class="card" style="cursor:default;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;"><span class="icon">🎮</span>' + openLink + '</div>'
-        + '<h3>' + esc(g.title || g.game) + '</h3>'
-        + '<p style="margin-bottom:6px;">' + esc(g.unit) + ' · ' + esc(g.game) + '</p>'
-        + '<div style="font-size:12px;font-weight:800;color:' + stInfo[0] + ';margin-bottom:12px;">' + stInfo[1] + '</div>'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;"><span class="icon" style="font-size:22px;margin-bottom:4px;">🎮</span>' + openLink + '</div>'
+        + '<h3 style="font-size:15px;margin-bottom:2px;">' + esc(g.title || g.game) + '</h3>'
+        + '<p style="font-size:11px;margin-bottom:5px;">' + esc(g.unit) + ' · ' + esc(g.game) + '</p>'
+        + '<div style="font-size:11px;font-weight:800;color:' + stInfo[0] + ';margin-bottom:10px;">' + stInfo[1] + '</div>'
         + '<div style="font-size:10px;color:#64748b;font-weight:800;margin-bottom:4px;">노출 상태</div>'
         + '<div style="display:flex;gap:5px;margin-bottom:10px;">' + statusBtns + '</div>'
         + '<div style="font-size:10px;color:#64748b;font-weight:800;margin-bottom:4px;">등수판 범위</div>'
