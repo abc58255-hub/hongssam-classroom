@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>🏁 게임 센터</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase-config.js"></script>
+<script src="./lessons-common.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: 'Pretendard', -apple-system, 'Apple SD Gothic Neo', sans-serif; background: #f3f4f6; margin: 0; padding: 16px; color: #1f2937; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+  .wrap { width: 100%; max-width: 480px; }
+  .head { background: white; border: 1px solid #e5e7eb; border-radius: 16px; padding: 18px 20px; margin-bottom: 12px; }
+  .head h1 { margin: 0; font-size: 20px; font-weight: 900; color: #1e3a8a; }
+  .head p { margin: 4px 0 0; font-size: 12px; color: #94a3b8; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .g-card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; text-decoration: none; color: inherit; display: block; }
+  .g-card:active { transform: scale(0.98); }
+  .g-badge { font-size: 10px; font-weight: 800; padding: 3px 8px; border-radius: 10px; display: inline-block; margin-bottom: 8px; }
+  .g-title { font-size: 14px; font-weight: 900; color: #0f172a; margin-bottom: 2px; word-break: keep-all; }
+  .g-unit { font-size: 11px; color: #94a3b8; margin-bottom: 10px; }
+  .g-stat { font-size: 12px; color: #475569; line-height: 1.7; }
+  .g-stat b { color: #2563eb; }
+  .empty { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 30px; text-align: center; color: #94a3b8; font-size: 13px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <h1>🏁 게임 센터</h1>
+    <p id="headSub">수업에서 했던 활동에 자유롭게 도전하고 기록을 겨뤄보세요!</p>
+  </div>
+  <div id="list" class="grid"></div>
+  <div style="text-align:center;color:#9ca3af;font-size:11px;padding:14px 0;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.00.00</span></div>
+</div>
+
+<script>
+function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+async function loadCenter(user) {
+  var sb = LessonHub.client;
+  var listEl = document.getElementById('list');
+  try {
+    var g = await sb.from('games').select('*').order('created_at', { ascending: false });
+    var lb = await sb.from('leaderboard').select('*');
+    if (g.error) throw new Error(g.error.message);
+    var games = (g.data || []).filter(function (x) { return x.url; });
+    var rows = lb.data || [];
+    if (games.length === 0) {
+      listEl.outerHTML = '<div class="empty">아직 공개된 게임이 없어요.<br>수업에서 만나요! 🎮</div>';
+      return;
+    }
+    // 진행 중 먼저, 그다음 자유 도전
+    games.sort(function (a, b) { return (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1); });
+    listEl.innerHTML = games.map(function (gm) {
+      var mine = rows.filter(function (r) { return r.unit === gm.unit && r.game === gm.game && r.student_id === user.studentId; })[0];
+      var top = rows.filter(function (r) { return r.unit === gm.unit && r.game === gm.game; })
+        .sort(function (a, b) { return b.best_score - a.best_score; })[0];
+      var badge = gm.status === 'open'
+        ? '<span class="g-badge" style="background:#fef3c7;color:#b45309;">🔥 진행 중</span>'
+        : '<span class="g-badge" style="background:#dcfce7;color:#15803d;">🏁 자유 도전</span>';
+      return '<a class="g-card" href="./' + esc(gm.url) + '">'
+        + badge
+        + '<div class="g-title">' + esc(gm.title || gm.game) + '</div>'
+        + '<div class="g-unit">' + esc(gm.unit) + ' · ' + (gm.scope === 'grade' ? '학년 등수' : '반 등수') + '</div>'
+        + '<div class="g-stat">내 최고 <b>' + (mine ? mine.best_score + '점' : '-') + '</b><br>'
+        + '🥇 ' + (top ? esc(top.name) + ' ' + top.best_score + '점' : '아직 없음') + '</div>'
+        + '</a>';
+    }).join('');
+  } catch (e) {
+    listEl.outerHTML = '<div class="empty">불러오기 오류: ' + esc(e.message) + '</div>';
+  }
+}
+
+LessonHub.init({
+  unit: '게임센터', game: 'hub',
+  onReady: function (user) {
+    document.getElementById('headSub').textContent = user.className + ' ' + user.name + ' — 오늘의 도전을 시작해볼까요?';
+    loadCenter(user);
+  }
+});
+</script>
+</body>
+</html>

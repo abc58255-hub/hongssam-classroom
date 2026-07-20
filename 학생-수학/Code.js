@@ -86,7 +86,7 @@ var RPC_WHITELIST = [
   'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
   'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
   'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
-  'logFeatureUse'
+  'logFeatureUse', 'setStudentPassword'
 ];
 
 function doPost(e) {
@@ -1199,7 +1199,24 @@ function getSubmitRank(studentId, taskName) {
 // ✅ 비밀번호 설정 (미설정 학생이 최초 로그인 시)
 // =====================================================
 function setStudentPassword(studentId, studentName, newPw) {
-  return StudentAuth.setPassword(studentId, studentName, newPw);
+  var res = StudentAuth.setPassword(studentId, studentName, newPw);
+  // 수업활동 플랫폼에도 즉시 반영 — 주간 동기화만 기다리면 최대 일주일간 게임 로그인 실패
+  if (res && res.success) _pushStudentToLessons_(studentId, studentName, getHash(newPw));
+  return res;
+}
+
+// 학생 1명 즉시 동기화 (partial — 다른 학생 비활성화 없음). 실패해도 본 기능에 영향 없음.
+function _pushStudentToLessons_(sid, name, pwHash) {
+  try {
+    var key = StudentAuth.getConfig('수업활동동기화키', '');
+    if (!key) return;
+    UrlFetchApp.fetch(SUPABASE_SYNC_URL, {
+      method: 'post', contentType: 'application/json',
+      headers: { 'X-Sync-Key': key },
+      payload: JSON.stringify({ partial: true, students: [{ sid: String(sid), name: String(name), pwHash: pwHash }] }),
+      muteHttpExceptions: true
+    });
+  } catch (_) {}
 }
 
 // =====================================================

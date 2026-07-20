@@ -29,7 +29,7 @@
     var FNS = [
       'teacherLogin', 'teacherLogout', 'validateTeacherSession',
       'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
-      'getLessonGames', 'setLessonGame'
+      'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame'
     ];
     function makeRunner() {
       var ok = function () {}, fail = function (e) { console.error('[GAS RPC]', e); };
@@ -289,6 +289,7 @@
         + '<div style="display:flex;gap:5px;margin-bottom:10px;">' + statusBtns + '</div>'
         + '<div style="font-size:10px;color:#64748b;font-weight:800;margin-bottom:4px;">등수판 범위</div>'
         + '<div style="display:flex;gap:5px;">' + scopeBtns + '</div>'
+        + '<button onclick="openLessonScores(' + i + ')" style="width:100%;margin-top:10px;border:none;background:#0f172a;color:#94a3b8;padding:8px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;">📊 기록 관리</button>'
         + '</div>';
     }).join('');
     if (!cards) cards = '<div class="card off" style="cursor:default;"><span class="icon">🎮</span><h3>아직 활동이 없어요</h3><p>활동 페이지를 만들면 여기에 카드가 자동으로 추가됩니다.</p></div>';
@@ -311,6 +312,59 @@
     }).withFailureHandler(function(e){ toast('오류: ' + e.message); openLessonAdmin(); })
       .setLessonGame(TOKEN, { unit: g.unit, game: g.game, title: g.title, url: g.url, scope: g.scope, status: g.status });
   }
+
+  // ── 📊 기록 관리 (기록 목록·삭제·전체 리셋) ──
+  var LS_GAME = null;
+  function openLessonScores(i) {
+    LS_GAME = LG_CACHE[i];
+    var main = document.getElementById('portalMain');
+    main.innerHTML = '<div class="loading">기록 불러오는 중...</div>';
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { toast('오류: ' + (res && res.message || '')); renderLessonView(); return; }
+      renderScoresView(res.scores || []);
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); renderLessonView(); })
+      .lessonScores(TOKEN, LS_GAME.unit, LS_GAME.game);
+  }
+  function renderScoresView(scores) {
+    var main = document.getElementById('portalMain');
+    var rows = scores.map(function(r, idx) {
+      var st = r.students || {};
+      var d = String(r.created_at || '').substring(5, 10).replace('-', '/');
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid #1e293b;font-size:13px;">'
+        + '<span style="width:26px;text-align:center;font-weight:900;color:#64748b;">' + (idx + 1) + '</span>'
+        + '<span style="flex:1;font-weight:700;">' + esc(st.name || r.student_id) + ' <span style="font-size:11px;color:#64748b;">' + esc(st.class_name || '') + ' · ' + d + '</span></span>'
+        + '<span style="font-weight:900;color:#60a5fa;">' + r.score + '점</span>'
+        + '<button class="small" style="padding:5px 9px;" onclick="lsDelete(' + r.id + ')">🗑</button>'
+        + '</div>';
+    }).join('') || '<p style="color:#64748b;font-size:13px;padding:14px;">기록이 없어요.</p>';
+    main.innerHTML = '<div class="group">'
+      + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;flex-wrap:wrap;">'
+      + '<button class="small" onclick="openLessonAdmin()">← 관리</button>'
+      + '<span>📊 ' + esc(LS_GAME.title || LS_GAME.game) + ' 기록 (' + scores.length + '건)</span>'
+      + '<span style="flex:1"></span>'
+      + '<button class="small" style="color:#f87171;" onclick="lsReset()">🧹 전체 리셋</button></h2>'
+      + '<div style="background:#1e293b;border:1px solid #334155;border-radius:14px;padding:10px 14px;max-width:640px;">' + rows + '</div>'
+      + '<p style="font-size:12px;color:#64748b;margin-top:12px;">이상한 기록(조작·장난)은 🗑 로 삭제하세요. 등수판은 최고점 기준이라 삭제하면 그 학생의 다음 기록이 반영돼요.</p>'
+      + '</div>';
+  }
+  function lsDelete(id) {
+    if (!confirm('이 기록을 삭제할까요?')) return;
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { toast('삭제 실패: ' + (res && res.message || '')); return; }
+      toast('🗑 삭제됨');
+      var idx = LG_CACHE.indexOf(LS_GAME);
+      openLessonScores(idx >= 0 ? idx : 0);
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).lessonDeleteScore(TOKEN, id);
+  }
+  function lsReset() {
+    if (!confirm('「' + (LS_GAME.title || LS_GAME.game) + '」의 모든 기록을 삭제할까요?\n등수판이 완전히 초기화됩니다. 되돌릴 수 없어요!')) return;
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { toast('리셋 실패: ' + (res && res.message || '')); return; }
+      toast('🧹 ' + (res.deleted || 0) + '건 삭제 완료');
+      openLessonAdmin();
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).lessonResetGame(TOKEN, LS_GAME.unit, LS_GAME.game);
+  }
+
 
   // ══════════ 🔔 교사 푸시 알림 등록 (앱 내 통합 — teacher.html과 동일 흐름) ══════════
   var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
@@ -418,6 +472,6 @@
 </script>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
-<div style="text-align:center; color:#475569; font-size:11px; padding:12px 0 18px;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.04.01</span></div>
+<div style="text-align:center; color:#475569; font-size:11px; padding:12px 0 18px;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.05.00</span></div>
 </body>
 </html>

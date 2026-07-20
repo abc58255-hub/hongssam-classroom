@@ -24,23 +24,54 @@ Deno.serve(async (req) => {
     // 게임 목록 조회 (교사 관리용 — hidden 포함 전체)
     if (body.op === "listGames") {
       const { data, error: lErr } = await admin0.from("games")
-        .select("unit, game, title, url, scope, status, created_at")
+        .select("*")
         .order("created_at", { ascending: false });
       if (lErr) return Response.json({ success: false, message: lErr.message }, { status: 500 });
       return Response.json({ success: true, games: data });
     }
 
+    // 특정 게임 기록 목록 (교사 기록 관리용 — 이름·반 포함, 점수순)
+    if (body.op === "listScores") {
+      const { data, error: sErr } = await admin0.from("game_scores")
+        .select("id, student_id, score, meta, created_at, students(name, class_name)")
+        .eq("unit", String(body.unit ?? "")).eq("game", String(body.game ?? ""))
+        .order("score", { ascending: false }).limit(300);
+      if (sErr) return Response.json({ success: false, message: sErr.message }, { status: 500 });
+      return Response.json({ success: true, scores: data });
+    }
+
+    // 기록 1건 삭제 (장난·조작 기록 제거)
+    if (body.op === "deleteScore") {
+      const { error: dErr } = await admin0.from("game_scores").delete().eq("id", Number(body.id));
+      if (dErr) return Response.json({ success: false, message: dErr.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
+    // 게임 전체 기록 리셋 (새 학기 등)
+    if (body.op === "resetGame") {
+      const { error: rErr, count } = await admin0.from("game_scores")
+        .delete({ count: "exact" })
+        .eq("unit", String(body.unit ?? "")).eq("game", String(body.game ?? ""));
+      if (rErr) return Response.json({ success: false, message: rErr.message }, { status: 500 });
+      return Response.json({ success: true, deleted: count ?? 0 });
+    }
+
     // 게임 등록/수정 모드: {games:[{unit,game,title,url,scope,status}]}
     if (Array.isArray(body.games)) {
       const okStatus = ["hidden", "open", "free"];
-      const gRows = body.games.map((g: Record<string, unknown>) => ({
-        unit: String(g.unit ?? "").trim(),
-        game: String(g.game ?? "").trim(),
-        title: String(g.title ?? "").trim(),
-        url: String(g.url ?? "").trim(),
-        scope: g.scope === "grade" ? "grade" : "class",
-        status: okStatus.includes(String(g.status)) ? String(g.status) : "hidden",
-      })).filter((g: { unit: string; game: string }) => g.unit && g.game);
+      const gRows = body.games.map((g: Record<string, unknown>) => {
+        const row: Record<string, unknown> = {
+          unit: String(g.unit ?? "").trim(),
+          game: String(g.game ?? "").trim(),
+          title: String(g.title ?? "").trim(),
+          url: String(g.url ?? "").trim(),
+          scope: g.scope === "grade" ? "grade" : "class",
+          status: okStatus.includes(String(g.status)) ? String(g.status) : "hidden",
+        };
+        // 점수 상한 (0 = 제한 없음) — 마이그레이션 전 호환 위해 값이 있을 때만 포함
+        if (g.max_score !== undefined) row.max_score = Number(g.max_score) || 0;
+        return row;
+      }).filter((g: { unit: string; game: string }) => g.unit && g.game);
       const { error: gErr } = await admin0.from("games").upsert(gRows, { onConflict: "unit,game" });
       if (gErr) return Response.json({ success: false, message: gErr.message }, { status: 500 });
       return Response.json({ success: true, games: gRows.length });

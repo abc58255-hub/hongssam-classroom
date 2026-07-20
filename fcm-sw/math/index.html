@@ -33,7 +33,7 @@
         'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
         'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
         'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
-        'logFeatureUse'
+        'logFeatureUse', 'setStudentPassword'
       ];
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[GAS RPC]', e); };
@@ -758,20 +758,25 @@
       if (!Array.isArray(rows)) { box.innerHTML = ''; return; }
       rows = rows.filter(function (g) { return g.url; });
       if (rows.length === 0) { box.innerHTML = ''; return; }
-      rows.sort(function (a, b) { return (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1); }); // 진행 중 먼저
-      var cards = rows.map(function (g) {
-        var badge = g.status === 'open'
-          ? '<span style="background:#fef3c7;color:#b45309;font-size:10px;font-weight:800;padding:3px 8px;border-radius:10px;white-space:nowrap;">🔥 진행 중</span>'
-          : '<span style="background:#dcfce7;color:#15803d;font-size:10px;font-weight:800;padding:3px 8px;border-radius:10px;white-space:nowrap;">🏁 자유 도전</span>';
+      // 🔥 진행 중은 개별 카드 (수업 시간용, 보통 0~2개) — 자유 도전은 게임 센터 한 줄로 압축
+      var opens = rows.filter(function (g) { return g.status === 'open'; });
+      var freeCnt = rows.length - opens.length;
+      var cards = opens.map(function (g) {
         var scopeTxt = g.scope === 'grade' ? '학년 등수' : '반 등수';
-        return '<a href="../lessons/' + g.url + '" style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:11px 12px;margin-bottom:6px;text-decoration:none;">'
+        return '<a href="../lessons/' + g.url + '" style="display:flex;align-items:center;gap:8px;background:#fffbeb;border:1.5px solid #fde68a;border-radius:10px;padding:11px 12px;margin-bottom:6px;text-decoration:none;">'
           + '<span style="flex:1;min-width:0;font-size:14px;font-weight:800;color:#0f172a;">' + escDj(g.title || g.game)
           + ' <span style="font-size:10px;color:#94a3b8;font-weight:600;">' + scopeTxt + '</span></span>'
-          + badge + '<span style="color:#94a3b8;font-weight:800;">›</span></a>';
+          + '<span style="background:#fef3c7;color:#b45309;font-size:10px;font-weight:800;padding:3px 8px;border-radius:10px;white-space:nowrap;">🔥 진행 중</span>'
+          + '<span style="color:#94a3b8;font-weight:800;">›</span></a>';
       }).join('');
+      var centerLink = freeCnt > 0
+        ? '<a href="../lessons/index.html" style="display:flex;align-items:center;gap:8px;background:#f8fafc;border:1px solid #eef2f7;border-radius:10px;padding:11px 12px;text-decoration:none;">'
+          + '<span style="flex:1;font-size:14px;font-weight:800;color:#0f172a;">🏁 게임 센터 <span style="font-size:11px;color:#94a3b8;font-weight:700;">자유 도전 ' + freeCnt + '개 — 기록에 도전!</span></span>'
+          + '<span style="color:#94a3b8;font-weight:800;">›</span></a>'
+        : '';
       box.innerHTML = '<div class="sec-card" style="padding:12px 14px;">'
         + '<div style="font-size:13px;font-weight:800;color:#1e3a8a;margin-bottom:8px;">🎮 수업 활동</div>'
-        + cards + '</div>';
+        + cards + centerLink + '</div>';
     }).catch(function () { box.innerHTML = ''; });
   }
   loadLessonActs();

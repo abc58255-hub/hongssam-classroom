@@ -20,7 +20,7 @@ function _serviceUrl_() {
 var RPC_WHITELIST = [
   'teacherLogin', 'teacherLogout', 'validateTeacherSession',
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
-  'getLessonGames', 'setLessonGame'
+  'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame'
 ];
 
 function doPost(e) {
@@ -125,10 +125,23 @@ function getLessonGames(token) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
   return _lessonCall_({ op: 'listGames' });
 }
-// g = {unit, game, title, url, scope, status}
+// g = {unit, game, title, url, scope, status, max_score?}
 function setLessonGame(token, g) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
   return _lessonCall_({ games: [g] });
+}
+// 기록 관리 — 목록·1건 삭제·전체 리셋
+function lessonScores(token, unit, game) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요' };
+  return _lessonCall_({ op: 'listScores', unit: unit, game: game });
+}
+function lessonDeleteScore(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요' };
+  return _lessonCall_({ op: 'deleteScore', id: id });
+}
+function lessonResetGame(token, unit, game) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요' };
+  return _lessonCall_({ op: 'resetGame', unit: unit, game: game });
 }
 
 // 카드 URL 수동 등록(미연결 카드 보정용) — 이름은 카드 keys[0]

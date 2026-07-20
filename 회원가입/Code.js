@@ -52,7 +52,24 @@ function doGet() {
 
 // 회원가입 처리 — 인증 라이브러리(인증 시트)로 위임. 가입코드도 인증 시트 설정 사용.
 function registerStudent(studentId, studentName, password, inputCode) {
-  return StudentAuth.registerStudent(studentId, studentName, password, inputCode);
+  var res = StudentAuth.registerStudent(studentId, studentName, password, inputCode);
+  // 수업활동 플랫폼(Supabase)에도 즉시 반영 — 가입 직후 게임 로그인 가능하게
+  if (res && res.success) {
+    try {
+      var key = StudentAuth.getConfig('수업활동동기화키', '');
+      if (key) {
+        var hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password)
+          .map(function(b){ return (b < 0 ? b + 256 : b).toString(16).padStart(2, '0'); }).join('');
+        UrlFetchApp.fetch('https://lqjrrqhrnxctyrqccmch.supabase.co/functions/v1/sync-roster', {
+          method: 'post', contentType: 'application/json',
+          headers: { 'X-Sync-Key': key },
+          payload: JSON.stringify({ partial: true, students: [{ sid: String(studentId), name: String(studentName), pwHash: hash }] }),
+          muteHttpExceptions: true
+        });
+      }
+    } catch (_) {}
+  }
+  return res;
 }
 // ── 초기 설정 (SHEET_ID 미설정 시 setup 화면) ──────────
 function _setupPage_() {
