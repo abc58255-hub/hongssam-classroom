@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>필기 성능 실험실</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  body { font-family: -apple-system, 'Apple SD Gothic Neo', sans-serif; background: #0f172a; color: #e2e8f0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+  #toolbar { display: flex; align-items: center; gap: 6px; padding: 8px 10px; background: #1e293b; flex-wrap: wrap; flex-shrink: 0; }
+  .btn { background: #334155; color: #e2e8f0; border: none; border-radius: 8px; padding: 8px 11px; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .btn.on { outline: 2px solid #fff; }
+  .cbtn { width: 26px; height: 26px; border-radius: 50%; border: 2px solid #475569; cursor: pointer; }
+  .cbtn.on { border-color: #fff; }
+  #wrap { flex: 1; position: relative; overflow: hidden; background: #0f172a; touch-action: none; }
+  #stage { position: absolute; top: 0; left: 0; transform-origin: 0 0; }
+  #bg { position: absolute; top: 0; left: 0; display: block; }
+  #draw { position: absolute; top: 0; left: 0; }
+  #fps { position: absolute; top: 8px; right: 10px; background: rgba(0,0,0,.6); color: #4ade80; font-size: 12px; font-weight: 800; padding: 4px 10px; border-radius: 8px; z-index: 10; font-family: monospace; }
+  #hint { padding: 6px 10px; font-size: 11px; color: #94a3b8; background: #1e293b; flex-shrink: 0; text-align: center; }
+</style>
+</head>
+<body>
+<div id="toolbar">
+  <button class="btn on" id="tPen" onclick="setTool('pen')">✏️ 펜</button>
+  <button class="btn" id="tHl" onclick="setTool('hl')">🖍 형광</button>
+  <button class="btn" id="tEr" onclick="setTool('er')">🧽 지우개</button>
+  <span style="width:8px"></span>
+  <button class="cbtn on" id="c0" style="background:#ef4444" onclick="setColor('#ef4444',this)"></button>
+  <button class="cbtn" style="background:#3b82f6" onclick="setColor('#3b82f6',this)"></button>
+  <button class="cbtn" style="background:#22c55e" onclick="setColor('#22c55e',this)"></button>
+  <button class="cbtn" style="background:#eab308" onclick="setColor('#eab308',this)"></button>
+  <span style="width:8px"></span>
+  <button class="btn" onclick="clearAll()">🗑 지우기</button>
+  <button class="btn" onclick="resetView()">⤢ 맞춤</button>
+</div>
+<div id="wrap">
+  <div id="fps">FPS --</div>
+  <div id="stage">
+    <img id="bg" alt="">
+    <canvas id="draw"></canvas>
+  </div>
+</div>
+<div id="hint">애플펜슬/S펜=그리기 · 손가락1=이동 · 손가락2=확대 · 손날 대고 써보세요 (성능·씹힘 체감 테스트)</div>
+
+<script>
+// ── 상태 ──
+var wrap = document.getElementById('wrap');
+var stage = document.getElementById('stage');
+var bg = document.getElementById('bg');
+var cv = document.getElementById('draw');
+var ctx = cv.getContext('2d');
+var tool = 'pen', color = '#ef4444', penSize = 3;
+var scale = 1, tx = 0, ty = 0;
+var drawing = false, penId = null, lastX = 0, lastY = 0;
+var touchPts = new Map(), panSX = 0, panSY = 0, panOX = 0, panOY = 0, pinch0 = 0, pinchS0 = 1;
+
+// ── 샘플 이미지 (큰 손글씨 사진 크기 흉내: 1600x2100 캔버스) ──
+var IMG_W = 1600, IMG_H = 2100;
+(function makeSample() {
+  var c = document.createElement('canvas'); c.width = IMG_W; c.height = IMG_H;
+  var x = c.getContext('2d');
+  x.fillStyle = '#fffef7'; x.fillRect(0, 0, IMG_W, IMG_H);
+  x.strokeStyle = '#dfe7f0'; x.lineWidth = 2;
+  for (var i = 1; i < 30; i++) { x.beginPath(); x.moveTo(0, i * 70); x.lineTo(IMG_W, i * 70); x.stroke(); }
+  x.fillStyle = '#334155'; x.font = 'bold 44px sans-serif';
+  x.fillText('학생 답안 (샘플)', 60, 90);
+  x.font = '38px sans-serif'; x.fillStyle = '#475569';
+  x.fillText('1. 이차방정식 x² - 5x + 6 = 0 을 풀어라.', 60, 220);
+  x.fillText('   (x-2)(x-3) = 0', 100, 300);
+  x.fillText('   x = 2 또는 x = 3', 100, 370);
+  x.fillText('2. 다음을 인수분해 하시오.', 60, 500);
+  x.fillText('   x² + 7x + 12 = (x+3)(x+4)', 100, 580);
+  bg.src = c.toDataURL('image/jpeg', 0.9);
+})();
+
+// 캔버스 백킹스토어 = 이미지 실크기 (표시는 CSS transform으로 축소)
+cv.width = IMG_W; cv.height = IMG_H;
+bg.style.width = IMG_W + 'px'; bg.style.height = IMG_H + 'px';
+cv.style.width = IMG_W + 'px'; cv.style.height = IMG_H + 'px';
+
+function applyTransform() { stage.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + scale + ')'; }
+function resetView() {
+  var r = wrap.getBoundingClientRect();
+  scale = Math.min(r.width / IMG_W, r.height / IMG_H) * 0.96;
+  tx = (r.width - IMG_W * scale) / 2; ty = (r.height - IMG_H * scale) / 2;
+  applyTransform();
+}
+bg.onload = resetView;
+
+// ── 도구 ──
+function setTool(t) {
+  tool = t;
+  ['tPen','tHl','tEr'].forEach(function(id){ document.getElementById(id).classList.remove('on'); });
+  document.getElementById({pen:'tPen',hl:'tHl',er:'tEr'}[t]).classList.add('on');
+}
+function setColor(c, el) {
+  color = c;
+  document.querySelectorAll('.cbtn').forEach(function(b){ b.classList.remove('on'); });
+  el.classList.add('on');
+}
+function clearAll() { ctx.clearRect(0, 0, cv.width, cv.height); }
+
+// ── 좌표 변환 (화면 → 캔버스) ──
+function toCanvas(cx, cy) {
+  var r = cv.getBoundingClientRect();
+  return { x: (cx - r.left) / scale, y: (cy - r.top) / scale };
+}
+
+// ── 그리기 (즉시 렌더, 스타일은 스트로크 시작 때 1회 설정) ──
+function beginStroke(cx, cy, pressure) {
+  var p = toCanvas(cx, cy);
+  lastX = p.x; lastY = p.y;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (tool === 'hl') {
+    ctx.globalAlpha = 0.3; ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = color; ctx.lineWidth = Math.max(penSize * 6, 26);
+  } else if (tool === 'er') {
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'destination-out';
+    ctx.lineWidth = Math.max(penSize * 6, 24);
+  } else {
+    ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = color; ctx.lineWidth = penSize * (0.6 + pressure);
+  }
+  ctx.beginPath(); ctx.moveTo(lastX, lastY);
+  ctx.lineTo(lastX + 0.1, lastY + 0.1); ctx.stroke(); // 점 하나
+}
+function extendStroke(evs) {
+  ctx.beginPath(); ctx.moveTo(lastX, lastY);
+  for (var i = 0; i < evs.length; i++) {
+    var p = toCanvas(evs[i].clientX, evs[i].clientY);
+    if (tool === 'pen') ctx.lineWidth = penSize * (0.6 + ((evs[i].pressure > 0) ? evs[i].pressure : 0.5));
+    ctx.lineTo(p.x, p.y);
+    lastX = p.x; lastY = p.y;
+  }
+  ctx.stroke();
+}
+
+// ── 입력 (pointer 통일) ──
+wrap.addEventListener('pointerdown', function(e) {
+  if (e.pointerType === 'touch') {
+    if (drawing || penId !== null) { e.preventDefault(); return; } // 팜 리젝션
+    touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touchPts.size === 1) { panSX = e.clientX; panSY = e.clientY; panOX = tx; panOY = ty; }
+    else if (touchPts.size === 2) {
+      var a = Array.from(touchPts.values());
+      pinch0 = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y); pinchS0 = scale;
+    }
+    e.preventDefault(); return;
+  }
+  if (e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
+  touchPts.clear();
+  drawing = true; penId = e.pointerId;
+  try { wrap.setPointerCapture(e.pointerId); } catch(_) {}
+  beginStroke(e.clientX, e.clientY, (e.pressure > 0) ? e.pressure : 0.5);
+  e.preventDefault();
+}, { passive: false });
+
+wrap.addEventListener('pointermove', function(e) {
+  if (e.pointerType === 'touch') {
+    if (!touchPts.has(e.pointerId)) return;
+    touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    var a = Array.from(touchPts.values());
+    if (a.length === 1) { tx = panOX + (a[0].x - panSX); ty = panOY + (a[0].y - panSY); applyTransform(); }
+    else if (a.length >= 2 && pinch0 > 0) {
+      var d = Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y);
+      scale = Math.min(Math.max(0.1, pinchS0 * (d / pinch0)), 6); applyTransform();
+    }
+    e.preventDefault(); return;
+  }
+  if (!drawing || e.pointerId !== penId) return;
+  var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+  extendStroke(evs);
+  tick();
+  e.preventDefault();
+}, { passive: false });
+
+function endPen(e) {
+  if (e.pointerType === 'touch') { touchPts.delete(e.pointerId); return; }
+  if (e.pointerId !== penId) return;
+  drawing = false; penId = null;
+}
+wrap.addEventListener('pointerup', endPen);
+wrap.addEventListener('pointercancel', endPen);
+
+// ── FPS 측정 ──
+var frames = 0, lastFps = performance.now();
+function tick() {
+  frames++;
+  var now = performance.now();
+  if (now - lastFps >= 500) {
+    var fps = Math.round(frames / ((now - lastFps) / 1000));
+    document.getElementById('fps').textContent = 'FPS ' + fps;
+    document.getElementById('fps').style.color = fps >= 50 ? '#4ade80' : fps >= 30 ? '#fbbf24' : '#f87171';
+    frames = 0; lastFps = now;
+  }
+}
+document.addEventListener('selectstart', function(e){ e.preventDefault(); });
+</script>
+</body>
+</html>
