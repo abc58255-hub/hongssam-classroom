@@ -151,12 +151,13 @@ wrap.addEventListener('pointerdown', function(e) {
   if (e.pointerType !== 'pen' && e.pointerType !== 'mouse') return;
   touchPts.clear();
   drawing = true; penId = e.pointerId;
-  try { wrap.setPointerCapture(e.pointerId); } catch(_) {}
+  // setPointerCapture는 iOS Safari에서 펜 이벤트 씹힘 유발 → 쓰지 않고 window 레벨로 추적
   beginStroke(e.clientX, e.clientY, (e.pressure > 0) ? e.pressure : 0.5);
   e.preventDefault();
 }, { passive: false });
 
-wrap.addEventListener('pointermove', function(e) {
+// 필기 이동은 window 레벨에서 받음 (capture 없이도 wrap 밖까지 추적, 씹힘 회피)
+window.addEventListener('pointermove', function(e) {
   if (e.pointerType === 'touch') {
     if (!touchPts.has(e.pointerId)) return;
     touchPts.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -180,8 +181,8 @@ function endPen(e) {
   if (e.pointerId !== penId) return;
   drawing = false; penId = null;
 }
-wrap.addEventListener('pointerup', endPen);
-wrap.addEventListener('pointercancel', endPen);
+window.addEventListener('pointerup', endPen);
+window.addEventListener('pointercancel', endPen);
 
 // ── FPS 측정 ──
 var frames = 0, lastFps = performance.now();
