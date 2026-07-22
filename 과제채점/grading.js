@@ -553,7 +553,8 @@ function saveNewTask(taskData) {
     const sheet = _taskSs().getSheetByName("과제설정");
     const existing = sheet.getRange("B:B").getValues().flat();
     if (existing.includes(taskData.name)) return { success: false, message: "이미 같은 이름의 과제가 존재합니다." };
-    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList]);
+    // I(9)=만점 자리 유지, J(10)=성취기준 코드 JSON 배열
+    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList, taskData.maxScore || '', taskData.standards || '']);
     const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     let taskFolder = parentFolder.createFolder(taskData.name);
     let deadlineObj = JSON.parse(taskData.deadlines);

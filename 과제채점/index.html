@@ -272,7 +272,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.01.03</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.02.00</span>
     </div>
   </div>
 </div>
@@ -377,6 +377,11 @@
         </div>
       </div>
       <div class="form-group"><label class="form-label">설명</label><input type="text" id="newTaskDesc" class="form-input" placeholder="학생에게 보여줄 과제 설명 (선택)"></div>
+      <div class="form-group">
+        <label class="form-label">🎯 성취기준 연결 <span style="font-size:12px; color:#64748b; font-weight:normal;">(선택 — 나중에 성취도·포트폴리오 분석에 활용)</span></label>
+        <div id="newStdChips" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;"></div>
+        <button type="button" onclick="openStdPicker('new')" style="background:#eef2ff; color:#4338ca; border:1px dashed #a5b4fc; padding:8px 14px; border-radius:8px; cursor:pointer; font-weight:700; font-size:13px;">+ 성취기준 선택</button>
+      </div>
       <div class="form-group">
         <label class="form-label">마감일 설정 <span style="font-size:12px; color:#64748b; font-weight:normal;">(반별로 다르게 설정 가능 / 마감 시간 기본값 오후 5시 5분)</span></label>
         <div id="deadlineContainer"></div>
@@ -1209,6 +1214,7 @@
     return s;
   }
  function loadData() {
+    loadAchievements(); // 🎯 성취기준 목록 준비 (과제 등록 시 선택용)
     let curClass = document.getElementById('classFilter') ? document.getElementById('classFilter').value : "";
     let curTask = document.getElementById('taskFilter') ? document.getElementById('taskFilter').value : "";
     let curStatus = document.getElementById('statusFilter') ? document.getElementById('statusFilter').value : "not_completed";
@@ -2005,6 +2011,54 @@
     }).installAutoNotifyTriggers();
   }
 
+  // ══════════ 🎯 성취기준 연결 ══════════
+  var gAchievements = [];
+  var gStdNew = [], gStdEdit = [];
+  function loadAchievements() {
+    google.script.run.withSuccessHandler(function(r) {
+      if (r && r.success) gAchievements = r.items || [];
+    }).withFailureHandler(function(){}).getAchievements();
+  }
+  function openStdPicker(mode) {
+    if (!gAchievements.length) { alert('성취기준을 불러오는 중이에요. 잠시 후 다시 시도해주세요.'); loadAchievements(); return; }
+    var selected = (mode === 'new') ? gStdNew : gStdEdit;
+    var areas = {};
+    gAchievements.forEach(function(a) { (areas[a.area] = areas[a.area] || []).push(a); });
+    var html = Object.keys(areas).map(function(area) {
+      var items = areas[area].map(function(a) {
+        var on = selected.indexOf(a.code) >= 0;
+        return '<label style="display:flex; gap:8px; padding:7px 6px; border-bottom:1px solid #f1f5f9; font-size:13px; cursor:pointer; align-items:flex-start;"><input type="checkbox" value="' + a.code + '" ' + (on ? 'checked' : '') + ' style="margin-top:2px;"> <b style="color:#0284c7; white-space:nowrap;">' + a.code + '</b> <span style="color:#334155;">' + escapeHtml(a.text) + '</span></label>';
+      }).join('');
+      return '<div style="margin-bottom:6px;"><div style="font-weight:800; color:#1e3a8a; font-size:13px; margin:8px 0 2px;">' + escapeHtml(area) + '</div>' + items + '</div>';
+    }).join('');
+    var ov = document.getElementById('stdPickerModal');
+    if (!ov) { ov = document.createElement('div'); ov.id = 'stdPickerModal'; document.body.appendChild(ov); }
+    ov.style.cssText = 'position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:9999; display:flex; align-items:center; justify-content:center; padding:20px;';
+    ov.onclick = function(e) { if (e.target === ov) ov.remove(); };
+    ov.innerHTML = '<div style="background:white; width:100%; max-width:580px; max-height:82vh; border-radius:16px; display:flex; flex-direction:column;">'
+      + '<div style="padding:16px 20px; border-bottom:1px solid #e2e8f0; font-size:16px; font-weight:800; color:#0f172a;">🎯 성취기준 선택 <span style="font-size:12px; color:#94a3b8; font-weight:600;">여러 개 선택 가능</span></div>'
+      + '<div id="stdPickerBody" style="padding:10px 20px; overflow-y:auto; flex:1;">' + html + '</div>'
+      + '<div style="padding:14px 20px; border-top:1px solid #e2e8f0; display:flex; gap:10px; justify-content:flex-end;">'
+        + '<button onclick="document.getElementById(\'stdPickerModal\').remove()" style="padding:10px 18px; border:none; background:#f1f5f9; color:#475569; border-radius:8px; font-weight:700; cursor:pointer;">취소</button>'
+        + '<button onclick="applyStdPicker(\'' + mode + '\')" style="padding:10px 18px; border:none; background:#0284c7; color:white; border-radius:8px; font-weight:800; cursor:pointer;">선택 완료</button>'
+      + '</div></div>';
+  }
+  function applyStdPicker(mode) {
+    var codes = [];
+    document.querySelectorAll('#stdPickerBody input:checked').forEach(function(c) { codes.push(c.value); });
+    if (mode === 'new') gStdNew = codes; else gStdEdit = codes;
+    var ov = document.getElementById('stdPickerModal'); if (ov) ov.remove();
+    renderStdChips(mode);
+  }
+  function renderStdChips(mode) {
+    var box = document.getElementById(mode === 'new' ? 'newStdChips' : 'editStdChips');
+    if (!box) return;
+    var selected = (mode === 'new') ? gStdNew : gStdEdit;
+    box.innerHTML = selected.length
+      ? selected.map(function(code) { return '<span style="background:#eef2ff; color:#4338ca; border:1px solid #c7d2fe; padding:3px 9px; border-radius:12px; font-size:12px; font-weight:700;">' + code + '</span>'; }).join('')
+      : '<span style="font-size:12px; color:#94a3b8;">연결된 성취기준 없음</span>';
+  }
+
   function createNewTask() {
     var n = document.getElementById('newTaskName').value.trim();
     if (!n) return alert("과제명을 입력해주세요.");
@@ -2019,7 +2073,7 @@
       choiceList = document.getElementById('newChoiceList').value.trim();
       if (!choiceList) return alert("선택할 문제 목록을 입력해주세요.");
     }
-    var td = { name: n, desc: document.getElementById('newTaskDesc').value, evalType: document.getElementById('newEvalType').value, deadlines: dJson, isPublic: false, reqPics: document.getElementById('newReqPics').value, choiceList: choiceList };
+    var td = { name: n, desc: document.getElementById('newTaskDesc').value, evalType: document.getElementById('newEvalType').value, deadlines: dJson, isPublic: false, reqPics: document.getElementById('newReqPics').value, choiceList: choiceList, standards: gStdNew.length ? JSON.stringify(gStdNew) : '' };
     var btn = document.getElementById('btnCreateTask');
     btn.innerText = "생성 중..."; btn.disabled = true;
     google.script.run.withFailureHandler(function(err) {
@@ -2031,6 +2085,7 @@
         document.getElementById('newTaskName').value = '';
         document.getElementById('newTaskDesc').value = '';
         document.getElementById('newChoiceList').value = '';
+        gStdNew = []; renderStdChips('new');
         document.getElementById('deadlineContainer').innerHTML = '';
         document.getElementById('checkChoiceMode').checked = false;
         document.getElementById('choiceModeSetup').style.display = 'none';
