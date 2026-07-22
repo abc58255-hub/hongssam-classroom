@@ -1579,3 +1579,90 @@ function approveResubmitRequest(rowIdx) {
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
+
+// ══════════ 성취기준 (achievements.js에서 병합 — 별도 .js 파일이 clasp에 안 올라가는 문제 회피) ══════════
+// 2022 개정 중학교 수학 성취기준 (NCIC 공식문서 추출, 48개) — 과제 성취기준 연결용
+// 교사가 시트 "성취기준"에서 편집하면 그 값이 우선됨 (getAchievements)
+var ACHIEVEMENT_STANDARDS = [
+  { code:'9수01-03', area:'수와 연산', text:'다양한 상황을 이용하여 음수의 필요성을 인식하고, 양수와 음수, 정수와 유리수의 개념을 이해한다.' },
+  { code:'9수01-04', area:'수와 연산', text:'정수와 유리수의 대소 관계를 판단할 수 있다.' },
+  { code:'9수01-05', area:'수와 연산', text:'정수와 유리수의 사칙계산의 원리를 이해하고, 그 계산을 할 수 있다.' },
+  { code:'9수01-06', area:'수와 연산', text:'순환소수의 뜻을 알고, 유리수와 순환소수의 관계를 설명할 수 있다.' },
+  { code:'9수01-07', area:'수와 연산', text:'제곱근의 뜻과 성질을 알고, 제곱근의 대소 관계를 판단할 수 있다.' },
+  { code:'9수01-08', area:'수와 연산', text:'무리수의 개념을 이해하고, 무리수의 유용성을 인식할 수 있다.' },
+  { code:'9수01-09', area:'수와 연산', text:'실수의 대소 관계를 판단하고 설명할 수 있다.' },
+  { code:'9수01-10', area:'수와 연산', text:'근호를 포함한 식의 사칙계산의 원리를 이해하고 설명할 수 있으며, 그 계산을 할 수 있다.' },
+  { code:'9수02-01', area:'변화와 관계', text:'다양한 상황을 문자를 사용한 식으로 나타내어 그 유용성을 인식하고, 식의 값을 구할 수 있다.' },
+  { code:'9수02-02', area:'변화와 관계', text:'일차식의 덧셈과 뺄셈의 원리를 이해하고, 그 계산을 할 수 있다.' },
+  { code:'9수02-03', area:'변화와 관계', text:'방정식과 그 해의 뜻을 알고, 등식의 성질을 설명할 수 있다.' },
+  { code:'9수02-05', area:'변화와 관계', text:'순서쌍과 좌표를 이해하고, 그 편리함을 인식할 수 있다.' },
+  { code:'9수02-06', area:'변화와 관계', text:'다양한 상황을 그래프로 나타내고, 주어진 그래프를 해석할 수 있다.' },
+  { code:'9수02-07', area:'변화와 관계', text:'정비례, 반비례 관계를 이해하고, 그 관계를 표, 식, 그래프로 나타낼 수 있다.' },
+  { code:'9수02-09', area:'변화와 관계', text:'다항식의 덧셈과 뺄셈의 원리를 이해하고, 그 계산을 할 수 있다.' },
+  { code:'9수02-11', area:'변화와 관계', text:'부등식과 그 해의 뜻을 알고, 부등식의 성질을 설명할 수 있다.' },
+  { code:'9수02-13', area:'변화와 관계', text:'미지수가 2개인 연립일차방정식을 풀 수 있고, 이를 활용하여 문제를 해결할 수 있다.' },
+  { code:'9수02-14', area:'변화와 관계', text:'함수의 개념을 이해하고, 함숫값을 구할 수 있다.' },
+  { code:'9수02-15', area:'변화와 관계', text:'일차함수의 개념을 이해하고, 그 그래프를 그릴 수 있다.' },
+  { code:'9수02-18', area:'변화와 관계', text:'두 일차함수의 그래프와 연립일차방정식의 관계를 설명할 수 있다.' },
+  { code:'9수02-19', area:'변화와 관계', text:'다항식의 곱셈과 인수분해를 할 수 있다.' },
+  { code:'9수02-21', area:'변화와 관계', text:'이차함수의 개념을 이해한다.' },
+  { code:'9수03-01', area:'도형과 측정', text:'점, 선, 면, 각을 이해하고, 실생활 상황과 연결하여 점, 직선, 평면의 위치 관계를 설명할 수 있다.' },
+  { code:'9수03-03', area:'도형과 측정', text:'삼각형을 작도하고, 그 과정을 설명할 수 있다.' },
+  { code:'9수03-04', area:'도형과 측정', text:'삼각형의 합동 조건을 이해하고, 이를 이용하여 두 삼각형이 합동인지 판별할 수 있다.' },
+  { code:'9수03-05', area:'도형과 측정', text:'다각형의 성질을 이해하고 설명할 수 있다.' },
+  { code:'9수03-06', area:'도형과 측정', text:'부채꼴의 중심각과 호의 관계를 이해하고, 이를 이용하여 부채꼴의 호의 길이와 넓이를 구할 수 있다.' },
+  { code:'9수03-07', area:'도형과 측정', text:'구체적인 모형이나 공학 도구를 이용하여 다면체와 회전체의 성질을 탐구하고, 이를 설명할 수 있다.' },
+  { code:'9수03-08', area:'도형과 측정', text:'입체도형의 겉넓이와 부피를 구할 수 있다.' },
+  { code:'9수03-10', area:'도형과 측정', text:'삼각형의 외심과 내심의 성질을 이해하고 정당화할 수 있다.' },
+  { code:'9수03-11', area:'도형과 측정', text:'사각형의 성질을 이해하고 정당화할 수 있다.' },
+  { code:'9수03-12', area:'도형과 측정', text:'도형의 닮음의 뜻과 닮은 도형의 성질을 이해하고, 닮음비를 구할 수 있다.' },
+  { code:'9수03-13', area:'도형과 측정', text:'삼각형의 닮음 조건을 이해하고, 이를 이용하여 두 삼각형이 닮음인지 판별할 수 있다.' },
+  { code:'9수03-14', area:'도형과 측정', text:'평행선 사이의 선분의 길이의 비를 구할 수 있다.' },
+  { code:'9수03-15', area:'도형과 측정', text:'피타고라스 정리를 이해하고 정당화할 수 있다.' },
+  { code:'9수03-16', area:'도형과 측정', text:'삼각비의 뜻을 알고, 간단한 삼각비의 값을 구할 수 있다.' },
+  { code:'9수03-17', area:'도형과 측정', text:'삼각비를 활용하여 여러 가지 문제를 해결할 수 있다.' },
+  { code:'9수03-18', area:'도형과 측정', text:'원의 현에 관한 성질과 접선에 관한 성질을 이해하고 정당화할 수 있다.' },
+  { code:'9수03-19', area:'도형과 측정', text:'원주각의 성질을 이해하고 정당화할 수 있다.' },
+  { code:'9수04-01', area:'자료와 가능성', text:'중앙값, 최빈값의 뜻을 알고, 자료의 특성에 따라 적절한 대푯값을 선택하여 구할 수 있다.' },
+  { code:'9수04-02', area:'자료와 가능성', text:'자료를 줄기와 잎 그림, 도수분포표, 히스토그램, 도수분포다각형 으 로 나타내고 해석할 수 있다.' },
+  { code:'9수04-03', area:'자료와 가능성', text:'상대도수를 구하고, 상대도수의 분포를 표나 그래프로 나타내고 해석할 수 있다.' },
+  { code:'9수04-04', area:'자료와 가능성', text:'통계적 탐구 문제를 설정하고, 공학 도구를 이용하여 자료를 수집하여 분석하고, 그 결과를 해석할 수 있다.' },
+  { code:'9수04-05', area:'자료와 가능성', text:'경우의 수를 구할 수 있다.' },
+  { code:'9수04-06', area:'자료와 가능성', text:'확률의 개념과 그 기본 성질을 이해하고, 확률을 구할 수 있다.' },
+  { code:'9수04-07', area:'자료와 가능성', text:'분산과 표준편차를 구하고 자료의 분포를 설명할 수 있다.' },
+  { code:'9수04-08', area:'자료와 가능성', text:'공학 도구를 이용하여 자료를 상자그림으로 나타내고 분포를 비교할 수 있다.' },
+  { code:'9수04-09', area:'자료와 가능성', text:'자료를 산점도로 나타내고 상관관계를 말할 수 있다.' },
+];
+
+// 성취기준 조회 — 시트 '성취기준'이 있으면 교사 편집분, 없으면 코드 시드
+function getAchievements() {
+  try {
+    var sh = _taskSs().getSheetByName('성취기준');
+    if (sh && sh.getLastRow() > 1) {
+      var d = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+      var out = [];
+      d.forEach(function(r) {
+        var code = String(r[0] || '').trim();
+        var use  = String(r[3] || 'Y').trim().toUpperCase();
+        if (code && use !== 'N') out.push({ code: code, area: String(r[1] || '').trim(), text: String(r[2] || '').trim() });
+      });
+      if (out.length) return { success: true, items: out };
+    }
+  } catch (e) {}
+  return { success: true, items: ACHIEVEMENT_STANDARDS };
+}
+
+// 시트 '성취기준'에 시드 1회 입력 (교사가 이후 편집 가능). GAS 편집기에서 수동 실행하거나 최초 조회 시 자동.
+function seedAchievementSheet() {
+  try {
+    var ss = _taskSs();
+    var sh = ss.getSheetByName('성취기준') || ss.insertSheet('성취기준');
+    if (sh.getLastRow() > 1) return { success: false, message: '이미 성취기준 시트에 데이터가 있습니다.' };
+    sh.getRange(1, 1, 1, 4).setValues([['코드', '영역', '내용', '사용여부(Y/N)']]);
+    sh.getRange(1, 1, 1, 4).setFontWeight('bold').setBackground('#0284c7').setFontColor('white');
+    var rows = ACHIEVEMENT_STANDARDS.map(function(a) { return [a.code, a.area, a.text, 'Y']; });
+    sh.getRange(2, 1, rows.length, 4).setValues(rows);
+    sh.setFrozenRows(1);
+    return { success: true, count: rows.length };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
