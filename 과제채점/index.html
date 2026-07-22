@@ -67,6 +67,8 @@
     
     .eval-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #e2e8f0; padding: 8px 12px; border-radius: 8px; }
     .score-input { padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; width: 120px; font-weight:bold; font-size: 14px;}
+    .sc-chip { padding: 4px 9px; border-radius: 6px; font-size: 12px; font-weight: 700; border: 1px solid #cbd5e1; background: #f1f5f9; color: #475569; cursor: pointer; transition: 0.12s; user-select: none; }
+    .sc-chip.on { background: #0284c7; color: #fff; border-color: #0284c7; }
     .pub-toggle { background: white; padding: 8px 12px; border-radius: 8px; border: 2px solid #cbd5e1; font-size: 13px; font-weight: 800; cursor: pointer; display: flex; align-items: center; color: #64748b;}
     .pub-toggle.on { border-color: #10b981; color: #059669; background: #ecfdf5;}
     .feedback-input, .memo-input { flex-grow: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; resize: none; background: white; width: 100%; box-sizing:border-box;}
@@ -270,7 +272,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.01.02</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.01.03</span>
     </div>
   </div>
 </div>
@@ -1256,30 +1258,21 @@
   }
   function buildScoreHtml(id, type, sc) {
     var v = sc || '';
-    var previewHtml = '';
-    var previewMap = {
-      '점수제 (직접 입력)': null, // 숫자 입력이라 미리보기 불필요
-      '코멘트만 남김': null,
+    var optMap = {
       '점수제 (10점 단위 선택)': ['100','90','80','70','60','50','40','30','20','10','0'],
       'A-B-C-D 등급제': ['A','B','C','D','미제출'],
       '상-중-하 등급제': ['상','중','하'],
       '통과/미통과 (P/F)': ['Pass','Fail']
     };
-    var previewOpts = previewMap[type];
-    if (previewOpts) {
-      previewHtml = '<div style="display:flex; gap:4px; flex-wrap:wrap; margin-bottom:5px;">';
-      previewOpts.forEach(function(o) {
-        var isSelected = (v === o);
-        previewHtml += '<span onclick="document.getElementById(\'' + id + '\').value=\'' + o + '\'; this.parentElement.querySelectorAll(\'span\').forEach(function(s){s.style.background=\'#f1f5f9\';s.style.color=\'#475569\';s.style.borderColor=\'#cbd5e1\';}); this.style.background=\'#0284c7\'; this.style.color=\'white\'; this.style.borderColor=\'#0284c7\';" style="cursor:pointer; padding:5px 10px; border-radius:6px; font-size:13px; font-weight:700; border:1px solid ' + (isSelected ? '#0284c7' : '#cbd5e1') + '; background:' + (isSelected ? '#0284c7' : '#f1f5f9') + '; color:' + (isSelected ? 'white' : '#475569') + '; transition:0.15s;">' + o + '</span>';
-      });
-      previewHtml += '</div>';
-    }
     if (type === '코멘트만 남김') return '<input type="hidden" id="' + id + '" value="">';
-    if (type === '점수제 (직접 입력)') return previewHtml + '<input type="number" id="' + id + '" class="score-input" value="' + v + '" placeholder="점수 입력">';
-    var opts = previewOpts || [];
-    var h = previewHtml + '<select id="' + id + '" class="score-input"><option value=""></option>';
-    opts.forEach(function(o) { h += '<option value="' + o + '" ' + (v === o ? 'selected' : '') + '>' + o + '</option>'; });
-    return h + '</select>';
+    if (type === '점수제 (직접 입력)')
+      return '<input type="number" id="' + id + '" class="score-input" value="' + v + '" placeholder="점수" style="width:78px;">';
+    // 등급·통과·10점: 드롭다운 없이 칩 버튼만 (선택값은 hidden에 저장) → 훨씬 컴팩트
+    var opts = optMap[type] || [];
+    var btns = opts.map(function(o) {
+      return '<span data-v="' + o + '" onclick="var i=document.getElementById(\'' + id + '\'); i.value=this.dataset.v; this.parentElement.querySelectorAll(\'.sc-chip\').forEach(function(s){s.classList.remove(\'on\');}); this.classList.add(\'on\');" class="sc-chip' + (v === o ? ' on' : '') + '">' + o + '</span>';
+    }).join('');
+    return btns + '<input type="hidden" id="' + id + '" value="' + v + '">';
   }
   function populateFilters() {
     let cAll = '<option value="all">🏫 전체 반</option>', cBlank = '<option value="">선택하세요</option>';
