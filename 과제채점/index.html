@@ -270,7 +270,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.00.00</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.01.00</span>
     </div>
   </div>
 </div>
@@ -763,17 +763,14 @@
           <input type="text" id="modalMemoInput" placeholder="간단한 특이사항 입력..." style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:13px; box-sizing:border-box;">
        </div>
        
-       <div style="padding:20px 15px; margin-top:auto; display:flex; flex-direction:column; gap:10px;">
+       <div style="padding:20px 15px; margin-top:auto; display:flex; flex-direction:column; gap:8px;">
           <div id="modalPrevRecords" style="display:none; margin-bottom:10px;"></div>
           <div style="display:flex; gap:10px;">
-             <button class="reject-btn" id="modalBtnRj" onclick="saveDrawing('반려요청')" style="flex:1; padding:12px 0; font-size:14px; border-radius:10px; background:#ef4444; color:white; border:none; font-weight:900; cursor:pointer; box-shadow:0 4px 6px rgba(239,68,68,0.25);">🚨 반려</button>
-             <button id="modalBtnFb" onclick="saveDrawing('피드백요청')" style="flex:1; padding:12px 0; font-size:14px; border-radius:10px; background:#f59e0b; color:white; border:none; font-weight:900; cursor:pointer; box-shadow:0 4px 6px rgba(245,158,11,0.25);">📩 피드백</button>
-             <button class="temp-btn" id="modalBtnTp" onclick="saveDrawing('임시')" style="flex:1; padding:12px 0; font-size:14px; border-radius:10px; background:#64748b; color:white; border:none; font-weight:900; cursor:pointer; box-shadow:0 4px 6px rgba(100,116,139,0.2);">💾 임시저장</button>
+             <button class="reject-btn" id="modalBtnRj" onclick="saveDrawing('반려요청')" style="flex:1; padding:15px 0; font-size:14px; border-radius:10px; background:#ef4444; color:white; border:none; font-weight:900; cursor:pointer; box-shadow:0 4px 6px rgba(239,68,68,0.25);">🚨 반려</button>
+             <button id="modalBtnFb" onclick="saveDrawing('피드백요청')" style="flex:1; padding:15px 0; font-size:14px; border-radius:10px; background:#f59e0b; color:white; border:none; font-weight:900; cursor:pointer; box-shadow:0 4px 6px rgba(245,158,11,0.25);">📩 피드백</button>
+             <button class="save-btn" id="modalBtnOk" onclick="saveDrawing('완료')" style="flex:1.5; padding:15px 0; font-size:16px; border-radius:10px; background:#10b981; color:white; border:none; font-weight:900; cursor:pointer; box-shadow:0 4px 10px rgba(16,185,129,0.3);">✅ 채점</button>
           </div>
-          <div style="display:flex; gap:10px;">
-             <button class="save-btn" id="modalBtnOk" onclick="saveDrawing('완료')" style="flex:1; padding:16px 0; font-size:16px; border-radius:10px; background:#10b981; color:white; border:none; font-weight:900; cursor:pointer; box-shadow:0 4px 10px rgba(16,185,129,0.3);">✅ 채점</button>
-             <button id="modalBtnFinal" onclick="saveDrawing('최종완료')" style="flex:0 0 auto; padding:16px 20px; font-size:15px; border-radius:10px; background:#1e293b; color:white; border:none; font-weight:900; cursor:pointer;">🔒 확정</button>
-          </div>
+          <div style="font-size:11px; color:#94a3b8; text-align:center;">그냥 닫으면 '채점중'으로 자동 저장돼요</div>
        </div>
     </div>
   </div>
@@ -1714,8 +1711,7 @@
               (!aiRes ? aiGradeBtn : '') + db +
               '<button class="reject-btn" style="flex:1; padding:12px 0; font-size:13px; border-radius:8px; width:auto; box-shadow:0 2px 4px rgba(239,68,68,0.2);" onclick="saveFb(' + item.rowIdx + ', \'반려요청\')" title="처음부터 다시 (반려기한 내 재제출)">🚨 반려</button>' +
               '<button style="flex:1; padding:12px 0; font-size:13px; border-radius:8px; width:auto; background:#f59e0b; color:#fff; border:none; font-weight:800; cursor:pointer; box-shadow:0 2px 4px rgba(245,158,11,0.25);" onclick="saveFb(' + item.rowIdx + ', \'피드백요청\')" title="보완해서 다시 (피드백기한 내 재제출, 이전 점수 유지)">📩 피드백</button>' +
-              '<button class="save-btn" style="flex:1; padding:12px 0; font-size:13px; border-radius:8px; width:auto; box-shadow:0 2px 4px rgba(16,185,129,0.2);" onclick="saveFb(' + item.rowIdx + ', \'완료\')" title="채점 저장 (아직 열림 — 이후 피드백/반려 가능)">✅ 채점</button>' +
-              '<button style="flex:1; padding:12px 0; font-size:13px; border-radius:8px; width:auto; background:#1e293b; color:#fff; border:none; font-weight:800; cursor:pointer;" onclick="saveFb(' + item.rowIdx + ', \'최종완료\')" title="최종 확정 — 잠금, 재제출 종료">🔒 확정</button>' +
+              '<button class="save-btn" style="flex:1.4; padding:12px 0; font-size:14px; border-radius:8px; width:auto; box-shadow:0 2px 4px rgba(16,185,129,0.2);" onclick="saveFb(' + item.rowIdx + ', \'완료\')" title="채점 저장">✅ 채점</button>' +
             '</div>' +
           '</div>' +
         '</div>' +
