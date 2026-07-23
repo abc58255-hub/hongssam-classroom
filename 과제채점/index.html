@@ -72,6 +72,9 @@
     .tf-sec { padding: 16px 0; border-top: 1px solid #f1f5f9; }
     .tf-sec-title { font-size: 13px; font-weight: 800; color: #1e3a8a; margin-bottom: 10px; display: flex; align-items: center; }
     .tf-num { display: inline-flex; width: 20px; height: 20px; background: #0284c7; color: #fff; border-radius: 50%; font-size: 11px; align-items: center; justify-content: center; margin-right: 7px; flex-shrink: 0; }
+    .tf-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 32px; align-items: start; }
+    @media (max-width: 860px) { .tf-cols { grid-template-columns: 1fr; gap: 0; } }
+    .tf-cols > div > .tf-sec:first-child { border-top: none; padding-top: 8px; }
     .pub-toggle { background: white; padding: 8px 12px; border-radius: 8px; border: 2px solid #cbd5e1; font-size: 13px; font-weight: 800; cursor: pointer; display: flex; align-items: center; color: #64748b;}
     .pub-toggle.on { border-color: #10b981; color: #059669; background: #ecfdf5;}
     .feedback-input, .memo-input { flex-grow: 1; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 13px; resize: none; background: white; width: 100%; box-sizing:border-box;}
@@ -275,7 +278,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.03.01</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.03.02</span>
     </div>
   </div>
 </div>
@@ -365,11 +368,13 @@
       </div>
       <button id="btnInstallTriggers" onclick="installTriggers()" style="background:#ea580c; color:white; border:none; padding:11px 18px; border-radius:10px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;">자동발송 켜기</button>
     </div>
-    <div class="new-task-form" style="background:white; border:1px solid #e2e8f0; border-radius:14px; padding:24px; margin-bottom:30px; max-width:720px;">
+    <div class="new-task-form" style="background:white; border:1px solid #e2e8f0; border-radius:14px; padding:26px; margin:0 auto 30px; max-width:960px;">
       <h3 style="margin:0 0 3px; color:#0f172a; font-size:18px;">➕ 새 과제 만들기</h3>
-      <p style="margin:0 0 6px; font-size:12px; color:#94a3b8;">위에서부터 차례로 채우면 돼요. ★만 필수예요.</p>
+      <p style="margin:0 0 10px; font-size:12px; color:#94a3b8;">위에서부터 차례로 채우면 돼요. ★만 필수예요.</p>
 
-      <div class="tf-sec" style="border-top:none; padding-top:8px;">
+      <div class="tf-cols">
+       <div>
+      <div class="tf-sec">
         <div class="tf-sec-title"><span class="tf-num">1</span>기본</div>
         <div class="form-group"><label class="form-label">과제명 ★</label><input type="text" id="newTaskName" class="form-input" placeholder="예: 일차함수 그래프 그리기"></div>
         <div class="form-group" style="margin-bottom:0;"><label class="form-label">설명</label><input type="text" id="newTaskDesc" class="form-input" placeholder="학생에게 보여줄 안내 (선택)"></div>
@@ -391,7 +396,8 @@
           <div class="form-group" id="newMaxScoreBox" style="margin-bottom:0; width:100px;"><label class="form-label">만점</label><input type="number" id="newMaxScore" class="form-input" value="10" min="1"></div>
         </div>
       </div>
-
+       </div>
+       <div>
       <div class="tf-sec">
         <div class="tf-sec-title"><span class="tf-num">4</span>AI 자동채점&nbsp;<span style="font-size:11px; color:#94a3b8; font-weight:600;">· 선택 (등록하면 학생 제출 시 AI가 예상 채점)</span></div>
         <div class="form-group"><textarea id="newRubricCriteria" class="form-input" rows="2" placeholder="채점 기준 설명 (예: 풀이 과정이 정확하면 만점, 답만 맞으면 절반)" style="resize:vertical;"></textarea></div>
@@ -412,6 +418,8 @@
         <div class="tf-sec-title"><span class="tf-num">6</span>마감일&nbsp;<span style="font-size:11px; color:#94a3b8; font-weight:600;">· 반별로 다르게 가능 (시간 기본 오후 5:05)</span></div>
         <div id="deadlineContainer"></div>
         <button type="button" onclick="addDeadlineRow()" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button>
+      </div>
+       </div>
       </div>
 
       <button type="button" id="btnCreateTask" onclick="createNewTask()" style="width:100%; margin-top:20px; background:#0284c7; color:white; border:none; padding:15px; border-radius:10px; font-size:16px; font-weight:800; cursor:pointer;">과제 만들기 🚀</button>
