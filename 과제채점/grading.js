@@ -88,6 +88,7 @@ function _dDayText_(deadline, now) {
 }
 function _notifyNewTask_(taskName, deadlinesJson) {
   try {
+    if (PropertiesService.getScriptProperties().getProperty('notify_newtask_on') === 'off') return 0;
     var deadlines;
     try { deadlines = JSON.parse(deadlinesJson || '{}'); } catch(_) { return 0; }
     var hasAny = Object.keys(deadlines).some(function(k){
@@ -121,6 +122,7 @@ function _notifyNewTask_(taskName, deadlinesJson) {
 }
 function _notifyTaskDeadlineChange_(taskName, oldJson, newJson) {
   try {
+    if (PropertiesService.getScriptProperties().getProperty('notify_newtask_on') === 'off') return 0;
     var oldDl, newDl;
     try { oldDl = JSON.parse(oldJson || '{}'); } catch(_) { oldDl = {}; }
     try { newDl = JSON.parse(newJson || '{}'); } catch(_) { return 0; }
@@ -168,6 +170,7 @@ function notifyGradedHourly() {
   }
   try {
     var props = PropertiesService.getScriptProperties();
+    if (props.getProperty('notify_graded_on') === 'off') { lock.releaseLock(); Logger.log('notifyGradedHourly: 꺼짐, 건너뜀'); return { skipped: true, reason: 'off' }; }
     var lastTs = parseInt(props.getProperty('last_grade_notify_ts') || '0');
     var now = Date.now();
     if (!lastTs) lastTs = now - 3600 * 1000;
@@ -230,6 +233,7 @@ function notifyUnsubmittedDaily() {
   if (!lock.tryLock(5000)) { Logger.log('notifyUnsubmittedDaily: 이미 실행 중, 건너뜀'); return { skipped: true }; }
   try {
     var props0 = PropertiesService.getScriptProperties();
+    if (props0.getProperty('notify_unsub_on') === 'off') { lock.releaseLock(); Logger.log('notifyUnsubmittedDaily: 꺼짐, 건너뜀'); return { skipped: true, reason: 'off' }; }
     var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
     if (props0.getProperty('last_unsub_notify_day') === today) {
       Logger.log('notifyUnsubmittedDaily: 오늘 이미 발송됨, 건너뜀');
@@ -339,13 +343,70 @@ function installAutoNotifyTriggers() {
     }
   });
 
+  var p = PropertiesService.getScriptProperties();
+  var h = parseInt(p.getProperty('unsub_notify_hour') || '8');
+  var m = parseInt(p.getProperty('unsub_notify_min') || '20');
+
   ScriptApp.newTrigger('notifyGradedHourly')
     .timeBased().everyHours(1).nearMinute(0).create();
 
   ScriptApp.newTrigger('notifyUnsubmittedDaily')
-    .timeBased().atHour(8).nearMinute(20).everyDays(1).create();
+    .timeBased().atHour(h).nearMinute(m).everyDays(1).create();
 
   return { success: true, message: '기존 ' + deleted + '개 정리 후 트리거 2개 설치 완료' };
+}
+
+// 자동알림 설정 조회 (종류별 on/off + 미제출 발송시각 + 트리거 설치 여부)
+function getNotifySettings() {
+  try {
+    var p = PropertiesService.getScriptProperties();
+    var ts = getTriggerStatus();
+    var counts = (ts && ts.counts) || {};
+    return {
+      success: true,
+      gradedOn:  p.getProperty('notify_graded_on')  !== 'off',
+      unsubOn:   p.getProperty('notify_unsub_on')    !== 'off',
+      newtaskOn: p.getProperty('notify_newtask_on')  !== 'off',
+      unsubHour: parseInt(p.getProperty('unsub_notify_hour') || '8'),
+      unsubMin:  parseInt(p.getProperty('unsub_notify_min')  || '20'),
+      triggersInstalled: !!(counts.notifyGradedHourly && counts.notifyUnsubmittedDaily)
+    };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 자동알림 설정 저장 (미제출 발송시각이 바뀌면 트리거 재설치)
+function setNotifySettings(s) {
+  try {
+    s = s || {};
+    var p = PropertiesService.getScriptProperties();
+    if (s.gradedOn  !== undefined) p.setProperty('notify_graded_on',  s.gradedOn  ? 'on' : 'off');
+    if (s.unsubOn   !== undefined) p.setProperty('notify_unsub_on',   s.unsubOn   ? 'on' : 'off');
+    if (s.newtaskOn !== undefined) p.setProperty('notify_newtask_on', s.newtaskOn ? 'on' : 'off');
+    var timeChanged = false;
+    if (s.unsubHour !== undefined) {
+      var h = Math.max(0, Math.min(23, parseInt(s.unsubHour)));
+      var m = Math.max(0, Math.min(59, parseInt(s.unsubMin != null ? s.unsubMin : 20)));
+      if (String(h) !== p.getProperty('unsub_notify_hour') || String(m) !== p.getProperty('unsub_notify_min')) timeChanged = true;
+      p.setProperty('unsub_notify_hour', String(h));
+      p.setProperty('unsub_notify_min', String(m));
+    }
+    if (timeChanged) _reinstallUnsubTrigger_();
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 미제출 알림 트리거만 저장된 시각으로 재설치 (설치돼 있을 때만)
+function _reinstallUnsubTrigger_() {
+  var p = PropertiesService.getScriptProperties();
+  var h = parseInt(p.getProperty('unsub_notify_hour') || '8');
+  var m = parseInt(p.getProperty('unsub_notify_min') || '20');
+  var had = false;
+  ScriptApp.getProjectTriggers().forEach(function(t) {
+    if (t.getHandlerFunction() === 'notifyUnsubmittedDaily') { ScriptApp.deleteTrigger(t); had = true; }
+  });
+  if (had) {
+    ScriptApp.newTrigger('notifyUnsubmittedDaily').timeBased().atHour(h).nearMinute(m).everyDays(1).create();
+  }
 }
 function getCached(key) {
   try {

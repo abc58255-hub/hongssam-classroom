@@ -24,6 +24,11 @@
     .menu-item { padding: 15px 20px; margin-bottom: 8px; border-radius: 12px; cursor: pointer; font-size: 15px; font-weight: 700; color: #94a3b8; display: flex; align-items: center; gap: 12px; transition: 0.2s;}
     .menu-item:hover { background: #1e293b; color: white;}
     .menu-item.active { background: #0284c7; color: white; box-shadow: 0 4px 15px rgba(2,132,199,0.3);}
+    .nt-switch { width:46px; height:26px; -webkit-appearance:none; appearance:none; background:#cbd5e1; border-radius:13px; position:relative; cursor:pointer; transition:0.2s; flex-shrink:0; margin:0; }
+    .nt-switch:checked { background:#10b981; }
+    .nt-switch::after { content:''; position:absolute; top:3px; left:3px; width:20px; height:20px; background:white; border-radius:50%; transition:0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.2); }
+    .nt-switch:checked::after { left:23px; }
+    .nt-log-row { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid #f6f7f9; }
     .sidebar-footer { padding: 20px; border-top: 1px solid #1e293b; text-align: center;}
     .refresh-btn { background: rgba(255,255,255,0.1); color: white; border: 1px solid rgba(255,255,255,0.2); padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s;}
     .main-content { flex-grow: 1; padding: 25px 35px; overflow-y: auto; background: #f8fafc; position: relative;}
@@ -241,6 +246,7 @@
   <ul class="menu-list">
     <li class="menu-item active" onclick="switchPage('page-grade', this)">✍️ 채점 / 첨삭 <span id="ungradedBadge" style="display:none; margin-left:auto; background:#ef4444; color:white; font-size:11px; font-weight:900; padding:2px 7px; border-radius:10px; min-width:18px; text-align:center;"></span></li>
     <li class="menu-item" onclick="switchPage('page-manage', this)">⚙️ 수학 과제 관리</li>
+    <li class="menu-item" onclick="switchPage('page-notify', this)">🔔 알림 관리</li>
     <li class="menu-item" onclick="switchPage('page-stats', this)">📈 반별 성취도 분석</li>
     <li class="menu-item" onclick="switchPage('page-port', this)">📁 학생 누적 포트폴리오</li>
     <li class="menu-item" onclick="switchPage('page-best', this)">🌟 명예의 전당 관리</li>
@@ -278,7 +284,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.06.00</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.07.00</span>
     </div>
   </div>
 </div>
@@ -360,13 +366,9 @@
       <span>⚙️ 과제 등록 및 관리</span>
       <button onclick="openRubricManager()" style="background:#6366f1;color:white;border:none;padding:9px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">📐 AI 채점기준 관리</button>
     </h2>
-    <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:14px; padding:18px 20px; margin-bottom:24px; display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
-      <div style="flex:1; min-width:220px;">
-        <div style="font-weight:800; color:#9a3412; font-size:15px;">🔔 과제 알림 자동발송</div>
-        <div style="font-size:12.5px; color:#9a3412; margin-top:4px; line-height:1.5;">매시간 채점완료 알림 + 매일 오전 8:20 미제출 알림을 자동으로 보냅니다.<br>(새 과제·마감일 변경 알림은 항상 자동 발송)</div>
-        <div id="triggerStatus" style="font-size:12px; color:#64748b; margin-top:6px;">상태 확인 중...</div>
-      </div>
-      <button id="btnInstallTriggers" onclick="installTriggers()" style="background:#ea580c; color:white; border:none; padding:11px 18px; border-radius:10px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;">자동발송 켜기</button>
+    <div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:12px; padding:12px 16px; margin-bottom:24px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px; font-size:12.5px; color:#9a3412; line-height:1.5;">🔔 채점·미제출·새 과제 알림은 <b>[알림 관리]</b> 탭에서 켜고 끌 수 있어요.</div>
+      <button onclick="switchPage('page-notify', document.querySelectorAll('.menu-item')[2])" style="background:#ea580c; color:white; border:none; padding:9px 16px; border-radius:10px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;">알림 관리 열기 →</button>
     </div>
     <div class="new-task-form" style="background:white; border:1px solid #e2e8f0; border-radius:14px; padding:26px; margin:0 auto 30px; max-width:960px;">
       <h3 style="margin:0 0 3px; color:#0f172a; font-size:18px;">➕ 새 과제 만들기</h3>
@@ -525,6 +527,71 @@
     </div>
   </div>
 
+
+  <!-- 🔔 알림 관리 -->
+  <div id="page-notify" class="page-section" style="display:none;">
+    <h2 class="page-title"><span>🔔 알림 관리</span></h2>
+
+    <!-- 자동발송 상태 -->
+    <div style="background:white; border:1px solid #e2e8f0; border-radius:14px; padding:20px 22px; margin-bottom:20px; max-width:820px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+        <div>
+          <div style="font-weight:800; color:#0f172a; font-size:16px;">⚡ 자동발송 스케줄</div>
+          <div id="ntTriggerState" style="font-size:12.5px; color:#64748b; margin-top:4px;">확인 중...</div>
+        </div>
+        <button id="ntInstallBtn" onclick="ntInstallTriggers()" style="background:#ea580c; color:white; border:none; padding:11px 18px; border-radius:10px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;">자동발송 켜기</button>
+      </div>
+      <div style="font-size:11.5px; color:#94a3b8; margin-top:10px; line-height:1.5;">한 번 켜두면 계속 유지돼요. 아래 종류별 스위치로 각 알림을 끄거나 켤 수 있어요.</div>
+    </div>
+
+    <!-- 종류별 on/off -->
+    <div style="background:white; border:1px solid #e2e8f0; border-radius:14px; padding:20px 22px; margin-bottom:20px; max-width:820px;">
+      <div style="font-weight:800; color:#0f172a; font-size:15px; margin-bottom:14px;">🔕 알림 종류별 켜기/끄기</div>
+
+      <label class="nt-row" style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #f1f5f9;">
+        <span><b>✅ 채점·반려 알림</b><br><span style="font-size:12px; color:#94a3b8;">매시간 — 그 사이 채점/반려된 학생에게</span></span>
+        <input type="checkbox" id="ntGraded" class="nt-switch" onchange="ntSaveToggles()">
+      </label>
+      <label class="nt-row" style="display:flex; align-items:center; justify-content:space-between; padding:12px 0; border-bottom:1px solid #f1f5f9;">
+        <span><b>📌 미제출 알림</b><br><span style="font-size:12px; color:#94a3b8;">매일 정해진 시각 — 마감 안 낸 학생에게</span></span>
+        <input type="checkbox" id="ntUnsub" class="nt-switch" onchange="ntSaveToggles()">
+      </label>
+      <label class="nt-row" style="display:flex; align-items:center; justify-content:space-between; padding:12px 0;">
+        <span><b>🆕 새 과제·마감변경 알림</b><br><span style="font-size:12px; color:#94a3b8;">과제 등록/마감 변경 즉시</span></span>
+        <input type="checkbox" id="ntNewtask" class="nt-switch" onchange="ntSaveToggles()">
+      </label>
+
+      <div style="margin-top:16px; padding-top:16px; border-top:1px solid #f1f5f9; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <span style="font-size:13px; font-weight:700; color:#334155;">📌 미제출 알림 발송 시각</span>
+        <select id="ntUnsubHour" style="padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px;"></select>
+        <span>시</span>
+        <select id="ntUnsubMin" style="padding:6px 8px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px;"></select>
+        <span>분</span>
+        <button onclick="ntSaveTime()" style="background:#0f172a; color:white; border:none; padding:7px 14px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer;">시각 저장</button>
+        <span id="ntTimeMsg" style="font-size:12px; color:#10b981; display:none;">저장됐어요!</span>
+      </div>
+    </div>
+
+    <!-- 수동 미제출 알림 -->
+    <div style="background:white; border:1px solid #e2e8f0; border-radius:14px; padding:20px 22px; margin-bottom:20px; max-width:820px;">
+      <div style="font-weight:800; color:#0f172a; font-size:15px; margin-bottom:4px;">📢 지금 바로 미제출 알림 보내기</div>
+      <div style="font-size:12px; color:#94a3b8; margin-bottom:14px;">특정 과제를 아직 안 낸 학생들에게 즉시 독려 알림을 보냅니다.</div>
+      <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+        <select id="ntManualTask" style="flex:1; min-width:200px; padding:9px 11px; border:1px solid #e2e8f0; border-radius:8px; font-size:13px;"><option value="">과제 선택</option></select>
+        <button id="ntManualBtn" onclick="ntSendManual()" style="background:#6366f1; color:white; border:none; padding:10px 18px; border-radius:8px; font-weight:800; font-size:13px; cursor:pointer; white-space:nowrap;">📢 미제출자에게 발송</button>
+      </div>
+      <div id="ntManualMsg" style="font-size:12.5px; margin-top:10px; display:none;"></div>
+    </div>
+
+    <!-- 발송 로그 -->
+    <div style="background:white; border:1px solid #e2e8f0; border-radius:14px; padding:20px 22px; max-width:820px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div style="font-weight:800; color:#0f172a; font-size:15px;">📜 최근 발송 로그</div>
+        <button onclick="ntLoadLog()" style="background:#f1f5f9; color:#475569; border:none; padding:6px 12px; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer;">🔄 새로고침</button>
+      </div>
+      <div id="ntLogList" style="font-size:13px;"><div style="color:#94a3b8; text-align:center; padding:20px;">불러오는 중...</div></div>
+    </div>
+  </div>
 
   <!-- ✅ 반별 성취도 분석 -->
   <div id="page-stats" class="page-section" style="display:none;">
@@ -1125,7 +1192,8 @@
     if(elem) elem.classList.add('active');
     if (window.innerWidth <= 768) toggleSidebar();
     
-    if (pageId === 'page-manage') { loadRubrics(function(){ renderManageTasks(); }); refreshTriggerStatus(); }
+    if (pageId === 'page-manage') { loadRubrics(function(){ renderManageTasks(); }); }
+    else if (pageId === 'page-notify') ntLoadPage();
     else if (pageId === 'page-stats') renderStats();
     else if (pageId === 'page-port') { updatePortStudentList(); renderPortfolio(); }
     else if (pageId === 'page-best') renderBestWorks();
@@ -1967,36 +2035,121 @@
     return JSON.stringify(d);
   }
 
-  function refreshTriggerStatus() {
-    var el = document.getElementById('triggerStatus');
-    if (el) el.textContent = '상태 확인 중...';
+  // ── 🔔 알림 관리 페이지 ──
+  var _ntTriggersOn = false;
+  function ntLoadPage() {
+    // 시각 셀렉트 채우기 (한 번만)
+    var hs = document.getElementById('ntUnsubHour');
+    if (hs && !hs.options.length) {
+      for (var h = 0; h < 24; h++) hs.add(new Option((h < 10 ? '0' : '') + h, h));
+    }
+    var ms = document.getElementById('ntUnsubMin');
+    if (ms && !ms.options.length) {
+      for (var m = 0; m < 60; m += 5) ms.add(new Option((m < 10 ? '0' : '') + m, m));
+    }
+    // 과제 목록 채우기
+    var tsel = document.getElementById('ntManualTask');
+    if (tsel) {
+      tsel.innerHTML = '<option value="">과제 선택</option>';
+      (allTasks || []).forEach(function(t){ tsel.innerHTML += '<option value="' + t.name + '">' + t.name + '</option>'; });
+    }
     google.script.run.withSuccessHandler(function(res) {
-      if (!el) return;
-      if (res && res.success) {
-        var c = res.counts || {};
-        var on = (c['notifyGradedHourly'] || 0) > 0 && (c['notifyUnsubmittedDaily'] || 0) > 0;
-        var btn = document.getElementById('btnInstallTriggers');
-        if (on) {
-          el.innerHTML = '<b style="color:#16a34a;">✅ 자동발송 켜짐</b> — 매시간 채점알림 · 매일 8:20 미제출알림';
-          if (btn) btn.textContent = '재설정';
-        } else {
-          el.innerHTML = '<b style="color:#dc2626;">⚠️ 자동발송 꺼짐</b> — 오른쪽 버튼으로 켜주세요';
-          if (btn) btn.textContent = '자동발송 켜기';
-        }
-      } else { el.textContent = '상태 확인 실패'; }
-    }).withFailureHandler(function(e){ if (el) el.textContent = '상태 확인 실패: ' + e.message; }).getTriggerStatus();
+      if (!res || !res.success) return;
+      _ntTriggersOn = res.triggersInstalled;
+      var st = document.getElementById('ntTriggerState');
+      var btn = document.getElementById('ntInstallBtn');
+      if (res.triggersInstalled) {
+        st.innerHTML = '<b style="color:#16a34a;">✅ 자동발송 켜짐</b> — 매시간 채점알림 · 매일 ' + _pad2(res.unsubHour) + ':' + _pad2(res.unsubMin) + ' 미제출알림';
+        btn.textContent = '재설정';
+      } else {
+        st.innerHTML = '<b style="color:#dc2626;">⚠️ 자동발송 꺼짐</b> — 오른쪽 버튼으로 켜주세요';
+        btn.textContent = '자동발송 켜기';
+      }
+      document.getElementById('ntGraded').checked  = res.gradedOn;
+      document.getElementById('ntUnsub').checked   = res.unsubOn;
+      document.getElementById('ntNewtask').checked = res.newtaskOn;
+      document.getElementById('ntUnsubHour').value = res.unsubHour;
+      document.getElementById('ntUnsubMin').value  = res.unsubMin;
+    }).withFailureHandler(function(e){
+      var st = document.getElementById('ntTriggerState'); if (st) st.textContent = '상태 확인 실패: ' + e.message;
+    }).getNotifySettings();
+    ntLoadLog();
   }
-  function installTriggers() {
-    var btn = document.getElementById('btnInstallTriggers');
+  function _pad2(n){ n = parseInt(n)||0; return (n < 10 ? '0' : '') + n; }
+
+  function ntInstallTriggers() {
+    var btn = document.getElementById('ntInstallBtn');
     btn.disabled = true; btn.textContent = '설정 중...';
     google.script.run.withSuccessHandler(function(res) {
       btn.disabled = false;
       alert(res && res.success ? ('✅ ' + (res.message || '자동발송이 켜졌습니다')) : ('실패: ' + (res && res.message || '오류')));
-      refreshTriggerStatus();
+      ntLoadPage();
     }).withFailureHandler(function(e) {
       btn.disabled = false; btn.textContent = '자동발송 켜기';
       alert('오류: ' + e.message);
     }).installAutoNotifyTriggers();
+  }
+
+  function ntSaveToggles() {
+    google.script.run.withSuccessHandler(function(){}).setNotifySettings({
+      gradedOn:  document.getElementById('ntGraded').checked,
+      unsubOn:   document.getElementById('ntUnsub').checked,
+      newtaskOn: document.getElementById('ntNewtask').checked
+    });
+  }
+
+  function ntSaveTime() {
+    var h = parseInt(document.getElementById('ntUnsubHour').value);
+    var m = parseInt(document.getElementById('ntUnsubMin').value);
+    google.script.run.withSuccessHandler(function(res){
+      var msg = document.getElementById('ntTimeMsg');
+      if (msg) { msg.style.display = 'inline'; setTimeout(function(){ msg.style.display = 'none'; }, 2500); }
+      // 트리거가 켜져 있으면 상태 문구도 갱신
+      if (_ntTriggersOn) {
+        var st = document.getElementById('ntTriggerState');
+        if (st) st.innerHTML = '<b style="color:#16a34a;">✅ 자동발송 켜짐</b> — 매시간 채점알림 · 매일 ' + _pad2(h) + ':' + _pad2(m) + ' 미제출알림';
+      }
+    }).setNotifySettings({ unsubHour: h, unsubMin: m });
+  }
+
+  function ntSendManual() {
+    var task = document.getElementById('ntManualTask').value;
+    if (!task) return alert('과제를 선택해주세요.');
+    if (!confirm('[' + task + ']을(를) 아직 안 낸 학생들에게 독려 알림을 보낼까요?')) return;
+    var btn = document.getElementById('ntManualBtn');
+    var msg = document.getElementById('ntManualMsg');
+    btn.disabled = true; btn.textContent = '발송 중...';
+    google.script.run.withSuccessHandler(function(res) {
+      btn.disabled = false; btn.textContent = '📢 미제출자에게 발송';
+      msg.style.display = 'block';
+      if (res && res.success) {
+        msg.style.color = '#10b981';
+        msg.textContent = res.sent > 0 ? ('✅ ' + res.sent + '명에게 발송했어요!') : 'ℹ️ ' + (res.message || '보낼 대상이 없어요.');
+        ntLoadLog();
+      } else {
+        msg.style.color = '#dc2626';
+        msg.textContent = '❌ 실패: ' + (res && res.message || '오류');
+      }
+    }).withFailureHandler(function(e) {
+      btn.disabled = false; btn.textContent = '📢 미제출자에게 발송';
+      msg.style.display = 'block'; msg.style.color = '#dc2626'; msg.textContent = '❌ 오류: ' + e.message;
+    }).sendPushToUnsubmitted(task);
+  }
+
+  function ntLoadLog() {
+    var area = document.getElementById('ntLogList');
+    if (!area) return;
+    google.script.run.withSuccessHandler(function(res) {
+      var logs = (res && res.logs) || [];
+      if (!logs.length) { area.innerHTML = '<div style="color:#94a3b8; text-align:center; padding:20px;">아직 발송 기록이 없어요.</div>'; return; }
+      area.innerHTML = logs.map(function(l) {
+        return '<div class="nt-log-row">'
+          + '<span style="color:#94a3b8; font-size:12px; width:88px; flex-shrink:0;">' + l.time + '</span>'
+          + '<span style="flex:1; font-weight:600; color:#334155;">' + l.type + '<span style="color:#94a3b8; font-weight:400;"> · ' + l.content + '</span></span>'
+          + '<span style="background:#eef2ff; color:#4338ca; font-weight:700; font-size:12px; padding:2px 9px; border-radius:10px; flex-shrink:0;">' + l.sent + '건</span>'
+          + '</div>';
+      }).join('');
+    }).withFailureHandler(function(e){ area.innerHTML = '<div style="color:#dc2626; text-align:center; padding:20px;">불러오기 실패: ' + e.message + '</div>'; }).getNotifyLog();
   }
 
   // ══════════ 🎯 성취기준 연결 ══════════
