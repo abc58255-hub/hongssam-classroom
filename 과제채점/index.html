@@ -278,7 +278,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.03.02</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.04.00</span>
     </div>
   </div>
 </div>
@@ -418,6 +418,10 @@
         <div class="tf-sec-title"><span class="tf-num">6</span>마감일&nbsp;<span style="font-size:11px; color:#94a3b8; font-weight:600;">· 반별로 다르게 가능 (시간 기본 오후 5:05)</span></div>
         <div id="deadlineContainer"></div>
         <button type="button" onclick="addDeadlineRow()" style="background:#e0f2fe; color:#0284c7; border:1px dashed #0284c7; padding:8px 16px; border-radius:8px; cursor:pointer; font-weight:bold; margin-top:6px; font-size:13px;">+ 마감일 추가</button>
+        <div style="display:flex; gap:10px; margin-top:12px;">
+          <div style="flex:1;"><label class="form-label" style="font-size:12px; color:#dc2626;">🚨 반려 후 재제출 기한(일)</label><input type="number" id="newRejectDays" class="form-input" min="1" value="7"></div>
+          <div style="flex:1;"><label class="form-label" style="font-size:12px; color:#b45309;">📩 피드백 후 재제출 기한(일)</label><input type="number" id="newFeedbackDays" class="form-input" min="1" value="7"></div>
+        </div>
       </div>
        </div>
       </div>
@@ -2163,7 +2167,7 @@
       choiceList = document.getElementById('newChoiceList').value.trim();
       if (!choiceList) return alert("선택할 문제 목록을 입력해주세요.");
     }
-    var td = { name: n, desc: document.getElementById('newTaskDesc').value, evalType: document.getElementById('newEvalType').value, deadlines: dJson, isPublic: false, reqPics: document.getElementById('newReqPics').value, choiceList: choiceList, standards: gStdNew.length ? JSON.stringify(gStdNew) : '' };
+    var td = { name: n, desc: document.getElementById('newTaskDesc').value, evalType: document.getElementById('newEvalType').value, deadlines: dJson, isPublic: false, reqPics: document.getElementById('newReqPics').value, choiceList: choiceList, standards: gStdNew.length ? JSON.stringify(gStdNew) : '', rejectDays: document.getElementById('newRejectDays').value, feedbackDays: document.getElementById('newFeedbackDays').value };
     var btn = document.getElementById('btnCreateTask');
     btn.innerText = "생성 중..."; btn.disabled = true;
     google.script.run.withFailureHandler(function(err) {

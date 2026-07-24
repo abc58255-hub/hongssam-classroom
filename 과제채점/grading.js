@@ -553,8 +553,8 @@ function saveNewTask(taskData) {
     const sheet = _taskSs().getSheetByName("과제설정");
     const existing = sheet.getRange("B:B").getValues().flat();
     if (existing.includes(taskData.name)) return { success: false, message: "이미 같은 이름의 과제가 존재합니다." };
-    // I(9)=만점 자리 유지, J(10)=성취기준 코드 JSON 배열
-    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList, taskData.maxScore || '', taskData.standards || '']);
+    // 열: I(9)만점 J(10)반려기한 K(11)피드백기한 L(12)성취기준 — 생성·수정 일치
+    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList, taskData.maxScore || '', parseInt(taskData.rejectDays) || 7, parseInt(taskData.feedbackDays) || 7, taskData.standards || '']);
     const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     let taskFolder = parentFolder.createFolder(taskData.name);
     let deadlineObj = JSON.parse(taskData.deadlines);
@@ -597,6 +597,7 @@ function updateTaskSettings(t) {
     s.getRange(r, 6).setValue(t.isPublic ? "일괄공개" : "비공개");
     if (t.rejectDays != null)   s.getRange(r, 10).setValue(parseInt(t.rejectDays)   || 7);
     if (t.feedbackDays != null) s.getRange(r, 11).setValue(parseInt(t.feedbackDays) || 7);
+    if (t.standards != null)    s.getRange(r, 12).setValue(t.standards); // L열 성취기준
     clearCache();
     // 🔔 마감일 변경/신규 반 추가 시 해당 학생만 알림
     var pushed = _notifyTaskDeadlineChange_(t.originalName, oldDeadlines, t.deadlines);
