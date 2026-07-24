@@ -86,7 +86,7 @@ var RPC_WHITELIST = [
   'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
   'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
   'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
-  'logFeatureUse', 'setStudentPassword'
+  'logFeatureUse', 'setStudentPassword', 'reviseSubmission'
 ];
 
 function doPost(e) {
@@ -1303,7 +1303,7 @@ function _getRubricFileBase64Student(url) {
 }
 
 // 학생 제출 직후 클라이언트가 호출하는 자동 채점 함수
-function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
+function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName, prevAiForCompare) {
   try {
     const baseTask = String(taskName).split(' (')[0];
     const rubric = _getRubricByTaskName(baseTask);
@@ -1346,7 +1346,11 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
         if (isType2)
           return '{"perQuestion":{"문항명":{"score":점수,"maxScore":만점,"feedback":"피드백"}},"totalScore":합계,"overallFeedback":"종합피드백","confidence":"high|medium|low","needsReview":true|false}';
         return '{"score":점수,"maxScore":' + rubric.maxScore + ',"feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
-      })()
+      })(),
+      prevAiForCompare ? ('※ 이 학생의 직전 답안 AI 채점: ' + JSON.stringify({
+        score: prevAiForCompare.score, grade: prevAiForCompare.grade,
+        feedback: prevAiForCompare.feedback || prevAiForCompare.overallFeedback
+      }) + '\n이번은 학생이 보완해서 다시 낸 답안이야. 위 JSON에 "changeSummary" 필드를 반드시 추가해서, 직전 답안 대비 무엇이 개선/변경됐는지(또는 그대로인지) 한두 문장으로 격려하듯 알려줘.') : ''
     ].filter(Boolean).join('\n');
 
     const content = [{ type: 'text', text: prompt }];
@@ -1425,6 +1429,62 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName) {
     }
 
     return { success: true, result: result };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+// ── 학생 셀프 보완: 같은 제출을 덮어쓰고 AI 재채점(변경점 요약 포함). 최대 2회, 교사 알림 없음 ──
+function reviseSubmission(rowIdx, taskName, studentId, studentName, filesData) {
+  try {
+    const sheet = _taskSs_().getSheetByName('제출현황');
+    if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return { success: false, message: '권한이 없어요.' };
+
+    // 교사가 이미 손댄 상태면 보완 불가 (첫 제출 직후 상태는 비어있음)
+    var status = String(sheet.getRange(rowIdx, 11).getValue() || '').trim();
+    if (status && status !== '이전기록채점완료') {
+      return { success: false, message: '선생님이 이미 확인 중이라 보완할 수 없어요.', locked: true };
+    }
+
+    // 보완 횟수 (col28, 최대 2)
+    var used = parseInt(sheet.getRange(rowIdx, 28).getValue() || '0') || 0;
+    if (used >= 2) return { success: false, message: '보완은 최대 2회까지예요.', revisionsLeft: 0 };
+
+    // 이전 AI 결과 (변경점 비교용)
+    var prevAi = null;
+    try { var praw = String(sheet.getRange(rowIdx, 23).getValue() || '').trim(); if (praw.startsWith('{')) prevAi = JSON.parse(praw); } catch(e) {}
+
+    // 사진 덮어쓰기
+    var incomingFiles = filesData || [];
+    if (!incomingFiles.length) return { success: false, message: '사진을 첨부해주세요.' };
+    var baseTask = String(taskName).split(' (')[0];
+    var className = studentId.length >= 2 ? (studentId.substring(0,1) + '학년 ' + studentId.substring(1,2) + '반') : '기타';
+    var parentFolder = DriveApp.getFolderById(_getParentFolderId_());
+    var taskFolder = parentFolder.getFoldersByName(baseTask).hasNext() ? parentFolder.getFoldersByName(baseTask).next() : parentFolder.createFolder(baseTask);
+    var classFolder = taskFolder.getFoldersByName(className).hasNext() ? taskFolder.getFoldersByName(className).next() : taskFolder.createFolder(className);
+
+    var newUrls = {}, hashObj = {};
+    incomingFiles.forEach(function(f) {
+      var bytes = Utilities.base64Decode(f.b64);
+      var blob = Utilities.newBlob(bytes, f.mime || 'image/jpeg',
+        '[' + studentId + '] ' + studentName + '_' + baseTask + '_보완' + (used + 1) + '_' + f.key + '.jpg');
+      newUrls[f.key] = classFolder.createFile(blob).getUrl();
+      hashObj[f.key] = getHash(bytes);
+    });
+    sheet.getRange(rowIdx, 7).setValue(JSON.stringify(newUrls));   // col7 사진 덮어쓰기
+    sheet.getRange(rowIdx, 9).setValue(JSON.stringify(hashObj));   // col9 해시
+    sheet.getRange(rowIdx, 23).setValue('');                        // col23 이전 AI 비우기(재채점 위해)
+    sheet.getRange(rowIdx, 28).setValue(used + 1);                  // col28 보완횟수++
+    _clearHistoryCache();
+
+    // AI 재채점 (직전 결과와 비교해 changeSummary 포함)
+    var aiRes = autoGradeNewSubmission(rowIdx, baseTask, studentId, studentName, prevAi);
+    return {
+      success: true,
+      result: aiRes.success ? aiRes.result : null,
+      aiError: aiRes.success ? null : (aiRes.message || ''),
+      revisionsLeft: 2 - (used + 1)
+    };
   } catch(e) {
     return { success: false, message: e.toString() };
   }

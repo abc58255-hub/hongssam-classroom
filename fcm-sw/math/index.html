@@ -33,7 +33,7 @@
         'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
         'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
         'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
-        'logFeatureUse', 'setStudentPassword'
+        'logFeatureUse', 'setStudentPassword', 'reviseSubmission'
       ];
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[GAS RPC]', e); };
@@ -291,7 +291,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.03.00</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.04.00</span>
     </div>
   </div>
 </div>
@@ -440,9 +440,21 @@
         </div>
         <div id="aiResultFeedback" style="font-size:14px; color:#334155; line-height:1.7; margin-bottom:10px; white-space:pre-wrap;"></div>
         <div id="aiResultPerQuestion" style="margin-bottom:10px;"></div>
+        <div id="aiResultChange" style="display:none; background:#fefce8; border:1px solid #fde68a; border-radius:10px; padding:10px 12px; margin-bottom:10px; font-size:13px; color:#854d0e; line-height:1.6;"></div>
         <div id="aiResultConfidence" style="margin-bottom:10px;"></div>
         <div style="font-size:11px; color:#94a3b8; font-style:italic; padding-top:8px; border-top:1px solid #bae6fd;">
           ⚠️ AI 참고 점수입니다. 선생님 최종 채점이 공식 점수예요!
+        </div>
+      </div>
+
+      <!-- 셀프 개선 루프: 이대로 제출 / 보완해서 다시 -->
+      <div id="aiSelfLoopBox" style="display:none;">
+        <div style="font-size:13px; color:#475569; text-align:center; margin-bottom:10px; line-height:1.6;">
+          AI 피드백을 참고해 <b>더 보완</b>하거나, <b>이대로</b> 선생님 채점을 기다릴 수 있어요.
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button class="primary-btn" id="reviseBtn" onclick="startRevise()" style="flex:1; background:linear-gradient(135deg,#f59e0b,#d97706);">✏️ 보완해서 다시 <span id="reviseLeftLabel"></span></button>
+          <button class="primary-btn" id="keepBtn" onclick="backToDashboard()" style="flex:1; background:linear-gradient(135deg,#10b981,#059669);">✅ 이대로 제출</button>
         </div>
       </div>
     </div>
@@ -2065,7 +2077,8 @@
       base64Files.push({ key: fObj.key, b64: b64Data, mime: 'image/jpeg', name: fObj.file.name });
       filesProcessedCount++;
       if (filesProcessedCount === filesToProcess.length) {
-        sendToServer(currentTargetTask.isResubmit ? "true" : "false", base64Files);
+        if (window._reviseMode) doRevise(base64Files);
+        else sendToServer(currentTargetTask.isResubmit ? "true" : "false", base64Files);
       }
     }
   }
@@ -2173,63 +2186,7 @@
                 setTimeout(function() {
                   document.getElementById('aiGradingLoader').style.display = 'none';
                   
-                  if (aiRes && aiRes.success && aiRes.result) {
-                    // ✅ AI 결과 표시
-                    var r = aiRes.result;
-                    
-                    // 점수 표시
-                    var scoreText = r.grade 
-                      || (r.perQuestion 
-                            ? Object.values(r.perQuestion).reduce(function(s,q){return s+(Number(q.score)||0);},0) + '점'
-                            : (r.score || 0) + '/' + (r.maxScore || '?') + '점');
-                    document.getElementById('aiResultScore').textContent = scoreText;
-                    
-                    // 피드백 표시
-                    var fbText = r.overallFeedback || r.feedback || '';
-                    document.getElementById('aiResultFeedback').textContent = fbText;
-                    
-                    // 문항별 결과 표시
-                    var pqDiv = document.getElementById('aiResultPerQuestion');
-                    if (r.perQuestion) {
-                      var pqHtml = '';
-                      Object.keys(r.perQuestion).forEach(function(k) {
-                        var q = r.perQuestion[k];
-                        pqHtml += '<div style="display:flex; justify-content:space-between; align-items:flex-start; padding:8px 10px; background:white; border-radius:8px; margin-bottom:6px; border:1px solid #e0f2fe;">'
-                          + '<div style="flex:1;">'
-                            + '<div style="font-size:13px; font-weight:700; color:#1e293b;">' + k + '</div>'
-                            + (q.feedback ? '<div style="font-size:12px; color:#64748b; margin-top:2px; line-height:1.5;">' + q.feedback + '</div>' : '')
-                          + '</div>'
-                          + '<div style="font-size:15px; font-weight:900; color:#0284c7; flex-shrink:0; margin-left:10px;">' + q.score + '/' + q.maxScore + '</div>'
-                        + '</div>';
-                      });
-                      pqDiv.innerHTML = pqHtml;
-                    } else {
-                      pqDiv.innerHTML = '';
-                    }
-                    
-                    // 신뢰도 표시
-                    var confDiv = document.getElementById('aiResultConfidence');
-                    var confInfo = r.confidence === 'high' 
-                      ? { emoji: '🟢', text: 'AI가 꽤 자신 있어하는 결과예요!' }
-                      : r.confidence === 'low'
-                        ? { emoji: '🔴', text: '이 결과는 불확실할 수 있어요. 선생님 채점을 기다려보세요.' }
-                        : { emoji: '🟡', text: '참고용으로 확인하고, 선생님 채점을 기다려보세요.' };
-                    confDiv.innerHTML = '<div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#64748b;">'
-                      + '<span style="font-size:16px;">' + confInfo.emoji + '</span>'
-                      + '<span>' + confInfo.text + '</span>'
-                      + '</div>';
-                    
-                    // 배너 타이틀 변경
-                    document.getElementById('successBannerTitle').textContent = 'AI 채점 완료! 🤖';
-                    
-                    document.getElementById('aiGradeResultBox').style.display = 'block';
-                  } else {
-                    var skipBox = document.getElementById('aiGradeSkippedBox');
-                    var errMsg = (aiRes && aiRes.message) ? aiRes.message : '';
-                    if (skipBox && errMsg) skipBox.innerHTML = '<div style="background:#fef2f2;border:1px dashed #fca5a5;border-radius:12px;padding:14px 16px;margin-bottom:16px;"><div style="font-size:12px;color:#dc2626;line-height:1.6;">⚠️ AI 채점 오류<br><span style="color:#94a3b8;">' + errMsg + '</span></div></div>';
-                    document.getElementById('aiGradeSkippedBox').style.display = 'block';
-                  }
-                  
+                  renderAiResult(aiRes, 2, res.rowIdx, taskNameVal);
                   document.getElementById('successBackBtn').style.display = 'block';
                 }, 500); // 0.5초 딜레이 (100% 바 보여주기)
               })
@@ -2326,7 +2283,125 @@
 
   function closeImageModal() { document.getElementById('imageModal').style.display = 'none'; }
 
+  // ── AI 결과 렌더링 (첫 제출·보완 공용) ──
+  function renderAiResult(aiRes, revisionsLeft, rowIdx, taskName) {
+    var changeBox = document.getElementById('aiResultChange');
+    var loopBox = document.getElementById('aiSelfLoopBox');
+    if (changeBox) changeBox.style.display = 'none';
+    if (loopBox) loopBox.style.display = 'none';
+    document.getElementById('aiGradeResultBox').style.display = 'none';
+    document.getElementById('aiGradeSkippedBox').style.display = 'none';
+
+    if (aiRes && aiRes.success && aiRes.result) {
+      var r = aiRes.result;
+      var scoreText = r.grade || (r.perQuestion
+        ? Object.values(r.perQuestion).reduce(function(s,q){return s+(Number(q.score)||0);},0) + '점'
+        : (r.score || 0) + '/' + (r.maxScore || '?') + '점');
+      document.getElementById('aiResultScore').textContent = scoreText;
+      document.getElementById('aiResultFeedback').textContent = r.overallFeedback || r.feedback || '';
+
+      var pqDiv = document.getElementById('aiResultPerQuestion');
+      if (r.perQuestion) {
+        var pqHtml = '';
+        Object.keys(r.perQuestion).forEach(function(k) {
+          var q = r.perQuestion[k];
+          pqHtml += '<div style="display:flex; justify-content:space-between; align-items:flex-start; padding:8px 10px; background:white; border-radius:8px; margin-bottom:6px; border:1px solid #e0f2fe;">'
+            + '<div style="flex:1;"><div style="font-size:13px; font-weight:700; color:#1e293b;">' + k + '</div>'
+            + (q.feedback ? '<div style="font-size:12px; color:#64748b; margin-top:2px; line-height:1.5;">' + q.feedback + '</div>' : '') + '</div>'
+            + '<div style="font-size:15px; font-weight:900; color:#0284c7; flex-shrink:0; margin-left:10px;">' + q.score + '/' + q.maxScore + '</div></div>';
+        });
+        pqDiv.innerHTML = pqHtml;
+      } else { pqDiv.innerHTML = ''; }
+
+      if (changeBox && r.changeSummary) {
+        changeBox.innerHTML = '✏️ <b>지난번과 달라진 점</b><br>' + r.changeSummary;
+        changeBox.style.display = 'block';
+      }
+
+      var confDiv = document.getElementById('aiResultConfidence');
+      var confInfo = r.confidence === 'high' ? { emoji: '🟢', text: 'AI가 꽤 자신 있어하는 결과예요!' }
+        : r.confidence === 'low' ? { emoji: '🔴', text: '이 결과는 불확실할 수 있어요. 선생님 채점을 기다려보세요.' }
+        : { emoji: '🟡', text: '참고용으로 확인하고, 선생님 채점을 기다려보세요.' };
+      confDiv.innerHTML = '<div style="display:flex; align-items:center; gap:6px; font-size:12px; color:#64748b;"><span style="font-size:16px;">' + confInfo.emoji + '</span><span>' + confInfo.text + '</span></div>';
+
+      document.getElementById('successBannerTitle').textContent = 'AI 채점 완료! 🤖';
+      document.getElementById('aiGradeResultBox').style.display = 'block';
+
+      window._aiLoopState = { rowIdx: rowIdx, taskName: taskName, revisionsLeft: revisionsLeft };
+      if (loopBox && revisionsLeft > 0) {
+        document.getElementById('reviseLeftLabel').textContent = '(' + revisionsLeft + '회 남음)';
+        loopBox.style.display = 'block';
+      }
+    } else {
+      var skipBox = document.getElementById('aiGradeSkippedBox');
+      var errMsg = (aiRes && aiRes.message) ? aiRes.message : '';
+      if (skipBox && errMsg) skipBox.innerHTML = '<div style="background:#fef2f2;border:1px dashed #fca5a5;border-radius:12px;padding:14px 16px;margin-bottom:16px;"><div style="font-size:12px;color:#dc2626;line-height:1.6;">⚠️ AI 채점 오류<br><span style="color:#94a3b8;">' + errMsg + '</span></div></div>';
+      if (skipBox) skipBox.style.display = 'block';
+    }
+  }
+
+  // ── 보완하기: 제출 화면으로 돌아가 다시 첨부 ──
+  function startRevise() {
+    var st = window._aiLoopState;
+    if (!st || st.revisionsLeft <= 0) return;
+    window._reviseMode = { rowIdx: st.rowIdx, taskName: st.taskName, revisionsLeft: st.revisionsLeft };
+    document.getElementById('successMsg').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
+    switchTab(1);
+    document.getElementById('submitStatus').innerText = '';
+    alert('✏️ 보완 모드예요! 고친 사진을 다시 첨부한 뒤 제출하면 AI가 다시 확인해줘요. (남은 보완 ' + st.revisionsLeft + '회)');
+  }
+
+  // ── 보완본 전송 → 같은 행 덮어쓰기 + AI 재채점 ──
+  function doRevise(base64FilesArray) {
+    var rm = window._reviseMode;
+    if (!rm) return;
+    document.getElementById('dashboardScreen').style.display = 'none';
+    document.getElementById('submitRankBox').style.display = 'none';
+    document.getElementById('successMsg').style.display = 'block';
+    document.getElementById('aiGradeResultBox').style.display = 'none';
+    document.getElementById('aiGradeSkippedBox').style.display = 'none';
+    document.getElementById('aiSelfLoopBox').style.display = 'none';
+    document.getElementById('successBackBtn').style.display = 'none';
+    document.getElementById('successBannerTitle').textContent = '보완본 확인 중... ✏️';
+    var loader = document.getElementById('aiGradingLoader');
+    loader.style.display = 'block';
+    var bar = document.getElementById('aiProgressBar');
+    var progress = 0;
+    var progressTimer = setInterval(function(){ progress += 3; if (progress > 90) progress = 90; if (bar) bar.style.width = progress + '%'; }, 400);
+
+    google.script.run
+      .withFailureHandler(function(err) {
+        clearInterval(progressTimer);
+        loader.style.display = 'none';
+        document.getElementById('successBackBtn').style.display = 'block';
+        alert('보완 전송 오류: ' + (err && err.message ? err.message : err));
+      })
+      .withSuccessHandler(function(res) {
+        clearInterval(progressTimer);
+        if (bar) bar.style.width = '100%';
+        setTimeout(function() {
+          loader.style.display = 'none';
+          window._reviseMode = null;
+          if (res && res.success && res.result) {
+            renderAiResult({ success: true, result: res.result }, res.revisionsLeft, rm.rowIdx, rm.taskName);
+          } else if (res && res.success) {
+            var skipBox = document.getElementById('aiGradeSkippedBox');
+            skipBox.innerHTML = '<div style="background:#f0fdf4;border:1px dashed #86efac;border-radius:12px;padding:14px 16px;margin-bottom:16px;"><div style="font-size:13px;color:#166534;line-height:1.6;">✅ 보완본이 저장됐어요!<br><span style="font-size:12px;color:#94a3b8;">' + (res.aiError || 'AI 재채점은 생략됐어요.') + '</span></div></div>';
+            skipBox.style.display = 'block';
+          } else {
+            var skipBox2 = document.getElementById('aiGradeSkippedBox');
+            skipBox2.innerHTML = '<div style="background:#fef2f2;border:1px dashed #fca5a5;border-radius:12px;padding:14px 16px;margin-bottom:16px;"><div style="font-size:13px;color:#dc2626;line-height:1.6;">⚠️ ' + (res && res.message ? res.message : '보완에 실패했어요.') + '</div></div>';
+            skipBox2.style.display = 'block';
+          }
+          document.getElementById('successBackBtn').style.display = 'block';
+        }, 400);
+      })
+      .reviseSubmission(rm.rowIdx, rm.taskName, currentUser.id, currentUser.name, base64FilesArray);
+  }
+
   function backToDashboard() {
+    window._reviseMode = null;
     document.getElementById('message').value = '';
     document.getElementById('multiUploadArea').innerHTML = '';
     document.getElementById('choiceArea').style.display = 'none';
@@ -2334,7 +2409,7 @@
     document.getElementById('submitStatus').innerText = '';
     document.getElementById('successMsg').style.display = 'none';
     document.getElementById('dashboardScreen').style.display = 'block';
-    refreshData(); 
+    refreshData();
     switchTab(2);
     
     // ✅ AI 채점이 완료될 시간을 주고 15초 후 자동 새로고침
