@@ -278,7 +278,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.05.00</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.06.00</span>
     </div>
   </div>
 </div>
@@ -437,7 +437,7 @@
 
       <!-- 헤더 -->
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #f1f5f9;flex-shrink:0;">
-        <div style="font-size:17px;font-weight:800;color:#0f172a;">📐 AI 채점기준 설정</div>
+        <div style="font-size:17px;font-weight:800;color:#0f172a;">📐 채점기준 관리 · AI 모델</div>
         <button onclick="document.getElementById('rubricModal').style.display='none'" style="background:none;border:none;font-size:22px;cursor:pointer;color:#94a3b8;">✕</button>
       </div>
 
@@ -451,7 +451,6 @@
               style="width:100%;padding:7px 10px;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;outline:none;">
           </div>
           <div style="flex:1;overflow-y:auto;padding:8px;">
-            <button onclick="newRubricForm()" style="width:100%;background:#6366f1;color:white;border:none;padding:8px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;margin-bottom:8px;">+ 새 채점기준</button>
             <div id="rubricList"></div>
           </div>
         </div>
@@ -459,59 +458,9 @@
         <!-- 오른쪽: 편집 폼 -->
         <div style="flex:1;overflow-y:auto;padding:18px 20px;">
       <input type="hidden" id="rubricRowIdx">
-
-      <!-- 과제 선택 -->
-      <div style="margin-bottom:12px;">
-        <label class="form-label">📋 과제 *</label>
-        <select id="rubricTaskName" class="form-input"></select>
-      </div>
-
-      <!-- 채점 유형 + 총점 -->
-      <div style="display:flex;gap:8px;margin-bottom:12px;">
-        <div style="flex:2;">
-          <label class="form-label">채점 유형</label>
-          <select id="rubricEvalType" class="form-input" onchange="updateRubricScoreUI()">
-            <option value="점수제">점수제 (직접 점수)</option>
-            <option value="문항별점수제">문항별 점수제 (문항 합산)</option>
-            <option value="A-B-C-D 등급제">A-B-C-D 등급제</option>
-            <option value="상-중-하 등급제">상-중-하 등급제</option>
-            <option value="통과/미통과 (P/F)">통과/미통과 (P/F)</option>
-          </select>
-        </div>
-        <div id="rubricMaxScoreBox" style="flex:1;">
-          <label class="form-label">총점</label>
-          <input type="number" id="rubricMaxScore" class="form-input" value="10" min="1">
-        </div>
-      </div>
-
-      <!-- 문항 구성 (문항별 점수제일 때) -->
-      <div id="rubricQuestionsBox" style="display:none;margin-bottom:12px;background:#f8fafc;border-radius:10px;padding:12px;border:1px solid #e2e8f0;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-          <label class="form-label" style="margin:0;">📝 문항별 점수</label>
-          <button onclick="addRubricQuestion()" style="background:#e0e7ff;color:#4338ca;border:none;padding:4px 12px;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;">+ 문항 추가</button>
-        </div>
-        <div id="rubricQuestionList"></div>
-        <div style="font-size:11px;color:#94a3b8;margin-top:6px;">총점은 문항별 점수 합계로 자동 계산돼요.</div>
-      </div>
-
-      <!-- 파일 업로드 영역 -->
-      <div style="margin-bottom:12px;">
-        <label class="form-label">📎 채점기준 파일 (사진/PDF) *</label>
-        <div id="rubricFileList" style="margin-bottom:8px;"></div>
-        <label style="display:flex;align-items:center;gap:8px;background:#f1f5f9;border:2px dashed #cbd5e1;border-radius:10px;padding:14px;cursor:pointer;transition:0.1s;" onmouseover="this.style.borderColor='#6366f1'" onmouseout="this.style.borderColor='#cbd5e1'">
-          <input type="file" id="rubricFileInput" multiple accept="image/*,.pdf" style="display:none;" onchange="handleRubricFileSelect(this)">
-          <span style="font-size:20px;">📁</span>
-          <div>
-            <div style="font-size:13px;font-weight:700;color:#0f172a;">파일 선택 (여러 개 가능)</div>
-            <div style="font-size:11px;color:#94a3b8;">사진, PDF 지원 · 파일당 최대 10MB</div>
-          </div>
-        </label>
-      </div>
-
-      <!-- 추가 설명 -->
-      <div style="margin-bottom:16px;">
-        <label class="form-label">📝 추가 설명 (선택)</label>
-        <textarea id="rubricCriteria" class="form-input" rows="8" style="resize:vertical;min-height:160px;font-size:13px;line-height:1.7;" placeholder="파일로 전달하기 어려운 추가 기준을 입력해주세요.&#10;예) 단위 표기 누락 시 1점 감점&#10;예) 풀이 과정 없으면 0점&#10;예) 검토과정 필수"></textarea>
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:16px;font-size:13px;color:#1e40af;line-height:1.6;">
+        💡 <b>채점기준 등록·수정은 [과제 관리]의 과제 만들기·수정에서 해요.</b><br>
+        여기서는 등록된 채점기준을 <b>확인·삭제</b>하고, <b>AI 채점 모델</b>을 설정합니다.
       </div>
 
       <!-- AI 모델 선택 -->
@@ -558,7 +507,7 @@
         <div id="rubricModelSaveMsg" style="font-size:11px;color:#10b981;text-align:center;margin-top:4px;display:none;">저장됐어요!</div>
       </div>
 
-      <button onclick="saveRubricData()" style="width:100%;background:#6366f1;color:white;border:none;padding:12px;border-radius:10px;font-weight:800;font-size:14px;cursor:pointer;">💾 채점기준 저장</button>
+      <div id="rubricPreview" style="background:#fafafa;border:1px solid #f1f5f9;border-radius:10px;padding:14px;font-size:13px;color:#334155;line-height:1.6;">왼쪽에서 채점기준을 선택하면 내용을 볼 수 있어요.</div>
 
         </div><!-- 오른쪽 폼 끝 -->
       </div><!-- 2열 레이아웃 끝 -->
@@ -2253,15 +2202,7 @@
           populateFilters();
           loadRubrics(function(){ renderManageTasks(); });
         }).getTasksOnly();
-        // ✅ 이어서 AI 채점기준 등록 유도 (코멘트만 남김 과제는 채점 불필요라 제외)
-        if (createdEval.indexOf('코멘트') < 0) {
-          if (confirm('✅ 과제 "' + createdName + '" 생성 완료!\n\n이어서 AI 채점기준을 등록할까요?\n채점기준이 없으면 AI 자동채점이 작동하지 않아요.')) {
-            openRubricManager();
-            setTimeout(function(){ _prefillRubricFor(createdName, createdEval); }, 150);
-          }
-        } else {
-          alert('과제가 생성되었습니다!');
-        }
+        alert('✅ 과제 "' + createdName + '" 생성 완료!');
       } else { alert(r.message); }
     }).saveNewTask(td);
   }
@@ -2283,14 +2224,15 @@
       if (ev) { ev.value = _taskEvalToRubric(evalType); updateRubricScoreUI(); }
     }
   }
-  // 특정 과제의 채점기준 등록/수정 모달 열기 (배지 클릭용)
+  // 이름으로 과제 수정 모달 열기 (채점기준 등록은 이제 수정 폼에서)
+  function openTaskEditByName(name) {
+    var t = (allTasks || []).find(function(x){ return x.name === name; });
+    if (t) openEditTaskModal(t);
+    else alert('과제를 찾을 수 없어요. 목록을 새로고침해 주세요.');
+  }
+  // 특정 과제의 채점기준 등록/수정 → 과제 수정 폼으로 (배지 클릭용)
   function openRubricFor(name, evalType) {
-    openRubricManager();
-    setTimeout(function(){
-      var rb = (rubricCache || []).filter(function(r){ return r.taskName === name; })[0];
-      if (rb) { editRubric(rb.rowIdx); }   // 기존 기준 있으면 불러오기
-      else { _prefillRubricFor(name, evalType); }
-    }, 150);
+    openTaskEditByName(name);
   }
 
   function submitTaskEdit() {
@@ -5237,44 +5179,24 @@
     renderRubricListPanel(rubricCache, _rubricSelectedRowIdx);
   }
 
-  function newRubricForm() {
+  function _resetRubricPreview() {
     _rubricSelectedRowIdx = null;
-    document.getElementById('rubricRowIdx').value = '';
-    document.getElementById('rubricTaskName').value = '';
-    document.getElementById('rubricEvalType').value = '점수제';
-    document.getElementById('rubricMaxScore').value = '10';
-    document.getElementById('rubricCriteria').value = '';
-    document.getElementById('rubricQuestionList').innerHTML = '';
-    rubricQuestionCount = 0;
-    rubricFiles = [];
-    renderRubricFileList();
-    updateRubricScoreUI();
+    var pv = document.getElementById('rubricPreview');
+    if (pv) pv.innerHTML = '왼쪽에서 채점기준을 선택하면 내용을 볼 수 있어요.';
     if (rubricCache) renderRubricListPanel(rubricCache, null);
   }
 
   function openRubricManager() {
-    rubricFiles = [];
-    rubricQuestionCount = 0;
-    document.getElementById('rubricRowIdx').value = '';
-    document.getElementById('rubricCriteria').value = '';
-    document.getElementById('rubricMaxScore').value = '10';
-    document.getElementById('rubricQuestionList').innerHTML = '';
-    renderRubricFileList();
-    updateRubricScoreUI();
     google.script.run
       .withSuccessHandler(function(res) {
         var sel = document.getElementById('rubricModelSelect');
         if (sel && res.model) { sel.value = _remapModelId(res.model); updateRubricModelHint(); }
       })
       .getApiSettings();
-    var sel = document.getElementById('rubricTaskName');
-    if (sel) {
-      sel.innerHTML = '<option value="">과제 선택</option>';
-      allTasks.forEach(function(t){ sel.innerHTML += '<option value="'+t.name+'">'+t.name+'</option>'; });
-    }
     loadRubrics(function(rubrics) {
       renderRubricListPanel(rubrics, null);
     });
+    _resetRubricPreview();
     document.getElementById('rubricModal').style.display = 'flex';
   }
   function editRubric(rowIdx) {
@@ -5283,24 +5205,28 @@
     if (!r) return;
     _rubricSelectedRowIdx = rowIdx;
     renderRubricListPanel(rubricCache, rowIdx);
-    document.getElementById('rubricRowIdx').value   = rowIdx;
-    document.getElementById('rubricTaskName').value = r.taskName;
-    document.getElementById('rubricEvalType').value = r.evalType;
-    document.getElementById('rubricMaxScore').value = r.maxScore||10;
-    document.getElementById('rubricCriteria').value = r.criteria||'';
-    updateRubricScoreUI();
-    rubricFiles = (r.files||[]).map(function(f){
-      return { name:f.name, mime:'', b64:null, url:f.url, role:f.role||'grading', questions:f.questions||[], uploaded:true };
-    });
-    renderRubricFileList();
-    rubricQuestionCount = 0;
-    document.getElementById('rubricQuestionList').innerHTML = '';
-    Object.keys(r.questions||{}).forEach(function(qName){
-      addRubricQuestion();
-      var n=rubricQuestionCount;
-      var el=document.getElementById('rq-name-'+n); if(el) el.value=qName;
-      var sc=document.getElementById('rq-score-'+n); if(sc) sc.value=(r.questions[qName]||{}).maxScore||4;
-    });
+    var evalIcon = { '점수제':'🔢','문항별점수제':'📋','A-B-C-D 등급제':'🅰','상-중-하 등급제':'🔼','통과/미통과 (P/F)':'✅' };
+    var filesHtml = (r.files||[]).length
+      ? (r.files||[]).map(function(f){
+          var label = escapeHtml(f.name||'파일') + (f.role==='achievement' ? ' <span style="color:#7c3aed;">(성취기준)</span>' : '');
+          return f.url ? '📄 <a href="'+f.url+'" target="_blank" style="color:#4338ca;">'+label+'</a>' : '📄 '+label;
+        }).join('<br>')
+      : '<span style="color:#94a3b8;">없음</span>';
+    var qHtml = '';
+    if (r.questions && Object.keys(r.questions).length) {
+      qHtml = '<div style="margin-bottom:8px;"><b>문항:</b><br>' + Object.keys(r.questions).map(function(qn){
+        return '• ' + escapeHtml(qn) + ' (' + ((r.questions[qn]||{}).maxScore||0) + '점)';
+      }).join('<br>') + '</div>';
+    }
+    var pv = document.getElementById('rubricPreview');
+    if (pv) pv.innerHTML =
+        '<div style="font-weight:800;color:#0f172a;font-size:15px;margin-bottom:10px;">' + escapeHtml(r.taskName) + '</div>'
+      + '<div style="margin-bottom:8px;"><b>채점유형:</b> ' + (evalIcon[r.evalType]||'📐') + ' ' + escapeHtml(r.evalType||'') + (r.maxScore ? ' · 만점 ' + r.maxScore + '점' : '') + '</div>'
+      + qHtml
+      + '<div style="margin-bottom:8px;"><b>기준 설명:</b><br>' + (r.criteria ? escapeHtml(r.criteria).replace(/\n/g,'<br>') : '<span style="color:#94a3b8;">없음</span>') + '</div>'
+      + '<div style="margin-bottom:12px;"><b>파일:</b><br>' + filesHtml + '</div>'
+      + '<button onclick="deleteRubricData(' + rowIdx + ')" style="background:#fee2e2;color:#dc2626;border:none;padding:8px 14px;border-radius:8px;font-weight:700;font-size:12px;cursor:pointer;">🗑 이 채점기준 삭제</button>'
+      + '<div style="font-size:11px;color:#94a3b8;margin-top:10px;line-height:1.5;">✏️ 내용 수정은 <b>[과제 관리]</b>에서 해당 과제를 <b>수정</b>하세요.</div>';
   }
   function saveRubricData() {
     var taskName = document.getElementById('rubricTaskName').value;
@@ -5349,7 +5275,7 @@
   }
   function deleteRubricData(rowIdx) {
     if(!confirm('이 채점기준을 삭제할까요?')) return;
-    google.script.run.withSuccessHandler(function(res){ if(res.success){ rubricCache=null; _rubricSelectedRowIdx=null; loadRubrics(function(rubrics){ renderRubricListPanel(rubrics, null); newRubricForm(); }); } }).deleteRubric(rowIdx);
+    google.script.run.withSuccessHandler(function(res){ if(res.success){ rubricCache=null; _rubricSelectedRowIdx=null; loadRubrics(function(rubrics){ renderRubricListPanel(rubrics, null); _resetRubricPreview(); }); } }).deleteRubric(rowIdx);
   }
   function startAiGrade(rowIdx) {
     var item = allSubmissions.find(function(i){ return i.rowIdx===rowIdx; });
@@ -5363,7 +5289,7 @@
     loadRubrics(function(rubrics) {
       var tName = String(item.task).split(' (재제출)')[0].split(' (')[0];
       var rubric = rubrics.find(function(r){ return r.taskName===tName; });
-      if (!rubric) { if(confirm('채점기준이 없어요. 지금 등록할까요?')) openRubricManager(); return; }
+      if (!rubric) { if(confirm('채점기준이 없어요. 과제 수정에서 지금 등록할까요?')) openTaskEditByName(tName); return; }
       var btn = document.getElementById('ai-grade-btn-'+rowIdx);
       if (btn) { btn.disabled=true; btn.textContent='🤖 채점 중...'; }
       google.script.run
@@ -5682,7 +5608,7 @@
     var skipDone=document.getElementById('aiBatchUngraded').checked;
     if(!taskName)return alert('과제를 선택하세요.');
     var rubric=(rubricCache||[]).find(function(r){return r.taskName===taskName;});
-    if(!rubric){if(confirm('채점기준이 없어요. 지금 등록할까요?')){document.getElementById('aiGradeModal').style.display='none';openRubricManager();}return;}
+    if(!rubric){if(confirm('채점기준이 없어요. 과제 수정에서 지금 등록할까요?')){document.getElementById('aiGradeModal').style.display='none';openTaskEditByName(taskName);}return;}
     aiBatchTaskName=taskName;
     aiBatchList=allSubmissions.filter(function(item){
       var safeId=String(item.id||'');
