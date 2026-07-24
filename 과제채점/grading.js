@@ -403,7 +403,8 @@ function parseTasks(ss) {
       reqPics: reqPics,
       choiceList: choiceList,
       rejectDays:   taskData[i][9]  !== '' && taskData[i][9]  != null ? parseInt(taskData[i][9])  : 7,
-      feedbackDays: taskData[i][10] !== '' && taskData[i][10] != null ? parseInt(taskData[i][10]) : 7
+      feedbackDays: taskData[i][10] !== '' && taskData[i][10] != null ? parseInt(taskData[i][10]) : 7,
+      standards: taskData[i][11] ? String(taskData[i][11]).trim() : '' // L열 성취기준
     });
   }
   tasks.reverse();
