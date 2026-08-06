@@ -291,7 +291,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.04.00</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.04.01</span>
     </div>
   </div>
 </div>
@@ -2348,6 +2348,9 @@
     document.getElementById('successMsg').style.display = 'none';
     document.getElementById('dashboardScreen').style.display = 'block';
     switchTab(1);
+    var tsel = document.getElementById('taskName');
+    if (tsel && st.taskName) tsel.value = st.taskName;  // 선택값 복원
+    initTaskUI();  // 제출 폼 새로 그리기(파일 입력 초기화 + 버튼 재활성화)
     document.getElementById('submitStatus').innerText = '';
     alert('✏️ 보완 모드예요! 고친 사진을 다시 첨부한 뒤 제출하면 AI가 다시 확인해줘요. (남은 보완 ' + st.revisionsLeft + '회)');
   }
