@@ -43,17 +43,27 @@
         FNS.forEach(function (name) {
           runner[name] = function () {
             var args = Array.prototype.slice.call(arguments);
-            fetch(GAS_EXEC_URL, {
-              method: 'POST',
-              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-              body: JSON.stringify({ fn: name, args: args })
-            }).then(function (res) {
-              if (!res.ok) throw new Error('HTTP ' + res.status);
-              return res.json();
-            }).then(function (data) {
-              if (data && data.ok) return data.result;
-              throw new Error((data && data.error) || '서버 오류');
-            }).then(function (result) { ok(result); }, function (e) { fail(e); });
+            var attempt = 0;
+            function run() {
+              attempt++;
+              fetch(GAS_EXEC_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ fn: name, args: args })
+              }).then(function (res) {
+                if (!res.ok) { var e = new Error('HTTP ' + res.status); e._net = true; throw e; }
+                return res.json();
+              }).then(function (data) {
+                if (data && data.ok) return data.result;
+                throw new Error((data && data.error) || '서버 오류'); // 앱 오류 — 재시도 안 함
+              }).then(function (result) { ok(result); }, function (e) {
+                // 네트워크·HTTP 오류만 자동 재시도(최대 3회, 백오프) — GAS 2-홉 간헐 실패 대응
+                var isNet = e && (e._net || /Failed to fetch|NetworkError|Load failed|HTTP (0|4\d\d|5\d\d)/i.test(e.message || ''));
+                if (isNet && attempt < 3) { setTimeout(run, 600 * attempt); }
+                else { fail(e); }
+              });
+            }
+            run();
           };
         });
         return runner;
@@ -291,7 +301,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.04.01</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.05.00</span>
     </div>
   </div>
 </div>
@@ -336,6 +346,10 @@
       <div id="rejectionReasonBox" style="display:none; background:#fef2f2; border:2px solid #ef4444; border-radius:12px; padding:16px; margin-bottom:4px;">
         <div id="rejectionReasonTitle" style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:8px;">🚨 선생님의 반려 사유</div>
         <div id="rejectionReasonText" style="font-size:14px; color:#1f2937; line-height:1.6; white-space:pre-wrap;"></div>
+        <div style="margin-top:12px; padding-top:12px; border-top:1px dashed rgba(0,0,0,0.12);">
+          <label style="display:block; font-size:12.5px; font-weight:800; color:#0f766e; margin-bottom:5px;">✏️ 어떤 부분을 보완했나요? <span style="color:#dc2626;">*필수</span></label>
+          <textarea id="resubNote" rows="2" style="width:100%; padding:10px; border:1.5px solid #5eead4; border-radius:8px; font-size:13px; box-sizing:border-box; background:white; resize:none;" placeholder="예) 3번 문제 풀이 과정을 다시 쓰고, 답에 단위를 붙였어요."></textarea>
+        </div>
       </div>
 
       <div id="choiceArea" class="field" style="display:none; background:#f8fafc; padding:15px; border-radius:12px; border:2px dashed #3b82f6;">
@@ -1591,6 +1605,8 @@
             : '<div style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:6px;">🚨 반려 — 처음부터 다시 제출하세요' + dlTxt + '</div>';
           rejectBox = '<div style="' + boxStyle + '">' + rbTitle + '<div style="font-size:14px; color:#1f2937; line-height:1.6; white-space:pre-wrap;">' + item.feedback + '</div></div>';
         }
+        // 반려/피드백 박스에 이미 피드백이 나오면 아래 '선생님 코멘트'는 중복이라 생략
+        var fbInRejectBox = (item.status === '재제출요청' || item.status === '피드백요청') && !!item.feedback;
 
         var hasPqData = item.perQuestionData && Object.keys(item.perQuestionData).length > 0;
         var pqHasContent = hasPqData && Object.values(item.perQuestionData).some(function(d) { return d.fb || d.sc; });
@@ -1611,11 +1627,11 @@
             feedHtml += '</div>';
           });
           feedHtml += '</div>';
-          if (item.feedback) feedHtml += '<div class="teacher-feedback">' + item.feedback + '</div>';
+          if (item.feedback && !fbInRejectBox) feedHtml += '<div class="teacher-feedback">' + item.feedback + '</div>';
           var dn1 = (item.maxScore && item.maxScore > 0) ? (' / ' + item.maxScore) : '';
           if (item.score) scoreBadge = '<span class="score-badge">💯 합계: ' + item.score + dn1 + '</span>';
         } else {
-          feedHtml = item.feedback ? '<div class="teacher-feedback">' + item.feedback + '</div>' : '';
+          feedHtml = (item.feedback && !fbInRejectBox) ? '<div class="teacher-feedback">' + item.feedback + '</div>' : '';
           var dn2 = (item.maxScore && item.maxScore > 0 && !isNaN(parseFloat(item.score))) ? (' / ' + item.maxScore) : '';
           scoreBadge = item.score ? '<span class="score-badge">💯 평가: ' + item.score + dn2 + '</span>' : '';
         }
@@ -1644,13 +1660,13 @@
           }
         }
 
-        if (item.reply && !isResubmitRequested) {
-          replySection = '<div class="my-reply">' + item.reply.replace(/\n/g, '<br>') + '</div>' + resubmitBtnHtml;
-        } else if (item.feedback || (item.annoUrls && Object.keys(item.annoUrls).length > 0) || item.status === '채점완료' || isResubmitRequested) {
-          var replyInputHtml = !isResubmitRequested
-            ? '<textarea id="reply_' + item.rowIdx + '" class="reply-input" rows="2" placeholder="선생님께 드릴 답장이나 나의 오답 성찰을 적어보세요."></textarea><button class="reply-btn" onclick="sendReply(' + item.rowIdx + ')">답장 보내기</button>'
-            : '';
-          replySection = '<div class="reply-section">' + replyInputHtml + resubmitBtnHtml + '</div>';
+        var canResubmitNow = (item.status === '재제출요청' || item.status === '피드백요청') && !isResubmitRequested;
+        if (canResubmitNow) {
+          // 반려/피드백 → 답장칸 대신 바로 제출 탭으로 이동하는 버튼
+          var safeBase = (item.baseName || item.task || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+          replySection = '<button class="reply-btn" style="background:#f97316;width:100%;margin-top:12px;padding:13px;font-size:14px;" onclick="goToResubmit(\'' + safeBase + '\')">📤 보완해서 다시 제출하기</button>';
+        } else if (isResubmitRequested || item.status === '채점완료') {
+          replySection = resubmitBtnHtml;
         }
 
         var aiRefBox = '';
@@ -1919,6 +1935,8 @@
         if (titleEl) { titleEl.style.color = '#dc2626'; titleEl.innerText = '🚨 선생님의 반려 사유'; }
       }
       document.getElementById('rejectionReasonText').innerText = currentTargetTask.rejectionFeedback;
+      var rnEl = document.getElementById('resubNote');
+      if (rnEl) { rnEl.value = ''; rnEl.style.borderColor = '#5eead4'; }
       rejBox.style.display = 'block';
     }
 
@@ -2036,6 +2054,15 @@
   });
 }
 
+  // 제출 메시지 구성: 재제출이면 '보완한 부분'을 앞에 붙여 교사가 보게 함
+  function _composeMessageWithNote() {
+    var msg = (document.getElementById('message').value || '').trim();
+    var noteEl = document.getElementById('resubNote');
+    var note = (currentTargetTask && currentTargetTask.isResubmit && !window._reviseMode && noteEl) ? (noteEl.value || '').trim() : '';
+    if (note) return '[보완한 부분] ' + note + (msg ? '\n' + msg : '');
+    return msg;
+  }
+
   async function upload() {
     if (!currentTargetTask) return;
 
@@ -2050,6 +2077,17 @@
         btn.style.background = '#9ca3af';
         document.getElementById('multiUploadArea').innerHTML = '<div style="text-align:center; padding:20px; color:#dc2626; border:2px dashed #fecaca; border-radius:12px; background:#fef2f2; font-weight:bold;">' + (isResub2 ? '🚨 재제출 기한 초과' : '🚨 제출 기한 초과') + '</div>';
         return;
+    }
+
+    // 반려·피드백 재제출은 '어떤 부분을 보완했는지' 필수 (셀프 보완 모드는 제외)
+    if (currentTargetTask.isResubmit && !window._reviseMode) {
+      var noteEl = document.getElementById('resubNote');
+      var note = noteEl ? (noteEl.value || '').trim() : '';
+      if (!note) {
+        document.getElementById('submitStatus').innerText = '✏️ 어떤 부분을 보완했는지 먼저 적어주세요!';
+        if (noteEl) { noteEl.style.borderColor = '#dc2626'; try { noteEl.focus(); } catch(_){} }
+        return;
+      }
     }
 
     // 이하 파일 처리 및 전송 로직 (기존과 동일)
@@ -2207,7 +2245,7 @@
         studentId: currentUser.id, studentName: currentUser.name,
         taskName: taskNameVal, isResubmit: isResubmitStr, voluntary: voluntaryStr,
         level: document.querySelector('input[name="level"]:checked').value,
-        message: document.getElementById('message').value,
+        message: _composeMessageWithNote(),
         filesData: base64FilesArray
       });
   }
@@ -2401,6 +2439,21 @@
         }, 400);
       })
       .reviseSubmission(rm.rowIdx, rm.taskName, currentUser.id, currentUser.name, base64FilesArray);
+  }
+
+  // 반려/피드백 카드의 '다시 제출하기' → 제출 탭으로 이동 + 해당 과제 선택
+  function goToResubmit(taskName) {
+    switchTab(1);
+    var sel = document.getElementById('taskName');
+    if (sel) {
+      var picked = false;
+      for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].value === taskName && sel.options[i].dataset.isResubmit === 'true') { sel.selectedIndex = i; picked = true; break; }
+      }
+      if (!picked) sel.value = taskName;
+    }
+    initTaskUI();
+    try { window.scrollTo(0, 0); } catch(_) {}
   }
 
   function backToDashboard() {

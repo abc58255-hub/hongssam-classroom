@@ -284,7 +284,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.07.02</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.07.03</span>
     </div>
   </div>
 </div>
@@ -2770,6 +2770,7 @@
            '<div style="font-size:18px; font-weight:900; color:#0284c7;">' + scoreText + ' <span style="font-size:12px; font-weight:800; color:' + ci.color + '; margin-left:4px;">' + ci.dot + ' ' + ci.label + '</span></div>' +
         '</div>' +
         (overallFb ? '<div style="font-size:13px; color:#334155; line-height:1.6; margin-bottom:4px; white-space:pre-wrap; word-break:keep-all;">' + overallFb + '</div>' : '') +
+        (r.changeSummary ? '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin:6px 0;font-size:12px;color:#854d0e;line-height:1.5;">✏️ <b>학생이 보완하며 달라진 점</b><br>' + escapeHtml(r.changeSummary) + '</div>' : '') +
         pqHtml;
     }, 100);
   }
@@ -5568,7 +5569,13 @@
       + 'white-space:pre-wrap;word-break:break-all;overflow-wrap:anywhere;width:100%;box-sizing:border-box;">'
       + escapeHtml(aiText) + '</div>'
       + '</div>';
-      
+
+    // ✏️ 학생이 보완하며 달라진 점 (셀프 보완 시 AI가 정리)
+    if (result.changeSummary) {
+      html += '<div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:#854d0e;line-height:1.6;">'
+        + '✏️ <b>학생이 보완하며 달라진 점 (AI 요약)</b><br>' + escapeHtml(result.changeSummary) + '</div>';
+    }
+
     if (result.needsReview) {
       // ✨ 예방조치 3: 반려 사유에도 적용
       html += '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px;margin-bottom:12px;">'
