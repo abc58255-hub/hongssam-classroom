@@ -23,7 +23,8 @@
   <script src="../config.js"></script>
   <script>
     // ✅ GAS 백엔드 주소 (학생-수학 고정 배포 — 재배포해도 주소 동일)
-    var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+    // iOS 사파리 대응: GAS로 직접 안 가고 Supabase 프록시 경유(CORS 정상). 프록시가 GAS로 서버끼리 전달.
+    var GAS_EXEC_URL = 'https://lqjrrqhrnxctyrqccmch.supabase.co/functions/v1/gas-proxy';
 
     // ✅ google.script.run 호환 어댑터 — GAS doPost RPC를 fetch로 호출
     //    text/plain 본문이라 CORS preflight 없음, GAS exec 응답에 ACAO:* 가 붙어 크로스오리진 가능
@@ -301,7 +302,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.06.00</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.07.00</span>
     </div>
   </div>
 </div>
@@ -1247,16 +1248,7 @@
     location.reload();
   }
 
-  // ── 로그인: Supabase 엣지함수로 검증 (CORS 정상 → iOS 사파리 '.Load failed' 해결) ──
-  // GAS(script.google.com)는 교차도메인 리다이렉트라 iOS 웹킷이 fetch 실패했음. Supabase는 CORS 헤더 정상.
-  var SB_LOGIN_URL = 'https://lqjrrqhrnxctyrqccmch.supabase.co/functions/v1/login';
-  var SB_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
-  async function _sha256Hex(text) {
-    var buf = new TextEncoder().encode(text);
-    var h = await crypto.subtle.digest('SHA-256', buf);
-    return Array.from(new Uint8Array(h)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
-  }
-  async function doLogin() {
+  function doLogin() {
     var id = document.getElementById('loginId').value.trim();
     var name = document.getElementById('loginName').value.trim();
     var pwEl = document.getElementById('loginPw');
@@ -1264,41 +1256,28 @@
     if (!id || !name) return;
     document.getElementById('loginBtn').disabled = true;
     document.getElementById('loginStatus').innerText = "인증 중...";
-    try {
-      // 비번을 입력했으면 해시, 아니면(자동 로그인) 저장된 해시 사용
-      var pwHash = pw ? await _sha256Hex(pw) : (localStorage.getItem('math_pwhash') || '');
-      if (!pwHash) {
-        document.getElementById('loginStatus').innerText = '비밀번호를 입력해 주세요.';
+    google.script.run
+      .withFailureHandler(function(err) {
+        document.getElementById('loginStatus').innerText = '오류: ' + err.message;
         document.getElementById('loginBtn').disabled = false;
-        return;
-      }
-      var resp = await fetch(SB_LOGIN_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'apikey': SB_ANON_KEY, 'Authorization': 'Bearer ' + SB_ANON_KEY },
-        body: JSON.stringify({ studentId: id, pwHash: pwHash })
-      });
-      var res = await resp.json();
-      if (res && res.success) {
-        localStorage.setItem('math_pwhash', pwHash); // 다음 자동 로그인용
-        currentUser.id = id;
-        currentUser.name = res.name || name; // Supabase 명부의 이름이 정답
-        currentUser.pw = pw; // 알림 등록 시 본인 확인용 (메모리에만 보관, 저장 안 함)
-        localStorage.setItem("math_student_id", id);
-        localStorage.setItem("math_student_name", currentUser.name);
-        document.getElementById('welcomeMsg').innerText = currentUser.name + " 학생, 환영합니다! 🎉";
-        document.getElementById('loginScreen').style.display = 'none';
-        document.getElementById('dashboardScreen').style.display = 'block';
-        onLoginSuccess(id);
-        refreshData();
-      } else {
-        if (!pw) localStorage.removeItem('math_pwhash'); // 저장된 해시가 안 맞으면(비번 변경 등) 폐기 → 다시 입력 유도
-        document.getElementById('loginStatus').innerText = (res && res.message) || '로그인 실패';
-        document.getElementById('loginBtn').disabled = false;
-      }
-    } catch (e) {
-      document.getElementById('loginStatus').innerText = '오류: ' + (e && e.message ? e.message : e);
-      document.getElementById('loginBtn').disabled = false;
-    }
+      })
+      .withSuccessHandler(function(res) {
+        if (res.success) {
+          currentUser.id = id; currentUser.name = name;
+          currentUser.pw = pw; // 알림 등록 시 본인 확인용 (메모리에만 보관, 저장 안 함)
+          localStorage.setItem("math_student_id", id);
+          localStorage.setItem("math_student_name", name);
+          document.getElementById('welcomeMsg').innerText = name + " 학생, 환영합니다! 🎉";
+          document.getElementById('loginScreen').style.display = 'none';
+          document.getElementById('dashboardScreen').style.display = 'block';
+          onLoginSuccess(id);
+          refreshData();
+        } else {
+          document.getElementById('loginStatus').innerText = res.message;
+          document.getElementById('loginBtn').disabled = false;
+        }
+      })
+      .verifyLogin(id, name, pw);
   }
 
   function refreshData() {
