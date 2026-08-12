@@ -302,7 +302,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.08.01</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.08.02</span>
     </div>
   </div>
 </div>
@@ -381,7 +381,18 @@
           <button class="subtab-btn" id="btnSub2" onclick="switchSubTab(2)">📊 성적·도장</button>
           <button class="subtab-btn" id="btnSub3" onclick="switchSubTab(3)">🎯 도전과제</button>
         </div>
-        <div id="subTab1"><div id="taskSummaryTable"></div></div>
+        <div id="subTab1">
+          <div style="display:flex; justify-content:flex-end; align-items:center; gap:6px; margin-bottom:8px;">
+            <span style="font-size:12px; color:#94a3b8;">정렬</span>
+            <select id="summarySort" onchange="localStorage.setItem('math_sum_sort', this.value); if (typeof gDashData !== 'undefined' && gDashData) renderTaskSummary(gDashData);" style="padding:5px 9px; border:1px solid #e5e7eb; border-radius:8px; font-size:12px; background:#f9fafb; color:#334155;">
+              <option value="recent">최근 받은 과제순</option>
+              <option value="todo">처리 필요한 순</option>
+              <option value="deadline">마감 임박순</option>
+              <option value="oldest">오래된 순</option>
+            </select>
+          </div>
+          <div id="taskSummaryTable"></div>
+        </div>
         <div id="subTab2" style="display:none;">
           <div id="myGrades"></div>
           <div id="myDojang"></div>
@@ -1152,12 +1163,23 @@
     var allTasks = (data.taskOrder || []).slice();
     (data.missingTasks || []).forEach(function(t){ if (allTasks.indexOf(t.name) < 0) allTasks.push(t.name); });
     Object.keys(latestMap).forEach(function(t){ if (allTasks.indexOf(t) < 0) allTasks.push(t); });
-    // 최근 부여순 (taskOrder 뒤쪽 = 최신 → 위로)
+    // 정렬 모드 (셀렉트/localStorage)
+    var _sortSel = document.getElementById('summarySort');
+    var _sortMode = localStorage.getItem('math_sum_sort') || 'recent';
+    if (_sortSel) _sortSel.value = _sortMode;
+    // 과제별 마감일 맵 (미제출 + 최신 제출기록에서)
+    var _dlMap = {};
+    (data.missingTasks || []).forEach(function(t){ if (t.deadline) _dlMap[t.name] = new Date(t.deadline).getTime(); });
+    Object.keys(latestMap).forEach(function(t){ var it = latestMap[t]; var d = it.resubDeadline || it.deadline; if (d && _dlMap[t] == null) _dlMap[t] = new Date(d).getTime(); });
+    function _ord(t){ var i = data.taskOrder ? data.taskOrder.indexOf(t) : -1; return i < 0 ? -1 : i; }
+    function _dl(t){ return _dlMap[t] != null ? _dlMap[t] : Infinity; }
+    function _pri(t){ var it = latestMap[t]; if (!it) return 0; var s = it.status; if (s === '재제출요청' || s === '피드백요청' || s === '반려검토') return 1; if (!s) return 2; return 3; } // 미제출<처리필요<채점중<완료
     allTasks.sort(function(a, b){
-      var ia = data.taskOrder ? data.taskOrder.indexOf(a) : -1;
-      var ib = data.taskOrder ? data.taskOrder.indexOf(b) : -1;
-      if (ia < 0) ia = 9999; if (ib < 0) ib = 9999;
-      return ib - ia;
+      if (_sortMode === 'oldest') { var ia = _ord(a), ib = _ord(b); if (ia < 0) ia = 9999; if (ib < 0) ib = 9999; return ia - ib; }
+      if (_sortMode === 'deadline') { var dd = _dl(a) - _dl(b); if (dd !== 0) return dd; }
+      if (_sortMode === 'todo') { var pp = _pri(a) - _pri(b); if (pp !== 0) return pp; }
+      // 기본(recent) 및 동순위 tie-break: 최근 받은 과제 위로
+      var ra = _ord(a), rb = _ord(b); return rb - ra;
     });
 
     if (allTasks.length === 0) {
