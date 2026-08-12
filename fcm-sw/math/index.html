@@ -302,7 +302,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.07.00</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.07.01</span>
     </div>
   </div>
 </div>
@@ -2536,14 +2536,14 @@
       var pwHash = '';
       try { if (currentUser.pw) pwHash = await sha256Hex(currentUser.pw); } catch (_) {}
 
-      var url = GAS_EXEC_URL + '?action=saveFcmToken'
-        + '&studentId=' + encodeURIComponent(sid)
-        + '&token=' + encodeURIComponent(token)
-        + (pwHash ? '&pwHash=' + encodeURIComponent(pwHash) : '')
-        + '&deviceId=' + encodeURIComponent(deviceId);
-      var res = await fetch(url);
-      var data = await res.json();
-      if (!data.success) throw new Error(data.message || '저장 실패');
+      // 프록시 경유 RPC로 저장 (기존 ?action= GET은 프록시가 처리 못 해 iOS에서 '저장실패' 났음)
+      var data = await new Promise(function (resolve, reject) {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .saveFcmToken(sid, token, pwHash || '', deviceId);
+      });
+      if (!data || !data.success) throw new Error((data && data.message) || '저장 실패');
 
       localStorage.setItem('fcm_registered_' + sid, '1');
       if (btn) { btn.innerText = '✅ 알림 켜짐'; btn.disabled = true; btn.style.opacity = '0.7'; }

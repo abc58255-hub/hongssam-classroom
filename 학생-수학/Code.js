@@ -86,7 +86,7 @@ var RPC_WHITELIST = [
   'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
   'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
   'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
-  'logFeatureUse', 'setStudentPassword', 'reviseSubmission'
+  'logFeatureUse', 'setStudentPassword', 'reviseSubmission', 'saveFcmToken'
 ];
 
 function doPost(e) {
