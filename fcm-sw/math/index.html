@@ -302,7 +302,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.07.02</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.08.00</span>
     </div>
   </div>
 </div>
@@ -468,8 +468,8 @@
           AI 피드백을 참고해 <b>더 보완</b>하거나, <b>이대로</b> 선생님 채점을 기다릴 수 있어요.
         </div>
         <div style="display:flex; gap:10px;">
-          <button class="primary-btn" id="reviseBtn" onclick="startRevise()" style="flex:1; background:linear-gradient(135deg,#f59e0b,#d97706);">✏️ 보완해서 다시 <span id="reviseLeftLabel"></span></button>
-          <button class="primary-btn" id="keepBtn" onclick="backToDashboard()" style="flex:1; background:linear-gradient(135deg,#10b981,#059669);">✅ 이대로 제출</button>
+          <button class="primary-btn" id="reviseBtn" onclick="if(confirm('✏️ 보완해서 다시 제출할까요?\n\n지금 화면을 나가 사진을 다시 첨부하게 돼요.')) startRevise();" style="flex:1; background:linear-gradient(135deg,#f59e0b,#d97706);">✏️ 보완해서 다시 <span id="reviseLeftLabel"></span></button>
+          <button class="primary-btn" id="keepBtn" onclick="if(confirm('✅ 이대로 제출을 마칠까요?\n\n더 보완하지 않고 선생님 채점을 기다려요.')) backToDashboard();" style="flex:1; background:linear-gradient(135deg,#10b981,#059669);">✅ 이대로 제출</button>
         </div>
       </div>
     </div>
@@ -1400,6 +1400,7 @@
     gMissingTasks = data.missingTasks;
     gResubmitTasks = data.resubmitTasks;
     gVoluntaryTasks = data.voluntaryTasks || [];
+    window._rubricTasks = data.rubricTasks || []; // AI 채점기준 있는 과제명 (제출 후 화면 분기)
 
     var select = document.getElementById('taskName');
     select.innerHTML = '<option value="">선택하세요</option>';
@@ -2108,6 +2109,12 @@
       return;
     }
 
+    // 제출 전 최종 확인
+    var _confirmMsg = window._reviseMode ? '✏️ 보완본을 제출할까요?'
+      : currentTargetTask.isResubmit ? '📤 이 과제를 다시 제출할까요?'
+      : '📤 이 과제를 제출할까요?';
+    if (!confirm(_confirmMsg)) return;
+
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('submitStatus').innerText = "사진 압축 및 전송 중... 🚀";
     var base64Files = []; var filesProcessedCount = 0;
@@ -2173,8 +2180,10 @@
             })
             .getSubmitRank(currentUser.id, taskNameVal);
           // ✅ AI 자동 채점 실행 (결과 올 때까지 로딩 화면 표시)
-          if (res.rowIdx) {
-            // 로딩 화면 표시
+          var _baseTask = taskNameVal.split(' (')[0];
+          var _hasRubric = (window._rubricTasks || []).indexOf(_baseTask) >= 0;
+          if (res.rowIdx && _hasRubric) {
+            // AI 채점기준 있음 → 'AI 채점중' 로딩 후 결과+셀프루프
             document.getElementById('aiGradingLoader').style.display = 'block';
             document.getElementById('successBackBtn').style.display = 'none';
             
@@ -2231,8 +2240,17 @@
                 }, 500); // 0.5초 딜레이 (100% 바 보여주기)
               })
               .autoGradeNewSubmission(res.rowIdx, taskNameVal, currentUser.id, currentUser.name);
+          } else if (res.rowIdx) {
+            // AI 채점기준 없는 과제 → 제출 완료 + 등수만 (AI 언급 없이 깔끔하게)
+            document.getElementById('successBannerTitle').textContent = '제출 완료! 🎉';
+            var _skip = document.getElementById('aiGradeSkippedBox');
+            if (_skip) {
+              _skip.innerHTML = '<div style="background:#f0fdf4;border:1px dashed #86efac;border-radius:12px;padding:14px 16px;margin-bottom:16px;"><div style="font-size:14px;color:#166534;line-height:1.5;font-weight:700;">✅ 과제를 제출했어요!</div><div style="font-size:12px;color:#94a3b8;margin-top:4px;">선생님이 채점해주실 거예요. 결과는 <b>내 제출현황</b>에서 확인할 수 있어요.</div></div>';
+              _skip.style.display = 'block';
+            }
+            document.getElementById('successBackBtn').style.display = 'block';
           } else {
-            // rowIdx 없으면 AI 채점 불가
+            // rowIdx 없으면 (예외) 안내만
             document.getElementById('aiGradeSkippedBox').style.display = 'block';
             document.getElementById('successBackBtn').style.display = 'block';
           }

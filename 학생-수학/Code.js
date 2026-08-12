@@ -519,11 +519,25 @@ function getDashboardData(studentId, studentName) {
       myStats = _computeAchievements(historyData, taskData, rosterData, safeId, className, activity);
     } catch(e) { Logger.log('업적 계산 오류: ' + e.message); }
 
+    // AI 채점기준이 등록된 과제명 목록 (제출 후 화면 분기용 — 있으면 'AI 채점중', 없으면 '제출완료+등수')
+    var rubricTaskNames = [];
+    try {
+      var _rsh = _taskSs_().getSheetByName('AI채점기준');
+      if (_rsh && _rsh.getLastRow() >= 2) {
+        var _rvals = _rsh.getRange(2, 1, _rsh.getLastRow() - 1, 1).getValues();
+        for (var _ri = 0; _ri < _rvals.length; _ri++) {
+          var _rn = String(_rvals[_ri][0] || '').trim();
+          if (_rn && rubricTaskNames.indexOf(_rn) < 0) rubricTaskNames.push(_rn);
+        }
+      }
+    } catch(_) {}
+
     return {
       history: history.reverse(),
       missingTasks: missingTasks,
       resubmitTasks: resubmitTasks,
       voluntaryTasks: voluntaryTasks,
+      rubricTasks: rubricTaskNames,
       unreadFeedbacks: unreadFeedbacks,
       bestWorksMap: bestWorksMap,
       taskOrder: assignedBaseTasks, // 이 학생 반에 배정된 과제만 (갤러리 정렬용)
