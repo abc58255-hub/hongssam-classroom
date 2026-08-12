@@ -269,7 +269,7 @@ function getDashboardData(studentId, studentName) {
       let choiceArray = choices ? choices.split(',').map(s => s.trim()).filter(s => s) : [];
       var maxScore = taskData[i][8] ? Number(taskData[i][8]) : 0; // col9 = 만점
       var taskPub = (function(){ var v = String(taskData[i][5] || '').trim(); return v === '일괄공개' || v === '공개'; })(); // col6 = 과제 단위 공개
-      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray, maxScore: maxScore, isPublicTask: taskPub };
+      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray, maxScore: maxScore, isPublicTask: taskPub, allowResubmit: String(taskData[i][12] || '').trim() !== 'N' }; // M(13)=재제출허용
 
       let isExpired = false;
       let hasDeadline = false;
@@ -406,6 +406,7 @@ function getDashboardData(studentId, studentName) {
           urls: urls, feedback: fb, status: status, annoUrls: annoUrls,
           score: score, reply: reply, isMyBest: isMyBest,
           maxScore: ts.maxScore || 0,
+          allowResubmit: ts.allowResubmit !== false,
           reqPics: ts.reqPics, choices: ts.choiceArray,
           perQuestionData: perQuestionData,
           isUnread: (fb !== "" || isMyBest) && isSeen === "",
@@ -1351,15 +1352,19 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName, prevAi
       '반환 형식:',
       (function() {
         const et = rubric.evalType;
-        if (et.indexOf('A-B-C') >= 0 || et.indexOf('등급') >= 0)
-          return '{"grade":"A|B|C|D","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
+        const mx = rubric.maxScore || 10;
+        // 순서 중요: '상-중-하 등급제'는 '등급'을 포함하므로 A-B-C-D보다 먼저 판별
         if (et.indexOf('상-중-하') >= 0)
           return '{"grade":"상|중|하","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
-        if (et.indexOf('P/F') >= 0 || et.indexOf('통과') >= 0)
+        if (et.indexOf('A-B-C') >= 0 || et.indexOf('ABCD') >= 0 || et.indexOf('등급') >= 0)
+          return '{"grade":"A|B|C|D","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
+        if (et.indexOf('P/F') >= 0 || et.indexOf('통과') >= 0 || et.indexOf('미통과') >= 0)
           return '{"grade":"Pass|Fail","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
         if (isType2)
           return '{"perQuestion":{"문항명":{"score":점수,"maxScore":만점,"feedback":"피드백"}},"totalScore":합계,"overallFeedback":"종합피드백","confidence":"high|medium|low","needsReview":true|false}';
-        return '{"score":점수,"maxScore":' + rubric.maxScore + ',"feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
+        if (et.indexOf('10점 단위') >= 0 || et.indexOf('10점단위') >= 0)
+          return 'score는 반드시 0, 10, 20 … ' + mx + ' 처럼 10점 단위 값만 사용해(그 외 숫자 금지).\n{"score":10점단위점수,"maxScore":' + mx + ',"feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
+        return '{"score":0~' + mx + '사이점수,"maxScore":' + mx + ',"feedback":"피드백","confidence":"high|medium|low","needsReview":true|false}';
       })(),
       prevAiForCompare ? ('※ 이 학생의 직전 답안 AI 채점: ' + JSON.stringify({
         score: prevAiForCompare.score, grade: prevAiForCompare.grade,

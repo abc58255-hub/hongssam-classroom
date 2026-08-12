@@ -465,7 +465,8 @@ function parseTasks(ss) {
       choiceList: choiceList,
       rejectDays:   taskData[i][9]  !== '' && taskData[i][9]  != null ? parseInt(taskData[i][9])  : 7,
       feedbackDays: taskData[i][10] !== '' && taskData[i][10] != null ? parseInt(taskData[i][10]) : 7,
-      standards: taskData[i][11] ? String(taskData[i][11]).trim() : '' // L열 성취기준
+      standards: taskData[i][11] ? String(taskData[i][11]).trim() : '', // L열 성취기준
+      allowResubmit: String(taskData[i][12] || '').trim() !== 'N' // M열 재제출허용(기본 허용)
     });
   }
   tasks.reverse();
@@ -616,7 +617,7 @@ function saveNewTask(taskData) {
     const existing = sheet.getRange("B:B").getValues().flat();
     if (existing.includes(taskData.name)) return { success: false, message: "이미 같은 이름의 과제가 존재합니다." };
     // 열: I(9)만점 J(10)반려기한 K(11)피드백기한 L(12)성취기준 — 생성·수정 일치
-    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList, taskData.maxScore || '', parseInt(taskData.rejectDays) || 7, parseInt(taskData.feedbackDays) || 7, taskData.standards || '']);
+    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList, taskData.maxScore || '', parseInt(taskData.rejectDays) || 7, parseInt(taskData.feedbackDays) || 7, taskData.standards || '', taskData.allowResubmit === false ? 'N' : '']); // M(13)=재제출허용('N'=금지)
     const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     let taskFolder = parentFolder.createFolder(taskData.name);
     let deadlineObj = JSON.parse(taskData.deadlines);
@@ -660,6 +661,7 @@ function updateTaskSettings(t) {
     if (t.rejectDays != null)   s.getRange(r, 10).setValue(parseInt(t.rejectDays)   || 7);
     if (t.feedbackDays != null) s.getRange(r, 11).setValue(parseInt(t.feedbackDays) || 7);
     if (t.standards != null)    s.getRange(r, 12).setValue(t.standards); // L열 성취기준
+    if (t.allowResubmit != null) s.getRange(r, 13).setValue(t.allowResubmit === false ? 'N' : ''); // M열 재제출허용
     clearCache();
     // 🔔 마감일 변경/신규 반 추가 시 해당 학생만 알림
     var pushed = _notifyTaskDeadlineChange_(t.originalName, oldDeadlines, t.deadlines);
@@ -1499,16 +1501,20 @@ function aiGradeSubmission(params) {
       '반환 형식:',
       (() => {
         const et = rubric.evalType || '점수제';
-        if (et.includes('A-B-C') || et.includes('등급')) {
-          return '{"grade":"A|B|C|D","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
-        } else if (et.includes('상-중-하')) {
+        const mx = rubric.maxScore || 10;
+        // 순서 중요: '상-중-하 등급제'는 '등급' 포함 → A-B-C-D보다 먼저
+        if (et.includes('상-중-하')) {
           return '{"grade":"상|중|하","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
-        } else if (et.includes('P/F') || et.includes('통과')) {
+        } else if (et.includes('A-B-C') || et.includes('ABCD') || et.includes('등급')) {
+          return '{"grade":"A|B|C|D","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
+        } else if (et.includes('P/F') || et.includes('통과') || et.includes('미통과')) {
           return '{"grade":"Pass|Fail","feedback":"피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
         } else if (isType2) {
           return '{"perQuestion":{"문항명":{"score":점수,"maxScore":만점,"feedback":"피드백"}},"totalScore":합계,"overallFeedback":"종합피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
+        } else if (et.includes('10점 단위') || et.includes('10점단위')) {
+          return 'score는 반드시 0, 10, 20 … ' + mx + ' 처럼 10점 단위 값만 사용해(그 외 숫자 금지).\n{"score":10점단위점수,"maxScore":' + mx + ',"feedback":"피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
         } else {
-          return '{"score":점수,"maxScore":' + rubric.maxScore + ',"feedback":"피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
+          return '{"score":0~' + mx + '사이점수,"maxScore":' + mx + ',"feedback":"피드백","confidence":"high|medium|low","needsReview":true|false,"rejectReason":"사유 또는 null"}';
         }
       })()
     ].filter(Boolean).join('\n');
