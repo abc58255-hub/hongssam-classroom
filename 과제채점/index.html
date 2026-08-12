@@ -218,6 +218,13 @@
   </style>
 </head>
 <body>
+<!-- 커스텀 확인/알림 모달 (브라우저 기본 alert/confirm 대체 — GAS iframe origin 표시 제거) -->
+<div id="uiModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:100000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:16px; max-width:400px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden;">
+    <div style="padding:24px 24px 4px;"><div id="uiModalMsg" style="font-size:15px; color:#1e293b; line-height:1.65; white-space:pre-wrap; word-break:keep-all;"></div></div>
+    <div id="uiModalBtns" style="display:flex; gap:8px; padding:18px 24px 20px; justify-content:flex-end;"></div>
+  </div>
+</div>
 
 <div id="loginScreen">
   <div class="login-box">
@@ -284,7 +291,7 @@
     </div>
 
     <div style="text-align:center; font-size:9px; color:#334155; margin-top:4px; line-height:1.6;">
-      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.08.00</span>
+      Made with ❤️ by 홍쌤 · <span class="app-ver" style="color:#475569;">v1.08.01</span>
     </div>
   </div>
 </div>
@@ -843,6 +850,31 @@
 </div>
 
 <script>
+  // ── 커스텀 알림/확인 (브라우저 기본 alert/confirm 대체) ──
+  function _uiModalShow(msg, btns) {
+    document.getElementById('uiModalMsg').textContent = msg;
+    var box = document.getElementById('uiModalBtns');
+    box.innerHTML = '';
+    btns.forEach(function(b) {
+      var el = document.createElement('button');
+      el.textContent = b.label;
+      el.style.cssText = 'padding:10px 20px;border-radius:10px;border:none;font-weight:700;font-size:14px;cursor:pointer;' + (b.primary ? 'background:#2563eb;color:white;' : 'background:#e2e8f0;color:#475569;');
+      el.onclick = b.on;
+      box.appendChild(el);
+    });
+    document.getElementById('uiModal').style.display = 'flex';
+  }
+  function _uiModalHide() { document.getElementById('uiModal').style.display = 'none'; }
+  function uiAlert(msg, cb) {
+    _uiModalShow(String(msg == null ? '' : msg), [{ label: '확인', primary: true, on: function() { _uiModalHide(); if (cb) cb(); } }]);
+  }
+  function uiConfirm(msg, onOk, onCancel) {
+    _uiModalShow(String(msg == null ? '' : msg), [
+      { label: '취소', primary: false, on: function() { _uiModalHide(); if (onCancel) onCancel(); } },
+      { label: '확인', primary: true, on: function() { _uiModalHide(); if (onOk) onOk(); } }
+    ]);
+  }
+
   let allRoster = [], classList = [], allTasks = [], allSubmissions = [], taskEvalMap = {};
   let globalDefaultSlideUrl = ""; // ✅ 추가: B4 슬라이드 URL 저장용
   let hrStr = "", hrActivities = [], hrSubmissions = [], gSurveys = [], gSurveyRes = [];
@@ -896,7 +928,7 @@
   function handleSessionExpired() {
     teacherSessionToken = null;
     sessionStorage.removeItem('teacherToken');
-    alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+    uiAlert('세션이 만료되었습니다. 다시 로그인해주세요.');
     document.getElementById('loginScreen').style.display = 'flex';
     document.getElementById('teacherPw').value = '';
   }
@@ -1199,9 +1231,8 @@
     else if (pageId === 'page-best') renderBestWorks();
   }
   function runCheatCheck(taskName) {
-    if (!taskName) return alert("과제명이 올바르지 않습니다.");
-    if (!confirm("[" + taskName + "] 과제의 부정 검사를 실행할까요?\n(제출된 모든 답안의 중복 도용 및 캡처 여부를 검사합니다.)")) return;
-    
+    if (!taskName) return uiAlert("과제명이 올바르지 않습니다.");
+    uiConfirm("[" + taskName + "] 과제의 부정 검사를 실행할까요?\n(제출된 모든 답안의 중복 도용 및 캡처 여부를 검사합니다.)", function() {
     var toast = document.createElement('div');
     toast.id = 'cheatToast';
     toast.innerText = '🕵️ AI 부정 검사 진행 중... (' + taskName + ')';
@@ -1210,14 +1241,15 @@
 
     google.script.run.withFailureHandler(function(err) {
       document.getElementById('cheatToast').remove();
-      alert("검사 중 오류: " + err.message + "\n(Drive API가 켜져 있는지 확인해주세요.)");
+      uiAlert("검사 중 오류: " + err.message + "\n(Drive API가 켜져 있는지 확인해주세요.)");
     }).withSuccessHandler(function(res) {
       document.getElementById('cheatToast').remove();
       if (res.success) {
-        if (res.count === 0) { alert("검사할 대상이 없거나 이미 모두 정상입니다."); }
-        else { alert("[" + res.taskName + "]\n총 " + res.total + "건 검사 완료!\n부정이 의심되는 답안에 🚨 배지가 추가되었습니다."); renderList(); }
-      } else { alert("오류: " + res.message); }
+        if (res.count === 0) { uiAlert("검사할 대상이 없거나 이미 모두 정상입니다."); }
+        else { uiAlert("[" + res.taskName + "]\n총 " + res.total + "건 검사 완료!\n부정이 의심되는 답안에 🚨 배지가 추가되었습니다."); renderList(); }
+      } else { uiAlert("오류: " + res.message); }
     }).runAICheatCheck(taskName);
+    });
   }
   function normalizeSubmission(s) {
     if (!s) return null;
@@ -1288,7 +1320,7 @@
 
     google.script.run.withFailureHandler(function(err) {
       if (refreshBtn) { refreshBtn.innerHTML = '🔄'; refreshBtn.style.color = '#94a3b8'; refreshBtn.disabled = false; }
-      alert("데이터를 불러오는 중 오류가 발생했습니다.\n" + err.message);
+      uiAlert("데이터를 불러오는 중 오류가 발생했습니다.\n" + err.message);
     }).withSuccessHandler(function(data) {
       if (refreshBtn) { refreshBtn.innerHTML = '🔄'; refreshBtn.style.color = '#94a3b8'; refreshBtn.disabled = false; }
       try {
@@ -1386,9 +1418,10 @@
       .clearStudentReply(rowIdx);
   }
   function rejectFromCard(rid) {
-    if (!confirm('이 학생에게 재제출을 요청할까요?')) return;
-    replyPanelCollapsed = false;
-    saveFb(parseInt(rid), '재제출');
+    uiConfirm('이 학생에게 재제출을 요청할까요?', function() {
+      replyPanelCollapsed = false;
+      saveFb(parseInt(rid), '재제출');
+    });
   }
   function updateReplyAlert() {
     var rg = document.getElementById('regradeAlertBadge');
@@ -1850,16 +1883,16 @@
     var mm  = mmEl ? mmEl.value : (item ? item.memo || '' : '');
     var pubEl = document.getElementById('pub_' + r);
     var pub = pubEl ? pubEl.checked : (item ? item.isPublic : false);
-    if ((a === '재제출' || a === '반려요청') && !fb.trim()) return alert("반려 사유를 입력하세요.");
-    if (a === '피드백요청' && !fb.trim()) return alert("학생에게 보낼 피드백 내용을 입력하세요.");
+    if ((a === '재제출' || a === '반려요청') && !fb.trim()) return uiAlert("반려 사유를 입력하세요.");
+    if (a === '피드백요청' && !fb.trim()) return uiAlert("학생에게 보낼 피드백 내용을 입력하세요.");
     var bestChecked = document.getElementById('cardBest_' + r) ? document.getElementById('cardBest_' + r).checked : false;
     var bestType    = bestChecked ? (document.getElementById('cardBestScope_' + r)  ? document.getElementById('cardBestScope_' + r).value         : '학급공개') : '';
     var bestAnon    = bestChecked ? (document.getElementById('cardBestAnon_' + r)    ? document.getElementById('cardBestAnon_' + r).checked          : false)     : false;
     var bestComment = bestChecked ? (document.getElementById('cardBestComment_' + r) ? document.getElementById('cardBestComment_' + r).value.trim()  : '')        : '';
     google.script.run
-      .withFailureHandler(function(err) { alert("저장 실패: " + err.message); })
+      .withFailureHandler(function(err) { uiAlert("저장 실패: " + err.message); })
       .withSuccessHandler(function(res) {
-        if (res && res.success === false) alert("저장 오류: " + (res.message || "알 수 없는 오류"));
+        if (res && res.success === false) uiAlert("저장 오류: " + (res.message || "알 수 없는 오류"));
         else {
           var item = allSubmissions.find(function(i){ return i.rowIdx === r; });
           var existingKey = item ? (item.bestKey || '') : '';
@@ -2087,11 +2120,11 @@
     btn.disabled = true; btn.textContent = '설정 중...';
     google.script.run.withSuccessHandler(function(res) {
       btn.disabled = false;
-      alert(res && res.success ? ('✅ ' + (res.message || '자동발송이 켜졌습니다')) : ('실패: ' + (res && res.message || '오류')));
+      uiAlert(res && res.success ? ('✅ ' + (res.message || '자동발송이 켜졌습니다')) : ('실패: ' + (res && res.message || '오류')));
       ntLoadPage();
     }).withFailureHandler(function(e) {
       btn.disabled = false; btn.textContent = '자동발송 켜기';
-      alert('오류: ' + e.message);
+      uiAlert('오류: ' + e.message);
     }).installAutoNotifyTriggers();
   }
 
@@ -2119,8 +2152,8 @@
 
   function ntSendManual() {
     var task = document.getElementById('ntManualTask').value;
-    if (!task) return alert('과제를 선택해주세요.');
-    if (!confirm('[' + task + ']을(를) 아직 안 낸 학생들에게 독려 알림을 보낼까요?')) return;
+    if (!task) return uiAlert('과제를 선택해주세요.');
+    uiConfirm('[' + task + ']을(를) 아직 안 낸 학생들에게 독려 알림을 보낼까요?', function() {
     var btn = document.getElementById('ntManualBtn');
     var msg = document.getElementById('ntManualMsg');
     btn.disabled = true; btn.textContent = '발송 중...';
@@ -2139,6 +2172,7 @@
       btn.disabled = false; btn.textContent = '📢 미제출자에게 발송';
       msg.style.display = 'block'; msg.style.color = '#dc2626'; msg.textContent = '❌ 오류: ' + e.message;
     }).sendPushToUnsubmitted(task);
+    });
   }
 
   function ntLoadLog() {
@@ -2166,7 +2200,7 @@
     }).withFailureHandler(function(){}).getAchievements();
   }
   function openStdPicker(mode) {
-    if (!gAchievements.length) { alert('성취기준을 불러오는 중이에요. 잠시 후 다시 시도해주세요.'); loadAchievements(); return; }
+    if (!gAchievements.length) { uiAlert('성취기준을 불러오는 중이에요. 잠시 후 다시 시도해주세요.'); loadAchievements(); return; }
     var selected = (mode === 'new') ? gStdNew : gStdEdit;
     var areas = {};
     gAchievements.forEach(function(a) { (areas[a.area] = areas[a.area] || []).push(a); });
@@ -2318,23 +2352,21 @@
 
   function createNewTask() {
     var n = document.getElementById('newTaskName').value.trim();
-    if (!n) return alert("과제명을 입력해주세요.");
+    if (!n) return uiAlert("과제명을 입력해주세요.");
     var rowCnt = document.querySelectorAll('#deadlineContainer .deadline-row').length;
     var dJson = extractDeadlinesJSON('deadlineContainer');
-    if (rowCnt > 0 && dJson === '{}') {
-      if (!confirm('마감일 행은 있는데 날짜가 비어있어요.\n날짜를 선택하지 않으면 "기한 없음"으로 저장됩니다.\n그래도 계속할까요?')) return;
-    }
-    
+    var _needDlWarn = (rowCnt > 0 && dJson === '{}');
+    function _createGo() {
     var choiceList = "";
     if (document.getElementById('checkChoiceMode').checked) {
       choiceList = document.getElementById('newChoiceList').value.trim();
-      if (!choiceList) return alert("선택할 문제 목록을 입력해주세요.");
+      if (!choiceList) return uiAlert("선택할 문제 목록을 입력해주세요.");
     }
     var td = { name: n, desc: document.getElementById('newTaskDesc').value, evalType: document.getElementById('newEvalType').value, deadlines: dJson, isPublic: false, reqPics: document.getElementById('newReqPics').value, choiceList: choiceList, standards: gStdNew.length ? JSON.stringify(gStdNew) : '', rejectDays: document.getElementById('newRejectDays').value, feedbackDays: document.getElementById('newFeedbackDays').value, allowResubmit: document.getElementById('newAllowResubmit').checked };
     var btn = document.getElementById('btnCreateTask');
     btn.innerText = "생성 중..."; btn.disabled = true;
     google.script.run.withFailureHandler(function(err) {
-      btn.innerText = "과제 생성하기 🚀"; btn.disabled = false; alert("오류: " + err.message);
+      btn.innerText = "과제 생성하기 🚀"; btn.disabled = false; uiAlert("오류: " + err.message);
     }).withSuccessHandler(function(r) {
       btn.innerText = "과제 생성하기 🚀"; btn.disabled = false;
       if (r.success) {
@@ -2360,9 +2392,12 @@
           populateFilters();
           loadRubrics(function(){ renderManageTasks(); });
         }).getTasksOnly();
-        alert('✅ 과제 "' + createdName + '" 생성 완료!');
-      } else { alert(r.message); }
+        uiAlert('✅ 과제 "' + createdName + '" 생성 완료!');
+      } else { uiAlert(r.message); }
     }).saveNewTask(td);
+    }
+    if (_needDlWarn) uiConfirm('마감일 행은 있는데 날짜가 비어있어요.\n날짜를 선택하지 않으면 "기한 없음"으로 저장됩니다.\n그래도 계속할까요?', _createGo);
+    else _createGo();
   }
 
   // 과제 evalType → 채점기준 모달 유형값 매핑
@@ -2386,7 +2421,7 @@
   function openTaskEditByName(name) {
     var t = (allTasks || []).find(function(x){ return x.name === name; });
     if (t) openEditTaskModal(t);
-    else alert('과제를 찾을 수 없어요. 목록을 새로고침해 주세요.');
+    else uiAlert('과제를 찾을 수 없어요. 목록을 새로고침해 주세요.');
   }
   // 특정 과제의 채점기준 등록/수정 → 과제 수정 폼으로 (배지 클릭용)
   function openRubricFor(name, evalType) {
@@ -2397,9 +2432,8 @@
     var n = document.getElementById('editTaskName').value;
     var rowCnt = document.querySelectorAll('#editDeadlineContainer .deadline-row').length;
     var dJson = extractDeadlinesJSON('editDeadlineContainer');
-    if (rowCnt > 0 && dJson === '{}') {
-      if (!confirm('마감일 행은 있는데 날짜가 비어있어요.\n날짜를 선택하지 않으면 "기한 없음"으로 저장됩니다.\n그래도 계속할까요?')) return;
-    }
+    var _needDlWarnE = (rowCnt > 0 && dJson === '{}');
+    function _editGo() {
     var o = allTasks.find(function(x) { return x.name === n; });
     var td = { originalName: n, desc: document.getElementById('editTaskDesc').value, evalType: document.getElementById('editEvalType').value, deadlines: dJson, isPublic: o ? o.isPublic : false,
                rejectDays: parseInt(document.getElementById('editRejectDays').value) || 7,
@@ -2409,13 +2443,13 @@
     var btn = document.getElementById('btnSaveEdit');
     btn.innerText = "저장 중..."; btn.disabled = true;
     google.script.run.withFailureHandler(function(err) {
-      btn.innerText = "저장"; btn.disabled = false; alert("오류: " + err.message);
+      btn.innerText = "저장"; btn.disabled = false; uiAlert("오류: " + err.message);
     }).withSuccessHandler(function(r) {
       // 채점기준도 저장 (있으면) 후 마무리
       _saveEditTaskRubric(n, td.evalType, function(){});
       btn.innerText = "저장"; btn.disabled = false;
       if (r.success) {
-        alert("수정되었습니다!");
+        uiAlert("수정되었습니다!");
         document.getElementById('editTaskModal').style.display = 'none';
         google.script.run.withSuccessHandler(function(data){
           allTasks = data.tasks || [];
@@ -2426,26 +2460,30 @@
           renderManageTasks();
         }).getTasksOnly();
       }
-      else { alert(r.message || "저장 실패"); }
+      else { uiAlert(r.message || "저장 실패"); }
     }).updateTaskSettings(td);
+    }
+    if (_needDlWarnE) uiConfirm('마감일 행은 있는데 날짜가 비어있어요.\n날짜를 선택하지 않으면 "기한 없음"으로 저장됩니다.\n그래도 계속할까요?', _editGo);
+    else _editGo();
   }
 
   function deleteTaskConfirm(taskName) {
-    if (!confirm('"' + taskName + '" 과제를 삭제할까요?\n\n⚠️ 과제설정에서만 제거됩니다.\n학생 제출 기록과 Drive 파일은 그대로 남아요.')) return;
-    google.script.run
-      .withFailureHandler(function(err) { alert('삭제 실패: ' + err.message); })
-      .withSuccessHandler(function(r) {
-        if (!r || !r.success) { alert(r && r.message ? r.message : '삭제 실패'); return; }
-        google.script.run.withSuccessHandler(function(data) {
-          allTasks = data.tasks || [];
-          var evalMap = {};
-          allTasks.forEach(function(t){ evalMap[t.name] = t.evalType; });
-          taskEvalMap = evalMap;
-          populateFilters();
-          renderManageTasks();
-        }).getTasksOnly();
-      })
-      .deleteTask(taskName);
+    uiConfirm('"' + taskName + '" 과제를 삭제할까요?\n\n⚠️ 과제설정에서만 제거됩니다.\n학생 제출 기록과 Drive 파일은 그대로 남아요.', function() {
+      google.script.run
+        .withFailureHandler(function(err) { uiAlert('삭제 실패: ' + err.message); })
+        .withSuccessHandler(function(r) {
+          if (!r || !r.success) { uiAlert(r && r.message ? r.message : '삭제 실패'); return; }
+          google.script.run.withSuccessHandler(function(data) {
+            allTasks = data.tasks || [];
+            var evalMap = {};
+            allTasks.forEach(function(t){ evalMap[t.name] = t.evalType; });
+            taskEvalMap = evalMap;
+            populateFilters();
+            renderManageTasks();
+          }).getTasksOnly();
+        })
+        .deleteTask(taskName);
+    });
   }
 
   function openEditTaskModal(t) {
@@ -2505,14 +2543,15 @@
   }
   // --- 여기까지 ---
   function togglePub(n, p) {
-    if (!confirm("'" + n + "' 점수를 " + (p ? "학생에게 공개" : "비공개로 전환") + "할까요?")) return;
-    google.script.run.withSuccessHandler(function(r) {
-      if (r.success) {
-        var task = allTasks.find(function(t){ return t.name === n; });
-        if (task) task.isPublic = p;
-        renderManageTasks();
-      }
-    }).toggleTaskVisibility(n, p);
+    uiConfirm("'" + n + "' 점수를 " + (p ? "학생에게 공개" : "비공개로 전환") + "할까요?", function() {
+      google.script.run.withSuccessHandler(function(r) {
+        if (r.success) {
+          var task = allTasks.find(function(t){ return t.name === n; });
+          if (task) task.isPublic = p;
+          renderManageTasks();
+        }
+      }).toggleTaskVisibility(n, p);
+    });
   }
   function openBulkPublishSetup() { document.getElementById('bulkClass').innerHTML = document.getElementById('classFilter').innerHTML; document.getElementById('bulkTask').innerHTML = document.getElementById('taskFilter').innerHTML.replace('<option value="all">📚 전체 과제</option>', '<option value="">선택 (필수)</option>'); document.getElementById('bulkPublishModal').style.display = 'flex'; }
   function confirmBulkPublish() {
@@ -2623,21 +2662,22 @@
     var item = allSubmissions.find(function(i){ return i.rowIdx === rowIdx; });
     if (!item) return;
     var next = (item.bestType === '학급공개') ? '학년공개' : '학급공개';
-    if (!confirm('공개 범위를 [' + next + ']으로 변경하시겠습니까?')) return;
+    uiConfirm('공개 범위를 [' + next + ']으로 변경하시겠습니까?', function() {
     btn.disabled = true;
     var capturedNext = next;
     google.script.run
       .withSuccessHandler(function(res) {
         btn.disabled = false;
-        if (!res || res.success === false) { alert('변경 실패'); return; }
+        if (!res || res.success === false) { uiAlert('변경 실패'); return; }
         var idx = allSubmissions.findIndex(function(i){ return i.rowIdx === rowIdx; });
         if (idx >= 0) allSubmissions[idx].bestType = capturedNext;
         renderBestWorks();
       })
       .changeBestScope(rowIdx, capturedNext);
+    });
   }
   function cancelBest(r) {
-    if (!confirm('명예의 전당에서 내리시겠습니까?')) return;
+    uiConfirm('명예의 전당에서 내리시겠습니까?', function() {
     google.script.run
       .withSuccessHandler(function(res) {
         if (res && res.success) {
@@ -2649,13 +2689,14 @@
             allSubmissions[idx].bestKey     = '';
           }
           renderBestWorks();
-        } else alert('오류: ' + ((res && res.message) || ''));
+        } else uiAlert('오류: ' + ((res && res.message) || ''));
       })
       .cancelBestWork(r);
+    });
   }
   function openMultiDrawModal(rowIdx, filterKey) {
     var item = allSubmissions.find(function(i) { return i.rowIdx === rowIdx; });
-    if (!item) { alert("해당 학생의 데이터를 찾을 수 없습니다."); return; }
+    if (!item) { uiAlert("해당 학생의 데이터를 찾을 수 없습니다."); return; }
     currentTargetInfo = { rowIdx: item.rowIdx, id: item.id, name: item.name, task: item.task };
     var allKeys = Object.keys(item.urls || {});
     if (!filterKey && isSmartMode && smartMode === 'question' && smartQuestionKey) {
@@ -2668,7 +2709,7 @@
       if (hasUrl || hasAnno) {
         keys = [filterKey];
       } else {
-        alert('[' + item.id + '] ' + item.name + ' 학생은 [' + filterKey + '] 문항을 제출하지 않았습니다.');
+        uiAlert('[' + item.id + '] ' + item.name + ' 학생은 [' + filterKey + '] 문항을 제출하지 않았습니다.');
         if (isSmartMode) { smartIdx++; loadSmartStudent(); }
         return;
       }
@@ -3033,7 +3074,7 @@
       return;
     }
     google.script.run
-      .withFailureHandler(function(err) { clearTimeout(loadingTimeout); alert(err.message); if (!isSmartMode) closeDrawModal(); else navSmart(1); })
+      .withFailureHandler(function(err) { clearTimeout(loadingTimeout); uiAlert(err.message); if (!isSmartMode) closeDrawModal(); else navSmart(1); })
       .withSuccessHandler(function(res) {
         if (res.success) applyImageToCanvas("data:" + res.mimeType + ";base64," + res.data);
         else { document.getElementById('loadingMsg').innerText = res.message; }
@@ -3077,7 +3118,7 @@
   function selectSmartMode(mode) {
     var radio = document.querySelector('input[name="smartMode"][value="' + mode + '"]');
     if (radio && radio.disabled) {
-        alert("1형(단일) 과제는 문항별 채점을 사용할 수 없습니다.");
+        uiAlert("1형(단일) 과제는 문항별 채점을 사용할 수 없습니다.");
         return;
     }
     document.getElementById('modeBtnStudent').style.cssText = 'text-align:center; padding:12px; border-radius:8px; border:2px solid ' + (mode === 'student' ? '#0284c7; background:#eff6ff; color:#0284c7;' : '#e2e8f0; background:#f8fafc; color:#64748b;') + ' font-weight:800; font-size:14px;';
@@ -3217,19 +3258,19 @@
     var skipDone = document.getElementById('smartUngraded').checked;
     var modeEl = document.querySelector('input[name="smartMode"]:checked');
     var mode = modeEl ? modeEl.value : 'student';
-    if (!tsk) return alert("과제를 선택하세요.");
+    if (!tsk) return uiAlert("과제를 선택하세요.");
     if (mode === 'student') {
       var sampleSubs = allSubmissions.filter(function(i) {
         return String(i.task).split(' (')[0] === tsk && Object.keys(i.urls || {}).length > 1;
       });
       if (sampleSubs.length > 0) {
-        return alert("'" + tsk + "'은 여러 문항 과제(2형)입니다.\n학생별 모드는 단일 문항 과제만 가능합니다.\n\n📝 문항별 모드를 선택해주세요.");
+        return uiAlert("'" + tsk + "'은 여러 문항 과제(2형)입니다.\n학생별 모드는 단일 문항 과제만 가능합니다.\n\n📝 문항별 모드를 선택해주세요.");
       }
     }
     var qKey = null;
     if (mode === 'question') {
       qKey = document.getElementById('smartQuestionKey').value;
-      if (!qKey) return alert("채점할 문항을 선택하세요.");
+      if (!qKey) return uiAlert("채점할 문항을 선택하세요.");
     }
     var resubIds = {};
     allSubmissions.forEach(function(i) {
@@ -3259,7 +3300,7 @@
       }
       return true;
     }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); });
-    if (smartList.length === 0) return alert("해당 조건에 맞는 제출물이 없습니다.");
+    if (smartList.length === 0) return uiAlert("해당 조건에 맞는 제출물이 없습니다.");
     smartCache = {};
     smartPrefetchCache = {};
     smartIdx = 0;
@@ -3430,12 +3471,12 @@
     google.script.run
       .withFailureHandler(function(err) {
         if (onFail) onFail(err);
-        else alert('저장 실패: ' + err.message);
+        else uiAlert('저장 실패: ' + err.message);
       })
       .withSuccessHandler(function(r) {
         if (r && r.success === false) {
           if (onFail) onFail({ message: r.message || '서버 오류' });
-          else alert('저장 오류: ' + (r.message || '알 수 없는 오류'));
+          else uiAlert('저장 오류: ' + (r.message || '알 수 없는 오류'));
         } else {
           var localStatus = status === '완료' ? '채점완료'
             : status === '최종완료' ? '완료'
@@ -3511,7 +3552,7 @@
       google.script.run
         .withFailureHandler(function(err) {
           if (btnTp) { btnTp.disabled = false; updateModalButtonText(); }
-          alert('임시저장 실패: ' + err.message);
+          uiAlert('임시저장 실패: ' + err.message);
         })
         .withSuccessHandler(function() {
           if (btnTp) { btnTp.disabled = false; updateModalButtonText(); }
@@ -3525,7 +3566,7 @@
 
     if ((st === '재제출' || st === '반려요청' || st === '피드백요청') && !isType2) {
       var fb = document.getElementById('modalFeedbackInput') ? document.getElementById('modalFeedbackInput').value : '';
-      if (!fb.trim()) return alert(st === '피드백요청' ? '학생에게 보낼 피드백을 입력하세요.' : '반려 사유를 입력하세요.');
+      if (!fb.trim()) return uiAlert(st === '피드백요청' ? '학생에게 보낼 피드백을 입력하세요.' : '반려 사유를 입력하세요.');
     }
 
     var tabStatus = (st === '재제출') ? '반려검토' : st;
@@ -3570,13 +3611,13 @@
         .withFailureHandler(function(err) {
           if (btnOk) { btnOk.disabled = false; updateModalButtonText(); }
           if (btnRj) btnRj.disabled = false;
-          alert('저장 실패: ' + err.message);
+          uiAlert('저장 실패: ' + err.message);
         })
         .withSuccessHandler(function(r) {
           if (btnOk) btnOk.disabled = false;
           if (btnRj) btnRj.disabled = false;
           updateModalButtonText();
-          if (r && r.success === false) { alert('저장 오류: ' + (r.message || '')); return; }
+          if (r && r.success === false) { uiAlert('저장 오류: ' + (r.message || '')); return; }
           
           var subItem = allSubmissions.find(function(i){ return i.rowIdx === rowIdx; });
           if (subItem) {
@@ -3648,7 +3689,7 @@
       function(err) {
         if (btnOk) { btnOk.disabled = false; updateModalButtonText(); }
         if (btnRj) btnRj.disabled = false;
-        alert('저장 실패: ' + err.message);
+        uiAlert('저장 실패: ' + err.message);
       }
     );
   }
@@ -3710,7 +3751,7 @@
     smartList = []; smartCache = {}; questionGradeData = {};
     closeDrawModal(true);
     renderList(); // ✅ 전체 loadData 대신 카드만 재렌더링
-    setTimeout(function(){ alert('✅ 채점 마무리 완료!'); }, 300);
+    setTimeout(function(){ uiAlert('✅ 채점 마무리 완료!'); }, 300);
   }
   function closeDrawModal(skipAutoSave) {
     if (!skipAutoSave && !isSmartMode && currentTargetInfo) {
@@ -4600,7 +4641,7 @@
     showStatDetail(title, list);
   }
   function _csClick(title) {
-    alert(title + ': 클릭 시 세부 목록을 확인하세요.');
+    uiAlert(title + ': 클릭 시 세부 목록을 확인하세요.');
   }
   function closeStatPopup() {
     var p = document.getElementById('statDetailPopup');
@@ -4608,7 +4649,7 @@
   }
   function showStatDetail(title, students) {
     closeStatPopup();
-    if (!students || students.length === 0) { alert(title + ': 해당 학생 없음'); return; }
+    if (!students || students.length === 0) { uiAlert(title + ': 해당 학생 없음'); return; }
     var popup = document.createElement('div');
     popup.id = 'statDetailPopup';
     popup.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:white;border-radius:14px;padding:20px;width:92%;max-width:360px;box-shadow:0 20px 60px rgba(0,0,0,0.25);z-index:10000;max-height:80vh;overflow-y:auto;';
@@ -4689,20 +4730,21 @@
   }
   function confirmResetPassword() {
     var studentId = document.getElementById('pwResetStudent').value;
-    if (!studentId) return alert('학생을 선택하세요.');
+    if (!studentId) return uiAlert('학생을 선택하세요.');
     var student = allRoster.find(function(s) { return s.id === studentId; });
     if (!student) return;
-    if (!confirm(student.id + ' ' + student.name + ' 학생의 비밀번호를 초기화하시겠습니까?\n학생이 회원가입 앱에서 다시 비밀번호를 설정해야 합니다.')) return;
+    uiConfirm(student.id + ' ' + student.name + ' 학생의 비밀번호를 초기화하시겠습니까?\n학생이 회원가입 앱에서 다시 비밀번호를 설정해야 합니다.', function() {
     var btn = document.getElementById('btnResetPw');
     btn.innerText = '초기화 중...'; btn.disabled = true;
     google.script.run
-      .withFailureHandler(function(err) { btn.innerText = '초기화 실행'; btn.disabled = false; alert('오류: ' + err.message); })
+      .withFailureHandler(function(err) { btn.innerText = '초기화 실행'; btn.disabled = false; uiAlert('오류: ' + err.message); })
       .withSuccessHandler(function(res) {
         btn.innerText = '초기화 실행'; btn.disabled = false;
-        if (res.success) { alert(student.name + ' 학생 비밀번호가 초기화되었습니다.'); document.getElementById('pwResetModal').style.display = 'none'; }
-        else { alert('오류: ' + res.message); }
+        if (res.success) { uiAlert(student.name + ' 학생 비밀번호가 초기화되었습니다.'); document.getElementById('pwResetModal').style.display = 'none'; }
+        else { uiAlert('오류: ' + res.message); }
       })
       .resetStudentPassword(studentId);
+    });
   }
   var ALARM_REGISTER_URL = ''; // 시스템설정 FCM_REGISTER_URL에서 로드
   function openAlarmQRModal(type) {
@@ -4713,7 +4755,7 @@
     if (!mathUrl) {
       google.script.run.withSuccessHandler(function(res){
         if (res && res.url) { appLinkCache['student'] = res.url; openAlarmQRModal(type); }
-        else { alert('수학교실 URL이 시스템설정에 없어요. 바로가기_수학교실 셀을 먼저 설정해주세요.'); }
+        else { uiAlert('수학교실 URL이 시스템설정에 없어요. 바로가기_수학교실 셀을 먼저 설정해주세요.'); }
       }).getAppLinkUrl('바로가기_수학교실');
       return;
     }
@@ -4837,7 +4879,7 @@
   function saveOneLink(type) {
     var meta = APP_LINK_META[type];
     var val = document.getElementById('linkInput_' + type).value.trim();
-    if (!val) return alert('URL을 입력하세요.');
+    if (!val) return uiAlert('URL을 입력하세요.');
     appLinkCache[type] = val;
     google.script.run
       .withSuccessHandler(function() {
@@ -4848,7 +4890,7 @@
   }
   function testOneLink(type) {
     var val = document.getElementById('linkInput_' + type).value.trim();
-    if (!val) return alert('URL을 먼저 입력하세요.');
+    if (!val) return uiAlert('URL을 먼저 입력하세요.');
     window.open(val, '_blank');
   }
   var _origRenderList = renderList;
@@ -5410,8 +5452,8 @@
     var evalType = document.getElementById('rubricEvalType').value;
     var criteria = document.getElementById('rubricCriteria').value.trim();
     var rowIdx   = parseInt(document.getElementById('rubricRowIdx').value)||null;
-    if (!taskName) return alert('과제를 선택해주세요.');
-    if (rubricFiles.length===0 && !criteria) return alert('채점기준 파일 또는 설명을 입력해주세요.');
+    if (!taskName) return uiAlert('과제를 선택해주세요.');
+    if (rubricFiles.length===0 && !criteria) return uiAlert('채점기준 파일 또는 설명을 입력해주세요.');
     var questions = (evalType==='문항별점수제') ? getRubricQuestions() : {};
     var maxScore  = evalType==='점수제' ? (parseInt(document.getElementById('rubricMaxScore').value)||10)
                   : evalType==='문항별점수제' ? Object.values(questions).reduce(function(s,q){return s+(q.maxScore||0);},0) : 0;
@@ -5426,7 +5468,7 @@
       var f=newFiles[uploadIdx];
       if (saveBtn) saveBtn.textContent='업로드 중... ('+(uploadIdx+1)+'/'+newFiles.length+')';
       google.script.run
-        .withFailureHandler(function(err){ if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 채점기준 저장';} alert('업로드 실패: '+err.message); })
+        .withFailureHandler(function(err){ if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 채점기준 저장';} uiAlert('업로드 실패: '+err.message); })
         .withSuccessHandler(function(res){
           if (res.success) { uploadedFiles.push({name:f.name,url:res.url,role:f.role,questions:f.questions}); var orig=rubricFiles.find(function(x){return x.name===f.name&&!x.uploaded;}); if(orig){orig.url=res.url;orig.uploaded=true;} }
           uploadIdx++; uploadNext();
@@ -5437,11 +5479,11 @@
   }
   function _saveRubricFinal(rowIdx,taskName,evalType,maxScore,criteria,questions,files,saveBtn) {
     google.script.run
-      .withFailureHandler(function(err){ if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 채점기준 저장';} alert('저장 실패: '+err.message); })
+      .withFailureHandler(function(err){ if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 채점기준 저장';} uiAlert('저장 실패: '+err.message); })
       .withSuccessHandler(function(res){
         if(saveBtn){saveBtn.disabled=false;saveBtn.textContent='💾 채점기준 저장';}
-        if(res.success){ rubricCache=null; loadRubrics(function(rubrics){ renderRubricListPanel(rubrics, _rubricSelectedRowIdx); }); alert('✅ 저장 완료!'); }
-        else alert('오류: '+(res.message||''));
+        if(res.success){ rubricCache=null; loadRubrics(function(rubrics){ renderRubricListPanel(rubrics, _rubricSelectedRowIdx); }); uiAlert('✅ 저장 완료!'); }
+        else uiAlert('오류: '+(res.message||''));
       })
       .saveRubric({rowIdx:rowIdx,taskName:taskName,evalType:evalType,maxScore:maxScore,criteria:criteria,files:files,questions:questions});
   }
@@ -5451,13 +5493,14 @@
       .getRubrics();
   }
   function deleteRubricData(rowIdx) {
-    if(!confirm('이 채점기준을 삭제할까요?')) return;
-    google.script.run.withSuccessHandler(function(res){ if(res.success){ rubricCache=null; _rubricSelectedRowIdx=null; loadRubrics(function(rubrics){ renderRubricListPanel(rubrics, null); _resetRubricPreview(); }); } }).deleteRubric(rowIdx);
+    uiConfirm('이 채점기준을 삭제할까요?', function() {
+      google.script.run.withSuccessHandler(function(res){ if(res.success){ rubricCache=null; _rubricSelectedRowIdx=null; loadRubrics(function(rubrics){ renderRubricListPanel(rubrics, null); _resetRubricPreview(); }); } }).deleteRubric(rowIdx);
+    });
   }
   function startAiGrade(rowIdx) {
     var item = allSubmissions.find(function(i){ return i.rowIdx===rowIdx; });
-    if (!item) return alert('데이터를 찾을 수 없어요.');
-    if (!item.urls||Object.keys(item.urls).length===0) return alert('제출된 사진이 없어요.');
+    if (!item) return uiAlert('데이터를 찾을 수 없어요.');
+    if (!item.urls||Object.keys(item.urls).length===0) return uiAlert('제출된 사진이 없어요.');
     if (item.aiGradeTemp && typeof item.aiGradeTemp === 'object') {
       aiGradePending[rowIdx] = item.aiGradeTemp;
       showAiGradeResult(rowIdx, item.aiGradeTemp, item, Object.keys(item.urls).length>1);
@@ -5466,17 +5509,17 @@
     loadRubrics(function(rubrics) {
       var tName = String(item.task).split(' (재제출)')[0].split(' (')[0];
       var rubric = rubrics.find(function(r){ return r.taskName===tName; });
-      if (!rubric) { if(confirm('채점기준이 없어요. 과제 수정에서 지금 등록할까요?')) openTaskEditByName(tName); return; }
+      if (!rubric) { uiConfirm('채점기준이 없어요. 과제 수정에서 지금 등록할까요?', function(){ openTaskEditByName(tName); }); return; }
       var btn = document.getElementById('ai-grade-btn-'+rowIdx);
       if (btn) { btn.disabled=true; btn.textContent='🤖 채점 중...'; }
       google.script.run
         .withFailureHandler(function(err) {
           if(btn){btn.disabled=false;btn.textContent='🤖 AI 채점';}
-          alert('오류: '+err.message);
+          uiAlert('오류: '+err.message);
         })
         .withSuccessHandler(function(res) {
           if(btn){btn.disabled=false;btn.textContent='🤖 AI 채점';}
-          if(!res.success){alert('채점 실패: '+res.message);return;}
+          if(!res.success){uiAlert('채점 실패: '+res.message);return;}
           aiGradePending[rowIdx] = res.result;
           google.script.run.saveAiGradeTempResult(rowIdx, JSON.stringify(res.result));
           item.aiGradeTemp = res.result;
@@ -5649,14 +5692,14 @@
     if(fbEl) fbEl.value=feedback; if(scEl) scEl.value=String(score);
     if (perQJson) {
       google.script.run
-        .withFailureHandler(function(err){alert('저장 실패: '+err.message);})
+        .withFailureHandler(function(err){uiAlert('저장 실패: '+err.message);})
         .withSuccessHandler(function(res){
           if(res.success){
             patchLocalSubmission(rowIdx,{status:isReject?'재제출요청':'채점완료',
               feedback:feedback,score:String(score),aiGradeTemp:null,
               perQuestionData:item?item.perQuestionData:{}});
             renderList();
-          } else alert('저장 오류: '+(res.message||''));
+          } else uiAlert('저장 오류: '+(res.message||''));
         }).saveAiGradeResult(rowIdx,feedback,String(score),statusAction,perQJson);
     } else {
       if(item){item.aiGradeTemp=null;}
@@ -5789,9 +5832,9 @@
     var taskName=document.getElementById('aiBatchTask').value;
     var cls=document.getElementById('aiBatchClass').value;
     var skipDone=document.getElementById('aiBatchUngraded').checked;
-    if(!taskName)return alert('과제를 선택하세요.');
+    if(!taskName)return uiAlert('과제를 선택하세요.');
     var rubric=(rubricCache||[]).find(function(r){return r.taskName===taskName;});
-    if(!rubric){if(confirm('채점기준이 없어요. 과제 수정에서 지금 등록할까요?')){document.getElementById('aiGradeModal').style.display='none';openTaskEditByName(taskName);}return;}
+    if(!rubric){uiConfirm('채점기준이 없어요. 과제 수정에서 지금 등록할까요?', function(){document.getElementById('aiGradeModal').style.display='none';openTaskEditByName(taskName);});return;}
     aiBatchTaskName=taskName;
     aiBatchList=allSubmissions.filter(function(item){
       var safeId=String(item.id||'');
@@ -5810,7 +5853,7 @@
       if(!item.urls||Object.keys(item.urls).length===0)return false;
       return true;
     }).sort(function(a,b){return String(a.id).localeCompare(String(b.id));});
-    if(aiBatchList.length===0)return alert('채점 대상이 없어요.');
+    if(aiBatchList.length===0)return uiAlert('채점 대상이 없어요.');
     aiBatchIdx=0;aiBatchResults={};aiBatchRunning=true;aiBatchInFlight=0;
     renderAiBatchProgress();runAiBatchNext();
   }
@@ -5959,13 +6002,14 @@
   }
   function confirmAllAiBatch() {
     var hasLow=Object.values(aiBatchResults).some(function(r){return r.confidence==='low';});
-    if(!confirm('전체 '+Object.keys(aiBatchResults).length+'명을 확정할까요?'+(hasLow?' 신뢰도 낮은 항목도 포함됩니다.':'')))return;
+    uiConfirm('전체 '+Object.keys(aiBatchResults).length+'명을 확정할까요?'+(hasLow?' 신뢰도 낮은 항목도 포함됩니다.':''), function() {
     var keys=Object.keys(aiBatchResults),idx=0;
     function next(){
-      if(idx>=keys.length){alert('✅ 전체 '+keys.length+'명 확정 완료!');renderList();return;}
+      if(idx>=keys.length){uiAlert('✅ 전체 '+keys.length+'명 확정 완료!');renderList();return;}
       confirmAiGradeInternal(parseInt(keys[idx]),false,function(){idx++;next();});
     }
     next();
+    });
   }
   
 
