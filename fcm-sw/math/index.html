@@ -283,6 +283,13 @@
   </style>
 </head>
 <body>
+<!-- 커스텀 확인/알림 모달 (브라우저 기본 alert/confirm 대체) -->
+<div id="uiModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,0.5); z-index:100000; align-items:center; justify-content:center; padding:20px;">
+  <div style="background:white; border-radius:16px; max-width:360px; width:100%; box-shadow:0 20px 60px rgba(0,0,0,0.3); overflow:hidden; font-family:'Pretendard',sans-serif;">
+    <div style="padding:24px 24px 4px;"><div id="uiModalMsg" style="font-size:15px; color:#1e293b; line-height:1.65; white-space:pre-wrap; word-break:keep-all;"></div></div>
+    <div id="uiModalBtns" style="display:flex; gap:8px; padding:18px 24px 20px; justify-content:flex-end;"></div>
+  </div>
+</div>
 
 <!-- 🎨 테마 장식 레이어 (꽃잎·기포·별 등) -->
 <div id="themeFx"></div>
@@ -302,7 +309,7 @@
     <div class="status-msg" id="loginStatus"></div>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
-      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.08.02</span>
+      <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.09.00</span>
     </div>
   </div>
 </div>
@@ -479,8 +486,8 @@
           AI 피드백을 참고해 <b>더 보완</b>하거나, <b>이대로</b> 선생님 채점을 기다릴 수 있어요.
         </div>
         <div style="display:flex; gap:10px;">
-          <button class="primary-btn" id="reviseBtn" onclick="if(confirm('✏️ 보완해서 다시 제출할까요?\n\n지금 화면을 나가 사진을 다시 첨부하게 돼요.')) startRevise();" style="flex:1; background:linear-gradient(135deg,#f59e0b,#d97706);">✏️ 보완해서 다시 <span id="reviseLeftLabel"></span></button>
-          <button class="primary-btn" id="keepBtn" onclick="if(confirm('✅ 이대로 제출을 마칠까요?\n\n더 보완하지 않고 선생님 채점을 기다려요.')) backToDashboard();" style="flex:1; background:linear-gradient(135deg,#10b981,#059669);">✅ 이대로 제출</button>
+          <button class="primary-btn" id="reviseBtn" onclick="uiConfirm('✏️ 보완해서 다시 제출할까요?\n\n지금 화면을 나가 사진을 다시 첨부하게 돼요.', startRevise);" style="flex:1; background:linear-gradient(135deg,#f59e0b,#d97706);">✏️ 보완해서 다시 <span id="reviseLeftLabel"></span></button>
+          <button class="primary-btn" id="keepBtn" onclick="uiConfirm('✅ 이대로 제출을 마칠까요?\n\n더 보완하지 않고 선생님 채점을 기다려요.', backToDashboard);" style="flex:1; background:linear-gradient(135deg,#10b981,#059669);">✅ 이대로 제출</button>
         </div>
       </div>
     </div>
@@ -525,6 +532,35 @@
 </div>
 
 <script>
+  // ── 커스텀 알림/확인 (브라우저 기본 alert/confirm 대체) ──
+  function _uiModalShow(msg, btns) {
+    document.getElementById('uiModalMsg').textContent = msg;
+    var box = document.getElementById('uiModalBtns');
+    box.innerHTML = '';
+    btns.forEach(function(b) {
+      var el = document.createElement('button');
+      el.textContent = b.label;
+      el.style.cssText = 'padding:10px 20px;border-radius:10px;border:none;font-weight:700;font-size:14px;cursor:pointer;' + (b.primary ? 'background:#2563eb;color:white;' : 'background:#e2e8f0;color:#475569;');
+      el.onclick = b.on;
+      box.appendChild(el);
+    });
+    document.getElementById('uiModal').style.display = 'flex';
+  }
+  function _uiModalHide() { document.getElementById('uiModal').style.display = 'none'; }
+  function uiAlert(msg, cb) {
+    _uiModalShow(String(msg == null ? '' : msg), [{ label: '확인', primary: true, on: function() { _uiModalHide(); if (cb) cb(); } }]);
+  }
+  function uiConfirm(msg, onOk, onCancel) {
+    _uiModalShow(String(msg == null ? '' : msg), [
+      { label: '취소', primary: false, on: function() { _uiModalHide(); if (onCancel) onCancel(); } },
+      { label: '확인', primary: true, on: function() { _uiModalHide(); if (onOk) onOk(); } }
+    ]);
+  }
+  // async 흐름용: await uiConfirmAsync(msg) → true/false
+  function uiConfirmAsync(msg) {
+    return new Promise(function(resolve) { uiConfirm(msg, function(){ resolve(true); }, function(){ resolve(false); }); });
+  }
+
   // ✅ D-day 계산 함수
   function getDdayText(deadlineStr) {
     if (!deadlineStr) return null;
@@ -855,7 +891,7 @@
 
   // 자발적 다시 제출 — 확인 후 제출 폼의 [다시 제출] 옵션 선택
   function goToResubmit(taskName) {
-    if (!confirm('「' + taskName + '」을(를) 다시 제출할까요?\n\n새로 제출하면 이전 채점·점수는 지워지고 다시 채점돼요.\n(마감 전까지 몇 번이든 가능)')) return;
+    uiConfirm('「' + taskName + '」을(를) 다시 제출할까요?\n\n새로 제출하면 이전 채점·점수는 지워지고 다시 채점돼요.\n(마감 전까지 몇 번이든 가능)', function() {
     switchTab(1);
     var sel = document.getElementById('taskName');
     if (!sel) return;
@@ -869,6 +905,7 @@
         return;
       }
     }
+    });
   }
 
   // 내 기록 탭 안의 서브탭 (제출현황 | 성적·도장 | 도전과제)
@@ -1308,7 +1345,7 @@
     google.script.run
       .withFailureHandler(function(err) {
         btn.innerText = "🔄 새로고침"; btn.disabled = false;
-        alert("새로고침 실패: " + (err.message||''));
+        uiAlert("새로고침 실패: " + (err.message||''));
       })
       .withSuccessHandler(function(data) {
         renderDashboard(data);
@@ -2028,7 +2065,7 @@
     if (idx > -1) { selectedChoices.splice(idx, 1); elem.classList.remove('selected'); }
     else {
       var lockedCount = document.querySelectorAll('.choice-chip.locked').length;
-      if (selectedChoices.length + lockedCount >= currentTargetTask.reqPics) { alert('이 과제는 총 ' + currentTargetTask.reqPics + '개만 제출하면 됩니다!'); return; }
+      if (selectedChoices.length + lockedCount >= currentTargetTask.reqPics) { uiAlert('이 과제는 총 ' + currentTargetTask.reqPics + '개만 제출하면 됩니다!'); return; }
       selectedChoices.push(choiceStr); elem.classList.add('selected');
     }
     renderDynamicUploadSlots();
@@ -2135,7 +2172,7 @@
     var _confirmMsg = window._reviseMode ? '✏️ 보완본을 제출할까요?'
       : currentTargetTask.isResubmit ? '📤 이 과제를 다시 제출할까요?'
       : '📤 이 과제를 제출할까요?';
-    if (!confirm(_confirmMsg)) return;
+    if (!(await uiConfirmAsync(_confirmMsg))) return;
 
     document.getElementById('submitBtn').disabled = true;
     document.getElementById('submitStatus').innerText = "사진 압축 및 전송 중... 🚀";
@@ -2163,7 +2200,7 @@
         document.getElementById('submitStatus').innerText = "⚠️ 제출 실패: " + err.message;
         document.getElementById('submitBtn').disabled = false;
         document.getElementById('submitBtn').innerText = '📤 과제 제출하기';
-        alert("제출 중 오류가 발생했습니다.\n" + err.message + "\n\n다시 시도해주세요.");
+        uiAlert("제출 중 오류가 발생했습니다.\n" + err.message + "\n\n다시 시도해주세요.");
       })
       .withSuccessHandler(function(res) {
         if (res.success) {
@@ -2280,7 +2317,7 @@
           document.getElementById('submitStatus').innerText = "⚠️ " + (res.message || "제출 실패");
           document.getElementById('submitBtn').disabled = false;
           document.getElementById('submitBtn').innerText = '📤 과제 제출하기';
-          alert(res.message || "제출에 실패했습니다. 다시 시도해주세요.");
+          uiAlert(res.message || "제출에 실패했습니다. 다시 시도해주세요.");
         }
       })
       .processForm({
@@ -2344,21 +2381,22 @@
 
   function sendReply(rowIdx) {
     var text = document.getElementById('reply_' + rowIdx).value.trim();
-    if (!text) return alert("내용을 입력해 주세요!");
+    if (!text) return uiAlert("내용을 입력해 주세요!");
     var btn = event.target; btn.innerText = "전송 중..."; btn.disabled = true;
     google.script.run.withSuccessHandler(function(success) {
-      if (success) { alert("선생님께 전달되었습니다!"); refreshData(); }
-      else { alert("오류가 발생했습니다."); btn.innerText = "답장 보내기"; btn.disabled = false; }
+      if (success) { uiAlert("선생님께 전달되었습니다!"); refreshData(); }
+      else { uiAlert("오류가 발생했습니다."); btn.innerText = "답장 보내기"; btn.disabled = false; }
     }).saveStudentReply(rowIdx, text, currentUser.id);
   }
 
   function requestResubmit(rowIdx, btn) {
-    if (!confirm("선생님께 재제출을 요청할까요?\n승인되면 다시 제출할 수 있어요.")) return;
-    btn.innerText = "요청 중..."; btn.disabled = true;
-    google.script.run.withSuccessHandler(function(res) {
-      if (res && res.success) { refreshData(); }
-      else { alert("오류가 발생했습니다."); btn.innerText = "🔄 재제출 요청하기"; btn.disabled = false; }
-    }).requestResubmission(rowIdx, currentUser.id);
+    uiConfirm("선생님께 재제출을 요청할까요?\n승인되면 다시 제출할 수 있어요.", function() {
+      btn.innerText = "요청 중..."; btn.disabled = true;
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) { refreshData(); }
+        else { uiAlert("오류가 발생했습니다."); btn.innerText = "🔄 재제출 요청하기"; btn.disabled = false; }
+      }).requestResubmission(rowIdx, currentUser.id);
+    });
   }
 
   function closeImageModal() { document.getElementById('imageModal').style.display = 'none'; }
@@ -2432,7 +2470,7 @@
     if (tsel && st.taskName) tsel.value = st.taskName;  // 선택값 복원
     initTaskUI();  // 제출 폼 새로 그리기(파일 입력 초기화 + 버튼 재활성화)
     document.getElementById('submitStatus').innerText = '';
-    alert('✏️ 보완 모드예요! 고친 사진을 다시 첨부한 뒤 제출하면 AI가 다시 확인해줘요. (남은 보완 ' + st.revisionsLeft + '회)');
+    uiAlert('✏️ 보완 모드예요! 고친 사진을 다시 첨부한 뒤 제출하면 AI가 다시 확인해줘요. (남은 보완 ' + st.revisionsLeft + '회)');
   }
 
   // ── 보완본 전송 → 같은 행 덮어쓰기 + AI 재채점 ──
@@ -2458,7 +2496,7 @@
         clearInterval(progressTimer);
         loader.style.display = 'none';
         document.getElementById('successBackBtn').style.display = 'block';
-        alert('보완 전송 오류: ' + (err && err.message ? err.message : err));
+        uiAlert('보완 전송 오류: ' + (err && err.message ? err.message : err));
       })
       .withSuccessHandler(function(res) {
         clearInterval(progressTimer);
@@ -2544,12 +2582,12 @@
   // 알림 등록 — 이 앱 안에서 권한 요청부터 토큰 저장까지 한 번에
   async function registerPushInApp() {
     var sid = currentUser && currentUser.id;
-    if (!sid) { alert('먼저 로그인해주세요.'); return; }
+    if (!sid) { uiAlert('먼저 로그인해주세요.'); return; }
     if (gIsIOS && !isStandaloneMode()) {
-      alert('아이폰은 홈 화면에 추가한 뒤에 알림을 켤 수 있어요.\n\n1. Safari 아래 공유 버튼(⬆︎)을 누르고\n2. "홈 화면에 추가"를 선택한 다음\n3. 홈 화면의 수학교실 아이콘으로 다시 열어 이 버튼을 눌러주세요.');
+      uiAlert('아이폰은 홈 화면에 추가한 뒤에 알림을 켤 수 있어요.\n\n1. Safari 아래 공유 버튼(⬆︎)을 누르고\n2. "홈 화면에 추가"를 선택한 다음\n3. 홈 화면의 수학교실 아이콘으로 다시 열어 이 버튼을 눌러주세요.');
       return;
     }
-    if (!fcmMessaging) { alert('알림 기능을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.'); return; }
+    if (!fcmMessaging) { uiAlert('알림 기능을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.'); return; }
     var btn = document.getElementById('notifSetupBtn');
     function stat(t) { if (btn) btn.innerText = t; }
     try {
@@ -2558,7 +2596,7 @@
       try { permission = await Notification.requestPermission(); }
       catch (_) { permission = await new Promise(function (res) { Notification.requestPermission(res); }); }
       if (permission !== 'granted') {
-        alert('알림이 거부되었어요. 기기 설정에서 알림을 허용한 뒤 다시 시도해주세요.');
+        uiAlert('알림이 거부되었어요. 기기 설정에서 알림을 허용한 뒤 다시 시도해주세요.');
         return;
       }
 
@@ -2590,7 +2628,7 @@
       showInAppNotification('🔔 알림 등록 완료!', '채점·피드백 알림을 이 기기로 받아요');
     } catch (e) {
       stat('🔔 알림 설정하기');
-      alert('알림 등록에 실패했어요: ' + (e && e.message || e));
+      uiAlert('알림 등록에 실패했어요: ' + (e && e.message || e));
     }
   }
 
