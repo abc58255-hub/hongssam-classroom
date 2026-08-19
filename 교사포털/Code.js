@@ -130,6 +130,21 @@ function setLessonGame(token, g) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
   return _lessonCall_({ games: [g] });
 }
+// ── 수업 링크 보드 (학생 대시보드 상단 카드) ──
+function getLinks(token) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
+  return _lessonCall_({ op: 'listLinks' });
+}
+// link = {id?, title, url, class_scope, active, sort}
+function saveLink(token, link) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
+  return _lessonCall_({ op: 'saveLink', link: link });
+}
+function deleteLink(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요' };
+  return _lessonCall_({ op: 'deleteLink', id: id });
+}
+
 // 기록 관리 — 목록·1건 삭제·전체 리셋
 function lessonScores(token, unit, game) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요' };

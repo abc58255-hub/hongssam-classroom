@@ -56,6 +56,41 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, deleted: count ?? 0 });
     }
 
+    // ── 수업 링크 보드 ──
+    // 링크 목록 (교사 관리용 — 비공개 포함 전체)
+    if (body.op === "listLinks") {
+      const { data, error: llErr } = await admin0.from("links")
+        .select("*").order("sort", { ascending: true }).order("created_at", { ascending: false });
+      if (llErr) return Response.json({ success: false, message: llErr.message }, { status: 500 });
+      return Response.json({ success: true, links: data });
+    }
+    // 링크 저장(신규/수정) — id 있으면 update, 없으면 insert
+    if (body.op === "saveLink") {
+      const L = body.link ?? {};
+      const row: Record<string, unknown> = {
+        title: String(L.title ?? "").trim(),
+        url: String(L.url ?? "").trim(),
+        class_scope: String(L.class_scope ?? "all").trim() || "all",
+        active: L.active === false ? false : true,
+        sort: Number(L.sort) || 0,
+      };
+      if (!row.title || !row.url) return Response.json({ success: false, message: "제목과 URL은 필수예요." }, { status: 400 });
+      if (L.id) {
+        const { error: uErr } = await admin0.from("links").update(row).eq("id", Number(L.id));
+        if (uErr) return Response.json({ success: false, message: uErr.message }, { status: 500 });
+      } else {
+        const { error: iErr } = await admin0.from("links").insert(row);
+        if (iErr) return Response.json({ success: false, message: iErr.message }, { status: 500 });
+      }
+      return Response.json({ success: true });
+    }
+    // 링크 삭제
+    if (body.op === "deleteLink") {
+      const { error: dlErr } = await admin0.from("links").delete().eq("id", Number(body.id));
+      if (dlErr) return Response.json({ success: false, message: dlErr.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
     // 게임 등록/수정 모드: {games:[{unit,game,title,url,scope,status}]}
     if (Array.isArray(body.games)) {
       const okStatus = ["hidden", "open", "free"];

@@ -339,6 +339,8 @@
   <div class="card-content" style="padding-top: 15px;">
     <button class="logout-btn" onclick="clearLoginInfo()">🔒 다른 기기인가요? 로그아웃하기</button>
     <button id="notifSetupBtn" onclick="openNotifSetup()" style="display:none;width:100%;background:#eff6ff;color:#1e3a8a;border:1.5px solid #bfdbfe;padding:9px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:10px;">🔔 알림 설정하기</button>
+    <!-- 📌 수업 링크 카드 (선생님이 공개한 링크만 자동 표시) -->
+    <div id="classLinks"></div>
     <!-- 🎮 수업활동 카드 (선생님이 공개한 활동만 자동 표시) -->
     <div id="lessonActs"></div>
     <div class="tab-container">
@@ -855,6 +857,34 @@
   }
   loadLessonActs();
 
+  // ══════════ 📌 수업 링크 카드 ══════════
+  // Supabase links에서 공개(active) 링크만 읽어, 전체 공통 + 내 반 링크만 표시
+  function loadClassLinks() {
+    var box = document.getElementById('classLinks');
+    if (!box) return;
+    var myClass = currentUser && currentUser.id ? (String(currentUser.id).substring(0,1) + '학년 ' + String(currentUser.id).substring(1,2) + '반') : '';
+    fetch(LESSON_SB_URL + '/rest/v1/links?select=title,url,class_scope,active,sort&active=eq.true&order=sort.asc', {
+      headers: { apikey: LESSON_SB_KEY }
+    }).then(function (r) { return r.json(); }).then(function (rows) {
+      if (!Array.isArray(rows)) { box.innerHTML = ''; return; }
+      rows = rows.filter(function (l) {
+        if (!l.url || !l.title) return false;
+        var sc = l.class_scope || 'all';
+        return sc === 'all' || sc === myClass;
+      });
+      if (rows.length === 0) { box.innerHTML = ''; return; }
+      var items = rows.map(function (l) {
+        return '<a href="' + encodeURI(l.url) + '" target="_blank" rel="noopener" style="display:flex;align-items:center;gap:8px;background:#eef2ff;border:1.5px solid #c7d2fe;border-radius:10px;padding:11px 12px;margin-bottom:6px;text-decoration:none;">'
+          + '<span style="font-size:16px;flex-shrink:0;">🔗</span>'
+          + '<span style="flex:1;min-width:0;font-size:14px;font-weight:800;color:#3730a3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escDj(l.title) + '</span>'
+          + '<span style="color:#818cf8;font-weight:800;">›</span></a>';
+      }).join('');
+      box.innerHTML = '<div class="sec-card" style="padding:12px 14px;">'
+        + '<div style="font-size:13px;font-weight:800;color:#4338ca;margin-bottom:8px;">📌 수업 링크</div>'
+        + items + '</div>';
+    }).catch(function () { box.innerHTML = ''; });
+  }
+
   window.onload = function() {
     var sId = localStorage.getItem("math_student_id");
     var sName = localStorage.getItem("math_student_name");
@@ -1330,6 +1360,7 @@
           document.getElementById('loginScreen').style.display = 'none';
           document.getElementById('dashboardScreen').style.display = 'block';
           onLoginSuccess(id);
+          loadClassLinks();
           refreshData();
         } else {
           document.getElementById('loginStatus').innerText = res.message;
