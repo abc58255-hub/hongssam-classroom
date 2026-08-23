@@ -109,6 +109,7 @@
                       background: #4f46e5; color: #fff; font-size: 16px; font-weight: 800; cursor: pointer; }
   .lock-card button:disabled { background: #e5e8eb; color: #b0b8c1; }
   .lock-card .err { font-size: 13px; color: #f04452; margin-top: 10px; min-height: 18px; font-weight: 600; }
+  @keyframes rvPop { 0%{transform:scale(0.6);opacity:0.3;} 60%{transform:scale(1.18);} 100%{transform:scale(1);opacity:1;} }
 </style>
 </head>
 <body>
@@ -169,6 +170,7 @@
     <span>🔖 킵 <b id="rvKept" style="color:#fbbf24;">0</b></span>
     <span>✅ 통과 <b id="rvPass" style="color:#4ade80;">0</b></span>
   </div>
+  <div id="rvKeptBar" style="display:none;padding:8px 16px;background:#1e293b;flex-shrink:0;line-height:1.9;"></div>
 
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;">
     <div id="rvCard" style="min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">
@@ -271,6 +273,8 @@
         DATA = res;
         renderBanner();
         renderGrid();
+        // 복습 룰렛 직행 진입(교사포털 복습질문 카드) — 학생 명단 로드 후 1회 자동 오픈
+        if (AUTO_REVIEW && !_reviewOpened) { _reviewOpened = true; openReview(); }
       }).getInputData(cls, TOK);
   }
 
@@ -457,6 +461,8 @@
   // ══════════ 🎲 복습 질문 룰렛 ══════════
   // 상태: { cls, mode('once'|'dup'), pool[], current, kept[], done[], pass }  — localStorage에 반별 저장
   var RV = null;
+  var RV_COUNTS = {};   // 누적 복습 도장 수 (공평 가중치용)
+  var RV_ANIM = false;  // 뽑기 애니메이션 중
   function _rvKey(cls){ return 'dj_review_' + cls; }
   function _rvSave(){ if (RV) try { localStorage.setItem(_rvKey(RV.cls), JSON.stringify(RV)); } catch(_){} }
   function _rvStudents(){ return (DATA.students || []).map(function(s){ return { sid:s.sid, name:s.name }; }); }
@@ -464,9 +470,11 @@
   function openReview() {
     var cls = document.getElementById('classSel').value;
     if (!cls) { toast('반을 먼저 선택하세요'); return; }
-    // 복습질문 카테고리 보장 (1회)
     google.script.run.withSuccessHandler(function(){}).ensureReviewCategory(TOK);
-    // 저장된 진행 복원, 없으면 새로
+    // 누적 복습 도장 수 로드 (공평 가중치)
+    google.script.run.withSuccessHandler(function(res){
+      RV_COUNTS = (res && res.success) ? (res.counts || {}) : {};
+    }).getReviewCounts(cls, TOK);
     var saved = null;
     try { saved = JSON.parse(localStorage.getItem(_rvKey(cls)) || 'null'); } catch(_){}
     if (saved && saved.cls === cls) { RV = saved; }
@@ -480,6 +488,18 @@
   }
   function closeReview(){ document.getElementById('reviewScreen').style.display = 'none'; }
 
+  // 공평 가중 랜덤: 누적 복습 도장이 적은 학생일수록 잘 뽑힘 (weight = maxCount - count + 1)
+  function _rvWeightedPick(candidates) {
+    if (candidates.length === 0) return null;
+    var maxC = 0;
+    candidates.forEach(function(sid){ var c = RV_COUNTS[sid]||0; if (c > maxC) maxC = c; });
+    var weights = candidates.map(function(sid){ return (maxC - (RV_COUNTS[sid]||0)) + 1; });
+    var total = weights.reduce(function(a,b){ return a+b; }, 0);
+    var r = Math.random() * total;
+    for (var i = 0; i < candidates.length; i++) { r -= weights[i]; if (r <= 0) return candidates[i]; }
+    return candidates[candidates.length-1];
+  }
+
   function _rvName(sid){ var s = (DATA.students||[]).find(function(x){ return x.sid === sid; }); return s ? s.name : ''; }
 
   function rvRender() {
@@ -489,6 +509,14 @@
     document.getElementById('rvDone').textContent = RV.done.length;
     document.getElementById('rvKept').textContent = RV.kept.length;
     document.getElementById('rvPass').textContent = RV.pass;
+    // 킵 학생 이름 칩 (상단)
+    var keptBar = document.getElementById('rvKeptBar');
+    if (keptBar) {
+      keptBar.innerHTML = RV.kept.length
+        ? '🔖 ' + RV.kept.map(function(sid){ return '<span style="background:#78350f;color:#fde68a;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:800;margin:0 3px 3px 0;display:inline-block;">' + esc(_rvName(sid)) + '</span>'; }).join('')
+        : '';
+      keptBar.style.display = RV.kept.length ? 'block' : 'none';
+    }
     var card = document.getElementById('rvCard');
     var drawRow = document.getElementById('rvDrawRow');
     var judgeRow = document.getElementById('rvJudgeRow');
@@ -512,11 +540,39 @@
   function rvToggleMode() { if (!RV) return; RV.mode = (RV.mode === 'dup') ? 'once' : 'dup'; rvRender(); }
 
   function rvDraw() {
-    if (!RV || RV.current) return;
+    if (!RV || RV.current || RV_ANIM) return;
     var candidates = RV.mode === 'dup' ? _rvStudents().map(function(s){ return s.sid; }) : RV.pool;
     if (candidates.length === 0) { toast('뽑을 학생이 없어요'); return; }
-    RV.current = candidates[Math.floor(Math.random() * candidates.length)];
-    rvRender();
+    var pick = _rvWeightedPick(candidates);  // 공평 가중 최종 당첨자
+    // ── 긴장감 셔플 애니메이션: 빠르게 이름이 바뀌다가 점점 느려지며 멈춤 ──
+    RV_ANIM = true;
+    document.getElementById('rvDrawRow').style.display = 'none';
+    var card = document.getElementById('rvCard');
+    var names = _rvStudents();
+    var allSids = names.map(function(s){ return s.sid; });
+    var ticks = 0, maxTicks = 22, delay = 45;
+    function flash() {
+      var showSid = allSids[Math.floor(Math.random()*allSids.length)];
+      var scale = 1 + Math.min(0.5, ticks/maxTicks*0.5);
+      card.innerHTML = '<div style="font-size:15px;color:#475569;">🎲 뽑는 중…</div>'
+        + '<div style="font-size:' + (44+ticks*0.7) + 'px;font-weight:900;color:#93c5fd;line-height:1.1;transition:transform 0.04s;transform:scale(' + scale + ');">' + esc(_rvName(showSid)) + '</div>';
+      ticks++;
+      if (ticks >= maxTicks) { _rvLand(pick); return; }
+      delay = 45 + ticks*ticks*0.9;  // 점점 느려짐 (감속)
+      setTimeout(flash, delay);
+    }
+    flash();
+  }
+  function _rvLand(sid) {
+    RV_ANIM = false;
+    RV.current = sid;
+    var card = document.getElementById('rvCard');
+    // 당첨 연출: 살짝 튕기며 확정
+    card.innerHTML = '<div style="font-size:20px;color:#94a3b8;font-weight:800;">' + esc(sid) + '</div>'
+      + '<div style="font-size:70px;font-weight:900;color:#fff;line-height:1.05;animation:rvPop 0.35s ease;">' + esc(_rvName(sid)) + '</div>'
+      + '<div style="font-size:13px;color:#fbbf24;margin-top:4px;">🎤 복습 질문!</div>';
+    document.getElementById('rvJudgeRow').style.display = 'flex';
+    _rvSave();
   }
 
   function rvJudge(kind) {
@@ -526,6 +582,7 @@
     if (RV.mode !== 'dup') RV.pool = RV.pool.filter(function(x){ return x !== sid; });
     if (kind === 'pass') {
       RV.pass++; RV.done.push(sid);
+      RV_COUNTS[sid] = (RV_COUNTS[sid]||0) + 1; // 누적 반영 → 다음 뽑기 공평성
       // 복습질문 도장 1개 기록 (즉시 UI, 서버 저장)
       google.script.run
         .withFailureHandler(function(err){ toast('⚠ 도장 저장 실패: ' + (err.message||'')); })
@@ -606,6 +663,8 @@
 
   // ===== QR (다른 태블릿에서 바로 접속) =====
   var APP_URL = '<?!= appUrl ?>'; // 서버(doGet)에서 배포 URL 자동 주입
+  var AUTO_REVIEW = '<?!= autoReview ?>' === '1'; // ?screen=review 진입 시 복습 룰렛 자동 오픈
+  var _reviewOpened = false;
   function openQR() {
     var qr = 'https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=' + encodeURIComponent(APP_URL);
     document.getElementById('qrBox').innerHTML =

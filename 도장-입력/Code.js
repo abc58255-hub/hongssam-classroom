@@ -45,11 +45,13 @@ function _registerAppUrl_(key) {
   } catch (e) {}
 }
 
-function doGet() {
+function doGet(e) {
   if (!SHEET_ID) return _setupPage_();
   _registerAppUrl_('바로가기_도장입력');
   try { StudentAuth.registerAppUrl('도장입력', ScriptApp.getService().getUrl()); } catch(_) {}
   var t = HtmlService.createTemplateFromFile('index');
+  // ?screen=review 로 진입하면 바로 복습 룰렛 자동 오픈 (교사포털 복습질문 카드용)
+  t.autoReview = (e && e.parameter && e.parameter.screen === 'review') ? '1' : '';
   // QR용 배포 URL 자동 주입 — 권한 문제 등으로 실패하면 시스템설정 바로가기 폴백
   var appUrl = '';
   try { appUrl = ScriptApp.getService().getUrl() || ''; } catch (e) {}
@@ -381,6 +383,27 @@ function recordStamp(p) {
     // 전체 로그 재조회 없이 즉시 응답 (속도) — 카운트는 클라이언트가 처리
     return { success: true, kind: kind, count: count };
   } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 반별 누적 복습질문 도장 수 — 공평 가중 랜덤용 { sid: count }
+function getReviewCounts(cls, tok) {
+  try {
+    var ss = _ensureSheets_();
+    if (!_tokOk_(ss, tok)) return NEED_AUTH;
+    var sh = _dojangSs().getSheetByName('도장기록');
+    var counts = {};
+    if (sh && sh.getLastRow() > 1) {
+      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 4).getValues(); // 날짜,학번,이름,종류
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][3]||'').trim() !== '복습질문') continue;
+        var sid = String(rows[i][1]||'').trim();
+        if (!sid) continue;
+        if (cls && _clsOf_(sid) !== cls) continue;
+        counts[sid] = (counts[sid]||0) + 1;
+      }
+    }
+    return { success: true, counts: counts };
+  } catch(e) { return { success: false, counts: {}, message: e.toString() }; }
 }
 
 // 복습질문 카테고리 보장 — 없으면 도장_설정 categories에 추가 (학생 대시보드 타일 노출용)
