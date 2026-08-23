@@ -70,6 +70,7 @@
     <h1>🏫 교사 포털</h1>
     <span class="hr-chip hidden" id="hrChip"></span>
     <div class="spacer"></div>
+    <button class="small" onclick="openLinkAdmin()">🔗 수업 링크</button>
     <button class="small" onclick="openPwReset()">🔑 비번 초기화</button>
     <button class="small" onclick="loadPortal()">↻ 새로고침</button>
     <button class="small" onclick="doLogout()">로그아웃</button>
@@ -247,6 +248,118 @@
       toast('✅ 적용됨');
     }).withFailureHandler(function(e){ toast('오류: ' + e.message); openLessonAdmin(); })
       .setLessonGame(TOKEN, { unit: g.unit, game: g.game, title: g.title, url: g.url, scope: g.scope, status: g.status });
+  }
+
+  // ══════════ 🔗 수업 링크 보드 (학생 대시보드 상단 카드) ══════════
+  var LK_CACHE = [];
+  function openLinkAdmin() {
+    var main = document.getElementById('portalMain');
+    main.innerHTML = '<div class="loading">불러오는 중...</div>';
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { main.innerHTML = '<div class="loading">오류: ' + esc(res && res.message || '') + '</div>'; return; }
+      LK_CACHE = res.links || [];
+      renderLinkView();
+    }).withFailureHandler(function(e){ main.innerHTML = '<div class="loading">오류: ' + esc(e.message) + '</div>'; }).getLinks(TOKEN);
+  }
+
+  function _scopeLabel(sc) { return (!sc || sc === 'all') ? '🏫 전체' : '👥 ' + sc; }
+
+  function renderLinkView() {
+    var main = document.getElementById('portalMain');
+    var rows = LK_CACHE.map(function(l) {
+      var onColor = l.active ? 'background:#059669;color:white;' : 'background:#0f172a;color:#64748b;';
+      return '<div class="card" style="cursor:default;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">'
+          + '<span class="icon" style="font-size:22px;">🔗</span>'
+          + '<a href="' + esc(l.url) + '" target="_blank" style="font-size:11px;color:#60a5fa;text-decoration:none;font-weight:700;">↗ 열어보기</a>'
+        + '</div>'
+        + '<h3 style="font-size:15px;margin-bottom:2px;">' + esc(l.title) + '</h3>'
+        + '<p style="font-size:11px;margin-bottom:5px;word-break:break-all;">' + esc(l.url) + '</p>'
+        + '<div style="font-size:11px;font-weight:800;color:#a5b4fc;margin-bottom:10px;">' + _scopeLabel(l.class_scope) + '</div>'
+        + '<div style="display:flex;gap:5px;">'
+          + '<button onclick="lkToggle(' + l.id + ')" style="flex:1;border:none;padding:8px 2px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;' + onColor + '">' + (l.active ? '✅ 공개 중' : '⚫ 비공개') + '</button>'
+          + '<button onclick="lkEdit(' + l.id + ')" style="border:none;padding:8px 12px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;background:#2563eb;color:white;">✏️</button>'
+          + '<button onclick="lkDelete(' + l.id + ')" style="border:none;padding:8px 12px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;background:#7f1d1d;color:#fecaca;">🗑</button>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+    if (!rows) rows = '<div class="card off" style="cursor:default;"><span class="icon">🔗</span><h3>아직 링크가 없어요</h3><p>+ 링크 추가로 학생에게 보여줄 자료를 올려보세요.</p></div>';
+    main.innerHTML = '<div class="group">'
+      + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;">'
+      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🔗 수업 링크 관리</span>'
+      + '<button class="small" style="margin-left:auto;background:#2563eb;color:white;" onclick="lkOpenForm()">+ 링크 추가</button></h2>'
+      + '<div class="grid">' + rows + '</div>'
+      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">✅ 공개 중인 링크만 학생 수학앱 상단에 카드로 떠요 · 유튜브·슬라이드·데스모스 등 어떤 주소든 가능</p>'
+      + '</div>';
+  }
+
+  function lkOpenForm(l) {
+    l = l || { title: '', url: '', class_scope: 'all', active: true };
+    var isClass = l.class_scope && l.class_scope !== 'all';
+    var g = '', c = '';
+    if (isClass) { var m = String(l.class_scope).match(/^(\d)학년 (\d+)반$/); if (m) { g = m[1]; c = m[2]; } }
+    var gradeOpts = [1,2,3].map(function(x){ return '<option value="'+x+'"'+(String(x)===g?' selected':'')+'>'+x+'학년</option>'; }).join('');
+    var classOpts = [];
+    for (var i=1;i<=10;i++) classOpts.push('<option value="'+i+'"'+(String(i)===c?' selected':'')+'>'+i+'반</option>');
+    var main = document.getElementById('portalMain');
+    main.innerHTML = '<div class="group"><h2 style="text-transform:none;letter-spacing:0;">'
+      + '<button class="small" onclick="openLinkAdmin()">← 목록</button> ' + (l.id ? '✏️ 링크 수정' : '+ 새 링크') + '</h2>'
+      + '<div class="card" style="cursor:default;max-width:520px;">'
+      + '<input type="hidden" id="lkId" value="' + (l.id || '') + '">'
+      + '<label style="font-size:12px;font-weight:800;color:#94a3b8;">제목</label>'
+      + '<input id="lkTitle" value="' + esc(l.title) + '" placeholder="예: 오늘의 데스모스 활동" style="width:100%;box-sizing:border-box;margin:6px 0 14px;padding:11px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;">'
+      + '<label style="font-size:12px;font-weight:800;color:#94a3b8;">링크 주소(URL)</label>'
+      + '<input id="lkUrl" value="' + esc(l.url) + '" placeholder="https://..." style="width:100%;box-sizing:border-box;margin:6px 0 14px;padding:11px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;font-size:14px;">'
+      + '<label style="font-size:12px;font-weight:800;color:#94a3b8;">보여줄 대상</label>'
+      + '<div style="display:flex;gap:8px;margin:6px 0 14px;align-items:center;flex-wrap:wrap;">'
+        + '<select id="lkScopeType" onchange="document.getElementById(\'lkClassBox\').style.display=this.value===\'class\'?\'flex\':\'none\'" style="padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">'
+          + '<option value="all"' + (!isClass?' selected':'') + '>🏫 전체 공통</option>'
+          + '<option value="class"' + (isClass?' selected':'') + '>👥 특정 반</option></select>'
+        + '<div id="lkClassBox" style="display:' + (isClass?'flex':'none') + ';gap:6px;">'
+          + '<select id="lkGrade" style="padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">' + gradeOpts + '</select>'
+          + '<select id="lkClass" style="padding:10px;border-radius:8px;border:1px solid #334155;background:#0f172a;color:#e2e8f0;">' + classOpts.join('') + '</select>'
+        + '</div>'
+      + '</div>'
+      + '<label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:16px;"><input type="checkbox" id="lkActive"' + (l.active!==false?' checked':'') + ' style="width:18px;height:18px;"> 바로 공개 (체크 해제 시 비공개로 저장)</label>'
+      + '<button onclick="lkSave()" style="width:100%;border:none;background:#2563eb;color:white;padding:13px;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;">💾 저장</button>'
+      + '</div></div>';
+  }
+
+  function lkSave() {
+    var scopeType = document.getElementById('lkScopeType').value;
+    var scope = 'all';
+    if (scopeType === 'class') scope = document.getElementById('lkGrade').value + '학년 ' + document.getElementById('lkClass').value + '반';
+    var link = {
+      id: document.getElementById('lkId').value || undefined,
+      title: document.getElementById('lkTitle').value.trim(),
+      url: document.getElementById('lkUrl').value.trim(),
+      class_scope: scope,
+      active: document.getElementById('lkActive').checked
+    };
+    if (!link.title || !link.url) { toast('제목과 URL을 입력해주세요.'); return; }
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { toast('저장 실패: ' + (res && res.message || '')); return; }
+      toast('✅ 저장됨'); openLinkAdmin();
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).saveLink(TOKEN, link);
+  }
+
+  function lkEdit(id) { var l = LK_CACHE.find(function(x){ return x.id === id; }); if (l) lkOpenForm(l); }
+  function lkToggle(id) {
+    var l = LK_CACHE.find(function(x){ return x.id === id; }); if (!l) return;
+    l.active = !l.active; renderLinkView();
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) { toast('실패: ' + (res && res.message || '')); openLinkAdmin(); return; }
+      toast(l.active ? '✅ 공개' : '⚫ 비공개');
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); openLinkAdmin(); })
+      .saveLink(TOKEN, { id: l.id, title: l.title, url: l.url, class_scope: l.class_scope, active: l.active });
+  }
+  function lkDelete(id) {
+    var l = LK_CACHE.find(function(x){ return x.id === id; }); if (!l) return;
+    if (!confirm('「' + l.title + '」 링크를 삭제할까요?')) return;
+    google.script.run.withSuccessHandler(function(res){
+      if (!res || !res.success) { toast('삭제 실패: ' + (res && res.message || '')); return; }
+      toast('🗑 삭제됨'); openLinkAdmin();
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).deleteLink(TOKEN, id);
   }
 
   // ── 📊 기록 관리 (기록 목록·삭제·전체 리셋) ──
