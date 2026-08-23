@@ -383,6 +383,28 @@ function recordStamp(p) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
+// 복습질문 카테고리 보장 — 없으면 도장_설정 categories에 추가 (학생 대시보드 타일 노출용)
+function ensureReviewCategory(tok) {
+  try {
+    var ss = _ensureSheets_();
+    if (!_tokOk_(ss, tok)) return NEED_AUTH;
+    var cats = _getCategories_(ss);
+    if (cats.some(function(c){ return c.name === '복습질문'; })) return { success: true, already: true };
+    cats.push({ name: '복습질문', emoji: '🔁', type: 'reason', presets: [] });
+    var sh = _dojangSs().getSheetByName('도장_설정');
+    if (!sh) return { success: false, message: '도장_설정 시트 없음' };
+    var found = false;
+    if (sh.getLastRow() >= 2) {
+      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 1).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][0]).trim() === 'categories') { sh.getRange(i+2, 2).setValue(JSON.stringify(cats)); found = true; break; }
+      }
+    }
+    if (!found) sh.appendRow(['categories', JSON.stringify(cats)]);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 // 여러 명에게 한 번에 (칭찬 등 사유형 일괄). 푸시 없이 빠르게 일괄 기록.
 function recordStampBatch(p) {
   try {

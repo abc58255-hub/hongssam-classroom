@@ -117,6 +117,7 @@
     <div class="top">
       <h1><span class="logo">🏅</span> 도장</h1>
       <select id="classSel" onchange="loadInput()"></select>
+      <button class="qrbtn" onclick="openReview()">🎲 복습</button>
       <button class="qrbtn" onclick="openQR()">📱 QR</button>
     </div>
   </div>
@@ -150,6 +151,44 @@
     <input type="password" id="lockPw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
     <button id="lockBtn" onclick="doUnlock()">확인</button>
     <div class="err" id="lockErr"></div>
+  </div>
+</div>
+
+<!-- 🎲 복습 질문 룰렛 -->
+<div id="reviewScreen" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:5000;flex-direction:column;color:#e2e8f0;font-family:inherit;">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:#1e293b;flex-shrink:0;">
+    <button onclick="closeReview()" style="background:#334155;color:#e2e8f0;border:none;border-radius:8px;padding:8px 12px;font-weight:800;cursor:pointer;">✕ 닫기</button>
+    <div style="font-size:16px;font-weight:900;">🎲 복습 질문 <span id="rvClass" style="color:#a5b4fc;font-size:14px;"></span></div>
+    <div style="margin-left:auto;display:flex;gap:6px;align-items:center;">
+      <button id="rvModeBtn" onclick="rvToggleMode()" style="background:#334155;color:#e2e8f0;border:none;border-radius:8px;padding:7px 11px;font-size:12px;font-weight:800;cursor:pointer;"></button>
+    </div>
+  </div>
+  <div style="display:flex;gap:14px;padding:8px 16px;font-size:12px;color:#94a3b8;flex-shrink:0;background:#1e293b;">
+    <span>남은 <b id="rvRemain" style="color:#38bdf8;">0</b></span>
+    <span>완료 <b id="rvDone" style="color:#4ade80;">0</b></span>
+    <span>🔖 킵 <b id="rvKept" style="color:#fbbf24;">0</b></span>
+    <span>✅ 통과 <b id="rvPass" style="color:#4ade80;">0</b></span>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;text-align:center;">
+    <div id="rvCard" style="min-height:180px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">
+      <div style="font-size:15px;color:#64748b;">아래 버튼을 눌러 학생을 뽑으세요</div>
+    </div>
+  </div>
+
+  <div style="padding:16px 16px 26px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;">
+    <div id="rvDrawRow">
+      <button onclick="rvDraw()" style="width:100%;background:linear-gradient(135deg,#6366f1,#4338ca);color:white;border:none;border-radius:14px;padding:18px;font-size:18px;font-weight:900;cursor:pointer;">🎲 다음 학생 뽑기</button>
+    </div>
+    <div id="rvJudgeRow" style="display:none;gap:8px;">
+      <button onclick="rvJudge('pass')" style="flex:1;background:#16a34a;color:white;border:none;border-radius:14px;padding:18px 8px;font-size:16px;font-weight:900;cursor:pointer;">✅ 통과</button>
+      <button onclick="rvJudge('fail')" style="flex:1;background:#dc2626;color:white;border:none;border-radius:14px;padding:18px 8px;font-size:16px;font-weight:900;cursor:pointer;">❌ 실패</button>
+      <button onclick="rvJudge('keep')" style="flex:1;background:#d97706;color:white;border:none;border-radius:14px;padding:18px 8px;font-size:16px;font-weight:900;cursor:pointer;">🔖 킵</button>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="rvFinish()" style="flex:1;background:#334155;color:#cbd5e1;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;">🏁 마무리 (킵 학생 다시)</button>
+      <button onclick="rvReset()" style="background:#334155;color:#f87171;border:none;border-radius:10px;padding:11px 14px;font-size:13px;font-weight:800;cursor:pointer;">↺ 처음부터</button>
+    </div>
   </div>
 </div>
 
@@ -413,6 +452,115 @@
           toast('⚠ 실패: '+((res&&res.message)||''));
         }
       }).recordStamp(payload);
+  }
+
+  // ══════════ 🎲 복습 질문 룰렛 ══════════
+  // 상태: { cls, mode('once'|'dup'), pool[], current, kept[], done[], pass }  — localStorage에 반별 저장
+  var RV = null;
+  function _rvKey(cls){ return 'dj_review_' + cls; }
+  function _rvSave(){ if (RV) try { localStorage.setItem(_rvKey(RV.cls), JSON.stringify(RV)); } catch(_){} }
+  function _rvStudents(){ return (DATA.students || []).map(function(s){ return { sid:s.sid, name:s.name }; }); }
+
+  function openReview() {
+    var cls = document.getElementById('classSel').value;
+    if (!cls) { toast('반을 먼저 선택하세요'); return; }
+    // 복습질문 카테고리 보장 (1회)
+    google.script.run.withSuccessHandler(function(){}).ensureReviewCategory(TOK);
+    // 저장된 진행 복원, 없으면 새로
+    var saved = null;
+    try { saved = JSON.parse(localStorage.getItem(_rvKey(cls)) || 'null'); } catch(_){}
+    if (saved && saved.cls === cls) { RV = saved; }
+    else {
+      var ids = _rvStudents().map(function(s){ return s.sid; });
+      RV = { cls: cls, mode: 'once', pool: ids.slice(), current: null, kept: [], done: [], pass: 0 };
+    }
+    document.getElementById('rvClass').textContent = cls;
+    document.getElementById('reviewScreen').style.display = 'flex';
+    rvRender();
+  }
+  function closeReview(){ document.getElementById('reviewScreen').style.display = 'none'; }
+
+  function _rvName(sid){ var s = (DATA.students||[]).find(function(x){ return x.sid === sid; }); return s ? s.name : ''; }
+
+  function rvRender() {
+    if (!RV) return;
+    document.getElementById('rvModeBtn').textContent = RV.mode === 'dup' ? '🔁 중복 허용' : '1️⃣ 한 번만';
+    document.getElementById('rvRemain').textContent = RV.mode === 'dup' ? '∞' : RV.pool.length;
+    document.getElementById('rvDone').textContent = RV.done.length;
+    document.getElementById('rvKept').textContent = RV.kept.length;
+    document.getElementById('rvPass').textContent = RV.pass;
+    var card = document.getElementById('rvCard');
+    var drawRow = document.getElementById('rvDrawRow');
+    var judgeRow = document.getElementById('rvJudgeRow');
+    if (RV.current) {
+      card.innerHTML = '<div style="font-size:20px;color:#94a3b8;font-weight:800;">' + esc(RV.current) + '</div>'
+        + '<div style="font-size:64px;font-weight:900;color:#fff;line-height:1.1;">' + esc(_rvName(RV.current)) + '</div>';
+      drawRow.style.display = 'none';
+      judgeRow.style.display = 'flex';
+    } else {
+      judgeRow.style.display = 'none';
+      drawRow.style.display = 'block';
+      var empty = (RV.mode !== 'dup' && RV.pool.length === 0);
+      card.innerHTML = empty
+        ? '<div style="font-size:17px;color:#fbbf24;font-weight:800;">이번 바퀴 끝! 🎉</div>'
+          + '<div style="font-size:14px;color:#94a3b8;">' + (RV.kept.length ? '🔖 킵한 ' + RV.kept.length + '명은 [마무리]로 다시 뽑아요' : '모든 학생을 확인했어요') + '</div>'
+        : '<div style="font-size:15px;color:#64748b;">아래 버튼을 눌러 학생을 뽑으세요</div>';
+    }
+    _rvSave();
+  }
+
+  function rvToggleMode() { if (!RV) return; RV.mode = (RV.mode === 'dup') ? 'once' : 'dup'; rvRender(); }
+
+  function rvDraw() {
+    if (!RV || RV.current) return;
+    var candidates = RV.mode === 'dup' ? _rvStudents().map(function(s){ return s.sid; }) : RV.pool;
+    if (candidates.length === 0) { toast('뽑을 학생이 없어요'); return; }
+    RV.current = candidates[Math.floor(Math.random() * candidates.length)];
+    rvRender();
+  }
+
+  function rvJudge(kind) {
+    if (!RV || !RV.current) return;
+    var sid = RV.current, name = _rvName(sid);
+    // 한 번만 모드: 풀에서 제거 (중복 모드는 유지)
+    if (RV.mode !== 'dup') RV.pool = RV.pool.filter(function(x){ return x !== sid; });
+    if (kind === 'pass') {
+      RV.pass++; RV.done.push(sid);
+      // 복습질문 도장 1개 기록 (즉시 UI, 서버 저장)
+      google.script.run
+        .withFailureHandler(function(err){ toast('⚠ 도장 저장 실패: ' + (err.message||'')); })
+        .withSuccessHandler(function(res){ if (res && res.needAuth) { toast('🔒 인증 필요'); } })
+        .recordStamp({ sid: sid, name: name, kind: '복습질문', type: 'reason', reason: '복습질문 통과', emoji: '🔁', count: 1, tok: TOK });
+      toast('✅ ' + name + ' 복습질문 통과! 도장 +1');
+    } else if (kind === 'fail') {
+      RV.done.push(sid);
+      toast('❌ ' + name + ' 실패 (도장 없음)');
+    } else { // keep
+      if (RV.kept.indexOf(sid) < 0) RV.kept.push(sid);
+      toast('🔖 ' + name + ' 킵');
+    }
+    RV.current = null;
+    rvRender();
+  }
+
+  function rvFinish() {
+    if (!RV) return;
+    if (RV.kept.length === 0) { toast('킵한 학생이 없어요'); return; }
+    // 킵한 학생들을 새 바퀴 풀로
+    RV.pool = RV.kept.slice();
+    RV.kept = [];
+    RV.current = null;
+    RV.mode = 'once'; // 마무리 바퀴는 한 번만
+    toast('🏁 킵한 학생 ' + RV.pool.length + '명 다시 시작!');
+    rvRender();
+  }
+
+  function rvReset() {
+    if (!RV) return;
+    if (!confirm('복습 진행을 처음부터 다시 시작할까요?\n(이미 기록된 도장은 지워지지 않아요)')) return;
+    var ids = _rvStudents().map(function(s){ return s.sid; });
+    RV = { cls: RV.cls, mode: RV.mode, pool: ids.slice(), current: null, kept: [], done: [], pass: 0 };
+    rvRender();
   }
 
   // 오늘 기록 확인·정정
