@@ -321,80 +321,82 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <div id="movedInList"></div>
     </div>
 
-    <!-- 수업 상태 선택 (시간표 예정일에서만 표시) -->
-    <div id="scheduleActionRow" style="display:none;margin-bottom:14px;">
-      <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:7px;">이 날 수업 상태</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button id="actionBtnNormal" class="action-btn" onclick="setScheduleAction('normal')">✅ 정상 수업</button>
-        <button id="actionBtnCancel" class="action-btn" onclick="setScheduleAction('cancel')">🚫 수업 취소</button>
-        <button id="actionBtnMove" class="action-btn" onclick="setScheduleAction('move')">🔄 날짜 이동</button>
-      </div>
-    </div>
+    <!-- 📅 이 날 수업 박스 (이동 수업 보라 박스와 구분되는 초록 박스) -->
+    <div id="ownLessonBox" style="margin-bottom:14px;background:#f0fdf4;border-radius:10px;padding:12px 14px;border:1px solid #bbf7d0;">
+      <div style="font-size:12px;font-weight:800;color:#15803d;margin-bottom:10px;">📅 이 날 수업</div>
 
-    <!-- 취소 사유 (수업 취소 선택 시) -->
-    <div id="cancelReasonRow" style="display:none;margin-bottom:10px;background:#fff1f2;border-radius:10px;padding:10px 12px;border:1px solid #fecaca;">
-      <div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:7px;">취소 사유 <span style="font-weight:400;color:#f87171;">(선택)</span></div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="cr-btn" data-reason="" onclick="selectCancelReason('')">🚫 사유 없음</button>
-        <button class="cr-btn" data-reason="공휴일" onclick="selectCancelReason('공휴일')">🏖️ 공휴일</button>
-        <button class="cr-btn" data-reason="학교행사" onclick="selectCancelReason('학교행사')">🎉 학교 행사</button>
-        <button class="cr-btn" data-reason="체험학습" onclick="selectCancelReason('체험학습')">🏕️ 체험학습</button>
-        <button class="cr-btn" data-reason="시험" onclick="selectCancelReason('시험')">📝 시험 기간</button>
-        <button class="cr-btn" data-reason="휴교" onclick="selectCancelReason('휴교')">🤒 임시 휴교</button>
-      </div>
-    </div>
-
-    <!-- 날짜 이동 대상 날짜 -->
-    <div id="moveDateRow" style="display:none;margin-bottom:12px;background:#f5f3ff;border-radius:8px;padding:10px 12px;border:1px solid #c4b5fd;">
-      <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:5px;">이동할 날짜 선택</div>
-      <input type="date" id="moveDateInput" class="form-input">
-    </div>
-
-    <!-- 차시 선택 -->
-    <div id="lessonInputSection" style="margin-bottom:12px;">
-
-      <!-- Mode A: 예상 + 실제 (시간표 정상 수업일) -->
-      <div id="plannedActualUI">
-        <!-- 예상 차시 -->
-        <div id="plannedSection" style="margin-bottom:10px;background:#f5f3ff;border-radius:10px;padding:10px 12px;border:1px solid #ddd6fe;">
-          <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;">📋 예상 차시 <span style="font-weight:400;color:#a78bfa;">(이 날 수업할 차시 미리 설정)</span></div>
-          <div id="plannedCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:120px;overflow-y:auto;padding:2px 0;margin-bottom:6px;"></div>
-          <div style="display:flex;align-items:center;gap:8px;">
-            <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
-            <input type="number" id="plannedLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="onPlannedInput(this.value)" style="max-width:110px;">
-          </div>
-          <div id="plannedPreview" style="font-size:11px;color:#7c3aed;margin-top:4px;min-height:16px;"></div>
+      <!-- 수업 상태 선택 (시간표 예정일에서만 표시) -->
+      <div id="scheduleActionRow" style="display:none;margin-bottom:12px;">
+        <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:7px;">수업 상태</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button id="actionBtnNormal" class="action-btn" onclick="setScheduleAction('normal')">✅ 정상 수업</button>
+          <button id="actionBtnCancel" class="action-btn" onclick="setScheduleAction('cancel')">🚫 수업 취소</button>
+          <button id="actionBtnMove" class="action-btn" onclick="setScheduleAction('move')">🔄 날짜 이동</button>
         </div>
-        <!-- 실제 수업 -->
-        <div id="actualSection" style="margin-bottom:2px;">
-          <div style="font-size:11px;font-weight:700;color:#10b981;margin-bottom:6px;">✅ 실제 수업</div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
-            <button id="actualBtnNone" class="actual-btn" onclick="setActualMode('none')">📌 수업 전</button>
-            <button id="actualBtnSame" class="actual-btn" onclick="setActualMode('same')">✅ 예상대로</button>
-            <button id="actualBtnDiff" class="actual-btn" onclick="setActualMode('diff')">✏️ 다른 차시</button>
-          </div>
-          <div id="actualDiffSection" style="display:none;">
-            <div id="actualCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:120px;overflow-y:auto;padding:2px 0;margin-bottom:6px;"></div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
-              <input type="number" id="actualLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="onActualInput(this.value)" style="max-width:110px;">
+      </div>
+
+      <!-- 취소 사유 (수업 취소 선택 시) -->
+      <div id="cancelReasonRow" style="display:none;margin-bottom:10px;background:#fff1f2;border-radius:10px;padding:10px 12px;border:1px solid #fecaca;">
+        <div style="font-size:11px;font-weight:700;color:#dc2626;margin-bottom:7px;">취소 사유 <span style="font-weight:400;color:#f87171;">(선택)</span></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button class="cr-btn" data-reason="" onclick="selectCancelReason('')">🚫 사유 없음</button>
+          <button class="cr-btn" data-reason="공휴일" onclick="selectCancelReason('공휴일')">🏖️ 공휴일</button>
+          <button class="cr-btn" data-reason="학교행사" onclick="selectCancelReason('학교행사')">🎉 학교 행사</button>
+          <button class="cr-btn" data-reason="체험학습" onclick="selectCancelReason('체험학습')">🏕️ 체험학습</button>
+          <button class="cr-btn" data-reason="시험" onclick="selectCancelReason('시험')">📝 시험 기간</button>
+          <button class="cr-btn" data-reason="휴교" onclick="selectCancelReason('휴교')">🤒 임시 휴교</button>
+        </div>
+      </div>
+
+      <!-- 날짜 이동 대상 날짜 -->
+      <div id="moveDateRow" style="display:none;margin-bottom:12px;background:#f5f3ff;border-radius:8px;padding:10px 12px;border:1px solid #c4b5fd;">
+        <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:5px;">이동할 날짜 선택</div>
+        <input type="date" id="moveDateInput" class="form-input">
+      </div>
+
+      <!-- 차시 선택 -->
+      <div id="lessonInputSection">
+
+        <!-- Mode A: 예상 + 실제 (시간표 정상 수업일) -->
+        <div id="plannedActualUI">
+          <!-- 예상 차시 -->
+          <div id="plannedSection" style="margin-bottom:12px;">
+            <div style="font-size:11px;font-weight:700;color:#7c3aed;margin-bottom:6px;">📋 예상 차시 <span style="font-weight:400;color:#a78bfa;">(다음 차시가 자동 선택돼요)</span></div>
+            <div style="display:flex;align-items:center;gap:6px;">
+              <select id="plannedSelect" class="form-input" onchange="onPlannedSelect(this.value)" style="flex:1;min-width:0;"></select>
+              <input type="number" id="plannedLessonNo" class="form-input" min="1" placeholder="차시" oninput="onPlannedInput(this.value)" style="width:66px;flex-shrink:0;" title="목록에 없는 차시는 여기 직접 입력">
             </div>
-            <div id="actualPreview" style="font-size:11px;color:#10b981;margin-top:4px;min-height:16px;"></div>
+            <div id="plannedPreview" style="font-size:11px;color:#7c3aed;margin-top:4px;min-height:16px;"></div>
+          </div>
+          <!-- 실제 수업 -->
+          <div id="actualSection" style="margin-bottom:2px;">
+            <div style="font-size:11px;font-weight:700;color:#10b981;margin-bottom:6px;">✅ 실제 수업</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;">
+              <button id="actualBtnNone" class="actual-btn" onclick="setActualMode('none')">📌 수업 전</button>
+              <button id="actualBtnSame" class="actual-btn" onclick="setActualMode('same')">✅ 예상대로</button>
+              <button id="actualBtnDiff" class="actual-btn" onclick="setActualMode('diff')">✏️ 다른 차시</button>
+            </div>
+            <div id="actualDiffSection" style="display:none;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <select id="actualSelect" class="form-input" onchange="onActualSelect(this.value)" style="flex:1;min-width:0;"></select>
+                <input type="number" id="actualLessonNo" class="form-input" min="1" placeholder="차시" oninput="onActualInput(this.value)" style="width:66px;flex-shrink:0;" title="목록에 없는 차시는 여기 직접 입력">
+              </div>
+              <div id="actualPreview" style="font-size:11px;color:#10b981;margin-top:4px;min-height:16px;"></div>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Mode B: 단순 (날짜 이동 / 임시 추가) -->
-      <div id="simpleUI" style="display:none;">
-        <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px;" id="lessonInputLabel">수업한 차시 선택</div>
-        <div id="lessonCards" style="display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow-y:auto;padding:2px 0;margin-bottom:8px;"></div>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <span style="font-size:11px;color:#94a3b8;white-space:nowrap;flex-shrink:0;">직접 입력:</span>
-          <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시 번호" oninput="previewLesson(this.value)" style="max-width:110px;">
+        <!-- Mode B: 단순 (날짜 이동 / 임시 추가) -->
+        <div id="simpleUI" style="display:none;">
+          <div style="font-size:12px;font-weight:700;color:#10b981;margin-bottom:6px;" id="lessonInputLabel">수업한 차시 선택</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <select id="simpleSelect" class="form-input" onchange="onSimpleSelect(this.value)" style="flex:1;min-width:0;"></select>
+            <input type="number" id="checkLessonNo" class="form-input" min="1" placeholder="차시" oninput="previewLesson(this.value)" style="width:66px;flex-shrink:0;" title="목록에 없는 차시는 여기 직접 입력">
+          </div>
+          <div id="checkLessonPreview" style="font-size:12px;color:#64748b;margin-top:4px;min-height:18px;padding:2px 0;"></div>
         </div>
-        <div id="checkLessonPreview" style="font-size:12px;color:#64748b;margin-top:4px;min-height:18px;padding:2px 0;"></div>
-      </div>
 
+      </div>
     </div>
 
     <div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:5px;">메모 (선택)</div>
@@ -893,17 +895,17 @@ function renderSylTable() {
           var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === displayLn; });
           var stateLabel, stateBg, stateBorder, stateColor, stateIcon, stateBadge;
           if (!actual) {
-            // 수업 전
+            // 수업 전 (아직 미완료)
             stateBg = '#eef2ff'; stateBorder = '#a5b4fc'; stateColor = '#4338ca';
             stateIcon = '📋'; stateBadge = '예정 (이동)';
           } else if (actual === planned) {
-            // 예상대로
-            stateBg = '#faf5ff'; stateBorder = '#ddd6fe'; stateColor = '#7c3aed';
-            stateIcon = '🔀'; stateBadge = '이동';
+            // 예상대로 완료 → 정규 수업과 동일한 초록 ✅
+            stateBg = '#f0fdf4'; stateBorder = '#86efac'; stateColor = '#15803d';
+            stateIcon = '✅'; stateBadge = '이동 완료';
           } else {
-            // 다른 차시
-            stateBg = '#fef3c7'; stateBorder = '#fcd34d'; stateColor = '#b45309';
-            stateIcon = '🔀'; stateBadge = '다른 차시';
+            // 다른 차시로 완료 → 초록 ✅ (예정과 다름은 아래 '예정: N차시'로 표시)
+            stateBg = '#f0fdf4'; stateBorder = '#86efac'; stateColor = '#15803d';
+            stateIcon = '✅'; stateBadge = '이동·완료';
           }
           html += '<div style="background:' + stateBg + ';border:1px solid ' + stateBorder + ';' + CARD + '">'
             + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
@@ -1294,6 +1296,26 @@ function onActualInput(val) {
   if (el) el.textContent = plan && plan.content ? '📚 ' + plan.content : '';
 }
 
+// ── 차시 드롭다운 (카드 벽 대체) ──
+function _lessonOptLabel(p) { return p.lessonNo + '차시' + (p.content ? ' · ' + p.content : ''); }
+function _fillLessonSelect(selId, selectedLn) {
+  var sel = document.getElementById(selId);
+  if (!sel) return;
+  var inList = false;
+  var opts = '<option value="">차시 선택…</option>';
+  (sylPlanCache || []).forEach(function(p) {
+    var on = (p.lessonNo === selectedLn);
+    if (on) inList = true;
+    opts += '<option value="' + p.lessonNo + '"' + (on ? ' selected' : '') + '>' + escapeHtml(_lessonOptLabel(p)) + '</option>';
+  });
+  // 계획에 없는 차시(예: 49차시 직접입력)도 선택 유지
+  if (selectedLn && !inList) opts += '<option value="' + selectedLn + '" selected>' + selectedLn + '차시 (직접)</option>';
+  sel.innerHTML = opts;
+}
+function onPlannedSelect(v) { var el = document.getElementById('plannedLessonNo'); if (el) el.value = v || ''; onPlannedInput(v); }
+function onActualSelect(v)  { var el = document.getElementById('actualLessonNo');  if (el) el.value = v || ''; onActualInput(v); }
+function onSimpleSelect(v)  { var el = document.getElementById('checkLessonNo');   if (el) el.value = v || ''; previewLesson(v); }
+
 function setActualMode(mode) {
   _actualMode = mode;
   ['None','Same','Diff'].forEach(function(m) {
@@ -1305,7 +1327,7 @@ function setActualMode(mode) {
   if (mode === 'diff') {
     diffSection.style.display = 'block';
     var existingActual = parseInt(document.getElementById('actualLessonNo').value) || 0;
-    renderLessonCardsIn('actualCards', existingActual, 'selectActualLesson', 'selected-actual');
+    _fillLessonSelect('actualSelect', existingActual);
   } else {
     diffSection.style.display = 'none';
   }
@@ -1320,9 +1342,15 @@ function _showPlannedActualUI(plannedLn, actualLn) {
   if (pui) pui.style.display = 'block';
   if (sui) sui.style.display = 'none';
 
+  // 예상 차시 미설정이면 다음 차시 자동 선택 (직전 기록 + 1)
+  if (!plannedLn) {
+    var _cls = document.getElementById('checkCls').value;
+    var _date = document.getElementById('checkDate').value;
+    if (_cls && _date) plannedLn = _nextLessonFor(_cls, _date);
+  }
   var pInput = document.getElementById('plannedLessonNo');
   if (pInput) pInput.value = plannedLn || '';
-  renderLessonCardsIn('plannedCards', plannedLn, 'selectPlannedLesson', 'selected-planned');
+  _fillLessonSelect('plannedSelect', plannedLn);
   var pPlan = plannedLn ? sylPlanCache.find(function(p){ return p.lessonNo === plannedLn; }) : null;
   var pPrev = document.getElementById('plannedPreview');
   if (pPrev) pPrev.textContent = pPlan && pPlan.content ? '📚 ' + pPlan.content : '';
@@ -1350,7 +1378,7 @@ function _showSimpleUI(label, selectedLn) {
   document.getElementById('lessonInputLabel').textContent = label;
   var lnInput = document.getElementById('checkLessonNo');
   if (lnInput) lnInput.value = selectedLn || '';
-  renderLessonCards(selectedLn || 0);
+  _fillLessonSelect('simpleSelect', selectedLn || 0);
   previewLesson(selectedLn ? String(selectedLn) : '');
 }
 
@@ -2184,6 +2212,6 @@ function deleteCurrentGroup() {
 </script>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
-<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.02.01</span></div>
+<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.03.00</span></div>
 </body>
 </html>
