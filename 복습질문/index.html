@@ -72,13 +72,13 @@
   .conf { position:fixed; top:-20px; z-index:150; pointer-events:none; border-radius:2px; }
   @keyframes fall { to { transform:translateY(105vh) rotate(720deg); opacity:.15; } }
   /* 멀티 뽑기 그리드 */
-  #multiWrap { width:100%; max-width:680px; display:grid; gap:10px; }
-  .mcard { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px 10px; text-align:center; backdrop-filter:blur(8px); animation:pop .4s cubic-bezier(.2,1.4,.4,1) both; }
-  .mcard .msid { font-size:13px; color:#94a3b8; font-weight:800; }
-  .mcard .mname { font-weight:900; color:#fff; line-height:1.1; margin:4px 0 10px; text-shadow:0 0 18px rgba(129,140,248,.6); }
-  .mrow { display:flex; gap:5px; }
-  .mrow button { flex:1; border:none; border-radius:10px; padding:10px 4px; font-size:13px; font-weight:900; color:white; cursor:pointer; transition:.1s; }
-  .mrow button:active { transform:scale(.94); }
+  #multiWrap { width:100%; max-width:900px; display:grid; gap:14px; }
+  .mcard { background:var(--card); border:1px solid var(--line); border-radius:20px; padding:20px 16px; text-align:center; backdrop-filter:blur(8px); animation:pop .4s cubic-bezier(.2,1.4,.4,1) both; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .mcard .msid { font-size:16px; color:#94a3b8; font-weight:800; }
+  .mcard .mname { font-weight:900; color:#fff; line-height:1.1; margin:8px 0 16px; text-shadow:0 0 22px rgba(129,140,248,.7); }
+  .mrow { display:flex; gap:8px; }
+  .mrow button { flex:1; border:none; border-radius:14px; padding:16px 6px; font-size:22px; font-weight:900; color:white; cursor:pointer; transition:.1s; box-shadow:0 6px 16px rgba(0,0,0,.35); }
+  .mrow button:active { transform:scale(.93); }
   .mdone { opacity:.35; }
 </style>
 </head>
@@ -132,6 +132,17 @@
 </div>
 <div class="toast" id="toast"></div>
 
+<!-- 커스텀 확인 모달 (브라우저 기본 confirm 대체) -->
+<div id="confirmBg" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,.6);backdrop-filter:blur(4px);z-index:300;align-items:center;justify-content:center;padding:24px;">
+  <div style="background:var(--card);backdrop-filter:blur(16px);border:1px solid var(--line);border-radius:22px;max-width:360px;width:100%;padding:26px 24px;box-shadow:0 25px 60px rgba(0,0,0,.5);">
+    <div id="confirmMsg" style="font-size:16px;font-weight:700;color:#e5e7eb;line-height:1.6;white-space:pre-wrap;margin-bottom:20px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button id="confirmCancel" style="flex:1;padding:14px;border:1px solid var(--line);border-radius:14px;background:rgba(51,65,85,.6);color:#cbd5e1;font-size:15px;font-weight:800;cursor:pointer;">취소</button>
+      <button id="confirmOk" style="flex:1;padding:14px;border:none;border-radius:14px;background:linear-gradient(135deg,#6366f1,#4338ca);color:white;font-size:15px;font-weight:900;cursor:pointer;">확인</button>
+    </div>
+  </div>
+</div>
+
 <script>
   var TOK = localStorage.getItem('rv_tok') || '';
   var STU = [];          // [{sid,name}]
@@ -141,6 +152,13 @@
 
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1600); }
+  function uiConfirm(msg, onOk){
+    var bg=document.getElementById('confirmBg');
+    document.getElementById('confirmMsg').textContent=msg;
+    bg.style.display='flex';
+    document.getElementById('confirmOk').onclick=function(){ bg.style.display='none'; onOk(); };
+    document.getElementById('confirmCancel').onclick=function(){ bg.style.display='none'; };
+  }
   function _name(sid){ var s=STU.find(function(x){return x.sid===sid;}); return s?s.name:''; }
   function _key(cls){ return 'rv_state_' + cls; }
   function _save(){ if(RV) try{ localStorage.setItem(_key(RV.cls), JSON.stringify(RV)); }catch(_){} }
@@ -235,7 +253,7 @@
         var nm=_name(sid);
         html+='<div class="mcard">'
           +'<div class="msid">'+esc(sid)+'</div>'
-          +'<div class="mname" style="font-size:'+_fs(nm,30)+'px;">'+esc(nm)+'</div>'
+          +'<div class="mname" style="font-size:'+_fs(nm, cur.length<=2?52:cur.length<=4?42:34)+'px;">'+esc(nm)+'</div>'
           +'<div class="mrow">'
             +'<button class="jpass" onclick="judgeOne(\''+esc(sid)+'\',\'pass\')">✅</button>'
             +'<button class="jfail" onclick="judgeOne(\''+esc(sid)+'\',\'fail\')">❌</button>'
@@ -325,8 +343,9 @@
   }
   function reset(){
     if(!RV) return;
-    if(!confirm('처음부터 다시 시작할까요?\n(기록된 도장은 지워지지 않아요)')) return;
-    RV={ cls:RV.cls, mode:RV.mode, pool:STU.map(function(s){return s.sid;}), current:[], kept:[], done:[], pass:0 }; render();
+    uiConfirm('처음부터 다시 시작할까요?\n(기록된 도장은 지워지지 않아요)', function(){
+      RV={ cls:RV.cls, mode:RV.mode, pool:STU.map(function(s){return s.sid;}), current:[], kept:[], done:[], pass:0 }; render();
+    });
   }
 
   // 시작
