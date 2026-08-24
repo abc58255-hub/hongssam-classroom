@@ -38,10 +38,35 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// ── 교사 인증 (ClassCore 위임) ──
-function teacherLogin(pw)            { return ClassCore.teacherLogin(pw); }
-function teacherLogout(token)        { return ClassCore.teacherLogout(token); }
-function validateTeacherSession(token) { return ClassCore.verifyTeacher(token); }
+// ── 교사 인증 ──
+// 비밀번호 검증은 ClassCore에 위임하되, 세션 토큰은 포털 자체 ScriptProperties로 관리.
+// (ClassCore가 토큰을 CacheService에 저장하는데, 캐시 라운드트립이 불안정할 때
+//  로그인 직후에도 "로그인 만료"가 뜨는 문제 회피 — 복습질문 앱과 동일 방식)
+var PTOK_TTL_MS = 6 * 3600 * 1000; // 6시간
+function _ptokOk_(token) {
+  if (!token) return false;
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty('ptok_' + String(token));
+    if (!v) return false;
+    if (Date.now() > parseInt(v)) { PropertiesService.getScriptProperties().deleteProperty('ptok_' + String(token)); return false; }
+    return true;
+  } catch (_) { return false; }
+}
+function teacherLogin(pw) {
+  var r;
+  try { r = ClassCore.teacherLogin(pw); } catch (e) { return { success: false, message: '인증 오류: ' + e.message }; }
+  var ok = (r === true) || !!(r && (r.success || r.valid || r.ok || r.token));
+  if (!ok) return (r && r.message) ? r : { success: false, message: '비밀번호가 올바르지 않습니다.' };
+  var token = Utilities.getUuid();
+  PropertiesService.getScriptProperties().setProperty('ptok_' + token, String(Date.now() + PTOK_TTL_MS));
+  return { success: true, token: token };
+}
+function teacherLogout(token) {
+  try { PropertiesService.getScriptProperties().deleteProperty('ptok_' + String(token)); } catch (_) {}
+  try { ClassCore.teacherLogout(token); } catch (_) {}
+  return { success: true };
+}
+function validateTeacherSession(token) { return { success: _ptokOk_(token) }; }
 
 // ── 포털 데이터: 카드 정의 + URL 매칭 ──
 // 카드별 keys 는 ClassCore 레지스트리에서 찾을 후보 이름(앞 순서 우선).
@@ -116,14 +141,8 @@ function _lessonCall_(payload) {
     return JSON.parse(res.getContentText());
   } catch (e) { return { success: false, message: String(e) }; }
 }
-// ClassCore.verifyTeacher의 반환 형식이 버전에 따라 달라 관대하게 판정
-// (true / {success} / {valid} / {ok} 모두 허용 — 형식 불일치로 "로그인 만료" 오탐났던 이력)
-function _teacherOk_(token) {
-  try {
-    var v = ClassCore.verifyTeacher(token);
-    return v === true || !!(v && (v.success || v.valid || v.ok));
-  } catch (_) { return false; }
-}
+// 포털 자체 토큰(ScriptProperties)으로 검증 — ClassCore 캐시 라운드트립 불안정 회피
+function _teacherOk_(token) { return _ptokOk_(token); }
 function getLessonGames(token) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
   return _lessonCall_({ op: 'listGames' });
