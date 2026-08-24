@@ -61,7 +61,7 @@ function getPortalData() {
       { name: '과제채점',  icon: '📝', desc: '수학 과제 출제·채점·첨삭',     keys: ['과제채점'] },
       { name: '진도표',    icon: '📋', desc: '진도 계획·기록',              keys: ['진도표'] },
       { name: '수업활동',  icon: '🎮', desc: '단원 게임·자유 도전 공개 관리', keys: [], action: 'lessonAdmin' },
-      { name: '복습 질문', icon: '🎲', desc: '반 뽑기 → 구두 복습 → 통과 도장(교사용)', keys: ['도장입력'], suffix: '?screen=review' }
+      { name: '복습 질문', icon: '🎲', desc: '반 뽑기 → 구두 복습 → 통과 도장(교사용)', keys: ['복습질문'], url: 'https://script.google.com/macros/s/AKfycbyF8T-3tY7kLQw3Tg6lNRb2z4NEVvdCbOEg5hUw1-KuxHZT5bN6M3iRFTixtSGZ6Q8VYQ/exec' }
     ]},
     { title: '학급운영', cards: [
       { name: '알림관리',  icon: '🔔', desc: '학급알림 작성·푸시 알림 전송',    keys: ['알림관리'] },
@@ -90,6 +90,7 @@ function getPortalData() {
 
   groups.forEach(function(g) {
     g.cards.forEach(function(c) {
+      if (c.url) return; // 하드코딩 URL(예: 복습질문 별도 앱)은 유지
       var base = resolve(c.keys);
       c.url = base ? (base + (c.suffix || '')) : '';
     });

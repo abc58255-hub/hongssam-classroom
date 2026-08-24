@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>홍쌤 복습 질문</title>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none; }
+  body { font-family:-apple-system,'Apple SD Gothic Neo',sans-serif; background:#0f172a; color:#e2e8f0; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+  .top { display:flex; align-items:center; gap:10px; padding:14px 16px; background:#1e293b; flex-shrink:0; }
+  .top h1 { font-size:17px; font-weight:900; }
+  .top select { margin-left:auto; padding:8px 10px; border-radius:8px; border:1px solid #334155; background:#0f172a; color:#e2e8f0; font-size:14px; font-weight:700; }
+  .mbtn { background:#334155; color:#e2e8f0; border:none; border-radius:8px; padding:8px 11px; font-size:12px; font-weight:800; cursor:pointer; }
+  .counts { display:flex; gap:14px; padding:8px 16px; font-size:12px; color:#94a3b8; background:#1e293b; flex-shrink:0; }
+  #keptBar { display:none; padding:8px 16px; background:#1e293b; line-height:1.9; flex-shrink:0; }
+  #stage { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:20px; text-align:center; }
+  #card { min-height:200px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; }
+  .foot { padding:16px 16px 26px; flex-shrink:0; display:flex; flex-direction:column; gap:10px; }
+  .big { width:100%; background:linear-gradient(135deg,#6366f1,#4338ca); color:white; border:none; border-radius:14px; padding:18px; font-size:18px; font-weight:900; cursor:pointer; }
+  .jrow { display:none; gap:8px; }
+  .jbtn { flex:1; border:none; border-radius:14px; padding:18px 8px; font-size:16px; font-weight:900; cursor:pointer; color:white; }
+  .srow { display:flex; gap:8px; }
+  .sbtn { border:none; border-radius:10px; padding:11px; font-size:13px; font-weight:800; cursor:pointer; background:#334155; color:#cbd5e1; }
+  /* 잠금 */
+  #lock { position:fixed; inset:0; background:radial-gradient(circle at 30% 20%,#1e3a8a,#0f172a 70%); display:flex; align-items:center; justify-content:center; z-index:100; }
+  .lockcard { background:#1e293b; padding:36px; border-radius:20px; width:320px; text-align:center; box-shadow:0 20px 50px rgba(0,0,0,.4); }
+  .lockcard .ico { font-size:44px; margin-bottom:8px; }
+  .lockcard h2 { font-size:20px; margin-bottom:6px; }
+  .lockcard p { color:#94a3b8; font-size:13px; margin-bottom:18px; line-height:1.5; }
+  .lockcard input { width:100%; padding:13px; border:2px solid #334155; border-radius:12px; background:#0f172a; color:white; font-size:15px; margin-bottom:12px; }
+  .lockcard button { width:100%; padding:13px; background:#2563eb; color:white; border:none; border-radius:12px; font-size:15px; font-weight:800; cursor:pointer; }
+  .lockcard .err { color:#f87171; font-size:13px; margin-top:10px; min-height:18px; font-weight:700; }
+  .toast { position:fixed; left:50%; bottom:100px; transform:translateX(-50%) translateY(20px); background:#111827; color:#fff; padding:12px 22px; border-radius:30px; font-size:14px; font-weight:800; z-index:200; opacity:0; transition:.3s; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  @keyframes pop { 0%{transform:scale(.6);opacity:.3;} 60%{transform:scale(1.18);} 100%{transform:scale(1);opacity:1;} }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>🎲 복습 질문</h1>
+  <select id="classSel" onchange="onClass()"></select>
+  <button class="mbtn" id="modeBtn" onclick="toggleMode()"></button>
+</div>
+<div class="counts">
+  <span>남은 <b id="cRemain" style="color:#38bdf8;">0</b></span>
+  <span>완료 <b id="cDone" style="color:#4ade80;">0</b></span>
+  <span>🔖 킵 <b id="cKept" style="color:#fbbf24;">0</b></span>
+  <span>✅ 통과 <b id="cPass" style="color:#4ade80;">0</b></span>
+</div>
+<div id="keptBar"></div>
+<div id="stage"><div id="card"><div style="font-size:15px;color:#64748b;">아래 버튼을 눌러 학생을 뽑으세요</div></div></div>
+<div class="foot">
+  <div id="drawRow"><button class="big" onclick="draw()">🎲 다음 학생 뽑기</button></div>
+  <div id="judgeRow" class="jrow">
+    <button class="jbtn" style="background:#16a34a;" onclick="judge('pass')">✅ 통과</button>
+    <button class="jbtn" style="background:#dc2626;" onclick="judge('fail')">❌ 실패</button>
+    <button class="jbtn" style="background:#d97706;" onclick="judge('keep')">🔖 킵</button>
+  </div>
+  <div class="srow">
+    <button class="sbtn" style="flex:1;" onclick="finish()">🏁 마무리 (킵 다시)</button>
+    <button class="sbtn" style="color:#f87171;" onclick="reset()">↺ 처음부터</button>
+  </div>
+</div>
+
+<div id="lock">
+  <div class="lockcard">
+    <div class="ico">🔒</div>
+    <h2>복습 질문</h2>
+    <p>교사 비밀번호를 입력하면<br>1시간 동안 사용할 수 있어요.</p>
+    <input type="password" id="lockPw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
+    <button id="lockBtn" onclick="doUnlock()">확인</button>
+    <div class="err" id="lockErr"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var TOK = localStorage.getItem('rv_tok') || '';
+  var STU = [];          // [{sid,name}]
+  var COUNTS = {};       // 누적 복습 도장
+  var RV = null;         // { cls, mode, pool[], current, kept[], done[], pass }
+  var ANIM = false;
+
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1600); }
+  function _name(sid){ var s=STU.find(function(x){return x.sid===sid;}); return s?s.name:''; }
+  function _key(cls){ return 'rv_state_' + cls; }
+  function _save(){ if(RV) try{ localStorage.setItem(_key(RV.cls), JSON.stringify(RV)); }catch(_){} }
+
+  // ── 인증 ──
+  function authGate(res){ if(res&&res.needAuth){ TOK=''; localStorage.removeItem('rv_tok'); showLock(); return true; } return false; }
+  function showLock(){ document.getElementById('lock').style.display='flex'; }
+  function hideLock(){ document.getElementById('lock').style.display='none'; }
+  function doUnlock(){
+    var pw=document.getElementById('lockPw').value; var btn=document.getElementById('lockBtn');
+    if(!pw) return; btn.disabled=true; btn.textContent='확인 중…';
+    google.script.run.withFailureHandler(function(e){ btn.disabled=false; btn.textContent='확인'; document.getElementById('lockErr').textContent='오류: '+e.message; })
+      .withSuccessHandler(function(res){
+        btn.disabled=false; btn.textContent='확인';
+        if(res&&res.success){ TOK=res.token; localStorage.setItem('rv_tok',TOK); document.getElementById('lockErr').textContent=''; hideLock(); loadClasses(); }
+        else document.getElementById('lockErr').textContent=(res&&res.message)||'실패';
+      }).unlockReview(pw);
+  }
+
+  function loadClasses(){
+    google.script.run.withFailureHandler(function(e){ toast('반 목록 오류: '+e.message); })
+      .withSuccessHandler(function(res){
+        if(authGate(res)) return; if(!res||!res.success) return;
+        var sel=document.getElementById('classSel');
+        sel.innerHTML=res.classes.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>';}).join('');
+        onClass();
+      }).getClassList(TOK);
+  }
+
+  function onClass(){
+    var cls=document.getElementById('classSel').value; if(!cls) return;
+    google.script.run.withFailureHandler(function(e){ toast('불러오기 실패: '+e.message); })
+      .withSuccessHandler(function(res){
+        if(authGate(res)) return; if(!res||!res.success) return;
+        STU=res.students||[]; COUNTS=res.counts||{};
+        var saved=null; try{ saved=JSON.parse(localStorage.getItem(_key(cls))||'null'); }catch(_){}
+        if(saved&&saved.cls===cls){ RV=saved; }
+        else { RV={ cls:cls, mode:'once', pool:STU.map(function(s){return s.sid;}), current:null, kept:[], done:[], pass:0 }; }
+        render();
+      }).getReviewData(cls, TOK);
+  }
+
+  function toggleMode(){ if(!RV) return; RV.mode=(RV.mode==='dup')?'once':'dup'; render(); }
+
+  // 공평 가중: 누적 복습 도장 적을수록 잘 뽑힘
+  function pick(cands){
+    if(!cands.length) return null;
+    var mx=0; cands.forEach(function(s){ var c=COUNTS[s]||0; if(c>mx)mx=c; });
+    var w=cands.map(function(s){ return (mx-(COUNTS[s]||0))+1; });
+    var tot=w.reduce(function(a,b){return a+b;},0), r=Math.random()*tot;
+    for(var i=0;i<cands.length;i++){ r-=w[i]; if(r<=0) return cands[i]; }
+    return cands[cands.length-1];
+  }
+
+  function render(){
+    if(!RV) return;
+    document.getElementById('modeBtn').textContent = RV.mode==='dup'?'🔁 중복 허용':'1️⃣ 한 번만';
+    document.getElementById('cRemain').textContent = RV.mode==='dup'?'∞':RV.pool.length;
+    document.getElementById('cDone').textContent = RV.done.length;
+    document.getElementById('cKept').textContent = RV.kept.length;
+    document.getElementById('cPass').textContent = RV.pass;
+    var kb=document.getElementById('keptBar');
+    kb.innerHTML = RV.kept.length ? '🔖 '+RV.kept.map(function(s){return '<span style="background:#78350f;color:#fde68a;padding:2px 8px;border-radius:10px;font-size:12px;font-weight:800;margin:0 3px 3px 0;display:inline-block;">'+esc(_name(s))+'</span>';}).join('') : '';
+    kb.style.display = RV.kept.length?'block':'none';
+    var card=document.getElementById('card'), drawRow=document.getElementById('drawRow'), judgeRow=document.getElementById('judgeRow');
+    if(RV.current){
+      card.innerHTML='<div style="font-size:20px;color:#94a3b8;font-weight:800;">'+esc(RV.current)+'</div>'
+        +'<div style="font-size:64px;font-weight:900;color:#fff;line-height:1.1;">'+esc(_name(RV.current))+'</div>';
+      drawRow.style.display='none'; judgeRow.style.display='flex';
+    } else {
+      judgeRow.style.display='none'; drawRow.style.display='block';
+      var empty=(RV.mode!=='dup'&&RV.pool.length===0);
+      card.innerHTML = empty
+        ? '<div style="font-size:17px;color:#fbbf24;font-weight:800;">이번 바퀴 끝! 🎉</div><div style="font-size:14px;color:#94a3b8;">'+(RV.kept.length?'🔖 킵한 '+RV.kept.length+'명은 [마무리]로 다시':'모든 학생 확인 완료')+'</div>'
+        : '<div style="font-size:15px;color:#64748b;">아래 버튼을 눌러 학생을 뽑으세요</div>';
+    }
+    _save();
+  }
+
+  function draw(){
+    if(!RV||RV.current||ANIM) return;
+    var cands = RV.mode==='dup' ? STU.map(function(s){return s.sid;}) : RV.pool;
+    if(!cands.length){ toast('뽑을 학생이 없어요'); return; }
+    var winner=pick(cands);
+    ANIM=true; document.getElementById('drawRow').style.display='none';
+    var card=document.getElementById('card'), all=STU.map(function(s){return s.sid;}), t=0, max=22;
+    function flash(){
+      var s=all[Math.floor(Math.random()*all.length)], sc=1+Math.min(.5,t/max*.5);
+      card.innerHTML='<div style="font-size:15px;color:#475569;">🎲 뽑는 중…</div>'
+        +'<div style="font-size:'+(44+t*.7)+'px;font-weight:900;color:#93c5fd;line-height:1.1;transform:scale('+sc+');">'+esc(_name(s))+'</div>';
+      t++; if(t>=max){ land(winner); return; }
+      setTimeout(flash, 45+t*t*.9);
+    }
+    flash();
+  }
+  function land(sid){
+    ANIM=false; RV.current=sid;
+    document.getElementById('card').innerHTML='<div style="font-size:20px;color:#94a3b8;font-weight:800;">'+esc(sid)+'</div>'
+      +'<div style="font-size:70px;font-weight:900;color:#fff;line-height:1.05;animation:pop .35s ease;">'+esc(_name(sid))+'</div>'
+      +'<div style="font-size:13px;color:#fbbf24;margin-top:4px;">🎤 복습 질문!</div>';
+    document.getElementById('judgeRow').style.display='flex'; _save();
+  }
+
+  function judge(kind){
+    if(!RV||!RV.current) return;
+    var sid=RV.current, name=_name(sid);
+    if(RV.mode!=='dup') RV.pool=RV.pool.filter(function(x){return x!==sid;});
+    if(kind==='pass'){
+      RV.pass++; RV.done.push(sid); COUNTS[sid]=(COUNTS[sid]||0)+1;
+      google.script.run.withFailureHandler(function(e){ toast('⚠ 도장 저장 실패: '+e.message); })
+        .withSuccessHandler(function(res){ if(res&&res.needAuth) toast('🔒 인증 필요'); }).recordReviewPass(sid, name, TOK);
+      toast('✅ '+name+' 통과! 도장 +1');
+    } else if(kind==='fail'){ RV.done.push(sid); toast('❌ '+name+' 실패'); }
+    else { if(RV.kept.indexOf(sid)<0) RV.kept.push(sid); toast('🔖 '+name+' 킵'); }
+    RV.current=null; render();
+  }
+
+  function finish(){
+    if(!RV) return;
+    if(!RV.kept.length){ toast('킵한 학생이 없어요'); return; }
+    RV.pool=RV.kept.slice(); RV.kept=[]; RV.current=null; RV.mode='once';
+    toast('🏁 킵한 '+RV.pool.length+'명 다시 시작!'); render();
+  }
+  function reset(){
+    if(!RV) return;
+    if(!confirm('처음부터 다시 시작할까요?\n(기록된 도장은 지워지지 않아요)')) return;
+    RV={ cls:RV.cls, mode:RV.mode, pool:STU.map(function(s){return s.sid;}), current:null, kept:[], done:[], pass:0 }; render();
+  }
+
+  // 시작
+  if(TOK){ hideLock(); loadClasses(); } else { showLock(); }
+</script>
+</body>
+</html>
