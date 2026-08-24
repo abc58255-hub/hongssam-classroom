@@ -73,9 +73,14 @@ Deno.serve(async (req) => {
         show_names: !!R.show_names, kind: String(R.kind ?? "line"),
         revealed: false, active: true,
       };
-      const { data, error } = await admin0.from("graph_rooms").insert(row).select("id").single();
-      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
-      return Response.json({ success: true, id: data.id });
+      let ins = await admin0.from("graph_rooms").insert(row).select("id").single();
+      if (ins.error) {
+        // 활성 방 유니크 충돌(동시 생성 레이스) → 기존 활성 방 정리 후 1회 재시도
+        await admin0.from("graph_rooms").update({ active: false }).eq("class_scope", cls).eq("active", true);
+        ins = await admin0.from("graph_rooms").insert(row).select("id").single();
+      }
+      if (ins.error) return Response.json({ success: false, message: ins.error.message }, { status: 500 });
+      return Response.json({ success: true, id: ins.data.id });
     }
     // 방 설정/개형 갱신: {op:'graphUpdate', id, patch:{revealed?,hide_eq?,max_points?,show_wrong?,int_only?,display?}}
     if (body.op === "graphUpdate") {

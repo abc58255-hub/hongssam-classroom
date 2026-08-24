@@ -22,7 +22,7 @@ var RPC_WHITELIST = [
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
   'getLinks', 'saveLink', 'deleteLink',
-  'graphCreate', 'graphUpdate', 'graphClear', 'graphClose'
+  'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses'
 ];
 
 function doPost(e) {
@@ -169,6 +169,19 @@ function graphClear(token, id) {
 function graphClose(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'graphClose', id: id });
+}
+// 실제 학생이 있는 반 목록만 반환 — 학번(sid) 앞2자리로 유도해 학생앱 className과 형식 일치 보장
+function graphClasses(token) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  var list;
+  try { list = ClassCore.getStudents() || []; } catch (e) { return { success: false, message: String(e) }; }
+  var set = {};
+  list.forEach(function (s) {
+    var sid = String((s && (s.id || s.sid || s.studentId || s['학번'] || s.number)) || '').trim();
+    if (sid.length >= 2) set[sid.charAt(0) + '학년 ' + sid.charAt(1) + '반'] = 1;
+  });
+  var classes = Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko', { numeric: true }); });
+  return { success: true, classes: classes };
 }
 
 // ── 수업 링크 보드 (학생 대시보드 상단 카드) ──

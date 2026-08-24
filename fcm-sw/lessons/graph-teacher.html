@@ -93,9 +93,9 @@
   <div class="card">
     <h3>1. 반 선택</h3>
     <div class="field">
-      <select id="grade"><option value="1">1학년</option><option value="2" selected>2학년</option><option value="3">3학년</option></select>
-      <select id="cls"></select>
+      <select id="classSel" style="min-width:160px;"><option value="">불러오는 중…</option></select>
     </div>
+    <div class="hint" style="text-align:left;" id="classHint"></div>
   </div>
   <div class="card">
     <h3>2. 직선 입력 (ax + by = c)</h3>
@@ -204,9 +204,18 @@
     {t:'x+y=4', a:1,b:1,c:4, d:'x + y = 4'}
   ];
   function initSetup(){
-    var cs=document.getElementById('cls'); var o=''; for(var i=1;i<=10;i++) o+='<option value="'+i+'">'+i+'반</option>'; cs.innerHTML=o;
     document.getElementById('presets').innerHTML=PRESETS.map(function(p,i){return '<button onclick="applyPreset('+i+')">'+p.t+'</button>';}).join('');
-    onABC();
+    onABC(); loadClasses();
+  }
+  function loadClasses(){
+    var sel=document.getElementById('classSel'), hint=document.getElementById('classHint');
+    portalRPC('graphClasses',[TOK]).then(function(res){
+      if(!res||!res.success||!res.classes||!res.classes.length){
+        sel.innerHTML='<option value="">반 정보 없음</option>'; hint.textContent='등록된 학생이 없어요. 학생 명단을 먼저 등록해주세요.'; return;
+      }
+      sel.innerHTML=res.classes.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
+      hint.textContent='학생 명단이 있는 반만 표시돼요.';
+    }).catch(function(e){ sel.innerHTML='<option value="">불러오기 실패</option>'; hint.textContent='오류: '+e.message; });
   }
   function applyPreset(i){ var p=PRESETS[i]; document.getElementById('ca').value=p.a; document.getElementById('cb').value=p.b; document.getElementById('cc').value=p.c; document.getElementById('disp').value=p.d; }
   // 계수 → 표시식 자동 생성
@@ -228,15 +237,18 @@
   }
   var MP=3;
   function setMp(v, fromCustom){
-    MP=v;
-    document.querySelectorAll('#mpSeg button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.v)===v);});
+    MP=Math.max(0, Math.min(99, parseInt(v)||0));   // 0=무제한, 최대 99
+    document.querySelectorAll('#mpSeg button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.v)===MP);});
     if(!fromCustom){ var c=document.getElementById('mpCustom'); if(c) c.value=''; }
   }
 
+  var starting=false;
   function startRoom(){
-    var g=document.getElementById('grade').value, cl=document.getElementById('cls').value;
+    if(starting) return;
+    var cls=document.getElementById('classSel').value;
+    if(!cls){ toast('반을 선택하세요'); return; }
     var room={
-      class_scope: g+'학년 '+cl+'반',
+      class_scope: cls,
       a: parseInt(document.getElementById('ca').value)||0,
       b: parseInt(document.getElementById('cb').value)||0,
       c: parseInt(document.getElementById('cc').value)||0,
@@ -249,11 +261,14 @@
       kind: 'line'
     };
     if(room.a===0&&room.b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
+    starting=true;
+    var sb0=document.querySelector('.start'); if(sb0){ sb0.disabled=true; sb0.textContent='방 만드는 중…'; }
+    function reset(){ starting=false; if(sb0){ sb0.disabled=false; sb0.textContent='🚀 방 시작하기'; } }
     portalRPC('graphCreate',[TOK, room]).then(function(res){
-      if(!res||!res.success){ toast('방 생성 실패: '+((res&&res.message)||'')); return; }
+      if(!res||!res.success){ toast('방 생성 실패: '+((res&&res.message)||'')); reset(); return; }
       ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, kind:'line', revealed:false, show_wrong:room.show_wrong, show_names:room.show_names };
-      enterLive();
-    }).catch(function(e){ toast('오류: '+e.message); });
+      starting=false; enterLive();
+    }).catch(function(e){ toast('오류: '+e.message); reset(); });
   }
 
   // ── 라이브 ──
