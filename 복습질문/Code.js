@@ -107,7 +107,8 @@ function _getRosterCached_() {
     if (!sid) continue;
     list.push({ sid: sid, name: String(roster[i][2] || '').trim() });
   }
-  try { cache.put('rv_roster', JSON.stringify(list), 600); } catch(_) {}
+  // 빈 명단은 캐시하지 않음 (첫 콜드 호출이 빈 값을 10분간 물고 있어 이름 안 뜨던 문제 방지)
+  if (list.length) { try { cache.put('rv_roster', JSON.stringify(list), 600); } catch(_) {} }
   return list;
 }
 

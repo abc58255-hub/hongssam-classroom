@@ -159,7 +159,7 @@
     document.getElementById('confirmOk').onclick=function(){ bg.style.display='none'; onOk(); };
     document.getElementById('confirmCancel').onclick=function(){ bg.style.display='none'; };
   }
-  function _name(sid){ var s=STU.find(function(x){return x.sid===sid;}); return s?s.name:''; }
+  function _name(sid){ var s=STU.find(function(x){return String(x.sid)===String(sid);}); return (s&&s.name)?s.name:sid; }
   function _key(cls){ return 'rv_state_' + cls; }
   function _save(){ if(RV) try{ localStorage.setItem(_key(RV.cls), JSON.stringify(RV)); }catch(_){} }
   // 이름 길이에 따라 폰트 자동 축소
@@ -275,6 +275,7 @@
 
   function draw(){
     if(!RV||(RV.current&&RV.current.length)||ANIM) return;
+    if(!STU.length){ toast('명단을 불러오는 중이에요…'); onClass(); return; } // 아직 로딩 전이면 재조회
     var cands = RV.mode==='dup' ? STU.map(function(s){return s.sid;}) : RV.pool;
     if(!cands.length){ toast('뽑을 학생이 없어요'); return; }
     var n=Math.min(_cnt(), cands.length);
