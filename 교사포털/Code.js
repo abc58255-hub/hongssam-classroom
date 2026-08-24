@@ -21,7 +21,8 @@ var RPC_WHITELIST = [
   'teacherLogin', 'teacherLogout', 'validateTeacherSession',
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
-  'getLinks', 'saveLink', 'deleteLink'
+  'getLinks', 'saveLink', 'deleteLink',
+  'graphCreate', 'graphUpdate', 'graphClear', 'graphClose'
 ];
 
 function doPost(e) {
@@ -152,6 +153,24 @@ function setLessonGame(token, g) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
   return _lessonCall_({ games: [g] });
 }
+// ── 협력 직선그래프 탐구 ──
+function graphCreate(token, room) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
+  return _lessonCall_({ op: 'graphCreate', room: room });
+}
+function graphUpdate(token, id, patch) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'graphUpdate', id: id, patch: patch });
+}
+function graphClear(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'graphClear', id: id });
+}
+function graphClose(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'graphClose', id: id });
+}
+
 // ── 수업 링크 보드 (학생 대시보드 상단 카드) ──
 function getLinks(token) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };

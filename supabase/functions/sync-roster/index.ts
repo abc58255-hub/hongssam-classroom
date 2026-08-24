@@ -56,6 +56,50 @@ Deno.serve(async (req) => {
       return Response.json({ success: true, deleted: count ?? 0 });
     }
 
+    // ── 협력 직선그래프 탐구 ──
+    // 방 생성: {op:'graphCreate', room:{class_scope,a,b,c,display,hide_eq,max_points,show_wrong,int_only}}
+    //   같은 반의 기존 활성방은 종료(active=false) 후 새로 생성
+    if (body.op === "graphCreate") {
+      const R = body.room ?? {};
+      const cls = String(R.class_scope ?? "").trim();
+      if (!cls) return Response.json({ success: false, message: "반이 없습니다." }, { status: 400 });
+      await admin0.from("graph_rooms").update({ active: false }).eq("class_scope", cls).eq("active", true);
+      const row = {
+        class_scope: cls,
+        a: Number(R.a) || 0, b: Number(R.b) || 0, c: Number(R.c) || 0,
+        display: String(R.display ?? "").trim(),
+        hide_eq: !!R.hide_eq, max_points: Number(R.max_points) || 0,
+        show_wrong: R.show_wrong !== false, int_only: !!R.int_only,
+        revealed: false, active: true,
+      };
+      const { data, error } = await admin0.from("graph_rooms").insert(row).select("id").single();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true, id: data.id });
+    }
+    // 방 설정/개형 갱신: {op:'graphUpdate', id, patch:{revealed?,hide_eq?,max_points?,show_wrong?,int_only?,display?}}
+    if (body.op === "graphUpdate") {
+      const p = body.patch ?? {};
+      const patch: Record<string, unknown> = {};
+      ["revealed","hide_eq","show_wrong","int_only"].forEach((k)=>{ if (p[k] !== undefined) patch[k] = !!p[k]; });
+      if (p.max_points !== undefined) patch.max_points = Number(p.max_points) || 0;
+      if (p.display !== undefined) patch.display = String(p.display).trim();
+      const { error } = await admin0.from("graph_rooms").update(patch).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 점 전체 지우기: {op:'graphClear', id}
+    if (body.op === "graphClear") {
+      const { error, count } = await admin0.from("graph_points").delete({ count: "exact" }).eq("room_id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true, deleted: count ?? 0 });
+    }
+    // 방 종료: {op:'graphClose', id}
+    if (body.op === "graphClose") {
+      const { error } = await admin0.from("graph_rooms").update({ active: false }).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
     // ── 수업 링크 보드 ──
     // 링크 목록 (교사 관리용 — 비공개 포함 전체)
     if (body.op === "listLinks") {
