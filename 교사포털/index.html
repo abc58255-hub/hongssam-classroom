@@ -229,13 +229,18 @@
         + '<button onclick="openLessonScores(' + i + ')" style="width:100%;margin-top:10px;border:none;background:#0f172a;color:#94a3b8;padding:8px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;">📊 기록 관리</button>'
         + '</div>';
     }).join('');
-    if (!cards) cards = '<div class="card off" style="cursor:default;"><span class="icon">🎮</span><h3>아직 활동이 없어요</h3><p>활동 페이지를 만들면 여기에 카드가 자동으로 추가됩니다.</p></div>';
+    var graphCard = '<div class="card" style="cursor:pointer;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/graph-teacher.html\',\'_blank\')">'
+      + '<span class="icon" style="font-size:22px;">📐</span>'
+      + '<h3 style="font-size:15px;margin-bottom:2px;">직선 그래프 탐구</h3>'
+      + '<p style="font-size:11px;margin-bottom:8px;">학생 참여형 협력 좌표평면 (실시간)</p>'
+      + '<button style="width:100%;border:none;background:#7a5230;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">📐 방 만들기 →</button>'
+      + '</div>';
+    cards = graphCard + cards;
     main.innerHTML = '<div class="group">'
       + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;">'
-      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🎮 수업활동 관리</span>'
-      + '<button class="small" style="margin-left:auto;background:#7a5230;color:#fff;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/graph-teacher.html\',\'_blank\')">📐 직선 그래프 열기</button></h2>'
+      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🎮 수업활동 관리</span></h2>'
       + '<div class="grid">' + cards + '</div>'
-      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">⚫ 숨김 = 학생에게 안 보임 · 🔥 진행 중 = 수업 시간 활동 · 🏁 자유 도전 = 종료 후 기록경쟁 · 📐 직선 그래프는 위 버튼으로 열어 방을 시작해요</p>'
+      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">⚫ 숨김 = 학생에게 안 보임 · 🔥 진행 중 = 수업 시간 활동 · 🏁 자유 도전 = 종료 후 기록경쟁</p>'
       + '</div>';
   }
 
