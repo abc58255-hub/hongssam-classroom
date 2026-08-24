@@ -297,9 +297,10 @@
     if (!cards) cards = '<div class="card off" style="cursor:default;"><span class="icon">🎮</span><h3>아직 활동이 없어요</h3><p>활동 페이지를 만들면 여기에 카드가 자동으로 추가됩니다.</p></div>';
     main.innerHTML = '<div class="group">'
       + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;">'
-      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🎮 수업활동 관리</span></h2>'
+      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🎮 수업활동 관리</span>'
+      + '<button class="small" style="margin-left:auto;background:#7a5230;color:#fff;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/graph-teacher.html\',\'_blank\')">📐 직선 그래프 열기</button></h2>'
       + '<div class="grid">' + cards + '</div>'
-      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">⚫ 숨김 = 학생에게 안 보임 · 🔥 진행 중 = 수업 시간 활동 · 🏁 자유 도전 = 종료 후 기록경쟁 — 버튼을 누르면 바로 적용돼요</p>'
+      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">⚫ 숨김 = 학생에게 안 보임 · 🔥 진행 중 = 수업 시간 활동 · 🏁 자유 도전 = 종료 후 기록경쟁 · 📐 직선 그래프는 위 버튼으로 열어 방을 시작해요</p>'
       + '</div>';
   }
 
