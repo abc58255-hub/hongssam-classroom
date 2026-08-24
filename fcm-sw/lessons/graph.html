@@ -48,9 +48,21 @@
       .order('created_at',{ascending:false}).limit(1)
       .then(function(r){
         var room=(r.data&&r.data[0])||null;
-        if(!room){ document.getElementById('app').innerHTML='<div class="none"><div class="ico">📭</div><b>진행 중인 그래프 활동이 없어요</b><div style="font-size:13px;margin-top:6px;">선생님이 시작하면 여기에 나타나요.</div></div>'; return; }
+        if(!room){
+          document.getElementById('app').innerHTML='<div class="none"><div class="ico">📭</div>'
+            +'<b>진행 중인 그래프 활동이 없어요</b>'
+            +'<div style="font-size:13px;margin-top:6px;">선생님이 시작하면 여기에 나타나요.</div>'
+            +'<div style="margin-top:16px;font-size:12px;color:#c4b5a0;">현재 입장: <b>'+esc(USER.name||'?')+'</b> · '+esc(USER.className||'반 미확인')+'</div>'
+            +'<button onclick="switchUser()" style="margin-top:10px;padding:10px 16px;background:#fff3dc;color:#7a5230;border:1px solid #eaddc2;border-radius:12px;font-size:13px;font-weight:800;cursor:pointer;">다른 학번으로 입장</button>'
+            +'</div>';
+          return;
+        }
         ROOM=room; loadMine();
       });
+  }
+  function switchUser(){
+    try{ localStorage.removeItem('lh_sid'); }catch(_){}
+    sb.auth.signOut().then(function(){ location.reload(); }).catch(function(){ location.reload(); });
   }
   function loadMine(){
     sb.from('graph_points').select('x_num,x_den,y_num,y_den').eq('room_id',ROOM.id).eq('student_id',USER.studentId)
