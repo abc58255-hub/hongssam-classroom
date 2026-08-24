@@ -20,7 +20,8 @@ function _serviceUrl_() {
 var RPC_WHITELIST = [
   'teacherLogin', 'teacherLogout', 'validateTeacherSession',
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
-  'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame'
+  'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
+  'getLinks', 'saveLink', 'deleteLink'
 ];
 
 function doPost(e) {

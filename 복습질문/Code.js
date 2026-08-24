@@ -65,7 +65,16 @@ function _getSys_(ss, key) {
   }
   return '';
 }
-function _tokOk_(tok) { return !!tok && CacheService.getScriptCache().get('rvs_' + String(tok)) === '1'; }
+// 토큰은 ScriptProperties에 만료시각과 함께 저장 (CacheService보다 라운드트립 안정적)
+function _tokOk_(tok) {
+  if (!tok) return false;
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty('rvtok_' + String(tok));
+    if (!v) return false;
+    if (Date.now() > parseInt(v)) { PropertiesService.getScriptProperties().deleteProperty('rvtok_' + String(tok)); return false; }
+    return true;
+  } catch(_) { return false; }
+}
 
 function unlockReview(pw) {
   try {
@@ -81,7 +90,7 @@ function unlockReview(pw) {
     }
     cache.remove('rv_pwfail');
     var token = Utilities.getUuid();
-    cache.put('rvs_' + token, '1', SESSION_TTL_SEC);
+    PropertiesService.getScriptProperties().setProperty('rvtok_' + token, String(Date.now() + SESSION_TTL_SEC * 1000));
     return { success: true, token: token };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
