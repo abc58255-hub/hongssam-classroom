@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>직선 그래프 탐구 — 교사</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none; }
+  body { font-family:-apple-system,'Apple SD Gothic Neo',sans-serif; background:#fffdf7; color:#3b2f1e; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+  .top { display:flex; align-items:center; gap:12px; padding:12px 18px; background:#7a5230; color:#fff8ec; flex-shrink:0; box-shadow:0 2px 10px rgba(0,0,0,.15); }
+  .top h1 { font-size:18px; font-weight:900; }
+  .top .eq { font-size:22px; font-weight:900; color:#ffe6b3; }
+  .top .sp { margin-left:auto; }
+  .top button { background:#fff3dc; color:#7a5230; border:none; border-radius:9px; padding:8px 13px; font-size:13px; font-weight:800; cursor:pointer; margin-left:6px; }
+  .top button.warn { background:#fecaca; color:#991b1b; }
+  .top button.on { background:#fbbf24; color:#3b2f1e; }
+
+  /* 설정 화면 */
+  #setup { flex:1; overflow-y:auto; padding:24px; display:flex; justify-content:center; }
+  .panel { width:100%; max-width:560px; }
+  .card { background:#fff; border:1px solid #f0e6d2; border-radius:16px; padding:20px 22px; margin-bottom:16px; box-shadow:0 4px 14px rgba(122,82,48,.06); }
+  .card h3 { font-size:14px; font-weight:900; color:#7a5230; margin-bottom:12px; }
+  .presets { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }
+  .presets button { background:#fff3dc; color:#7a5230; border:1px solid #eaddc2; border-radius:20px; padding:7px 13px; font-size:13px; font-weight:800; cursor:pointer; }
+  .abc { display:flex; align-items:center; gap:8px; justify-content:center; font-size:18px; font-weight:800; flex-wrap:wrap; }
+  .abc input { width:64px; padding:9px; border:1.5px solid #eaddc2; border-radius:10px; font-size:17px; text-align:center; font-weight:800; }
+  .hint { font-size:12px; color:#a68a63; margin-top:8px; text-align:center; }
+  .disp { width:100%; padding:12px; border:1.5px solid #eaddc2; border-radius:10px; font-size:16px; font-weight:800; text-align:center; margin-top:6px; }
+  .row { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+  .row label { font-size:14px; font-weight:700; }
+  .seg { display:flex; gap:6px; }
+  .seg button { background:#fff3dc; color:#7a5230; border:1px solid #eaddc2; border-radius:8px; padding:7px 12px; font-size:13px; font-weight:800; cursor:pointer; }
+  .seg button.on { background:#7a5230; color:#fff; border-color:#7a5230; }
+  .chk { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; cursor:pointer; }
+  .chk input { width:18px; height:18px; }
+  .start { width:100%; padding:16px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:14px; font-size:18px; font-weight:900; cursor:pointer; box-shadow:0 8px 22px rgba(217,119,6,.35); }
+  .field { display:flex; align-items:center; gap:8px; }
+  select { padding:9px 11px; border:1.5px solid #eaddc2; border-radius:10px; font-size:15px; font-weight:800; background:#fff; }
+
+  /* 라이브 화면 */
+  #live { flex:1; display:none; position:relative; }
+  #cv { width:100%; height:100%; display:block; background:#fffdf7; }
+  .hud { position:absolute; left:14px; bottom:12px; display:flex; gap:14px; font-size:15px; font-weight:800; color:#7a5230; background:rgba(255,255,255,.85); padding:8px 14px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.1); }
+  .range { position:absolute; right:14px; top:12px; display:flex; gap:6px; }
+  .range button { background:rgba(255,255,255,.9); color:#7a5230; border:1px solid #eaddc2; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:800; cursor:pointer; }
+  .range button.on { background:#7a5230; color:#fff; }
+
+  /* 잠금 */
+  #lock { position:fixed; inset:0; background:radial-gradient(circle at 30% 20%,#8a6034,#3b2a17 70%); display:flex; align-items:center; justify-content:center; z-index:100; }
+  .lc { background:#fff; padding:36px 30px; border-radius:22px; width:320px; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,.4); }
+  .lc .ico { font-size:44px; margin-bottom:8px; }
+  .lc h2 { font-size:20px; margin-bottom:6px; font-weight:900; color:#7a5230; }
+  .lc p { color:#a68a63; font-size:13px; margin-bottom:18px; }
+  .lc input { width:100%; padding:13px; border:2px solid #eaddc2; border-radius:12px; font-size:15px; margin-bottom:12px; }
+  .lc button { width:100%; padding:13px; background:#7a5230; color:white; border:none; border-radius:12px; font-size:15px; font-weight:900; cursor:pointer; }
+  .lc .err { color:#dc2626; font-size:13px; margin-top:8px; min-height:18px; font-weight:700; }
+  .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%) translateY(20px); background:#3b2f1e; color:#fff; padding:12px 22px; border-radius:30px; font-size:14px; font-weight:800; z-index:200; opacity:0; transition:.3s; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="top">
+  <h1>📐 직선 그래프 탐구</h1>
+  <span class="eq" id="topEq"></span>
+  <span class="sp"></span>
+  <span id="liveBtns" style="display:none;">
+    <button id="revealBtn" onclick="toggleReveal()">✨ 개형 공개</button>
+    <button onclick="clearPoints()">🧹 점 지우기</button>
+    <button class="warn" onclick="closeRoom()">■ 종료</button>
+  </span>
+</div>
+
+<!-- 설정 -->
+<div id="setup"><div class="panel">
+  <div class="card">
+    <h3>1. 반 선택</h3>
+    <div class="field">
+      <select id="grade"><option value="1">1학년</option><option value="2" selected>2학년</option><option value="3">3학년</option></select>
+      <select id="cls"></select>
+    </div>
+  </div>
+  <div class="card">
+    <h3>2. 직선 (프리셋 또는 계수 입력)</h3>
+    <div class="presets" id="presets"></div>
+    <div class="abc">
+      <input type="number" id="ca" value="1" oninput="onABC()"> x <span style="color:#a68a63;">+</span>
+      <input type="number" id="cb" value="0" oninput="onABC()"> y <span style="color:#a68a63;">=</span>
+      <input type="number" id="cc" value="2" oninput="onABC()">
+    </div>
+    <div class="hint">ax + by = c 형태. 세로선은 b=0, 가로선은 a=0</div>
+    <div style="margin-top:12px;font-size:12px;font-weight:800;color:#7a5230;">학생에게 보일 식</div>
+    <input class="disp" id="disp" value="x = 2">
+  </div>
+  <div class="card">
+    <h3>3. 설정</h3>
+    <div class="row"><label>학생당 점 개수</label>
+      <div class="seg" id="mpSeg">
+        <button data-v="1" onclick="setMp(1)">1개</button>
+        <button data-v="3" class="on" onclick="setMp(3)">3개</button>
+        <button data-v="5" onclick="setMp(5)">5개</button>
+        <button data-v="0" onclick="setMp(0)">무제한</button>
+      </div>
+    </div>
+    <label class="chk"><input type="checkbox" id="showWrong" checked> 틀린 점도 표시 (회색)</label>
+    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="intOnly"> 정수만 입력 허용</label>
+    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="hideEq"> 함수식 숨기기 (학생 화면에 식 미표시)</label>
+  </div>
+  <button class="start" onclick="startRoom()">🚀 방 시작하기</button>
+</div></div>
+
+<!-- 라이브 -->
+<div id="live">
+  <canvas id="cv"></canvas>
+  <div class="range">
+    <button data-r="5" onclick="setRange(5)">-5~5</button>
+    <button data-r="10" class="on" onclick="setRange(10)">-10~10</button>
+    <button data-r="20" onclick="setRange(20)">-20~20</button>
+  </div>
+  <div class="hud">
+    <span>👥 <b id="hCount">0</b></span>
+    <span>📍 <b id="hPoints">0</b></span>
+    <span style="color:#16a34a;">✅ <b id="hCorrect">0</b></span>
+  </div>
+</div>
+
+<!-- 잠금 -->
+<div id="lock">
+  <div class="lc">
+    <div class="ico">🔒</div>
+    <h2>직선 그래프 탐구</h2>
+    <p>교사 비밀번호를 입력하세요.</p>
+    <input type="password" id="lpw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
+    <button id="lbtn" onclick="doUnlock()">확인</button>
+    <div class="err" id="lerr"></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
+  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
+  var sb = supabase.createClient(SB_URL, SB_KEY);
+  var TOK = localStorage.getItem('graph_ptok') || '';
+  var ROOM = null;      // { id, a,b,c, display, revealed, show_wrong }
+  var POINTS = [];      // [{x,y,correct,name}]
+  var RANGE = 10, ch = null;
+
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1600); }
+  function portalRPC(fn, args){
+    return fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args})})
+      .then(function(r){return r.json();}).then(function(d){ if(d&&d.ok) return d.result; throw new Error((d&&d.error)||'서버 오류'); });
+  }
+
+  // ── 인증 ──
+  function doUnlock(){
+    var pw=document.getElementById('lpw').value, b=document.getElementById('lbtn');
+    if(!pw) return; b.disabled=true; b.textContent='확인 중…';
+    portalRPC('teacherLogin',[pw]).then(function(res){
+      b.disabled=false; b.textContent='확인';
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('graph_ptok',TOK); document.getElementById('lock').style.display='none'; initSetup(); }
+      else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
+    }).catch(function(e){ b.disabled=false; b.textContent='확인'; document.getElementById('lerr').textContent='오류: '+e.message; });
+  }
+
+  // ── 설정 화면 ──
+  var PRESETS=[
+    {t:'정비례 y=2x', a:2,b:-1,c:0, d:'y = 2x'},
+    {t:'일차 y=2x+1', a:2,b:-1,c:-1, d:'y = 2x + 1'},
+    {t:'x = 3', a:1,b:0,c:3, d:'x = 3'},
+    {t:'y = -2', a:0,b:1,c:-2, d:'y = -2'},
+    {t:'2x+3y=6', a:2,b:3,c:6, d:'2x + 3y = 6'},
+    {t:'x+y=4', a:1,b:1,c:4, d:'x + y = 4'}
+  ];
+  function initSetup(){
+    var cs=document.getElementById('cls'); var o=''; for(var i=1;i<=10;i++) o+='<option value="'+i+'">'+i+'반</option>'; cs.innerHTML=o;
+    document.getElementById('presets').innerHTML=PRESETS.map(function(p,i){return '<button onclick="applyPreset('+i+')">'+p.t+'</button>';}).join('');
+    onABC();
+  }
+  function applyPreset(i){ var p=PRESETS[i]; document.getElementById('ca').value=p.a; document.getElementById('cb').value=p.b; document.getElementById('cc').value=p.c; document.getElementById('disp').value=p.d; }
+  // 계수 → 표시식 자동 생성
+  function _gcd(a,b){ a=Math.abs(a);b=Math.abs(b); while(b){var t=b;b=a%b;a=t;} return a||1; }
+  function _frac(n,d){ if(d===0) return '0'; var g=_gcd(n,d); n/=g; d/=g; if(d<0){n=-n;d=-d;} return d===1?String(n):(n+'/'+d); }
+  function autoDisplay(a,b,c){
+    if(a===0&&b===0) return '';
+    if(b===0) return 'x = ' + _frac(c,a);          // 세로선
+    if(a===0) return 'y = ' + _frac(c,b);          // 가로선
+    // y = mx + n  (m=-a/b, n=c/b)
+    var m=_frac(-a,b), n=_frac(c,b);
+    var mt = m==='1'?'x':(m==='-1'?'-x':m+'x');
+    var nt = (n==='0')?'':(String(n).charAt(0)==='-'?(' - '+n.slice(1)):(' + '+n));
+    return 'y = ' + mt + nt;
+  }
+  function onABC(){
+    var a=parseInt(document.getElementById('ca').value)||0, b=parseInt(document.getElementById('cb').value)||0, c=parseInt(document.getElementById('cc').value)||0;
+    document.getElementById('disp').value = autoDisplay(a,b,c);
+  }
+  var MP=3;
+  function setMp(v){ MP=v; document.querySelectorAll('#mpSeg button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.v)===v);}); }
+
+  function startRoom(){
+    var g=document.getElementById('grade').value, cl=document.getElementById('cls').value;
+    var room={
+      class_scope: g+'학년 '+cl+'반',
+      a: parseInt(document.getElementById('ca').value)||0,
+      b: parseInt(document.getElementById('cb').value)||0,
+      c: parseInt(document.getElementById('cc').value)||0,
+      display: document.getElementById('disp').value.trim(),
+      hide_eq: document.getElementById('hideEq').checked,
+      max_points: MP,
+      show_wrong: document.getElementById('showWrong').checked,
+      int_only: document.getElementById('intOnly').checked
+    };
+    if(room.a===0&&room.b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
+    portalRPC('graphCreate',[TOK, room]).then(function(res){
+      if(!res||!res.success){ toast('방 생성 실패: '+((res&&res.message)||'')); return; }
+      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, revealed:false, show_wrong:room.show_wrong };
+      enterLive();
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+
+  // ── 라이브 ──
+  function enterLive(){
+    document.getElementById('setup').style.display='none';
+    document.getElementById('live').style.display='block';
+    document.getElementById('liveBtns').style.display='inline';
+    document.getElementById('topEq').textContent = ROOM.display;
+    POINTS=[]; resizeCanvas(); render();
+    // 기존 점 로드 + 실시간 구독
+    sb.from('graph_points').select('*').eq('room_id', ROOM.id).then(function(r){
+      (r.data||[]).forEach(addRow); updateHud(); render();
+    });
+    if(ch) sb.removeChannel(ch);
+    ch = sb.channel('gp'+ROOM.id).on('postgres_changes',
+      {event:'INSERT', schema:'public', table:'graph_points', filter:'room_id=eq.'+ROOM.id},
+      function(p){ addRow(p.new); updateHud(); render(); }).subscribe();
+  }
+  function addRow(r){ POINTS.push({ x:r.x_num/r.x_den, y:r.y_num/r.y_den, correct:r.correct, name:r.name }); }
+  function updateHud(){
+    var names={}; POINTS.forEach(function(p){ names[p.name]=1; });
+    document.getElementById('hCount').textContent=Object.keys(names).length;
+    document.getElementById('hPoints').textContent=POINTS.length;
+    document.getElementById('hCorrect').textContent=POINTS.filter(function(p){return p.correct;}).length;
+  }
+
+  function toggleReveal(){
+    if(!ROOM) return;
+    ROOM.revealed=!ROOM.revealed;
+    document.getElementById('revealBtn').classList.toggle('on', ROOM.revealed);
+    render();
+    portalRPC('graphUpdate',[TOK, ROOM.id, {revealed:ROOM.revealed}]).catch(function(){});
+  }
+  function clearPoints(){
+    if(!ROOM||!confirm('찍힌 점을 모두 지울까요?')) return;
+    portalRPC('graphClear',[TOK, ROOM.id]).then(function(){ POINTS=[]; updateHud(); render(); toast('점을 지웠어요'); }).catch(function(e){ toast('오류: '+e.message); });
+  }
+  function closeRoom(){
+    if(!ROOM||!confirm('이 방을 종료할까요?\n(학생 화면에서 사라져요)')) return;
+    portalRPC('graphClose',[TOK, ROOM.id]).then(function(){
+      if(ch){ sb.removeChannel(ch); ch=null; }
+      ROOM=null; document.getElementById('live').style.display='none';
+      document.getElementById('liveBtns').style.display='none'; document.getElementById('topEq').textContent='';
+      document.getElementById('setup').style.display='flex'; toast('방을 종료했어요');
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+
+  // ── 좌표평면 그리기 ──
+  var cv, ctx;
+  function resizeCanvas(){ cv=document.getElementById('cv'); ctx=cv.getContext('2d'); var d=window.devicePixelRatio||1; cv.width=cv.clientWidth*d; cv.height=cv.clientHeight*d; ctx.setTransform(d,0,0,d,0,0); }
+  window.addEventListener('resize', function(){ if(ROOM){ resizeCanvas(); render(); } });
+  function setRange(r){ RANGE=r; document.querySelectorAll('.range button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.r)===r);}); render(); }
+  function render(){
+    if(!ctx) return;
+    var W=cv.clientWidth, H=cv.clientHeight, R=RANGE;
+    var cx=W/2, cy=H/2, u=Math.min(W,H)/(R*2+1); // 단위 픽셀
+    function px(x){ return cx + x*u; }
+    function py(y){ return cy - y*u; }
+    ctx.clearRect(0,0,W,H);
+    // 격자
+    ctx.strokeStyle='#efe6d4'; ctx.lineWidth=1;
+    for(var i=-R;i<=R;i++){ ctx.beginPath(); ctx.moveTo(px(i),0); ctx.lineTo(px(i),H); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,py(i)); ctx.lineTo(W,py(i)); ctx.stroke(); }
+    // 축
+    ctx.strokeStyle='#8a6034'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,H); ctx.stroke();
+    // 눈금 숫자
+    ctx.fillStyle='#a68a63'; ctx.font='12px sans-serif'; ctx.textAlign='center';
+    var step = R<=5?1:(R<=10?1:2);
+    for(var j=-R;j<=R;j+=step){ if(j!==0){ ctx.fillText(j, px(j), cy+15); ctx.textAlign='right'; ctx.fillText(j, cx-6, py(j)+4); ctx.textAlign='center'; } }
+    // 개형(직선)
+    if(ROOM&&ROOM.revealed){
+      ctx.strokeStyle='#dc2626'; ctx.lineWidth=3;
+      var a=ROOM.a,b=ROOM.b,c=ROOM.c;
+      ctx.beginPath();
+      if(b===0){ var xv=c/a; ctx.moveTo(px(xv),0); ctx.lineTo(px(xv),H); }
+      else { var x1=-R, y1=(c-a*x1)/b, x2=R, y2=(c-a*x2)/b; ctx.moveTo(px(x1),py(y1)); ctx.lineTo(px(x2),py(y2)); }
+      ctx.stroke();
+    }
+    // 점
+    POINTS.forEach(function(p){
+      if(!p.correct && ROOM && !ROOM.show_wrong) return;
+      ctx.beginPath(); ctx.arc(px(p.x),py(p.y), 6, 0, Math.PI*2);
+      ctx.fillStyle = p.correct ? '#16a34a' : '#c4b5a0';
+      ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    });
+  }
+
+  // 시작: 토큰 있으면 세션 검증
+  if(TOK){
+    portalRPC('validateTeacherSession',[TOK]).then(function(res){
+      if(res&&res.success){ document.getElementById('lock').style.display='none'; initSetup(); }
+      else { TOK=''; localStorage.removeItem('graph_ptok'); }
+    }).catch(function(){});
+  }
+</script>
+</body>
+</html>
