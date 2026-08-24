@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <title>그래프 탐구 — 교사</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./graph-plot.js"></script>
 <style>
   * { box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none; }
   body { font-family:-apple-system,'Apple SD Gothic Neo',sans-serif; background:#fffdf7; color:#3b2f1e; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
@@ -23,10 +24,14 @@
   .card h3 { font-size:14px; font-weight:900; color:#7a5230; margin-bottom:12px; }
   .presets { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }
   .presets button { background:#fff3dc; color:#7a5230; border:1px solid #eaddc2; border-radius:20px; padding:7px 13px; font-size:13px; font-weight:800; cursor:pointer; }
-  .abc { display:flex; align-items:center; gap:8px; justify-content:center; font-size:18px; font-weight:800; flex-wrap:wrap; }
-  .abc input { width:64px; padding:9px; border:1.5px solid #eaddc2; border-radius:10px; font-size:17px; text-align:center; font-weight:800; }
-  .hint { font-size:12px; color:#a68a63; margin-top:8px; text-align:center; }
-  .disp { width:100%; padding:12px; border:1.5px solid #eaddc2; border-radius:10px; font-size:16px; font-weight:800; text-align:center; margin-top:6px; }
+  .abc { display:flex; align-items:center; gap:10px; justify-content:center; font-size:22px; font-weight:800; flex-wrap:wrap; }
+  .abc input { width:76px; padding:12px; border:1.5px solid #eaddc2; border-radius:12px; font-size:22px; text-align:center; font-weight:900; background:#fffdf7; }
+  .abc input:focus { outline:none; border-color:#d97706; }
+  .hint { font-size:12px; color:#a68a63; margin-top:10px; text-align:center; }
+  .prevbox { margin-top:14px; background:#fff8ec; border:1px dashed #eaddc2; border-radius:12px; padding:10px 12px; }
+  .prevlab { font-size:11px; font-weight:800; color:#a68a63; margin-bottom:4px; }
+  .disp { width:100%; padding:11px; border:1.5px solid #eaddc2; border-radius:10px; font-size:18px; font-weight:900; text-align:center; color:#7a5230; background:#fff; }
+  .quicklab { font-size:11px; font-weight:800; color:#a68a63; margin:14px 0 6px; }
   .row { display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
   .row label { font-size:14px; font-weight:700; }
   .seg { display:flex; gap:6px; }
@@ -81,28 +86,33 @@
     </div>
   </div>
   <div class="card">
-    <h3>2. 직선 (프리셋 또는 계수 입력)</h3>
-    <div class="presets" id="presets"></div>
+    <h3>2. 직선 입력 (ax + by = c)</h3>
     <div class="abc">
       <input type="number" id="ca" value="1" oninput="onABC()"> x <span style="color:#a68a63;">+</span>
       <input type="number" id="cb" value="0" oninput="onABC()"> y <span style="color:#a68a63;">=</span>
       <input type="number" id="cc" value="2" oninput="onABC()">
     </div>
-    <div class="hint">ax + by = c 형태. 세로선은 b=0, 가로선은 a=0</div>
-    <div style="margin-top:12px;font-size:12px;font-weight:800;color:#7a5230;">학생에게 보일 식</div>
-    <input class="disp" id="disp" value="x = 2">
+    <div class="hint">세로선은 b=0, 가로선은 a=0 · 계수는 분수 대신 정수로</div>
+    <div class="prevbox">
+      <div class="prevlab">학생에게 보일 식</div>
+      <input class="disp" id="disp" value="x = 2">
+    </div>
+    <div class="quicklab">빠른 예시</div>
+    <div class="presets" id="presets"></div>
   </div>
   <div class="card">
     <h3>3. 설정</h3>
     <div class="row"><label>학생당 점 개수</label>
       <div class="seg" id="mpSeg">
-        <button data-v="1" onclick="setMp(1)">1개</button>
-        <button data-v="3" class="on" onclick="setMp(3)">3개</button>
-        <button data-v="5" onclick="setMp(5)">5개</button>
+        <button data-v="1" onclick="setMp(1)">1</button>
+        <button data-v="3" class="on" onclick="setMp(3)">3</button>
+        <button data-v="5" onclick="setMp(5)">5</button>
         <button data-v="0" onclick="setMp(0)">무제한</button>
       </div>
+      <input type="number" id="mpCustom" min="0" placeholder="직접" oninput="setMp(parseInt(this.value)||0, true)" style="width:70px;padding:7px;border:1.5px solid #eaddc2;border-radius:8px;font-size:14px;text-align:center;font-weight:800;">
     </div>
     <label class="chk"><input type="checkbox" id="showWrong" checked> 틀린 점도 표시 (회색)</label>
+    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="showNames"> 점에 학생 이름 표시</label>
     <label class="chk" style="margin-top:8px;"><input type="checkbox" id="intOnly"> 정수만 입력 허용</label>
     <label class="chk" style="margin-top:8px;"><input type="checkbox" id="hideEq"> 함수식 숨기기 (학생 화면에 식 미표시)</label>
   </div>
@@ -113,9 +123,10 @@
 <div id="live">
   <canvas id="cv"></canvas>
   <div class="range">
-    <button data-r="5" onclick="setRange(5)">-5~5</button>
-    <button data-r="10" class="on" onclick="setRange(10)">-10~10</button>
-    <button data-r="20" onclick="setRange(20)">-20~20</button>
+    <button onclick="plot.zoomBy(1.25)">＋</button>
+    <button onclick="plot.zoomBy(0.8)">－</button>
+    <button onclick="plot.fit()">✥ 맞춤</button>
+    <button onclick="plot.resetView()">↺ 기본</button>
   </div>
   <div class="hud">
     <span>👥 <b id="hCount">0</b></span>
@@ -145,7 +156,7 @@
   var TOK = localStorage.getItem('graph_ptok') || '';
   var ROOM = null;      // { id, a,b,c, display, revealed, show_wrong }
   var POINTS = [];      // [{x,y,correct,name}]
-  var RANGE = 10, ch = null;
+  var ch = null;
 
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1600); }
   function portalRPC(fn, args){
@@ -197,7 +208,11 @@
     document.getElementById('disp').value = autoDisplay(a,b,c);
   }
   var MP=3;
-  function setMp(v){ MP=v; document.querySelectorAll('#mpSeg button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.v)===v);}); }
+  function setMp(v, fromCustom){
+    MP=v;
+    document.querySelectorAll('#mpSeg button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.v)===v);});
+    if(!fromCustom){ var c=document.getElementById('mpCustom'); if(c) c.value=''; }
+  }
 
   function startRoom(){
     var g=document.getElementById('grade').value, cl=document.getElementById('cls').value;
@@ -210,31 +225,36 @@
       hide_eq: document.getElementById('hideEq').checked,
       max_points: MP,
       show_wrong: document.getElementById('showWrong').checked,
-      int_only: document.getElementById('intOnly').checked
+      show_names: document.getElementById('showNames').checked,
+      int_only: document.getElementById('intOnly').checked,
+      kind: 'line'
     };
     if(room.a===0&&room.b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
     portalRPC('graphCreate',[TOK, room]).then(function(res){
       if(!res||!res.success){ toast('방 생성 실패: '+((res&&res.message)||'')); return; }
-      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, revealed:false, show_wrong:room.show_wrong };
+      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, kind:'line', revealed:false, show_wrong:room.show_wrong, show_names:room.show_names };
       enterLive();
     }).catch(function(e){ toast('오류: '+e.message); });
   }
 
   // ── 라이브 ──
+  var plot=null;
   function enterLive(){
     document.getElementById('setup').style.display='none';
     document.getElementById('live').style.display='block';
     document.getElementById('liveBtns').style.display='inline';
     document.getElementById('topEq').textContent = ROOM.display;
-    POINTS=[]; resizeCanvas(); render();
+    POINTS=[];
+    if(!plot) plot=GraphPlot.attach(document.getElementById('cv'), {interactive:true});
+    plot.setRoom(ROOM).setPoints(POINTS).resetView();
     // 기존 점 로드 + 실시간 구독
     sb.from('graph_points').select('*').eq('room_id', ROOM.id).then(function(r){
-      (r.data||[]).forEach(addRow); updateHud(); render();
+      (r.data||[]).forEach(addRow); updateHud(); plot.render();
     });
     if(ch) sb.removeChannel(ch);
     ch = sb.channel('gp'+ROOM.id).on('postgres_changes',
       {event:'INSERT', schema:'public', table:'graph_points', filter:'room_id=eq.'+ROOM.id},
-      function(p){ addRow(p.new); updateHud(); render(); }).subscribe();
+      function(p){ addRow(p.new); updateHud(); plot.render(); }).subscribe();
   }
   function addRow(r){ POINTS.push({ x:r.x_num/r.x_den, y:r.y_num/r.y_den, correct:r.correct, name:r.name }); }
   function updateHud(){
@@ -245,15 +265,15 @@
   }
 
   function toggleReveal(){
-    if(!ROOM) return;
+    if(!ROOM||!plot) return;
     ROOM.revealed=!ROOM.revealed;
     document.getElementById('revealBtn').classList.toggle('on', ROOM.revealed);
-    render();
+    if(ROOM.revealed) plot.animateReveal(); else plot.render();
     portalRPC('graphUpdate',[TOK, ROOM.id, {revealed:ROOM.revealed}]).catch(function(){});
   }
   function clearPoints(){
     if(!ROOM||!confirm('찍힌 점을 모두 지울까요?')) return;
-    portalRPC('graphClear',[TOK, ROOM.id]).then(function(){ POINTS=[]; updateHud(); render(); toast('점을 지웠어요'); }).catch(function(e){ toast('오류: '+e.message); });
+    portalRPC('graphClear',[TOK, ROOM.id]).then(function(){ POINTS.length=0; updateHud(); if(plot) plot.render(); toast('점을 지웠어요'); }).catch(function(e){ toast('오류: '+e.message); });
   }
   function closeRoom(){
     if(!ROOM||!confirm('이 방을 종료할까요?\n(학생 화면에서 사라져요)')) return;
@@ -265,46 +285,7 @@
     }).catch(function(e){ toast('오류: '+e.message); });
   }
 
-  // ── 좌표평면 그리기 ──
-  var cv, ctx;
-  function resizeCanvas(){ cv=document.getElementById('cv'); ctx=cv.getContext('2d'); var d=window.devicePixelRatio||1; cv.width=cv.clientWidth*d; cv.height=cv.clientHeight*d; ctx.setTransform(d,0,0,d,0,0); }
-  window.addEventListener('resize', function(){ if(ROOM){ resizeCanvas(); render(); } });
-  function setRange(r){ RANGE=r; document.querySelectorAll('.range button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.r)===r);}); render(); }
-  function render(){
-    if(!ctx) return;
-    var W=cv.clientWidth, H=cv.clientHeight, R=RANGE;
-    var cx=W/2, cy=H/2, u=Math.min(W,H)/(R*2+1); // 단위 픽셀
-    function px(x){ return cx + x*u; }
-    function py(y){ return cy - y*u; }
-    ctx.clearRect(0,0,W,H);
-    // 격자
-    ctx.strokeStyle='#efe6d4'; ctx.lineWidth=1;
-    for(var i=-R;i<=R;i++){ ctx.beginPath(); ctx.moveTo(px(i),0); ctx.lineTo(px(i),H); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0,py(i)); ctx.lineTo(W,py(i)); ctx.stroke(); }
-    // 축
-    ctx.strokeStyle='#8a6034'; ctx.lineWidth=2;
-    ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(W,cy); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,H); ctx.stroke();
-    // 눈금 숫자
-    ctx.fillStyle='#a68a63'; ctx.font='12px sans-serif'; ctx.textAlign='center';
-    var step = R<=5?1:(R<=10?1:2);
-    for(var j=-R;j<=R;j+=step){ if(j!==0){ ctx.fillText(j, px(j), cy+15); ctx.textAlign='right'; ctx.fillText(j, cx-6, py(j)+4); ctx.textAlign='center'; } }
-    // 개형(직선)
-    if(ROOM&&ROOM.revealed){
-      ctx.strokeStyle='#dc2626'; ctx.lineWidth=3;
-      var a=ROOM.a,b=ROOM.b,c=ROOM.c;
-      ctx.beginPath();
-      if(b===0){ var xv=c/a; ctx.moveTo(px(xv),0); ctx.lineTo(px(xv),H); }
-      else { var x1=-R, y1=(c-a*x1)/b, x2=R, y2=(c-a*x2)/b; ctx.moveTo(px(x1),py(y1)); ctx.lineTo(px(x2),py(y2)); }
-      ctx.stroke();
-    }
-    // 점
-    POINTS.forEach(function(p){
-      if(!p.correct && ROOM && !ROOM.show_wrong) return;
-      ctx.beginPath(); ctx.arc(px(p.x),py(p.y), 6, 0, Math.PI*2);
-      ctx.fillStyle = p.correct ? '#16a34a' : '#c4b5a0';
-      ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
-    });
-  }
+  // 좌표평면 렌더링은 graph-plot.js(GraphPlot)가 전담
 
   // 시작: 토큰 있으면 세션 검증
   if(TOK){
