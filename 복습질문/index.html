@@ -71,12 +71,29 @@
   @keyframes shimmer { 0%{background-position:-200% 0;} 100%{background-position:200% 0;} }
   .conf { position:fixed; top:-20px; z-index:150; pointer-events:none; border-radius:2px; }
   @keyframes fall { to { transform:translateY(105vh) rotate(720deg); opacity:.15; } }
+  /* 멀티 뽑기 그리드 */
+  #multiWrap { width:100%; max-width:680px; display:grid; gap:10px; }
+  .mcard { background:var(--card); border:1px solid var(--line); border-radius:16px; padding:12px 10px; text-align:center; backdrop-filter:blur(8px); animation:pop .4s cubic-bezier(.2,1.4,.4,1) both; }
+  .mcard .msid { font-size:13px; color:#94a3b8; font-weight:800; }
+  .mcard .mname { font-weight:900; color:#fff; line-height:1.1; margin:4px 0 10px; text-shadow:0 0 18px rgba(129,140,248,.6); }
+  .mrow { display:flex; gap:5px; }
+  .mrow button { flex:1; border:none; border-radius:10px; padding:10px 4px; font-size:13px; font-weight:900; color:white; cursor:pointer; transition:.1s; }
+  .mrow button:active { transform:scale(.94); }
+  .mdone { opacity:.35; }
 </style>
 </head>
 <body>
 <div class="top">
   <h1>🎲 복습 질문</h1>
   <select id="classSel" onchange="onClass()"></select>
+  <select id="cntSel" class="mbtn" onchange="onCnt()" title="한 번에 뽑을 인원">
+    <option value="1">👤 1명</option>
+    <option value="2">👥 2명</option>
+    <option value="3">👥 3명</option>
+    <option value="4">👥 4명</option>
+    <option value="5">👥 5명</option>
+    <option value="6">👥 6명</option>
+  </select>
   <button class="mbtn" id="modeBtn" onclick="toggleMode()"></button>
 </div>
 <div class="counts">
@@ -163,7 +180,10 @@
         STU=res.students||[]; COUNTS=res.counts||{};
         var saved=null; try{ saved=JSON.parse(localStorage.getItem(_key(cls))||'null'); }catch(_){}
         if(saved&&saved.cls===cls){ RV=saved; }
-        else { RV={ cls:cls, mode:'once', pool:STU.map(function(s){return s.sid;}), current:null, kept:[], done:[], pass:0 }; }
+        else { RV={ cls:cls, mode:'once', pool:STU.map(function(s){return s.sid;}), current:[], kept:[], done:[], pass:0 }; }
+        // current를 배열로 정규화 (구버전 저장분: 단일 sid 또는 null)
+        if(!Array.isArray(RV.current)) RV.current = RV.current ? [RV.current] : [];
+        var savedCnt=localStorage.getItem('rv_cnt'); if(savedCnt) document.getElementById('cntSel').value=savedCnt;
         render();
       }).getReviewData(cls, TOK);
   }
@@ -179,6 +199,14 @@
     for(var i=0;i<cands.length;i++){ r-=w[i]; if(r<=0) return cands[i]; }
     return cands[cands.length-1];
   }
+  // 서로 다른 N명 가중 추출
+  function pickN(cands, n){
+    var pool=cands.slice(), out=[];
+    while(out.length<n && pool.length){ var s=pick(pool); if(s==null) break; out.push(s); pool=pool.filter(function(x){return x!==s;}); }
+    return out;
+  }
+  function onCnt(){ localStorage.setItem('rv_cnt', document.getElementById('cntSel').value); }
+  function _cnt(){ return parseInt(document.getElementById('cntSel').value)||1; }
 
   function render(){
     if(!RV) return;
@@ -191,11 +219,32 @@
     kb.innerHTML = RV.kept.length ? '🔖 '+RV.kept.map(function(s){return '<span class="keptchip">'+esc(_name(s))+'</span>';}).join('') : '';
     kb.style.display = RV.kept.length?'block':'none';
     var card=document.getElementById('card'), drawRow=document.getElementById('drawRow'), judgeRow=document.getElementById('judgeRow');
-    if(RV.current){
-      card.innerHTML='<div class="sid">'+esc(RV.current)+'</div>'
-        +'<div class="winner" style="font-size:'+_fs(_name(RV.current),76)+'px;">'+esc(_name(RV.current))+'</div>'
+    var cur = RV.current || [];
+    if(cur.length===1){
+      // 단일: 큰 카드 + 하단 판정 버튼
+      var sid=cur[0];
+      card.innerHTML='<div class="sid">'+esc(sid)+'</div>'
+        +'<div class="winner" style="font-size:'+_fs(_name(sid),76)+'px;">'+esc(_name(sid))+'</div>'
         +'<div class="badge">🎤 복습 질문!</div>';
       drawRow.style.display='none'; judgeRow.style.display='flex';
+    } else if(cur.length>1){
+      // 멀티: 카드별 판정 버튼 (하단 버튼 숨김)
+      var cols = cur.length<=2?cur.length:(cur.length<=4?2:3);
+      var html='<div id="multiWrap" style="grid-template-columns:repeat('+cols+',1fr);">';
+      cur.forEach(function(sid){
+        var nm=_name(sid);
+        html+='<div class="mcard">'
+          +'<div class="msid">'+esc(sid)+'</div>'
+          +'<div class="mname" style="font-size:'+_fs(nm,30)+'px;">'+esc(nm)+'</div>'
+          +'<div class="mrow">'
+            +'<button class="jpass" onclick="judgeOne(\''+esc(sid)+'\',\'pass\')">✅</button>'
+            +'<button class="jfail" onclick="judgeOne(\''+esc(sid)+'\',\'fail\')">❌</button>'
+            +'<button class="jkeep" onclick="judgeOne(\''+esc(sid)+'\',\'keep\')">🔖</button>'
+          +'</div></div>';
+      });
+      html+='</div>';
+      card.innerHTML=html;
+      drawRow.style.display='none'; judgeRow.style.display='none';
     } else {
       judgeRow.style.display='none'; drawRow.style.display='block';
       var empty=(RV.mode!=='dup'&&RV.pool.length===0);
@@ -207,30 +256,34 @@
   }
 
   function draw(){
-    if(!RV||RV.current||ANIM) return;
+    if(!RV||(RV.current&&RV.current.length)||ANIM) return;
     var cands = RV.mode==='dup' ? STU.map(function(s){return s.sid;}) : RV.pool;
     if(!cands.length){ toast('뽑을 학생이 없어요'); return; }
-    var winner=pick(cands);
+    var n=Math.min(_cnt(), cands.length);
+    var winners=pickN(cands, n);
     ANIM=true; document.getElementById('drawRow').style.display='none';
-    var card=document.getElementById('card'), all=STU.map(function(s){return s.sid;}), t=0, max=24;
+    var card=document.getElementById('card'), all=STU.map(function(s){return s.sid;}), t=0, max=(n===1?24:14);
     function flash(){
-      var s=all[Math.floor(Math.random()*all.length)];
-      var prog=t/max, blur=Math.max(0,(1-prog)*7), op=.45+prog*.55, nm=_name(s);
-      card.innerHTML='<div class="hint" style="color:#818cf8;">🎲 뽑는 중…</div>'
-        +'<div class="rolling" style="font-size:'+_fs(nm,60)+'px;filter:blur('+blur.toFixed(1)+'px);opacity:'+op.toFixed(2)+';transform:translateY('+((1-prog)*6-3).toFixed(0)+'px);">'+esc(nm)+'</div>';
-      t++; if(t>=max){ land(winner); return; }
-      setTimeout(flash, 40+t*t*.95);
+      var prog=t/max, blur=Math.max(0,(1-prog)*7), op=.45+prog*.55;
+      if(n===1){
+        var s=all[Math.floor(Math.random()*all.length)], nm=_name(s);
+        card.innerHTML='<div class="hint" style="color:#818cf8;">🎲 뽑는 중…</div>'
+          +'<div class="rolling" style="font-size:'+_fs(nm,60)+'px;filter:blur('+blur.toFixed(1)+'px);opacity:'+op.toFixed(2)+';transform:translateY('+((1-prog)*6-3).toFixed(0)+'px);">'+esc(nm)+'</div>';
+      } else {
+        var names=[]; for(var k=0;k<n;k++) names.push(esc(_name(all[Math.floor(Math.random()*all.length)])));
+        card.innerHTML='<div class="hint" style="color:#818cf8;">🎲 '+n+'명 뽑는 중…</div>'
+          +'<div style="font-size:26px;font-weight:900;color:#93c5fd;filter:blur('+blur.toFixed(1)+'px);opacity:'+op.toFixed(2)+';line-height:1.5;">'+names.join(' · ')+'</div>';
+      }
+      t++; if(t>=max){ land(winners); return; }
+      setTimeout(flash, (n===1?40:36)+t*t*.9);
     }
     flash();
   }
-  function land(sid){
-    ANIM=false; RV.current=sid; var nm=_name(sid);
+  function land(winners){
+    ANIM=false; RV.current=winners.slice();
     var spot=document.getElementById('spot'); spot.classList.remove('on'); void spot.offsetWidth; spot.classList.add('on');
-    document.getElementById('card').innerHTML='<div class="sid">'+esc(sid)+'</div>'
-      +'<div class="winner" style="font-size:'+_fs(nm,80)+'px;animation:pop .45s cubic-bezier(.2,1.4,.4,1);">'+esc(nm)+'</div>'
-      +'<div class="badge" style="animation:pop .5s ease .1s both;">🎤 복습 질문!</div>';
     confetti();
-    document.getElementById('judgeRow').style.display='flex'; _save();
+    render();
   }
 
   // 컨페티 이펙트
@@ -248,9 +301,9 @@
     }
   }
 
-  function judge(kind){
-    if(!RV||!RV.current) return;
-    var sid=RV.current, name=_name(sid);
+  // 판정 공통 처리 (한 명 해결 → RV.current에서 제거)
+  function _resolve(sid, kind){
+    var name=_name(sid);
     if(RV.mode!=='dup') RV.pool=RV.pool.filter(function(x){return x!==sid;});
     if(kind==='pass'){
       RV.pass++; RV.done.push(sid); COUNTS[sid]=(COUNTS[sid]||0)+1;
@@ -259,19 +312,21 @@
       toast('✅ '+name+' 통과! 도장 +1');
     } else if(kind==='fail'){ RV.done.push(sid); toast('❌ '+name+' 실패'); }
     else { if(RV.kept.indexOf(sid)<0) RV.kept.push(sid); toast('🔖 '+name+' 킵'); }
-    RV.current=null; render();
+    RV.current = (RV.current||[]).filter(function(x){return x!==sid;});
   }
+  function judge(kind){ if(!RV||!RV.current||!RV.current.length) return; _resolve(RV.current[0], kind); render(); }
+  function judgeOne(sid, kind){ if(!RV||(RV.current||[]).indexOf(sid)<0) return; _resolve(sid, kind); render(); }
 
   function finish(){
     if(!RV) return;
     if(!RV.kept.length){ toast('킵한 학생이 없어요'); return; }
-    RV.pool=RV.kept.slice(); RV.kept=[]; RV.current=null; RV.mode='once';
+    RV.pool=RV.kept.slice(); RV.kept=[]; RV.current=[]; RV.mode='once';
     toast('🏁 킵한 '+RV.pool.length+'명 다시 시작!'); render();
   }
   function reset(){
     if(!RV) return;
     if(!confirm('처음부터 다시 시작할까요?\n(기록된 도장은 지워지지 않아요)')) return;
-    RV={ cls:RV.cls, mode:RV.mode, pool:STU.map(function(s){return s.sid;}), current:null, kept:[], done:[], pass:0 }; render();
+    RV={ cls:RV.cls, mode:RV.mode, pool:STU.map(function(s){return s.sid;}), current:[], kept:[], done:[], pass:0 }; render();
   }
 
   // 시작
