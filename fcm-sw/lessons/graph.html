@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>직선 그래프 탐구</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase-config.js"></script>
+<script src="./lessons-common.js"></script>
+<style>
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:-apple-system,'Apple SD Gothic Neo',sans-serif; background:#fffdf7; color:#3b2f1e; min-height:100vh; padding:16px; }
+  .wrap { max-width:460px; margin:0 auto; }
+  .card { background:#fff; border:1px solid #f0e6d2; border-radius:16px; padding:18px; margin-bottom:14px; box-shadow:0 4px 14px rgba(122,82,48,.06); }
+  .eq { font-size:30px; font-weight:900; text-align:center; color:#7a5230; margin:6px 0; }
+  .sub { text-align:center; font-size:13px; color:#a68a63; }
+  .who { text-align:center; font-size:12px; color:#c4b5a0; margin-bottom:4px; }
+  .inrow { display:flex; align-items:center; justify-content:center; gap:8px; font-size:22px; font-weight:800; margin:14px 0 6px; }
+  .inrow input { width:84px; padding:12px; border:1.5px solid #eaddc2; border-radius:12px; font-size:20px; text-align:center; font-weight:800; }
+  .rem { text-align:right; font-size:13px; color:#a68a63; font-weight:700; }
+  .hint { text-align:center; font-size:12px; color:#c4b5a0; margin-top:4px; }
+  .submit { width:100%; padding:15px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:14px; font-size:17px; font-weight:900; cursor:pointer; margin-top:10px; box-shadow:0 8px 20px rgba(217,119,6,.3); }
+  .submit:disabled { opacity:.5; }
+  .fb { text-align:center; font-size:15px; font-weight:800; min-height:22px; margin-top:8px; }
+  .fb.ok { color:#16a34a; } .fb.no { color:#dc2626; }
+  #cv { width:100%; height:300px; display:block; border-radius:12px; background:#fffdf7; border:1px solid #f0e6d2; }
+  .none { text-align:center; padding:50px 20px; color:#a68a63; }
+  .none .ico { font-size:44px; margin-bottom:10px; }
+  .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px); background:#3b2f1e; color:#fff; padding:12px 22px; border-radius:30px; font-size:14px; font-weight:800; z-index:200; opacity:0; transition:.3s; pointer-events:none; }
+  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  .loading { text-align:center; padding:60px; color:#a68a63; }
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="loading">불러오는 중…</div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var sb=null, USER=null, ROOM=null, POINTS=[], myCount=0, ch=null, chRoom=null;
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1600); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+
+  LessonHub.init({ onReady: function(user){ USER=user; sb=LessonHub.client; findRoom(); } });
+
+  function findRoom(){
+    sb.from('graph_rooms').select('*').eq('class_scope', USER.className).eq('active', true)
+      .order('created_at',{ascending:false}).limit(1)
+      .then(function(r){
+        var room=(r.data&&r.data[0])||null;
+        if(!room){ document.getElementById('app').innerHTML='<div class="none"><div class="ico">📭</div><b>진행 중인 그래프 활동이 없어요</b><div style="font-size:13px;margin-top:6px;">선생님이 시작하면 여기에 나타나요.</div></div>'; return; }
+        ROOM=room; loadMine();
+      });
+  }
+  function loadMine(){
+    sb.from('graph_points').select('id',{count:'exact'}).eq('room_id',ROOM.id).eq('student_id',USER.studentId)
+      .then(function(r){ myCount=r.count||0; buildUI(); loadPoints(); subscribe(); });
+  }
+
+  function buildUI(){
+    var eqHtml = ROOM.hide_eq ? '<div class="eq">❓ 숨겨진 직선</div><div class="sub">선생님이 낸 직선 위의 점을 찾아 제출해요</div>'
+      : '<div class="eq">'+esc(ROOM.display)+'</div><div class="sub">이 식을 만족하는 순서쌍 (x, y)를 제출하세요</div>';
+    document.getElementById('app').innerHTML =
+      '<div class="card"><div class="who">'+esc(USER.name)+' · '+esc(USER.className)+'</div>'+eqHtml+'</div>'
+      +'<div class="card">'
+        +'<div class="rem" id="rem"></div>'
+        +'<div class="inrow">( <input id="ix" placeholder="x" inputmode="text"> , <input id="iy" placeholder="y" inputmode="text"> )</div>'
+        +'<div class="hint">'+(ROOM.int_only?'정수만 입력해요':'분수는 3/2, 소수는 1.5 처럼 입력할 수 있어요')+'</div>'
+        +'<button class="submit" id="subBtn" onclick="submitPoint()">점 제출하기</button>'
+        +'<div class="fb" id="fb"></div>'
+      +'</div>'
+      +'<div class="card"><div style="font-size:13px;font-weight:800;color:#7a5230;margin-bottom:8px;">우리 반 좌표평면 (실시간)</div><canvas id="cv"></canvas></div>';
+    resizeCanvas(); updateRem();
+  }
+  function updateRem(){
+    var rem=document.getElementById('rem'); if(!rem) return;
+    if(ROOM.max_points>0){ var left=Math.max(0,ROOM.max_points-myCount); rem.textContent='남은 기회 '+left+'개';
+      document.getElementById('subBtn').disabled = left<=0; if(left<=0) document.getElementById('subBtn').textContent='제출 완료';
+    } else rem.textContent='무제한';
+  }
+
+  // 분수/소수 파싱 → {num,den} (정수는 den=1)
+  function parseFrac(s){
+    s=String(s==null?'':s).trim(); if(!s) return null;
+    if(s.indexOf('/')>=0){ var p=s.split('/'); var n=parseInt(p[0],10), d=parseInt(p[1],10); if(isNaN(n)||isNaN(d)||d===0) return null; return {num:n,den:d}; }
+    if(s.indexOf('.')>=0){ if(!/^-?\d*\.\d+$/.test(s)) return null; var neg=s.charAt(0)==='-'; var t=neg?s.slice(1):s; var dp=t.split('.'); var den=Math.pow(10,dp[1].length); var num=parseInt(dp[0]||'0',10)*den + parseInt(dp[1],10); return {num:(neg?-num:num), den:den}; }
+    if(!/^-?\d+$/.test(s)) return null; return {num:parseInt(s,10), den:1};
+  }
+  function submitPoint(){
+    var fb=document.getElementById('fb'); fb.className='fb'; fb.textContent='';
+    var X=parseFrac(document.getElementById('ix').value), Y=parseFrac(document.getElementById('iy').value);
+    if(!X||!Y){ fb.className='fb no'; fb.textContent='x, y를 바르게 입력하세요'; return; }
+    if(ROOM.int_only && (X.den!==1||Y.den!==1)){ fb.className='fb no'; fb.textContent='정수만 입력할 수 있어요'; return; }
+    // 정답: a*x + b*y == c  →  a*xn*yd + b*yn*xd == c*xd*yd
+    var a=Number(ROOM.a), b=Number(ROOM.b), c=Number(ROOM.c);
+    var lhs = a*X.num*Y.den + b*Y.num*X.den, rhs = c*X.den*Y.den;
+    var correct = (lhs===rhs);
+    var btn=document.getElementById('subBtn'); btn.disabled=true;
+    sb.from('graph_points').insert({ room_id:ROOM.id, student_id:USER.studentId, name:USER.name,
+      x_num:X.num, x_den:X.den, y_num:Y.num, y_den:Y.den, correct:correct })
+      .then(function(r){
+        if(r.error){ btn.disabled=false; fb.className='fb no'; fb.textContent='제출 실패: '+r.error.message; return; }
+        myCount++; updateRem();
+        document.getElementById('ix').value=''; document.getElementById('iy').value='';
+        if(correct){ fb.className='fb ok'; fb.textContent='✅ 정답! 직선 위의 점이에요'; }
+        else { fb.className='fb no'; fb.textContent='❌ 이 직선 위의 점이 아니에요'; }
+        if(!(ROOM.max_points>0 && myCount>=ROOM.max_points)) btn.disabled=false;
+      });
+  }
+
+  function loadPoints(){
+    sb.from('graph_points').select('*').eq('room_id',ROOM.id).then(function(r){ POINTS=(r.data||[]).map(rowToPt); render(); });
+  }
+  function rowToPt(r){ return { x:r.x_num/r.x_den, y:r.y_num/r.y_den, correct:r.correct }; }
+  function subscribe(){
+    if(ch) sb.removeChannel(ch);
+    ch=sb.channel('sp'+ROOM.id).on('postgres_changes',{event:'INSERT',schema:'public',table:'graph_points',filter:'room_id=eq.'+ROOM.id},
+      function(p){ POINTS.push(rowToPt(p.new)); render(); }).subscribe();
+    if(chRoom) sb.removeChannel(chRoom);
+    chRoom=sb.channel('sr'+ROOM.id).on('postgres_changes',{event:'UPDATE',schema:'public',table:'graph_rooms',filter:'id=eq.'+ROOM.id},
+      function(p){ var n=p.new; if(!n.active){ toast('활동이 종료됐어요'); location.reload(); return; } ROOM.revealed=n.revealed; render(); }).subscribe();
+  }
+
+  // 좌표평면 (고정 -10~10)
+  var cv,ctx,R=10;
+  function resizeCanvas(){ cv=document.getElementById('cv'); if(!cv) return; ctx=cv.getContext('2d'); var d=window.devicePixelRatio||1; cv.width=cv.clientWidth*d; cv.height=cv.clientHeight*d; ctx.setTransform(d,0,0,d,0,0); render(); }
+  window.addEventListener('resize', resizeCanvas);
+  function render(){
+    if(!ctx) return; var W=cv.clientWidth,H=cv.clientHeight,cx=W/2,cy=H/2,u=Math.min(W,H)/(R*2+1);
+    function px(x){return cx+x*u;} function py(y){return cy-y*u;}
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='#efe6d4'; ctx.lineWidth=1;
+    for(var i=-R;i<=R;i++){ ctx.beginPath();ctx.moveTo(px(i),0);ctx.lineTo(px(i),H);ctx.stroke(); ctx.beginPath();ctx.moveTo(0,py(i));ctx.lineTo(W,py(i));ctx.stroke(); }
+    ctx.strokeStyle='#8a6034'; ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(0,cy);ctx.lineTo(W,cy);ctx.stroke(); ctx.beginPath();ctx.moveTo(cx,0);ctx.lineTo(cx,H);ctx.stroke();
+    if(ROOM&&ROOM.revealed){ ctx.strokeStyle='#dc2626';ctx.lineWidth=3; var a=Number(ROOM.a),b=Number(ROOM.b),c=Number(ROOM.c); ctx.beginPath();
+      if(b===0){ var xv=c/a; ctx.moveTo(px(xv),0);ctx.lineTo(px(xv),H); } else { ctx.moveTo(px(-R),py((c-a*(-R))/b)); ctx.lineTo(px(R),py((c-a*R)/b)); } ctx.stroke(); }
+    POINTS.forEach(function(p){ if(!p.correct && ROOM && !ROOM.show_wrong) return;
+      ctx.beginPath();ctx.arc(px(p.x),py(p.y),5,0,Math.PI*2); ctx.fillStyle=p.correct?'#16a34a':'#c4b5a0'; ctx.fill(); ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.stroke(); });
+  }
+</script>
+</body>
+</html>
