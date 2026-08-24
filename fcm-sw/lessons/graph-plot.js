@@ -20,6 +20,7 @@
     curve: '#dc2626', ok: '#16a34a', wrong: '#c4b5a0', name: '#7a5230'
   };
 
+  var GRID_PX = 40;   // 격자 최소 픽셀 간격 — 낮출수록 축소 시 단위(1→2→5) 전환이 늦어짐
   function niceStep(minUnits) {
     var pow = Math.pow(10, Math.floor(Math.log10(minUnits)));
     var cands = [1, 2, 5, 10];
@@ -95,7 +96,7 @@
       ctx.clearRect(0, 0, W, H);
       ctx.fillStyle = COL.bg; ctx.fillRect(0, 0, W, H);
 
-      var step = niceStep(64 / view.scale);         // 큰 격자 간격(단위)
+      var step = niceStep(GRID_PX / view.scale);     // 큰 격자 간격(단위) — 값 작을수록 단위 전환이 늦음
       var minx = wx(0), maxx = wx(W), miny = wy(H), maxy = wy(0);
 
       // 격자

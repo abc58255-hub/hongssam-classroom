@@ -37,7 +37,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-  var sb=null, USER=null, ROOM=null, POINTS=[], myCount=0, ch=null, chRoom=null, plot=null;
+  var sb=null, USER=null, ROOM=null, POINTS=[], myCount=0, ch=null, chRoom=null, plot=null, mySet={};
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1600); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
 
@@ -53,9 +53,17 @@
       });
   }
   function loadMine(){
-    sb.from('graph_points').select('id',{count:'exact'}).eq('room_id',ROOM.id).eq('student_id',USER.studentId)
-      .then(function(r){ myCount=r.count||0; buildUI(); loadPoints(); subscribe(); });
+    sb.from('graph_points').select('x_num,x_den,y_num,y_den').eq('room_id',ROOM.id).eq('student_id',USER.studentId)
+      .then(function(r){
+        var rows=r.data||[]; myCount=rows.length;
+        rows.forEach(function(p){ mySet[normKey(p.x_num,p.x_den,p.y_num,p.y_den)]=1; });
+        buildUI(); loadPoints(); subscribe();
+      });
   }
+  // 분수 약분(부호는 분자로) — 중복 판정·저장 정규화
+  function _gcd(a,b){ a=Math.abs(a);b=Math.abs(b); while(b){var t=b;b=a%b;a=t;} return a||1; }
+  function reduce(n,d){ if(d<0){n=-n;d=-d;} var g=_gcd(n,d); return [n/g, d/g]; }
+  function normKey(xn,xd,yn,yd){ var X=reduce(xn,xd), Y=reduce(yn,yd); return X[0]+'/'+X[1]+','+Y[0]+'/'+Y[1]; }
 
   function buildUI(){
     var eqHtml = ROOM.hide_eq ? '<div class="eq">❓ 숨겨진 직선</div><div class="sub">선생님이 낸 직선 위의 점을 찾아 제출해요</div>'
@@ -94,16 +102,20 @@
     var X=parseFrac(document.getElementById('ix').value), Y=parseFrac(document.getElementById('iy').value);
     if(!X||!Y){ fb.className='fb no'; fb.textContent='x, y를 바르게 입력하세요'; return; }
     if(ROOM.int_only && (X.den!==1||Y.den!==1)){ fb.className='fb no'; fb.textContent='정수만 입력할 수 있어요'; return; }
+    // 약분 후 정규화 (같은 값 재제출 방지)
+    var rx=reduce(X.num,X.den), ry=reduce(Y.num,Y.den);
+    var key=rx[0]+'/'+rx[1]+','+ry[0]+'/'+ry[1];
+    if(mySet[key]){ fb.className='fb no'; fb.textContent='이미 제출한 점이에요'; return; }
     // 정답: a*x + b*y == c  →  a*xn*yd + b*yn*xd == c*xd*yd
     var a=Number(ROOM.a), b=Number(ROOM.b), c=Number(ROOM.c);
-    var lhs = a*X.num*Y.den + b*Y.num*X.den, rhs = c*X.den*Y.den;
+    var lhs = a*rx[0]*ry[1] + b*ry[0]*rx[1], rhs = c*rx[1]*ry[1];
     var correct = (lhs===rhs);
     var btn=document.getElementById('subBtn'); btn.disabled=true;
     sb.from('graph_points').insert({ room_id:ROOM.id, student_id:USER.studentId, name:USER.name,
-      x_num:X.num, x_den:X.den, y_num:Y.num, y_den:Y.den, correct:correct })
+      x_num:rx[0], x_den:rx[1], y_num:ry[0], y_den:ry[1], correct:correct })
       .then(function(r){
-        if(r.error){ btn.disabled=false; fb.className='fb no'; fb.textContent='제출 실패: '+r.error.message; return; }
-        myCount++; updateRem();
+        if(r.error){ btn.disabled=false; var dup=/duplicate|unique/i.test(r.error.message||''); fb.className='fb no'; fb.textContent=dup?'이미 제출한 점이에요':('제출 실패: '+r.error.message); if(dup) mySet[key]=1; return; }
+        mySet[key]=1; myCount++; updateRem();
         document.getElementById('ix').value=''; document.getElementById('iy').value='';
         if(correct){ fb.className='fb ok'; fb.textContent='✅ 정답! 직선 위의 점이에요'; }
         else { fb.className='fb no'; fb.textContent='❌ 이 직선 위의 점이 아니에요'; }

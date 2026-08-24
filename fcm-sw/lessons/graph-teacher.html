@@ -44,12 +44,23 @@
   select { padding:9px 11px; border:1.5px solid #eaddc2; border-radius:10px; font-size:15px; font-weight:800; background:#fff; }
 
   /* 라이브 화면 */
-  #live { flex:1; display:none; position:relative; }
-  #cv { width:100%; height:100%; display:block; background:#fffdf7; }
-  .hud { position:absolute; left:14px; bottom:12px; display:flex; gap:14px; font-size:15px; font-weight:800; color:#7a5230; background:rgba(255,255,255,.85); padding:8px 14px; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,.1); }
-  .range { position:absolute; right:14px; top:12px; display:flex; gap:6px; }
-  .range button { background:rgba(255,255,255,.9); color:#7a5230; border:1px solid #eaddc2; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:800; cursor:pointer; }
-  .range button.on { background:#7a5230; color:#fff; }
+  #live { flex:1; display:none; padding:16px; gap:16px; overflow:hidden; }
+  #plotBox { flex:1; display:flex; align-items:center; justify-content:center; min-width:0; }
+  #cvWrap { position:relative; width:100%; max-width:min(78vh, 760px); aspect-ratio:1/1; background:#fffdf7; border:1px solid #f0e6d2; border-radius:16px; box-shadow:0 6px 20px rgba(122,82,48,.1); overflow:hidden; }
+  #cv { width:100%; height:100%; display:block; }
+  .range { position:absolute; right:12px; top:12px; display:flex; gap:6px; }
+  .range button { background:rgba(255,255,255,.92); color:#7a5230; border:1px solid #eaddc2; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:800; cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,.08); }
+  /* 리더보드 사이드 */
+  #side { width:320px; flex-shrink:0; display:flex; flex-direction:column; background:#fff; border:1px solid #f0e6d2; border-radius:16px; padding:14px 16px; overflow:hidden; box-shadow:0 4px 14px rgba(122,82,48,.06); }
+  .sideHead { display:flex; gap:14px; font-size:15px; font-weight:800; color:#7a5230; padding-bottom:10px; border-bottom:1px solid #f0e6d2; margin-bottom:6px; }
+  #board { flex:1; overflow-y:auto; }
+  .brow { display:flex; align-items:center; gap:8px; padding:9px 4px; border-bottom:1px solid #f6efe0; font-size:14px; }
+  .brank { width:26px; text-align:center; font-weight:900; color:#a68a63; font-size:15px; }
+  .bname { flex:1; font-weight:800; color:#3b2f1e; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .bok { color:#16a34a; font-weight:900; }
+  .bno { color:#c4b5a0; font-weight:700; font-size:12px; }
+  .bempty { text-align:center; color:#c4b5a0; padding:34px 0; font-size:13px; font-weight:700; }
+  @media (max-width:720px){ #live{ flex-direction:column; } #side{ width:auto; max-height:38%; } }
 
   /* 잠금 */
   #lock { position:fixed; inset:0; background:radial-gradient(circle at 30% 20%,#8a6034,#3b2a17 70%); display:flex; align-items:center; justify-content:center; z-index:100; }
@@ -70,6 +81,7 @@
   <span class="eq" id="topEq"></span>
   <span class="sp"></span>
   <span id="liveBtns" style="display:none;">
+    <button id="nameBtn" onclick="toggleNames()">🏷 이름</button>
     <button id="revealBtn" onclick="toggleReveal()">✨ 개형 공개</button>
     <button onclick="clearPoints()">🧹 점 지우기</button>
     <button class="warn" onclick="closeRoom()">■ 종료</button>
@@ -121,17 +133,24 @@
 
 <!-- 라이브 -->
 <div id="live">
-  <canvas id="cv"></canvas>
-  <div class="range">
-    <button onclick="plot.zoomBy(1.25)">＋</button>
-    <button onclick="plot.zoomBy(0.8)">－</button>
-    <button onclick="plot.fit()">✥ 맞춤</button>
-    <button onclick="plot.resetView()">↺ 기본</button>
+  <div id="plotBox">
+    <div id="cvWrap">
+      <canvas id="cv"></canvas>
+      <div class="range">
+        <button onclick="plot.zoomBy(1.25)">＋</button>
+        <button onclick="plot.zoomBy(0.8)">－</button>
+        <button onclick="plot.fit()">✥ 맞춤</button>
+        <button onclick="plot.resetView()">↺ 기본</button>
+      </div>
+    </div>
   </div>
-  <div class="hud">
-    <span>👥 <b id="hCount">0</b></span>
-    <span>📍 <b id="hPoints">0</b></span>
-    <span style="color:#16a34a;">✅ <b id="hCorrect">0</b></span>
+  <div id="side">
+    <div class="sideHead">
+      <span>👥 <b id="hCount">0</b>명</span>
+      <span>📍 <b id="hPoints">0</b></span>
+      <span style="color:#16a34a;">✅ <b id="hCorrect">0</b></span>
+    </div>
+    <div id="board"><div class="bempty">아직 제출이 없어요</div></div>
   </div>
 </div>
 
@@ -241,29 +260,59 @@
   var plot=null;
   function enterLive(){
     document.getElementById('setup').style.display='none';
-    document.getElementById('live').style.display='block';
+    document.getElementById('live').style.display='flex';
     document.getElementById('liveBtns').style.display='inline';
     document.getElementById('topEq').textContent = ROOM.display;
+    document.getElementById('nameBtn').classList.toggle('on', !!ROOM.show_names);
     POINTS=[];
     if(!plot) plot=GraphPlot.attach(document.getElementById('cv'), {interactive:true});
     plot.setRoom(ROOM).setPoints(POINTS).resetView();
     // 기존 점 로드 + 실시간 구독
-    sb.from('graph_points').select('*').eq('room_id', ROOM.id).then(function(r){
-      (r.data||[]).forEach(addRow); updateHud(); plot.render();
+    sb.from('graph_points').select('*').eq('room_id', ROOM.id).order('created_at',{ascending:true}).then(function(r){
+      (r.data||[]).forEach(addRow); updateHud(); renderBoard(); plot.render();
     });
     if(ch) sb.removeChannel(ch);
     ch = sb.channel('gp'+ROOM.id).on('postgres_changes',
       {event:'INSERT', schema:'public', table:'graph_points', filter:'room_id=eq.'+ROOM.id},
-      function(p){ addRow(p.new); updateHud(); plot.render(); }).subscribe();
+      function(p){ addRow(p.new); updateHud(); renderBoard(); plot.render(); }).subscribe();
   }
-  function addRow(r){ POINTS.push({ x:r.x_num/r.x_den, y:r.y_num/r.y_den, correct:r.correct, name:r.name }); }
+  function addRow(r){ POINTS.push({ x:r.x_num/r.x_den, y:r.y_num/r.y_den, correct:r.correct, name:r.name, sid:r.student_id, t:r.created_at?Date.parse(r.created_at):0 }); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function updateHud(){
-    var names={}; POINTS.forEach(function(p){ names[p.name]=1; });
+    var names={}; POINTS.forEach(function(p){ names[p.sid||p.name]=1; });
     document.getElementById('hCount').textContent=Object.keys(names).length;
     document.getElementById('hPoints').textContent=POINTS.length;
     document.getElementById('hCorrect').textContent=POINTS.filter(function(p){return p.correct;}).length;
   }
+  // 리더보드: 정답 많은 순 → (동점) 정답 완료가 빠른 순
+  var MEDAL=['🥇','🥈','🥉'];
+  function renderBoard(){
+    var map={};
+    POINTS.forEach(function(p){
+      var k=p.sid||p.name; if(!map[k]) map[k]={name:p.name, correct:0, wrong:0, cLast:0};
+      var m=map[k]; if(p.correct){ m.correct++; if(p.t>m.cLast) m.cLast=p.t; } else m.wrong++;
+    });
+    var arr=Object.keys(map).map(function(k){return map[k];});
+    arr.sort(function(a,b){
+      if(b.correct!==a.correct) return b.correct-a.correct;
+      var ca=a.correct?a.cLast:Infinity, cb=b.correct?b.cLast:Infinity;
+      return ca-cb;
+    });
+    document.getElementById('board').innerHTML = arr.length ? arr.map(function(m,i){
+      return '<div class="brow"><span class="brank">'+(i<3?MEDAL[i]:(i+1))+'</span>'
+        +'<span class="bname">'+esc(m.name)+'</span>'
+        +'<span class="bok">✅'+m.correct+'</span>'
+        +(m.wrong?'<span class="bno">❌'+m.wrong+'</span>':'')+'</div>';
+    }).join('') : '<div class="bempty">아직 제출이 없어요</div>';
+  }
 
+  function toggleNames(){
+    if(!ROOM||!plot) return;
+    ROOM.show_names=!ROOM.show_names;
+    document.getElementById('nameBtn').classList.toggle('on', ROOM.show_names);
+    plot.render();
+    portalRPC('graphUpdate',[TOK, ROOM.id, {show_names:ROOM.show_names}]).catch(function(){});
+  }
   function toggleReveal(){
     if(!ROOM||!plot) return;
     ROOM.revealed=!ROOM.revealed;
@@ -273,7 +322,7 @@
   }
   function clearPoints(){
     if(!ROOM||!confirm('찍힌 점을 모두 지울까요?')) return;
-    portalRPC('graphClear',[TOK, ROOM.id]).then(function(){ POINTS.length=0; updateHud(); if(plot) plot.render(); toast('점을 지웠어요'); }).catch(function(e){ toast('오류: '+e.message); });
+    portalRPC('graphClear',[TOK, ROOM.id]).then(function(){ POINTS.length=0; updateHud(); renderBoard(); if(plot) plot.render(); toast('점을 지웠어요'); }).catch(function(e){ toast('오류: '+e.message); });
   }
   function closeRoom(){
     if(!ROOM||!confirm('이 방을 종료할까요?\n(학생 화면에서 사라져요)')) return;
