@@ -244,11 +244,12 @@
     }).join('');
   }
   function resetPw(sid, name) {
-    if (!confirm(sid + ' ' + name + ' 학생의 비밀번호를 초기화할까요?\n다음 로그인 때 새 비밀번호를 직접 정하게 됩니다.')) return;
-    google.script.run.withSuccessHandler(function(res){
-      toast(res && res.success ? (name + ' 초기화됨') : ('실패: ' + (res && res.message || '오류')));
-      if (res && res.success) { var s = STUDENTS_CACHE.filter(function(x){ return x.studentId === sid; })[0]; if (s) s.joined = false; renderStudents(); }
-    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).resetStudentPassword(sid, '');
+    uiConfirm(sid + ' ' + name + ' 학생의 비밀번호를 초기화할까요?\n다음 로그인 때 새 비밀번호를 직접 정하게 됩니다.', function(){
+      google.script.run.withSuccessHandler(function(res){
+        toast(res && res.success ? (name + ' 초기화됨') : ('실패: ' + (res && res.message || '오류')));
+        if (res && res.success) { var s = STUDENTS_CACHE.filter(function(x){ return x.studentId === sid; })[0]; if (s) s.joined = false; renderStudents(); }
+      }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).resetStudentPassword(sid, '');
+    }, {icon:'🔑', okText:'초기화'});
   }
 
   // ══════════ 🎮 수업활동 관리 (게임 노출 상태·등수 범위) ══════════
@@ -428,11 +429,12 @@
   }
   function lkDelete(id) {
     var l = LK_CACHE.find(function(x){ return x.id === id; }); if (!l) return;
-    if (!confirm('「' + l.title + '」 링크를 삭제할까요?')) return;
-    google.script.run.withSuccessHandler(function(res){
-      if (!res || !res.success) { toast('삭제 실패: ' + (res && res.message || '')); return; }
-      toast('🗑 삭제됨'); openLinkAdmin();
-    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).deleteLink(TOKEN, id);
+    uiConfirm('「' + l.title + '」 링크를 삭제할까요?', function(){
+      google.script.run.withSuccessHandler(function(res){
+        if (!res || !res.success) { toast('삭제 실패: ' + (res && res.message || '')); return; }
+        toast('🗑 삭제됨'); openLinkAdmin();
+      }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).deleteLink(TOKEN, id);
+    }, {icon:'🗑', danger:true, okText:'삭제'});
   }
 
   // ── 📊 기록 관리 (기록 목록·삭제·전체 리셋) ──
@@ -470,21 +472,23 @@
       + '</div>';
   }
   function lsDelete(id) {
-    if (!confirm('이 기록을 삭제할까요?')) return;
-    google.script.run.withSuccessHandler(function(res) {
-      if (!res || !res.success) { toast('삭제 실패: ' + (res && res.message || '')); return; }
-      toast('🗑 삭제됨');
-      var idx = LG_CACHE.indexOf(LS_GAME);
-      openLessonScores(idx >= 0 ? idx : 0);
-    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).lessonDeleteScore(TOKEN, id);
+    uiConfirm('이 기록을 삭제할까요?', function(){
+      google.script.run.withSuccessHandler(function(res) {
+        if (!res || !res.success) { toast('삭제 실패: ' + (res && res.message || '')); return; }
+        toast('🗑 삭제됨');
+        var idx = LG_CACHE.indexOf(LS_GAME);
+        openLessonScores(idx >= 0 ? idx : 0);
+      }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).lessonDeleteScore(TOKEN, id);
+    }, {icon:'🗑', danger:true, okText:'삭제'});
   }
   function lsReset() {
-    if (!confirm('「' + (LS_GAME.title || LS_GAME.game) + '」의 모든 기록을 삭제할까요?\n등수판이 완전히 초기화됩니다. 되돌릴 수 없어요!')) return;
-    google.script.run.withSuccessHandler(function(res) {
-      if (!res || !res.success) { toast('리셋 실패: ' + (res && res.message || '')); return; }
-      toast('🧹 ' + (res.deleted || 0) + '건 삭제 완료');
-      openLessonAdmin();
-    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).lessonResetGame(TOKEN, LS_GAME.unit, LS_GAME.game);
+    uiConfirm('「' + (LS_GAME.title || LS_GAME.game) + '」의 모든 기록을 삭제할까요?\n등수판이 완전히 초기화됩니다. 되돌릴 수 없어요!', function(){
+      google.script.run.withSuccessHandler(function(res) {
+        if (!res || !res.success) { toast('리셋 실패: ' + (res && res.message || '')); return; }
+        toast('🧹 ' + (res.deleted || 0) + '건 삭제 완료');
+        openLessonAdmin();
+      }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).lessonResetGame(TOKEN, LS_GAME.unit, LS_GAME.game);
+    }, {icon:'🧹', danger:true, okText:'전체 삭제'});
   }
 
 
@@ -588,6 +592,23 @@
     var t = document.getElementById('toast');
     t.textContent = msg; t.classList.add('show');
     setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+  // 예쁜 확인창 (브라우저 confirm 대체)
+  function uiConfirm(msg, onOk, opt) {
+    opt = opt || {};
+    var ov = document.createElement('div'); ov.className = 'modal-bg';
+    var lines = String(msg).split('\n').map(function(l){ return esc(l); }).join('<br>');
+    ov.innerHTML = '<div class="modal" style="width:360px;text-align:center;">'
+      + '<div style="font-size:34px;margin-bottom:8px;">' + (opt.icon || '❓') + '</div>'
+      + '<div style="font-size:15px;font-weight:600;line-height:1.55;margin-bottom:20px;">' + lines + '</div>'
+      + '<div style="display:flex;gap:8px;">'
+        + '<button id="ucNo" class="small" style="flex:1;padding:12px;">취소</button>'
+        + '<button id="ucYes" style="flex:1;padding:12px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;color:#fff;background:' + (opt.danger ? '#dc2626' : '#2563eb') + ';">' + (opt.okText || '확인') + '</button>'
+      + '</div></div>';
+    ov.addEventListener('click', function(e){ if (e.target === ov) ov.remove(); });
+    document.body.appendChild(ov);
+    document.getElementById('ucNo').onclick = function(){ ov.remove(); };
+    document.getElementById('ucYes').onclick = function(){ ov.remove(); if (onOk) onOk(); };
   }
 
   checkSession();
