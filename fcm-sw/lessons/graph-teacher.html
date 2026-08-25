@@ -185,6 +185,25 @@
   var ch = null;
 
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1600); }
+  // 예쁜 확인창 (브라우저 confirm 대체)
+  function uiConfirm(msg, onOk, opt){
+    opt=opt||{};
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(59,42,23,.45);display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;';
+    var lines=String(msg).split('\n').map(function(l){return esc(l);}).join('<br>');
+    ov.innerHTML='<div style="background:#fff;border-radius:20px;padding:24px 22px;width:320px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.3);text-align:center;">'
+      +'<div style="font-size:34px;margin-bottom:8px;">'+(opt.icon||'❓')+'</div>'
+      +'<div style="font-size:15px;font-weight:700;color:#3b2f1e;line-height:1.5;margin-bottom:20px;">'+lines+'</div>'
+      +'<div style="display:flex;gap:8px;">'
+        +'<button id="ucNo" style="flex:1;padding:13px;border:1.5px solid #eaddc2;background:#fff;color:#7a5230;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;">취소</button>'
+        +'<button id="ucYes" style="flex:1;padding:13px;border:none;background:'+(opt.danger?'#dc2626':'#7a5230')+';color:#fff;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;">'+(opt.okText||'확인')+'</button>'
+      +'</div></div>';
+    document.body.appendChild(ov);
+    function close(){ ov.remove(); }
+    ov.querySelector('#ucNo').onclick=close;
+    ov.querySelector('#ucYes').onclick=function(){ close(); if(onOk) onOk(); };
+    ov.addEventListener('click',function(e){ if(e.target===ov) close(); });
+  }
   function portalRPC(fn, args){
     return fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args})})
       .then(function(r){return r.json();}).then(function(d){ if(d&&d.ok) return d.result; throw new Error((d&&d.error)||'서버 오류'); });
@@ -234,8 +253,9 @@
     enterLive();
   }
   function closeRoomById(id){
-    if(!confirm('이 방을 종료할까요?\n(학생 화면에서 사라져요)')) return;
-    portalRPC('graphClose',[TOK,id]).then(function(){ toast('방을 종료했어요'); loadActiveRooms(); }).catch(function(e){ toast('오류: '+e.message); });
+    uiConfirm('이 방을 종료할까요?\n학생 화면에서 사라져요.', function(){
+      portalRPC('graphClose',[TOK,id]).then(function(){ toast('방을 종료했어요'); loadActiveRooms(); }).catch(function(e){ toast('오류: '+e.message); });
+    }, {icon:'■', danger:true, okText:'종료'});
   }
   function loadClasses(){
     var sel=document.getElementById('classSel'), hint=document.getElementById('classHint');
@@ -367,17 +387,21 @@
     portalRPC('graphUpdate',[TOK, ROOM.id, {revealed:ROOM.revealed}]).catch(function(){});
   }
   function clearPoints(){
-    if(!ROOM||!confirm('찍힌 점을 모두 지울까요?')) return;
-    portalRPC('graphClear',[TOK, ROOM.id]).then(function(){ POINTS.length=0; updateHud(); renderBoard(); if(plot) plot.render(); toast('점을 지웠어요'); }).catch(function(e){ toast('오류: '+e.message); });
+    if(!ROOM) return;
+    uiConfirm('찍힌 점을 모두 지울까요?', function(){
+      portalRPC('graphClear',[TOK, ROOM.id]).then(function(){ POINTS.length=0; updateHud(); renderBoard(); if(plot) plot.render(); toast('점을 지웠어요'); }).catch(function(e){ toast('오류: '+e.message); });
+    }, {icon:'🧹', danger:true, okText:'지우기'});
   }
   function closeRoom(){
-    if(!ROOM||!confirm('이 방을 종료할까요?\n(학생 화면에서 사라져요)')) return;
-    portalRPC('graphClose',[TOK, ROOM.id]).then(function(){
-      if(ch){ sb.removeChannel(ch); ch=null; }
-      ROOM=null; document.getElementById('live').style.display='none';
-      document.getElementById('liveBtns').style.display='none'; document.getElementById('topEq').textContent='';
-      document.getElementById('setup').style.display='flex'; loadActiveRooms(); resetStartBtn(); toast('방을 종료했어요');
-    }).catch(function(e){ toast('오류: '+e.message); });
+    if(!ROOM) return;
+    uiConfirm('이 방을 종료할까요?\n학생 화면에서 사라져요.', function(){
+      portalRPC('graphClose',[TOK, ROOM.id]).then(function(){
+        if(ch){ sb.removeChannel(ch); ch=null; }
+        ROOM=null; document.getElementById('live').style.display='none';
+        document.getElementById('liveBtns').style.display='none'; document.getElementById('topEq').textContent='';
+        document.getElementById('setup').style.display='flex'; loadActiveRooms(); resetStartBtn(); toast('방을 종료했어요');
+      }).catch(function(e){ toast('오류: '+e.message); });
+    }, {icon:'■', danger:true, okText:'종료'});
   }
 
   // 좌표평면 렌더링은 graph-plot.js(GraphPlot)가 전담
