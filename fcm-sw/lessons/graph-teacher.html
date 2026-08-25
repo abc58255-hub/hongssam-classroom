@@ -273,6 +273,7 @@
   }
 
   var starting=false;
+  function resetStartBtn(){ starting=false; var b=document.querySelector('.start'); if(b){ b.disabled=false; b.textContent='🚀 방 시작하기'; } }
   function startRoom(){
     if(starting) return;
     var cls=document.getElementById('classSel').value;
@@ -375,7 +376,7 @@
       if(ch){ sb.removeChannel(ch); ch=null; }
       ROOM=null; document.getElementById('live').style.display='none';
       document.getElementById('liveBtns').style.display='none'; document.getElementById('topEq').textContent='';
-      document.getElementById('setup').style.display='flex'; loadActiveRooms(); toast('방을 종료했어요');
+      document.getElementById('setup').style.display='flex'; loadActiveRooms(); resetStartBtn(); toast('방을 종료했어요');
     }).catch(function(e){ toast('오류: '+e.message); });
   }
 
