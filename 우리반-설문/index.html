@@ -467,11 +467,12 @@
     qs.forEach(function(q) { addSurveyQuestion(q.type || 'text', q); });
   }
   function deleteCustomTemplate(tmplId) {
-    if (!confirm('이 템플릿을 삭제할까요?')) return;
-    var templates = JSON.parse(localStorage.getItem('hongSurveyTemplates') || '[]');
-    templates = templates.filter(function(t){ return t.id !== tmplId; });
-    localStorage.setItem('hongSurveyTemplates', JSON.stringify(templates));
-    renderCustomTemplates();
+    uiConfirm('이 템플릿을 삭제할까요?', function(){
+      var templates = JSON.parse(localStorage.getItem('hongSurveyTemplates') || '[]');
+      templates = templates.filter(function(t){ return t.id !== tmplId; });
+      localStorage.setItem('hongSurveyTemplates', JSON.stringify(templates));
+      renderCustomTemplates();
+    }, {icon:'🗑', danger:true, okText:'삭제'});
   }
   function saveAsTemplate() {
     var title = (document.getElementById('surveyTitle').value || '').trim();
@@ -751,13 +752,14 @@
     openSurveyBuilder(sv);
   }
   function deleteSurvey(svId) {
-    if (!confirm('이 설문을 삭제할까요?')) return;
-    google.script.run
-      .withSuccessHandler(function(res) {
-        if (res.success) { _surveyLoaded=false; loadSurveyTab(function(){ renderSurveyList(); }); }
-        else alert('삭제 실패: '+(res.message||''));
-      })
-      .deleteSurvey(svId);
+    uiConfirm('이 설문을 삭제할까요?', function(){
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res.success) { _surveyLoaded=false; loadSurveyTab(function(){ renderSurveyList(); }); }
+          else alert('삭제 실패: '+(res.message||''));
+        })
+        .deleteSurvey(svId);
+    }, {icon:'🗑', danger:true, okText:'삭제'});
   }
   function changeSurveyStatus(svId, newStatus) {
     google.script.run
@@ -1168,5 +1170,29 @@
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
 <div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.00.00</span></div>
+<script>
+/* 예쁜 확인/알림창 — 브라우저 기본 confirm/alert 대체 (자체 스타일 포함) */
+(function(){
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function build(msg,opt,withCancel){
+    opt=opt||{};
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+    var lines=String(msg).split('\n').map(esc).join('<br>');
+    ov.innerHTML='<div style="background:#fff;border-radius:18px;padding:24px 22px;width:340px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.28);text-align:center;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">'
+      +'<div style="font-size:32px;margin-bottom:8px;">'+(opt.icon||(withCancel?'❓':'💬'))+'</div>'
+      +'<div style="font-size:15px;font-weight:600;line-height:1.55;margin-bottom:20px;">'+lines+'</div>'
+      +'<div style="display:flex;gap:8px;">'
+        +(withCancel?'<button data-no style="flex:1;padding:12px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;">취소</button>':'')
+        +'<button data-yes style="flex:1;padding:12px;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;color:#fff;background:'+(opt.danger?'#dc2626':'#2563eb')+';">'+(opt.okText||'확인')+'</button>'
+      +'</div></div>';
+    document.body.appendChild(ov); return ov;
+  }
+  window.uiConfirm=function(msg,onOk,opt){var ov=build(msg,opt,true);function c(){ov.remove();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-no]').onclick=c;ov.querySelector('[data-yes]').onclick=function(){c();if(onOk)onOk();};};
+  window.uiAlert=function(msg,cb,opt){var ov=build(msg,opt,false);function c(){ov.remove();if(cb)cb();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-yes]').onclick=c;};
+  window.alert=function(m){window.uiAlert(m);};
+})();
+</script>
+
 </body>
 </html>

@@ -1042,18 +1042,19 @@ function applyBulk(mode) {
   var label = mode === 'cancel'
     ? start + ' ~ ' + end + ' 기간의 수업 예정일을 전부 "취소' + (reason ? '(' + reason + ')' : '') + '" 처리할까요?'
     : start + ' ~ ' + end + ' 기간의 취소 기록을 전부 해제(삭제)할까요?\n수업 예정일로 되돌아갑니다.';
-  if (!confirm('📅 ' + classes.join(', ') + '\n\n' + label)) return;
-  statusEl.style.color = '#64748b';
-  statusEl.textContent = '처리 중...';
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) { statusEl.style.color = '#ef4444'; statusEl.textContent = '❌ ' + (res.message || '오류'); return; }
-      statusEl.style.color = '#16a34a';
-      statusEl.textContent = '✅ ' + res.applied + '건 처리 완료' + (res.skipped ? ' (기록·이동된 ' + res.skipped + '건은 보호)' : '');
-      loadSyllabusData(1);
-    })
-    .withFailureHandler(function(e) { statusEl.style.color = '#ef4444'; statusEl.textContent = '❌ ' + e.message; })
-    .bulkChangeLessons(currentGroupId, mode, start, end, classes, reason);
+  uiConfirm('📅 ' + classes.join(', ') + '\n\n' + label, function(){
+    statusEl.style.color = '#64748b';
+    statusEl.textContent = '처리 중...';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) { statusEl.style.color = '#ef4444'; statusEl.textContent = '❌ ' + (res.message || '오류'); return; }
+        statusEl.style.color = '#16a34a';
+        statusEl.textContent = '✅ ' + res.applied + '건 처리 완료' + (res.skipped ? ' (기록·이동된 ' + res.skipped + '건은 보호)' : '');
+        loadSyllabusData(1);
+      })
+      .withFailureHandler(function(e) { statusEl.style.color = '#ef4444'; statusEl.textContent = '❌ ' + e.message; })
+      .bulkChangeLessons(currentGroupId, mode, start, end, classes, reason);
+  }, {icon:'📅', okText:'처리'});
 }
 
 // ─── ✓ 하루 일괄 완료 ───
@@ -1089,14 +1090,15 @@ function bulkCompleteDayUI(dateStr) {
   });
   if (entries.length === 0) return alert('이 날 완료 처리할 수업이 없어요.\n(이미 기록됐거나 예정된 수업이 없습니다)');
   var d = new Date(dateStr + 'T09:00:00');
-  if (!confirm('✅ ' + (d.getMonth()+1) + '/' + d.getDate() + ' 수업을 한 번에 완료 처리할까요?\n\n' + lines.join('\n') + '\n\n(이미 기록된 반은 건드리지 않아요)')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) return alert('오류: ' + (res.message || ''));
-      loadSyllabusData(1);
-    })
-    .withFailureHandler(function(e) { alert('오류: ' + e.message); })
-    .bulkCompleteDay(dateStr, entries, currentGroupId);
+  uiConfirm('✅ ' + (d.getMonth()+1) + '/' + d.getDate() + ' 수업을 한 번에 완료 처리할까요?\n\n' + lines.join('\n') + '\n\n(이미 기록된 반은 건드리지 않아요)', function(){
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) return alert('오류: ' + (res.message || ''));
+        loadSyllabusData(1);
+      })
+      .withFailureHandler(function(e) { alert('오류: ' + e.message); })
+      .bulkCompleteDay(dateStr, entries, currentGroupId);
+  }, {icon:'✅', okText:'완료 처리'});
 }
 
 // ─── 수업 기록 모달 ───
@@ -1396,7 +1398,7 @@ function cancelCheck() {
     var targetDate = status.substring(3);
     msg += '\n이동 대상(' + targetDate + ')의 이동 기록도 함께 삭제됩니다.';
   }
-  if (!confirm(msg)) return;
+  uiConfirm(msg, function(){
 
   document.getElementById('checkDateModal').classList.remove('open');
   delete sylCheckCache[key];
@@ -1414,6 +1416,7 @@ function cancelCheck() {
 
   renderSylTable();
   google.script.run.withSuccessHandler(function(){}).deleteSyllabusCheck(date, cls, currentGroupId);
+  }, {icon:'🗑', danger:true, okText:'삭제'});
 }
 
 // 이동받은 수업 개별 삭제 (모달에서 삭제 버튼 클릭)
@@ -1506,7 +1509,7 @@ function removeMovedIn(targetDate, cls, sourceDate) {
   var d1 = new Date(sourceDate + 'T09:00:00');
   var DAY_KR_R = ['일','월','화','수','목','금','토'];
   var fromLabel = (d1.getMonth()+1) + '/' + d1.getDate() + '(' + DAY_KR_R[d1.getDay()] + ')';
-  if (!confirm(fromLabel + ' 수업의 이동 기록을 삭제할까요?\n(원본 날짜의 이동됨 표시도 함께 삭제됩니다)')) return;
+  uiConfirm(fromLabel + ' 수업의 이동 기록을 삭제할까요?\n(원본 날짜의 이동됨 표시도 함께 삭제됩니다)', function(){
 
   var tKey = targetDate + '_' + cls;
   if (sylMovedInCache[tKey]) {
@@ -1523,6 +1526,7 @@ function removeMovedIn(targetDate, cls, sourceDate) {
   document.getElementById('checkDateModal').classList.remove('open');
   renderSylTable();
   google.script.run.withSuccessHandler(function(){}).deleteMovedInLesson(targetDate, cls, sourceDate, currentGroupId);
+  }, {icon:'🗑', danger:true, okText:'삭제'});
 }
 
 function confirmCheck() {
@@ -2016,18 +2020,20 @@ function renderSavedTimetableList() {
 }
 
 function deleteTimetableEntry(semName) {
-  if (!confirm('"' + semName + '" 학기의 시간표 및 예상 수업일을 삭제할까요?')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
-      loadTimetableTab(); loadSyllabusData();
-    })
-    .deleteSemester(currentGroupId, semName);
+  uiConfirm('"' + semName + '" 학기의 시간표 및 예상 수업일을 삭제할까요?', function(){
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+        loadTimetableTab(); loadSyllabusData();
+      })
+      .deleteSemester(currentGroupId, semName);
+  }, {icon:'🗑', danger:true, okText:'삭제'});
 }
 
 function regenerateTimetable(semName) {
-  if (!confirm('"' + semName + '" 수업 일정을 새로 계산할까요?')) return;
-  loadSyllabusData(1);
+  uiConfirm('"' + semName + '" 수업 일정을 새로 계산할까요?', function(){
+    loadSyllabusData(1);
+  }, {icon:'🔄', okText:'새로 계산'});
 }
 
 // ═══════════════════════════════════════
@@ -2163,13 +2169,14 @@ function doRenamePlan(planId, currentName) {
 
 function doDeletePlan(planId) {
   var plan = plansCache.find(function(p){ return p.id === planId; });
-  if (!confirm('"' + (plan ? plan.name : planId) + '" 계획을 삭제할까요?\n이 계획을 사용하는 그룹이 없어야 합니다.')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
-      _reloadPlans(renderPlanManageList);
-    })
-    .deletePlan(planId);
+  uiConfirm('"' + (plan ? plan.name : planId) + '" 계획을 삭제할까요?\n이 계획을 사용하는 그룹이 없어야 합니다.', function(){
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+        _reloadPlans(renderPlanManageList);
+      })
+      .deletePlan(planId);
+  }, {icon:'🗑', danger:true, okText:'삭제'});
 }
 
 function editPlanContent(planId) {
@@ -2199,19 +2206,44 @@ function deleteCurrentGroup() {
   var gid = document.getElementById('groupModalId').value;
   if (!gid) return;
   var grp = groupsCache.find(function(g){ return g.id === gid; });
-  if (!confirm('"' + (grp ? grp.name : gid) + '" 그룹을 삭제할까요?\n이 그룹의 진도계획, 진도체크 시트도 모두 삭제됩니다.')) return;
-  google.script.run
-    .withSuccessHandler(function(res) {
-      if (!res.success) { alert('오류: ' + (res.message||'')); return; }
-      document.getElementById('groupModal').classList.remove('open');
-      currentGroupId = '기본';
-      loadGroups();
-    })
-    .deleteGroup(gid);
+  uiConfirm('"' + (grp ? grp.name : gid) + '" 그룹을 삭제할까요?\n이 그룹의 진도계획, 진도체크 시트도 모두 삭제됩니다.', function(){
+    google.script.run
+      .withSuccessHandler(function(res) {
+        if (!res.success) { alert('오류: ' + (res.message||'')); return; }
+        document.getElementById('groupModal').classList.remove('open');
+        currentGroupId = '기본';
+        loadGroups();
+      })
+      .deleteGroup(gid);
+  }, {icon:'🗑', danger:true, okText:'삭제'});
 }
 </script>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
 <div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.03.00</span></div>
+<script>
+/* 예쁜 확인/알림창 — 브라우저 기본 confirm/alert 대체 (자체 스타일 포함) */
+(function(){
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function build(msg,opt,withCancel){
+    opt=opt||{};
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+    var lines=String(msg).split('\n').map(esc).join('<br>');
+    ov.innerHTML='<div style="background:#fff;border-radius:18px;padding:24px 22px;width:340px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.28);text-align:center;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">'
+      +'<div style="font-size:32px;margin-bottom:8px;">'+(opt.icon||(withCancel?'❓':'💬'))+'</div>'
+      +'<div style="font-size:15px;font-weight:600;line-height:1.55;margin-bottom:20px;">'+lines+'</div>'
+      +'<div style="display:flex;gap:8px;">'
+        +(withCancel?'<button data-no style="flex:1;padding:12px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;">취소</button>':'')
+        +'<button data-yes style="flex:1;padding:12px;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;color:#fff;background:'+(opt.danger?'#dc2626':'#2563eb')+';">'+(opt.okText||'확인')+'</button>'
+      +'</div></div>';
+    document.body.appendChild(ov); return ov;
+  }
+  window.uiConfirm=function(msg,onOk,opt){var ov=build(msg,opt,true);function c(){ov.remove();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-no]').onclick=c;ov.querySelector('[data-yes]').onclick=function(){c();if(onOk)onOk();};};
+  window.uiAlert=function(msg,cb,opt){var ov=build(msg,opt,false);function c(){ov.remove();if(cb)cb();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-yes]').onclick=c;};
+  window.alert=function(m){window.uiAlert(m);};
+})();
+</script>
+
 </body>
 </html>
