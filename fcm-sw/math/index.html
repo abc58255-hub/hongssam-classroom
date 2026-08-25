@@ -865,7 +865,9 @@
           + graphRow + cards + centerLink + '</div>';
       }
       if (myClass) {
-        fetch(LESSON_SB_URL + '/rest/v1/graph_rooms?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } })
+        // 만든 지 4시간 지난 방은 '깜빡하고 안 닫은 방'으로 보고 학생 화면에서 숨김
+        var graphCutoff = new Date(Date.now() - 4 * 3600 * 1000).toISOString();
+        fetch(LESSON_SB_URL + '/rest/v1/graph_rooms?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&created_at=gte.' + encodeURIComponent(graphCutoff) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } })
           .then(function (r) { return r.json(); }).then(function (gr) { done(Array.isArray(gr) && gr.length > 0); }).catch(function () { done(false); });
       } else done(false);
     }).catch(function () { box.innerHTML = ''; });

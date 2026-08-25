@@ -44,7 +44,8 @@
   LessonHub.init({ onReady: function(user){ USER=user; sb=LessonHub.client; findRoom(); } });
 
   function findRoom(){
-    sb.from('graph_rooms').select('*').eq('class_scope', USER.className).eq('active', true)
+    var cutoff=new Date(Date.now()-4*3600*1000).toISOString();   // 4시간 지난 방은 숨김
+    sb.from('graph_rooms').select('*').eq('class_scope', USER.className).eq('active', true).gte('created_at', cutoff)
       .order('created_at',{ascending:false}).limit(1)
       .then(function(r){
         var room=(r.data&&r.data[0])||null;

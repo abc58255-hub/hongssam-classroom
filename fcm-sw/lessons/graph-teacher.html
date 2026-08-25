@@ -40,6 +40,12 @@
   .chk { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; cursor:pointer; }
   .chk input { width:18px; height:18px; }
   .start { width:100%; padding:16px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:14px; font-size:18px; font-weight:900; cursor:pointer; box-shadow:0 8px 22px rgba(217,119,6,.35); }
+  /* 진행 중 방 배너 */
+  .abrow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff7ed; border:1.5px solid #fdba74; border-radius:14px; padding:12px 14px; margin-bottom:12px; }
+  .abinfo { flex:1; min-width:0; font-size:14px; font-weight:800; color:#9a3412; }
+  .abbtns { display:flex; gap:6px; }
+  .abbtns button { border:none; border-radius:10px; padding:8px 12px; font-size:13px; font-weight:800; cursor:pointer; background:#d97706; color:#fff; }
+  .abbtns button.warn { background:#fecaca; color:#991b1b; }
   .field { display:flex; align-items:center; gap:8px; }
   select { padding:9px 11px; border:1.5px solid #eaddc2; border-radius:10px; font-size:15px; font-weight:800; background:#fff; }
 
@@ -90,6 +96,7 @@
 
 <!-- 설정 -->
 <div id="setup"><div class="panel">
+  <div id="activeBanner"></div>
   <div class="card">
     <h3>1. 반 선택</h3>
     <div class="field">
@@ -205,7 +212,30 @@
   ];
   function initSetup(){
     document.getElementById('presets').innerHTML=PRESETS.map(function(p,i){return '<button onclick="applyPreset('+i+')">'+p.t+'</button>';}).join('');
-    onABC(); loadClasses();
+    onABC(); loadClasses(); loadActiveRooms();
+  }
+  // B. 진행 중(안 닫힌) 방 배너 — 이어서 열기 / 종료
+  var activeRooms=[];
+  function loadActiveRooms(){
+    var box=document.getElementById('activeBanner'); if(!box) return;
+    sb.from('graph_rooms').select('*').eq('active',true).order('created_at',{ascending:false}).then(function(r){
+      activeRooms=r.data||[];
+      if(!activeRooms.length){ box.innerHTML=''; return; }
+      box.innerHTML=activeRooms.map(function(rm){
+        return '<div class="abrow"><div class="abinfo">🔴 진행 중 · '+esc(rm.class_scope)+' · '+esc(rm.display)+'</div>'
+          +'<div class="abbtns"><button onclick="resumeRoom('+rm.id+')">이어서 열기</button>'
+          +'<button class="warn" onclick="closeRoomById('+rm.id+')">종료</button></div></div>';
+      }).join('');
+    });
+  }
+  function resumeRoom(id){
+    var rm=activeRooms.filter(function(x){return x.id===id;})[0]; if(!rm) return;
+    ROOM={ id:rm.id, a:Number(rm.a), b:Number(rm.b), c:Number(rm.c), display:rm.display, kind:rm.kind||'line', revealed:!!rm.revealed, show_wrong:rm.show_wrong!==false, show_names:!!rm.show_names };
+    enterLive();
+  }
+  function closeRoomById(id){
+    if(!confirm('이 방을 종료할까요?\n(학생 화면에서 사라져요)')) return;
+    portalRPC('graphClose',[TOK,id]).then(function(){ toast('방을 종료했어요'); loadActiveRooms(); }).catch(function(e){ toast('오류: '+e.message); });
   }
   function loadClasses(){
     var sel=document.getElementById('classSel'), hint=document.getElementById('classHint');
@@ -345,7 +375,7 @@
       if(ch){ sb.removeChannel(ch); ch=null; }
       ROOM=null; document.getElementById('live').style.display='none';
       document.getElementById('liveBtns').style.display='none'; document.getElementById('topEq').textContent='';
-      document.getElementById('setup').style.display='flex'; toast('방을 종료했어요');
+      document.getElementById('setup').style.display='flex'; loadActiveRooms(); toast('방을 종료했어요');
     }).catch(function(e){ toast('오류: '+e.message); });
   }
 
