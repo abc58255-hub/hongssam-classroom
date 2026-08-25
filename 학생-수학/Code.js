@@ -627,7 +627,12 @@ function _logVisitAndGetActivity_(studentId) {
       if (String(rows[i][0]).trim() === sid) {
         var visits = Number(rows[i][1] || 0);
         res.features = String(rows[i][3] || '').split(',').map(function(s){ return s.trim(); }).filter(Boolean);
-        if (String(rows[i][2] || '').trim() !== today) {
+        // 마지막접속일이 Date로 저장돼 있을 수 있어(시트 자동변환) → yyyy-MM-dd로 정규화 후 비교
+        var lastRaw = rows[i][2];
+        var lastStr = (lastRaw instanceof Date)
+          ? Utilities.formatDate(lastRaw, 'Asia/Seoul', 'yyyy-MM-dd')
+          : String(lastRaw || '').trim();
+        if (lastStr !== today) {
           visits++;
           sh.getRange(i + 2, 2, 1, 2).setValues([[visits, today]]);
         }
