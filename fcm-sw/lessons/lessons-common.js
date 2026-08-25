@@ -85,6 +85,39 @@ var LessonHub = (function () {
     }
   }
 
+  // 조용한 로그인 — 오버레이 없이 학번·비번으로 Supabase 세션 수립.
+  // 수학앱 로그인 성공 시 호출 → graph.html·게임이 이 세션을 공유(두 번째 로그인 제거).
+  // 실패해도(미동기화·네트워크) 조용히 넘어감 → 각 페이지의 LessonHub 로그인창이 폴백.
+  async function silentLogin(sid, pw) {
+    try {
+      sid = String(sid || '').trim();
+      if (!sid || !pw) return { success: false, message: '학번/비번 없음' };
+      // 이미 같은 학생 세션이면 재사용, 다른 학생 세션이면 교체
+      var cur = await sb.auth.getSession();
+      if (cur.data && cur.data.session) {
+        setUserFromSession(cur.data.session);
+        if (user && user.studentId === sid) return { success: true, user: user };
+        await sb.auth.signOut();
+      }
+      var pwHash = await sha256(pw);
+      var res = await fetch(SUPABASE_URL + '/functions/v1/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'apikey': SUPABASE_ANON_KEY, 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+        body: JSON.stringify({ studentId: sid, pwHash: pwHash })
+      });
+      var out = await res.json();
+      if (!out.success) return { success: false, message: out.message || '로그인 실패' };
+      var auth = await sb.auth.signInWithPassword({ email: out.email, password: pwHash });
+      if (auth.error) return { success: false, message: auth.error.message };
+      localStorage.setItem('lh_sid', sid);
+      setUserFromSession(auth.data.session);
+      return { success: true, user: user };
+    } catch (e) { return { success: false, message: e.message }; }
+  }
+
+  // 세션만 종료(리로드 없음) — 수학앱 로그아웃/기기 인계 때 사용
+  async function signOut() { try { await sb.auth.signOut(); } catch (_) {} user = null; }
+
   // ── 공개 API ────────────────────────────────────────────────
   async function init(options) {
     cfg = options || {};
@@ -131,6 +164,7 @@ var LessonHub = (function () {
   return {
     init: init, saveScore: saveScore, leaderboard: leaderboard,
     onNewScore: onNewScore, logout: logout,
+    silentLogin: silentLogin, signOut: signOut,
     get user() { return user; }, get client() { return sb; }
   };
 })();

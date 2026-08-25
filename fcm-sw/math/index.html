@@ -21,6 +21,10 @@
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-messaging-compat.js"></script>
   <script src="../config.js"></script>
+  <!-- 수업활동(그래프·게임) Supabase 세션을 수학앱 로그인 때 함께 수립 → 두 번째 로그인 제거 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../lessons/supabase-config.js"></script>
+  <script src="../lessons/lessons-common.js"></script>
   <script>
     // ✅ GAS 백엔드 주소 (학생-수학 고정 배포 — 재배포해도 주소 동일)
     // iOS 사파리 대응: GAS로 직접 안 가고 Supabase 프록시 경유(CORS 정상). 프록시가 GAS로 서버끼리 전달.
@@ -1348,6 +1352,8 @@
     localStorage.removeItem("math_student_id");
     localStorage.removeItem("math_student_name");
     localStorage.removeItem("math_pwhash");
+    // 수업활동 Supabase 세션도 함께 종료 (공용 기기에서 다음 학생이 물려받지 않게)
+    try { if (window.LessonHub) { LessonHub.signOut(); localStorage.removeItem('lh_sid'); } } catch (_) {}
     location.reload();
   }
 
@@ -1368,6 +1374,8 @@
         if (res.success) {
           currentUser.id = id; currentUser.name = name;
           currentUser.pw = pw; // 알림 등록 시 본인 확인용 (메모리에만 보관, 저장 안 함)
+          // 수업활동(그래프·게임) Supabase 세션도 백그라운드로 함께 수립 (실패해도 무해 — 각 페이지 로그인창이 폴백)
+          try { if (window.LessonHub) LessonHub.silentLogin(id, pw); } catch (_) {}
           localStorage.setItem("math_student_id", id);
           localStorage.setItem("math_student_name", name);
           document.getElementById('welcomeMsg').innerText = name + " 학생, 환영합니다! 🎉";
