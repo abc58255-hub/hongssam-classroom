@@ -733,6 +733,7 @@ function _computeAchievements(historyData, taskData, rosterData, myId, myClass, 
     var pubv = String(historyData[h][13] || '').trim();
     var rowObj = {
       rowIdx: h,
+      ts: historyData[h][0],   // 제출 시각(Date) — 일찍 제출러 판정용
       score: String(historyData[h][12] || '').trim(),
       bestType: String(historyData[h][16] || '').trim(),
       pub: (pubv === '공개' || pubv === '일괄공개')
@@ -849,12 +850,21 @@ function _computeAchievements(historyData, taskData, rosterData, myId, myClass, 
     var f = parseFloat(s);
     return (s !== '' && !isNaN(f)) ? f : null;
   }
-  var streak = 0, cur = 0, perfect = 0, fast = 0, phoenix = 0;
+  var streak = 0, cur = 0, perfect = 0, fast = 0, phoenix = 0, early = 0;
   taskOrder.forEach(function(tName){
     if (!assignedToClass(tName, myClass)) return;
     var lt = latest[tName] ? latest[tName][myId] : null;
     if (lt) { cur++; if (cur > streak) streak = cur; } else { cur = 0; }
     if (taskInfo[tName].isScore5 && lt && parseFloat(lt.score) === 5 && isOpen(tName, lt)) perfect++;
+    // 🌅 일찍 제출러: 마감 24시간+ 전에 (최초) 제출한 과제
+    var eRow = earliest[tName] ? earliest[tName][myId] : null;
+    if (eRow && eRow.ts) {
+      var dlv = taskInfo[tName].deadlines[myClass] || taskInfo[tName].deadlines['all'];
+      if (dlv) {
+        var dlTime = new Date(dlv), subTime = new Date(eRow.ts);
+        if (!isNaN(dlTime.getTime()) && !isNaN(subTime.getTime()) && (dlTime.getTime() - subTime.getTime()) >= 24*3600*1000) early++;
+      }
+    }
     // ⚡ 스피드러너: 우리 반에서 1~3번째로 제출한 과제
     if (earliest[tName] && earliest[tName][myId]) {
       var myRow = earliest[tName][myId].rowIdx, fasterCnt = 0;
@@ -907,6 +917,7 @@ function _computeAchievements(historyData, taskData, rosterData, myId, myClass, 
       best: me.best,
       fast: fast,
       phoenix: phoenix,
+      early: early,
       replies: myReplies,
       visits: act.visits || 0,
       features: feats
