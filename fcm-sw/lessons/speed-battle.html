@@ -59,7 +59,7 @@
       <div class="title">⚡ 연산 스피드 배틀</div>
       <div class="sub" id="greet"></div>
       <div style="background:#f8fafc;border:1px solid #eef2f7;border-radius:12px;padding:14px;margin:16px 0;font-size:13px;color:#475569;line-height:1.8;">
-        ⏱️ <b>60초</b> 동안 <b>사칙연산(＋−×÷)</b>을 최대한 많이 풀어요<br>
+        ⏱️ <b>60초</b> 동안 <b>정수 사칙연산(＋−×÷·음수 포함)</b>을 최대한 많이 풀어요<br>
         ✅ 정답 1개 = 1점 · ❌ 오답 시 시간 −1초<br>
         🏆 최고 기록이 등수판에 올라가요
       </div>
@@ -109,24 +109,30 @@
 var GAME_LEN = 60; // 초
 var state = { score: 0, correct: 0, wrong: 0, timeLeft: 0, answer: null, timer: null, busy: false };
 
-// ── 문제 생성 (사칙연산: 덧셈·뺄셈·곱셈·나눗셈, 쉽고 다양하게) ──
+// ── 문제 생성 (정수 사칙연산: 음수 포함, 중학생 난이도) ──
 function rnd(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function sgn() { return Math.random() < 0.5 ? -1 : 1; }
+function fmt(n) { return n < 0 ? '(−' + (-n) + ')' : String(n); }   // 음수는 괄호로 표기
 function makeProblem() {
   var type = rnd(0, 3), text, ans, a, b;
-  if (type === 0) {           // 덧셈
-    a = rnd(1, 50); b = rnd(1, 50); text = a + ' + ' + b; ans = a + b;
-  } else if (type === 1) {    // 뺄셈 (결과는 항상 0 이상)
-    a = rnd(11, 99); b = rnd(1, a); text = a + ' − ' + b; ans = a - b;
-  } else if (type === 2) {    // 곱셈 (구구단 위주)
-    a = rnd(2, 9); b = rnd(2, 9); text = a + ' × ' + b; ans = a * b;
-  } else {                    // 나눗셈 (나누어떨어짐 — 구구단 역)
-    var q = rnd(2, 9), d = rnd(2, 9); a = q * d; text = a + ' ÷ ' + d; ans = q;
+  if (type === 0) {           // 덧셈 (음수 포함)
+    a = rnd(-40, 50); b = rnd(-40, 50); ans = a + b;
+    text = fmt(a) + ' + ' + fmt(b);
+  } else if (type === 1) {    // 뺄셈 (음수·음수결과 허용)
+    a = rnd(-40, 50); b = rnd(-40, 50); ans = a - b;
+    text = fmt(a) + ' − ' + fmt(b);
+  } else if (type === 2) {    // 곱셈 (음수 포함, ×12까지)
+    a = rnd(2, 12) * sgn(); b = rnd(2, 9) * sgn(); ans = a * b;
+    text = fmt(a) + ' × ' + fmt(b);
+  } else {                    // 나눗셈 (나누어떨어짐, 음수 포함)
+    var q = rnd(2, 12) * sgn(), d = rnd(2, 9) * sgn(); a = q * d; ans = q;
+    text = fmt(a) + ' ÷ ' + fmt(d);
   }
-  // 보기 4개 (정답 + 근접 오답 3개)
+  // 보기 4개 (정답 + 근접 오답 3개) — 음수 정답·오답 허용
   var opts = [ans];
   while (opts.length < 4) {
     var cand = ans + (Math.random() < 0.5 ? -1 : 1) * rnd(1, 9);
-    if (cand >= 0 && opts.indexOf(cand) < 0) opts.push(cand);
+    if (opts.indexOf(cand) < 0) opts.push(cand);
   }
   opts.sort(function () { return Math.random() - 0.5; });
   return { text: text, ans: ans, opts: opts };
@@ -138,7 +144,7 @@ function showProblem() {
   state.busy = false;
   document.getElementById('problem').textContent = p.text;
   document.getElementById('choices').innerHTML = p.opts.map(function (o) {
-    return '<div class="choice" onclick="pick(this,' + o + ')">' + o + '</div>';
+    return '<div class="choice" onclick="pick(this,' + o + ')">' + String(o).replace('-', '−') + '</div>';
   }).join('');
 }
 
