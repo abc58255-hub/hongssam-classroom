@@ -72,6 +72,7 @@
     <div class="spacer"></div>
     <button class="small" onclick="openLinkAdmin()">🔗 수업 링크</button>
     <button class="small" onclick="openPwReset()">🔑 비번 초기화</button>
+    <button class="small" onclick="doSyncRoster(this)">🔄 명단 동기화</button>
     <button class="small" onclick="loadPortal()">↻ 새로고침</button>
     <button class="small" onclick="doLogout()">로그아웃</button>
   </header>
@@ -92,6 +93,15 @@
         TOKEN = res.token; localStorage.setItem('portal_token', TOKEN); showApp();
       } else { toast(res && res.message ? res.message : '비밀번호가 틀렸습니다'); }
     }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).teacherLogin(pw);
+  }
+  function doSyncRoster(btn) {
+    var orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '동기화 중…'; }
+    google.script.run.withSuccessHandler(function(res) {
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+      if (res && res.success) toast('✅ 명단 동기화 완료 (' + (res.upserted || res.sent || 0) + '명)');
+      else toast('동기화 실패: ' + ((res && res.message) || '오류'));
+    }).withFailureHandler(function(e) { if (btn) { btn.disabled = false; btn.textContent = orig; } toast('오류: ' + e.message); }).syncRoster(TOKEN);
   }
   function doLogout() {
     google.script.run.teacherLogout(TOKEN);

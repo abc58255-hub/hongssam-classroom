@@ -23,7 +23,7 @@ var RPC_WHITELIST = [
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
   'getLinks', 'saveLink', 'deleteLink',
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
-  'graphPresetSave', 'graphPresetDelete'
+  'graphPresetSave', 'graphPresetDelete', 'syncRoster'
 ];
 
 function doPost(e) {
@@ -207,6 +207,19 @@ function saveLink(token, link) {
 function deleteLink(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요' };
   return _lessonCall_({ op: 'deleteLink', id: id });
+}
+
+// 명단 즉시 동기화 — 학생-수학 GAS의 syncRoster(전체 로스터→Supabase students/Auth) 호출.
+// 시트에서 학생을 추가·수정한 뒤 이걸 누르면 수업활동·그래프 로그인이 바로 반영됨.
+var STUDENT_MATH_URL = 'https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec';
+function syncRoster(token) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  var key = _cfg('수업활동동기화키', '');
+  if (!key) return { success: false, message: '시스템설정에 수업활동동기화키가 없습니다' };
+  try {
+    var res = UrlFetchApp.fetch(STUDENT_MATH_URL + '?action=syncRoster&key=' + encodeURIComponent(key), { muteHttpExceptions: true, followRedirects: true });
+    return JSON.parse(res.getContentText());
+  } catch (e) { return { success: false, message: String(e) }; }
 }
 
 // 기록 관리 — 목록·1건 삭제·전체 리셋
