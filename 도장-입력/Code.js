@@ -222,6 +222,15 @@ function _getCategories_(ss) {
 }
 
 // 반 목록
+// 명단 캐시(10분) 즉시 비우기 — 전학생 추가 등 명부 수정 직후 반영용
+function refreshRoster(tok) {
+  try {
+    if (!_tokOk_(SpreadsheetApp.openById(SHEET_ID), tok)) return NEED_AUTH;
+    CacheService.getScriptCache().remove('dj_roster');
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 function getClassList(tok) {
   try {
     if (!_tokOk_(SpreadsheetApp.openById(SHEET_ID), tok)) return NEED_AUTH;

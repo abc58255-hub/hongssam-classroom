@@ -118,6 +118,7 @@
     <div class="top">
       <h1><span class="logo">🏅</span> 도장</h1>
       <select id="classSel" onchange="loadInput()"></select>
+      <button class="qrbtn" onclick="refreshRosterUI(this)" title="명단 새로고침 (전학생 등 반영)">🔄</button>
       <button class="qrbtn" onclick="openQR()">📱 QR</button>
     </div>
   </div>
@@ -254,6 +255,20 @@
         sel.innerHTML = res.classes.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join('');
         loadInput();
       }).getClassList(TOK);
+  }
+
+  // 명단 캐시(10분) 비우고 다시 불러오기 — 전학생 추가 등 명부 수정 직후
+  function refreshRosterUI(btn) {
+    var orig = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    google.script.run
+      .withFailureHandler(function(err){ if (btn) { btn.disabled = false; btn.textContent = orig; } toast('오류: ' + (err.message||'')); })
+      .withSuccessHandler(function(res){
+        if (btn) { btn.disabled = false; btn.textContent = orig; }
+        if (authGate(res)) return;
+        toast('🔄 명단 새로고침됨');
+        loadClasses();   // 반 목록+명단 최신으로 (새 반·전학생 반영)
+      }).refreshRoster(TOK);
   }
 
   function loadInput() {
