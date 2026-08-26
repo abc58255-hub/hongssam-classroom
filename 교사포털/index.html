@@ -384,12 +384,21 @@
   }
   function renderScoresView(scores) {
     var main = document.getElementById('portalMain');
-    var rows = scores.map(function(r, idx) {
+    // 등수 = 학생별 최고점 1줄만 (도전 횟수 표시). 🗑는 그 최고 기록 삭제 → 다음 기록 반영
+    var bestByS = {}, cntByS = {};
+    (scores || []).forEach(function(r){
+      var sid = r.student_id;
+      cntByS[sid] = (cntByS[sid] || 0) + 1;
+      if (!bestByS[sid] || (Number(r.score)||0) > (Number(bestByS[sid].score)||0)) bestByS[sid] = r;
+    });
+    var best = Object.keys(bestByS).map(function(k){ return bestByS[k]; })
+      .sort(function(a,b){ return (Number(b.score)||0) - (Number(a.score)||0); });
+    var rows = best.map(function(r, idx) {
       var st = r.students || {};
-      var d = String(r.created_at || '').substring(5, 10).replace('-', '/');
+      var medal = idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':(idx+1);
       return '<div style="display:flex;align-items:center;gap:10px;padding:9px 6px;border-bottom:1px solid #1e293b;font-size:13px;">'
-        + '<span style="width:26px;text-align:center;font-weight:900;color:#64748b;">' + (idx + 1) + '</span>'
-        + '<span style="flex:1;font-weight:700;">' + esc(st.name || r.student_id) + ' <span style="font-size:11px;color:#64748b;">' + esc(st.class_name || '') + ' · ' + d + '</span></span>'
+        + '<span style="width:26px;text-align:center;font-weight:900;color:#64748b;">' + medal + '</span>'
+        + '<span style="flex:1;font-weight:700;">' + esc(st.name || r.student_id) + ' <span style="font-size:11px;color:#64748b;">' + esc(st.class_name || '') + ' · ' + (cntByS[r.student_id]||1) + '회 도전</span></span>'
         + '<span style="font-weight:900;color:#60a5fa;">' + r.score + '점</span>'
         + '<button class="small" style="padding:5px 9px;" onclick="lsDelete(' + r.id + ')">🗑</button>'
         + '</div>';
@@ -397,11 +406,11 @@
     main.innerHTML = '<div class="group">'
       + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;flex-wrap:wrap;">'
       + '<button class="small" onclick="openLessonAdmin()">← 관리</button>'
-      + '<span>📊 ' + esc(LS_GAME.title || LS_GAME.game) + ' 기록 (' + scores.length + '건)</span>'
+      + '<span>📊 ' + esc(LS_GAME.title || LS_GAME.game) + ' 등수 (' + best.length + '명)</span>'
       + '<span style="flex:1"></span>'
       + '<button class="small" style="color:#f87171;" onclick="lsReset()">🧹 전체 리셋</button></h2>'
       + '<div style="background:#1e293b;border:1px solid #334155;border-radius:14px;padding:10px 14px;max-width:640px;">' + rows + '</div>'
-      + '<p style="font-size:12px;color:#64748b;margin-top:12px;">이상한 기록(조작·장난)은 🗑 로 삭제하세요. 등수판은 최고점 기준이라 삭제하면 그 학생의 다음 기록이 반영돼요.</p>'
+      + '<p style="font-size:12px;color:#64748b;margin-top:12px;">학생별 최고점 1줄만 보여요. 🗑로 그 학생의 최고 기록을 지우면 다음 기록이 반영돼요 (조작·장난 정리용).</p>'
       + '</div>';
   }
   function lsDelete(id) {
