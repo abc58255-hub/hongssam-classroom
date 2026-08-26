@@ -40,6 +40,12 @@
   .chk { display:flex; align-items:center; gap:8px; font-size:14px; font-weight:700; cursor:pointer; }
   .chk input { width:18px; height:18px; }
   .start { width:100%; padding:16px; background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:14px; font-size:18px; font-weight:900; cursor:pointer; box-shadow:0 8px 22px rgba(217,119,6,.35); }
+  .savePreset { width:100%; padding:12px; background:#fff; color:#7a5230; border:1.5px solid #eaddc2; border-radius:12px; font-size:14px; font-weight:800; cursor:pointer; margin-bottom:10px; }
+  .savePreset:active { background:#fff3dc; }
+  .pstrow { display:flex; align-items:center; gap:8px; background:#fff8ec; border:1px solid #eaddc2; border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+  .pstrow .peq { flex:1; min-width:0; font-size:15px; font-weight:900; color:#7a5230; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pstrow .pgo { background:#d97706; color:#fff; border:none; border-radius:9px; padding:8px 14px; font-size:13px; font-weight:800; cursor:pointer; flex-shrink:0; }
+  .pstrow .pdel { background:#fff; color:#b91c1c; border:1px solid #fecaca; border-radius:9px; padding:8px 10px; font-size:13px; font-weight:800; cursor:pointer; flex-shrink:0; }
   /* 진행 중 방 배너 */
   .abrow { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:#fff7ed; border:1.5px solid #fdba74; border-radius:14px; padding:12px 14px; margin-bottom:12px; }
   .abinfo { flex:1; min-width:0; font-size:14px; font-weight:800; color:#9a3412; }
@@ -104,6 +110,10 @@
     </div>
     <div class="hint" style="text-align:left;" id="classHint"></div>
   </div>
+  <div class="card" id="presetCard" style="display:none;">
+    <h3>⭐ 저장된 프리셋 <span style="font-weight:600;font-size:11px;color:#a68a63;">반 선택 후 [시작]</span></h3>
+    <div id="presetList"></div>
+  </div>
   <div class="card">
     <h3>2. 직선 입력 (ax + by = c)</h3>
     <div class="abc">
@@ -135,6 +145,7 @@
     <label class="chk" style="margin-top:8px;"><input type="checkbox" id="intOnly"> 정수만 입력 허용</label>
     <label class="chk" style="margin-top:8px;"><input type="checkbox" id="hideEq"> 함수식 숨기기 (학생 화면에 식 미표시)</label>
   </div>
+  <button class="savePreset" onclick="savePreset()">＋ 지금 설정을 프리셋으로 저장</button>
   <button class="start" onclick="startRoom()">🚀 방 시작하기</button>
 </div></div>
 
@@ -231,7 +242,7 @@
   ];
   function initSetup(){
     document.getElementById('presets').innerHTML=PRESETS.map(function(p,i){return '<button onclick="applyPreset('+i+')">'+p.t+'</button>';}).join('');
-    onABC(); loadClasses(); loadActiveRooms();
+    onABC(); loadClasses(); loadActiveRooms(); loadPresets();
   }
   // B. 진행 중(안 닫힌) 방 배너 — 이어서 열기 / 종료
   var activeRooms=[];
@@ -268,6 +279,51 @@
     }).catch(function(e){ sel.innerHTML='<option value="">불러오기 실패</option>'; hint.textContent='오류: '+e.message; });
   }
   function applyPreset(i){ var p=PRESETS[i]; document.getElementById('ca').value=p.a; document.getElementById('cb').value=p.b; document.getElementById('cc').value=p.c; document.getElementById('disp').value=p.d; }
+
+  // ── 저장된 프리셋 (Supabase graph_presets) ──
+  var SAVED=[];
+  function loadPresets(){
+    sb.from('graph_presets').select('*').order('sort',{ascending:true}).order('created_at',{ascending:true}).then(function(r){
+      SAVED=r.data||[];
+      var card=document.getElementById('presetCard'), list=document.getElementById('presetList');
+      if(!SAVED.length){ card.style.display='none'; list.innerHTML=''; return; }
+      card.style.display='block';
+      list.innerHTML=SAVED.map(function(p){
+        return '<div class="pstrow"><span class="peq">'+esc(p.display||'(식 없음)')+'</span>'
+          +'<button class="pgo" onclick="startFromPreset('+p.id+')">시작</button>'
+          +'<button class="pdel" onclick="deletePreset('+p.id+')">🗑</button></div>';
+      }).join('');
+    });
+  }
+  function savePreset(){
+    var a=parseInt(document.getElementById('ca').value)||0, b=parseInt(document.getElementById('cb').value)||0, c=parseInt(document.getElementById('cc').value)||0;
+    if(a===0&&b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
+    var preset={
+      title:'', a:a, b:b, c:c, display:document.getElementById('disp').value.trim(), kind:'line',
+      max_points:MP, show_wrong:document.getElementById('showWrong').checked,
+      show_names:document.getElementById('showNames').checked, int_only:document.getElementById('intOnly').checked,
+      hide_eq:document.getElementById('hideEq').checked
+    };
+    portalRPC('graphPresetSave',[TOK, preset]).then(function(res){
+      if(!res||!res.success){ toast('저장 실패: '+((res&&res.message)||'')); return; }
+      toast('⭐ 프리셋 저장됨'); loadPresets();
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+  function startFromPreset(id){
+    var cls=document.getElementById('classSel').value;
+    if(!cls){ toast('먼저 반을 선택하세요'); return; }
+    var p=SAVED.filter(function(x){return x.id===id;})[0]; if(!p) return;
+    createRoom({
+      class_scope:cls, a:Number(p.a), b:Number(p.b), c:Number(p.c), display:p.display, kind:p.kind||'line',
+      hide_eq:!!p.hide_eq, max_points:Number(p.max_points)||0, show_wrong:p.show_wrong!==false,
+      show_names:!!p.show_names, int_only:!!p.int_only
+    });
+  }
+  function deletePreset(id){
+    uiConfirm('이 프리셋을 삭제할까요?', function(){
+      portalRPC('graphPresetDelete',[TOK, id]).then(function(){ toast('삭제됨'); loadPresets(); }).catch(function(e){ toast('오류: '+e.message); });
+    }, {icon:'🗑', danger:true, okText:'삭제'});
+  }
   // 계수 → 표시식 자동 생성
   function _gcd(a,b){ a=Math.abs(a);b=Math.abs(b); while(b){var t=b;b=a%b;a=t;} return a||1; }
   function _frac(n,d){ if(d===0) return '0'; var g=_gcd(n,d); n/=g; d/=g; if(d<0){n=-n;d=-d;} return d===1?String(n):(n+'/'+d); }
@@ -312,12 +368,17 @@
       kind: 'line'
     };
     if(room.a===0&&room.b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
+    createRoom(room);
+  }
+  // 방 생성 공통 (직접 입력·프리셋 모두 여기로)
+  function createRoom(room){
+    if(starting) return;
     starting=true;
     var sb0=document.querySelector('.start'); if(sb0){ sb0.disabled=true; sb0.textContent='방 만드는 중…'; }
-    function reset(){ starting=false; if(sb0){ sb0.disabled=false; sb0.textContent='🚀 방 시작하기'; } }
+    function reset(){ resetStartBtn(); }
     portalRPC('graphCreate',[TOK, room]).then(function(res){
       if(!res||!res.success){ toast('방 생성 실패: '+((res&&res.message)||'')); reset(); return; }
-      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, kind:'line', revealed:false, show_wrong:room.show_wrong, show_names:room.show_names };
+      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, kind:room.kind||'line', revealed:false, show_wrong:room.show_wrong, show_names:room.show_names };
       starting=false; enterLive();
     }).catch(function(e){ toast('오류: '+e.message); reset(); });
   }

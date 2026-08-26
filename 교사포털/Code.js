@@ -22,7 +22,8 @@ var RPC_WHITELIST = [
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
   'getLinks', 'saveLink', 'deleteLink',
-  'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses'
+  'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
+  'graphPresetSave', 'graphPresetDelete'
 ];
 
 function doPost(e) {
@@ -182,6 +183,15 @@ function graphClasses(token) {
   });
   var classes = Object.keys(set).sort(function (a, b) { return a.localeCompare(b, 'ko', { numeric: true }); });
   return { success: true, classes: classes };
+}
+// 그래프 직선 프리셋 저장/삭제 (읽기는 클라이언트가 anon으로 직접)
+function graphPresetSave(token, preset) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'graphPresetSave', preset: preset });
+}
+function graphPresetDelete(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'graphPresetDelete', id: id });
 }
 
 // ── 수업 링크 보드 (학생 대시보드 상단 카드) ──

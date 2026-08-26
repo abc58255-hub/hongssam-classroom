@@ -105,6 +105,27 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
+    // 프리셋 저장(신규): {op:'graphPresetSave', preset:{title,a,b,c,display,kind,max_points,show_wrong,int_only,show_names,hide_eq}}
+    if (body.op === "graphPresetSave") {
+      const P = body.preset ?? {};
+      const row = {
+        title: String(P.title ?? "").trim(),
+        a: Number(P.a) || 0, b: Number(P.b) || 0, c: Number(P.c) || 0,
+        display: String(P.display ?? "").trim(), kind: String(P.kind ?? "line"),
+        max_points: Number(P.max_points) || 0,
+        show_wrong: P.show_wrong !== false, int_only: !!P.int_only,
+        show_names: !!P.show_names, hide_eq: !!P.hide_eq,
+      };
+      const { data, error } = await admin0.from("graph_presets").insert(row).select("id").single();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true, id: data.id });
+    }
+    // 프리셋 삭제: {op:'graphPresetDelete', id}
+    if (body.op === "graphPresetDelete") {
+      const { error } = await admin0.from("graph_presets").delete().eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
 
     // ── 수업 링크 보드 ──
     // 링크 목록 (교사 관리용 — 비공개 포함 전체)
