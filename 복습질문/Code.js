@@ -112,6 +112,15 @@ function _getRosterCached_() {
   return list;
 }
 
+// 명단 캐시(10분) 즉시 비우기 — 전학생 추가 등 명부 수정 직후 반영용
+function refreshRoster(tok) {
+  try {
+    if (!_tokOk_(tok)) return NEED_AUTH;
+    CacheService.getScriptCache().remove('rv_roster');
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 function getClassList(tok) {
   try {
     if (!_tokOk_(tok)) return NEED_AUTH;

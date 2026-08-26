@@ -95,6 +95,7 @@
     <option value="6">👥 6명</option>
   </select>
   <button class="mbtn" id="modeBtn" onclick="toggleMode()"></button>
+  <button class="mbtn" onclick="refreshRosterUI(this)" title="명단 새로고침 (전학생 등 반영)">🔄</button>
 </div>
 <div class="counts">
   <span class="chip">남은 <b id="cRemain" style="color:#38bdf8;">0</b></span>
@@ -178,6 +179,20 @@
         if(res&&res.success){ TOK=res.token; localStorage.setItem('rv_tok',TOK); document.getElementById('lockErr').textContent=''; hideLock(); loadClasses(); }
         else document.getElementById('lockErr').textContent=(res&&res.message)||'실패';
       }).unlockReview(pw);
+  }
+
+  // 명단 캐시(10분) 비우고 다시 불러오기 — 전학생 추가 등 명부 수정 직후
+  function refreshRosterUI(btn){
+    var orig = btn ? btn.textContent : '';
+    if(btn){ btn.disabled=true; btn.textContent='…'; }
+    google.script.run
+      .withFailureHandler(function(err){ if(btn){ btn.disabled=false; btn.textContent=orig; } toast('오류: '+(err.message||'')); })
+      .withSuccessHandler(function(res){
+        if(btn){ btn.disabled=false; btn.textContent=orig; }
+        if(authGate(res)) return;
+        toast('🔄 명단 새로고침됨');
+        loadClasses();
+      }).refreshRoster(TOK);
   }
 
   function loadClasses(){
