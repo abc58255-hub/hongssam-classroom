@@ -140,7 +140,8 @@
       </div>
       <input type="number" id="mpCustom" min="0" placeholder="직접" oninput="setMp(parseInt(this.value)||0, true)" style="width:70px;padding:7px;border:1.5px solid #eaddc2;border-radius:8px;font-size:14px;text-align:center;font-weight:800;">
     </div>
-    <label class="chk"><input type="checkbox" id="showWrong" checked> 틀린 점도 표시 (회색)</label>
+    <label class="chk"><input type="checkbox" id="noDup" checked> 같은 점 중복 제출 방지 (학생별)</label>
+    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="showWrong" checked> 틀린 점도 표시 (회색)</label>
     <label class="chk" style="margin-top:8px;"><input type="checkbox" id="showNames"> 점에 학생 이름 표시</label>
     <label class="chk" style="margin-top:8px;"><input type="checkbox" id="intOnly"> 정수만 입력 허용</label>
     <label class="chk" style="margin-top:8px;"><input type="checkbox" id="hideEq"> 함수식 숨기기 (학생 화면에 식 미표시)</label>
@@ -260,7 +261,7 @@
   }
   function resumeRoom(id){
     var rm=activeRooms.filter(function(x){return x.id===id;})[0]; if(!rm) return;
-    ROOM={ id:rm.id, a:Number(rm.a), b:Number(rm.b), c:Number(rm.c), display:rm.display, kind:rm.kind||'line', revealed:!!rm.revealed, show_wrong:rm.show_wrong!==false, show_names:!!rm.show_names };
+    ROOM={ id:rm.id, a:Number(rm.a), b:Number(rm.b), c:Number(rm.c), display:rm.display, kind:rm.kind||'line', revealed:!!rm.revealed, show_wrong:rm.show_wrong!==false, show_names:!!rm.show_names, no_dup:rm.no_dup!==false };
     enterLive();
   }
   function closeRoomById(id){
@@ -302,7 +303,7 @@
       title:'', a:a, b:b, c:c, display:document.getElementById('disp').value.trim(), kind:'line',
       max_points:MP, show_wrong:document.getElementById('showWrong').checked,
       show_names:document.getElementById('showNames').checked, int_only:document.getElementById('intOnly').checked,
-      hide_eq:document.getElementById('hideEq').checked
+      hide_eq:document.getElementById('hideEq').checked, no_dup:document.getElementById('noDup').checked
     };
     portalRPC('graphPresetSave',[TOK, preset]).then(function(res){
       if(!res||!res.success){ toast('저장 실패: '+((res&&res.message)||'')); return; }
@@ -316,7 +317,7 @@
     createRoom({
       class_scope:cls, a:Number(p.a), b:Number(p.b), c:Number(p.c), display:p.display, kind:p.kind||'line',
       hide_eq:!!p.hide_eq, max_points:Number(p.max_points)||0, show_wrong:p.show_wrong!==false,
-      show_names:!!p.show_names, int_only:!!p.int_only
+      show_names:!!p.show_names, int_only:!!p.int_only, no_dup:p.no_dup!==false
     });
   }
   function deletePreset(id){
@@ -365,6 +366,7 @@
       show_wrong: document.getElementById('showWrong').checked,
       show_names: document.getElementById('showNames').checked,
       int_only: document.getElementById('intOnly').checked,
+      no_dup: document.getElementById('noDup').checked,
       kind: 'line'
     };
     if(room.a===0&&room.b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
@@ -378,7 +380,7 @@
     function reset(){ resetStartBtn(); }
     portalRPC('graphCreate',[TOK, room]).then(function(res){
       if(!res||!res.success){ toast('방 생성 실패: '+((res&&res.message)||'')); reset(); return; }
-      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, kind:room.kind||'line', revealed:false, show_wrong:room.show_wrong, show_names:room.show_names };
+      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, kind:room.kind||'line', revealed:false, show_wrong:room.show_wrong, show_names:room.show_names, no_dup:room.no_dup };
       starting=false; enterLive();
     }).catch(function(e){ toast('오류: '+e.message); reset(); });
   }

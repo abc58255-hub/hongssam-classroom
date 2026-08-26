@@ -71,6 +71,7 @@ Deno.serve(async (req) => {
         hide_eq: !!R.hide_eq, max_points: Number(R.max_points) || 0,
         show_wrong: R.show_wrong !== false, int_only: !!R.int_only,
         show_names: !!R.show_names, kind: String(R.kind ?? "line"),
+        no_dup: R.no_dup !== false,
         revealed: false, active: true,
       };
       let ins = await admin0.from("graph_rooms").insert(row).select("id").single();
@@ -86,7 +87,7 @@ Deno.serve(async (req) => {
     if (body.op === "graphUpdate") {
       const p = body.patch ?? {};
       const patch: Record<string, unknown> = {};
-      ["revealed","hide_eq","show_wrong","int_only","show_names"].forEach((k)=>{ if (p[k] !== undefined) patch[k] = !!p[k]; });
+      ["revealed","hide_eq","show_wrong","int_only","show_names","no_dup"].forEach((k)=>{ if (p[k] !== undefined) patch[k] = !!p[k]; });
       if (p.max_points !== undefined) patch.max_points = Number(p.max_points) || 0;
       if (p.display !== undefined) patch.display = String(p.display).trim();
       const { error } = await admin0.from("graph_rooms").update(patch).eq("id", Number(body.id));
@@ -114,7 +115,7 @@ Deno.serve(async (req) => {
         display: String(P.display ?? "").trim(), kind: String(P.kind ?? "line"),
         max_points: Number(P.max_points) || 0,
         show_wrong: P.show_wrong !== false, int_only: !!P.int_only,
-        show_names: !!P.show_names, hide_eq: !!P.hide_eq,
+        show_names: !!P.show_names, hide_eq: !!P.hide_eq, no_dup: P.no_dup !== false,
       };
       const { data, error } = await admin0.from("graph_presets").insert(row).select("id").single();
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
