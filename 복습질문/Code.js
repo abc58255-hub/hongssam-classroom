@@ -130,6 +130,27 @@ function getClassList(tok) {
   } catch(e) { return { success: false, classes: [], message: e.toString() }; }
 }
 
+// 전체 명단(반 포함) + 전체 복습 도장 횟수를 한 번에 — 클라가 캐시해 반 전환을 서버 없이 즉시
+function getAllReviewData(tok) {
+  try {
+    if (!_tokOk_(tok)) return NEED_AUTH;
+    var all = [];
+    _getRosterCached_().forEach(function(s){ var c = _clsOf_(s.sid); if (c) all.push({ sid: s.sid, name: s.name, cls: c }); });
+    all.sort(function(a,b){ return a.sid.localeCompare(b.sid); });
+    var counts = {};
+    var sh = _dojangSs().getSheetByName('도장기록');
+    if (sh && sh.getLastRow() > 1) {
+      var rows = sh.getRange(2, 1, sh.getLastRow()-1, 4).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][3]||'').trim() !== '복습질문') continue;
+        var sid = String(rows[i][1]||'').trim();
+        if (sid) counts[sid] = (counts[sid]||0) + 1;
+      }
+    }
+    return { success: true, all: all, counts: counts };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 function getReviewData(cls, tok) {
   try {
     if (!_tokOk_(tok)) return NEED_AUTH;

@@ -151,7 +151,8 @@
 
 <script>
   var TOK = localStorage.getItem('rv_tok') || '';
-  var STU = [];          // [{sid,name}]
+  var ALL = [];          // 전체 명단 [{sid,name,cls}] — 1회 로드 후 캐시
+  var STU = [];          // 현재 반 [{sid,name}]
   var COUNTS = {};       // 누적 복습 도장
   var RV = null;         // { cls, mode, pool[], current, kept[], done[], pass }
   var ANIM = false;
@@ -200,30 +201,35 @@
       }).refreshRoster(TOK);
   }
 
+  // 전체 명단+횟수 1회 로드 → 이후 반 전환은 서버 없이 즉시(메모리 필터)
   function loadClasses(){
-    google.script.run.withFailureHandler(function(e){ toast('반 목록 오류: '+e.message); })
-      .withSuccessHandler(function(res){
-        if(authGate(res)) return; if(!res||!res.success) return;
-        var sel=document.getElementById('classSel');
-        sel.innerHTML=res.classes.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>';}).join('');
-        onClass();
-      }).getClassList(TOK);
-  }
-
-  function onClass(){
-    var cls=document.getElementById('classSel').value; if(!cls) return;
+    document.getElementById('card').innerHTML='<div class="hint">명단 불러오는 중…</div>';
     google.script.run.withFailureHandler(function(e){ toast('불러오기 실패: '+e.message); })
       .withSuccessHandler(function(res){
         if(authGate(res)) return; if(!res||!res.success) return;
-        STU=res.students||[]; COUNTS=res.counts||{};
-        var saved=null; try{ saved=JSON.parse(localStorage.getItem(_key(cls))||'null'); }catch(_){}
-        if(saved&&saved.cls===cls){ RV=saved; }
-        else { RV={ cls:cls, mode:'once', pool:STU.map(function(s){return s.sid;}), current:[], kept:[], done:[], pass:0 }; }
-        // current를 배열로 정규화 (구버전 저장분: 단일 sid 또는 null)
-        if(!Array.isArray(RV.current)) RV.current = RV.current ? [RV.current] : [];
-        var savedCnt=localStorage.getItem('rv_cnt'); if(savedCnt) document.getElementById('cntSel').value=savedCnt;
-        render();
-      }).getReviewData(cls, TOK);
+        ALL=res.all||[]; COUNTS=res.counts||{};
+        var set={}; ALL.forEach(function(s){ set[s.cls]=true; });
+        var classes=Object.keys(set).sort();
+        var sel=document.getElementById('classSel');
+        sel.innerHTML=classes.map(function(c){return '<option value="'+esc(c)+'">'+esc(c)+'</option>';}).join('');
+        var last=localStorage.getItem('rv_lastcls'); if(last && classes.indexOf(last)>=0) sel.value=last;
+        onClass();
+      }).getAllReviewData(TOK);
+  }
+
+  // 반 전환 — 서버 왕복 없이 즉시. (응답 지연으로 이전 반 학생이 뽑히던 문제도 해결)
+  function onClass(){
+    var cls=document.getElementById('classSel').value; if(!cls) return;
+    ANIM=false;
+    localStorage.setItem('rv_lastcls', cls);
+    STU=ALL.filter(function(s){ return s.cls===cls; }).map(function(s){ return { sid:s.sid, name:s.name }; });
+    var saved=null; try{ saved=JSON.parse(localStorage.getItem(_key(cls))||'null'); }catch(_){}
+    if(saved&&saved.cls===cls){ RV=saved; }
+    else { RV={ cls:cls, mode:'once', pool:STU.map(function(s){return s.sid;}), current:[], kept:[], done:[], pass:0 }; }
+    // current를 배열로 정규화 (구버전 저장분: 단일 sid 또는 null)
+    if(!Array.isArray(RV.current)) RV.current = RV.current ? [RV.current] : [];
+    var savedCnt=localStorage.getItem('rv_cnt'); if(savedCnt) document.getElementById('cntSel').value=savedCnt;
+    render();
   }
 
   function toggleMode(){ if(!RV) return; RV.mode=(RV.mode==='dup')?'once':'dup'; render(); }
