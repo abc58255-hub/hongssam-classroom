@@ -1,0 +1,14 @@
+{
+  "name": "복습 질문",
+  "short_name": "복습질문",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0b1020",
+  "theme_color": "#4338ca",
+  "icons": [
+    { "src": "./icon-review-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-review-180.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
