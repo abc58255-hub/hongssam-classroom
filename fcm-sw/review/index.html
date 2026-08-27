@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>복습 질문</title>
+<!-- 아이패드 홈 화면 아이콘 (주사위) -->
+<link rel="apple-touch-icon" href="./icon-review-180.png">
+<link rel="icon" type="image/png" href="./icon-review-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="복습 질문">
+<meta name="theme-color" content="#4338ca">
+<style>
+  * { box-sizing:border-box; }
+  html,body { height:100%; margin:0; }
+  body { background:linear-gradient(160deg,#6366f1,#4338ca); color:#fff;
+    font-family:-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:18px; padding:24px; text-align:center; }
+  .ico { font-size:70px; filter:drop-shadow(0 8px 20px rgba(0,0,0,.35)); }
+  .t { font-size:23px; font-weight:900; }
+  .s { font-size:14px; color:#c7d2fe; line-height:1.6; max-width:320px; }
+  .btn { margin-top:6px; padding:15px 30px; background:#fff; color:#4338ca; border:none; border-radius:16px; font-size:17px; font-weight:900; cursor:pointer; text-decoration:none; box-shadow:0 10px 28px rgba(0,0,0,.3); }
+  .hint { margin-top:14px; font-size:13px; color:#a5b4fc; line-height:1.7; }
+</style>
+</head>
+<body>
+  <div class="ico">🎲</div>
+  <div class="t">복습 질문</div>
+  <div id="body">
+    <a class="btn" id="openBtn" href="#">여는 중…</a>
+  </div>
+
+<script>
+  var RV_URL = 'https://script.google.com/macros/s/AKfycbyF8T-3tY7kLQw3Tg6lNRb2z4NEVvdCbOEg5hUw1-KuxHZT5bN6M3iRFTixtSGZ6Q8VYQ/exec';
+  document.getElementById('openBtn').href = RV_URL;
+  var standalone = window.navigator.standalone === true ||
+    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+  if (standalone) {
+    // 홈 화면 아이콘으로 열었을 때 → 바로 복습 질문으로 이동
+    location.replace(RV_URL);
+  } else {
+    // Safari에서 열었을 때 → 홈 화면 추가 안내 + 수동 열기
+    document.getElementById('body').innerHTML =
+      '<a class="btn" href="' + RV_URL + '">🎲 복습 질문 열기</a>'
+      + '<div class="hint">📌 아이패드 홈에 추가: 공유 → <b>홈 화면에 추가</b><br>주사위 아이콘이 생겨요.</div>';
+  }
+</script>
+</body>
+</html>
