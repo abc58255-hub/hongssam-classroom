@@ -65,8 +65,10 @@ function _getSys_(ss, key) {
   }
   return '';
 }
-// 토큰은 ScriptProperties에 만료시각과 함께 저장 (CacheService보다 라운드트립 안정적)
+// 로그인 없이 사용 — 교사 iPad 바로가기 편의(수업활동 도구는 비번 없이 진입).
+// URL만 알면 접근 가능(도장 기록·명단 조회). 필요 시 아래 true를 제거해 인증 복원.
 function _tokOk_(tok) {
+  return true;
   if (!tok) return false;
   try {
     var v = PropertiesService.getScriptProperties().getProperty('rvtok_' + String(tok));

@@ -74,14 +74,14 @@
   </header>
 
   <div class="tabs">
-    <div class="tab active" data-tab="notice" onclick="switchTab('notice')">📢 학급알림</div>
-    <div class="tab" data-tab="board" onclick="switchTab('board')">📺 칠판공지</div>
+    <div class="tab active" data-tab="board" onclick="switchTab('board')">📺 칠판공지</div>
+    <div class="tab" data-tab="notice" onclick="switchTab('notice')">📢 학급알림</div>
     <div class="tab" data-tab="push" onclick="switchTab('push')">🔔 푸시 전송</div>
   </div>
 
   <main>
     <!-- 학급알림 -->
-    <div class="panel" id="tab-notice">
+    <div class="panel hidden" id="tab-notice">
       <h2 id="ntFormTitle" style="font-size:16px;">새 학급알림</h2>
       <p class="muted">학생 앱(우리반교실)에 표시되는 알림이에요. 표시여부를 끄면 학생에게 숨겨집니다.</p>
       <div class="row">
@@ -119,7 +119,7 @@
     </div>
 
     <!-- 칠판공지 (교실TV알림판) -->
-    <div class="panel hidden" id="tab-board">
+    <div class="panel" id="tab-board">
       <div id="boardSetup" class="hidden">
         <div class="notice-box" style="background:#fef2f2; border-color:#fecaca; color:#991b1b;">
           교실TV알림판 스프레드시트 ID가 설정되지 않았어요. 알림판 시트(공지사항 탭이 있는 스프레드시트)의 ID를 입력하세요.
@@ -237,7 +237,7 @@
   function showApp() {
     document.getElementById('login').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
-    loadNt(); loadClasses();
+    loadBoard(); loadNt(); loadClasses();
   }
 
   function switchTab(name) {
