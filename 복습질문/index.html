@@ -117,6 +117,9 @@
     <button class="jbtn jfail" onclick="judge('fail')">실패</button>
     <button class="jbtn jkeep" onclick="judge('keep')">킵</button>
   </div>
+  <div id="moreRow" style="display:none;">
+    <button class="big" style="background:linear-gradient(135deg,#0ea5e9,#0369a1);box-shadow:0 10px 30px rgba(14,165,233,.4);" onclick="drawMore()">➕ 추가 뽑기 (한 명 더)</button>
+  </div>
   <div class="srow">
     <button class="sbtn" style="flex:1;" onclick="finish()">🏁 마무리 (킵 다시)</button>
     <button class="sbtn" style="color:#f87171;" onclick="reset()">↺ 처음부터</button>
@@ -253,7 +256,7 @@
     var kb=document.getElementById('keptBar');
     kb.innerHTML = RV.kept.length ? '🔖 '+RV.kept.map(function(s){return '<span class="keptchip">'+esc(_name(s))+'</span>';}).join('') : '';
     kb.style.display = RV.kept.length?'block':'none';
-    var card=document.getElementById('card'), drawRow=document.getElementById('drawRow'), judgeRow=document.getElementById('judgeRow');
+    var card=document.getElementById('card'), drawRow=document.getElementById('drawRow'), judgeRow=document.getElementById('judgeRow'), moreRow=document.getElementById('moreRow');
     var cur = RV.current || [];
     if(cur.length===1){
       // 단일: 큰 카드 + 하단 판정 버튼
@@ -263,7 +266,7 @@
         +'<div class="winner" style="font-size:clamp(54px,'+(len<=3?15:len<=5?11:8)+'vw,168px);">'+esc(nm)+'</div>'
         +'<div class="badge">🎤 복습 질문!</div>'
       +'</div>';
-      drawRow.style.display='none'; judgeRow.style.display='flex';
+      drawRow.style.display='none'; judgeRow.style.display='flex'; moreRow.style.display='block';
     } else if(cur.length>1){
       // 멀티: 카드별 판정 버튼 (하단 버튼 숨김)
       var cols = cur.length<=2?cur.length:(cur.length<=4?2:3);
@@ -281,9 +284,9 @@
       });
       html+='</div>';
       card.innerHTML=html;
-      drawRow.style.display='none'; judgeRow.style.display='none';
+      drawRow.style.display='none'; judgeRow.style.display='none'; moreRow.style.display='block';
     } else {
-      judgeRow.style.display='none'; drawRow.style.display='block';
+      judgeRow.style.display='none'; drawRow.style.display='block'; moreRow.style.display='none';
       var empty=(RV.mode!=='dup'&&RV.pool.length===0);
       card.innerHTML = empty
         ? '<div class="endbig">이번 바퀴 끝! 🎉</div><div class="endsub">'+(RV.kept.length?'🔖 킵한 '+RV.kept.length+'명은 [마무리]로 다시':'모든 학생 확인 완료')+'</div>'
@@ -292,14 +295,23 @@
     _save();
   }
 
-  function draw(){
-    if(!RV||(RV.current&&RV.current.length)||ANIM) return;
+  function draw(){ _doDraw(false); }
+  function drawMore(){ _doDraw(true); }   // 이미 뽑은 사람 유지 + 한 명 더 합류
+  function _doDraw(add){
+    if(!RV||ANIM) return;
+    var cur = RV.current||[];
+    if(add ? !cur.length : cur.length) return;   // 추가는 뽑힌 게 있을 때만 / 일반은 없을 때만
     if(!STU.length){ toast('명단을 불러오는 중이에요…'); onClass(); return; } // 아직 로딩 전이면 재조회
-    var cands = RV.mode==='dup' ? STU.map(function(s){return s.sid;}) : RV.pool;
-    if(!cands.length){ toast('뽑을 학생이 없어요'); return; }
-    var n=Math.min(_cnt(), cands.length);
+    var cands = (RV.mode==='dup' ? STU.map(function(s){return s.sid;}) : RV.pool)
+      .filter(function(x){ return cur.indexOf(x)<0; });   // 이미 뽑힌 사람 제외
+    if(!cands.length){ toast(add?'더 뽑을 학생이 없어요':'뽑을 학생이 없어요'); return; }
+    var n=add ? 1 : Math.min(_cnt(), cands.length);
+    n=Math.min(n, cands.length);
     var winners=pickN(cands, n);
-    ANIM=true; document.getElementById('drawRow').style.display='none';
+    ANIM=true;
+    document.getElementById('drawRow').style.display='none';
+    document.getElementById('judgeRow').style.display='none';
+    document.getElementById('moreRow').style.display='none';
     var card=document.getElementById('card'), all=STU.map(function(s){return s.sid;}), t=0, max=(n===1?24:14);
     function flash(){
       var prog=t/max, blur=Math.max(0,(1-prog)*7), op=.45+prog*.55;
@@ -312,13 +324,13 @@
         card.innerHTML='<div class="hint" style="color:#818cf8;">🎲 '+n+'명 뽑는 중…</div>'
           +'<div style="font-size:26px;font-weight:900;color:#93c5fd;filter:blur('+blur.toFixed(1)+'px);opacity:'+op.toFixed(2)+';line-height:1.5;">'+names.join(' · ')+'</div>';
       }
-      t++; if(t>=max){ land(winners); return; }
+      t++; if(t>=max){ land(add ? cur.concat(winners) : winners.slice()); return; }
       setTimeout(flash, (n===1?40:36)+t*t*.9);
     }
     flash();
   }
-  function land(winners){
-    ANIM=false; RV.current=winners.slice();
+  function land(nextCurrent){
+    ANIM=false; RV.current=nextCurrent;
     var spot=document.getElementById('spot'); spot.classList.remove('on'); void spot.offsetWidth; spot.classList.add('on');
     confetti();
     render();
