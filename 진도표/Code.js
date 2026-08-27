@@ -48,6 +48,22 @@ function doGet() {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
+// PWA(Pages) 프론트에서 google.script.run 어댑터로 호출 — text/plain {fn,args} → {ok,result|error}
+var RPC_WHITELIST = ['bulkChangeLessons','bulkCompleteDay','createGroup','createPlan','deleteGroup','deleteMovedInLesson','deletePlan','deleteSemester','deleteSyllabusCheck','generateAndApplySchedule','getClassList','getGroups','getPlanList','getSemesterList','getSyllabusData','getSyllabusPlanById','getTimetableList','renamePlan','saveMovedInLesson','saveSylClassList','saveSyllabusCheck','saveSyllabusPlan','saveSyllabusPlanById','updateGroup','verifyTeacher'];
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    var fn = globalThis[req.fn];
+    if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
+    out = { ok: true, result: fn.apply(null, req.args || []) };
+  } catch (err) {
+    out = { ok: false, error: String(err && err.message || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 function _getSysSetting(key) {
   try {
     var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName('시스템설정');

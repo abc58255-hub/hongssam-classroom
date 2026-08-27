@@ -87,7 +87,7 @@ function getPortalData() {
   var groups = [
     { title: '수업·평가', cards: [
       { name: '과제채점',  icon: '📝', desc: '수학 과제 출제·채점·첨삭',     keys: ['과제채점'] },
-      { name: '진도표',    icon: '📋', desc: '진도 계획·기록',              keys: ['진도표'] },
+      { name: '진도표',    icon: '📋', desc: '진도 계획·기록',              keys: ['진도표'], url: 'https://abc58255-hub.github.io/hongssam-classroom/progress/' },
       { name: '수업활동',  icon: '🎮', desc: '단원 게임·자유 도전 공개 관리', keys: [], action: 'lessonAdmin' },
       { name: '복습 질문', icon: '🎲', desc: '반 뽑기 → 구두 복습 → 통과 도장(교사용)', keys: ['복습질문'], url: 'https://abc58255-hub.github.io/hongssam-classroom/review/' }
     ]},

@@ -1,0 +1,14 @@
+{
+  "name": "진도표",
+  "short_name": "진도표",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f8fafc",
+  "theme_color": "#1d4ed8",
+  "icons": [
+    { "src": "./icon-progress-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-progress-180.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
