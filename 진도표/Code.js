@@ -55,6 +55,10 @@ function doPost(e) {
   try {
     var req = JSON.parse(e.postData.contents);
     if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    // verifyTeacher(로그인) 외 모든 호출은 토큰 필요 — 공개 웹앱이라 비번 게이트 서버 강제
+    if (req.fn !== 'verifyTeacher' && !_pgTokOk_(req.token)) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: '로그인이 필요해요', needAuth: true })).setMimeType(ContentService.MimeType.JSON);
+    }
     var fn = globalThis[req.fn];
     if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
     out = { ok: true, result: fn.apply(null, req.args || []) };
@@ -81,9 +85,24 @@ function verifyTeacher(password) {
     // 시스템설정 '교사비밀번호' 키 우선, 없으면 학생명부 F2 폴백
     var pw = _getSysSetting('교사비밀번호');
     if (!pw) return { success: false, message: '비밀번호가 설정되어 있지 않습니다. 시스템설정 시트를 확인하세요.' };
-    if (String(password).trim() === pw) return { success: true };
+    if (String(password).trim() === pw) return { success: true, token: _pgIssueToken_() };
     return { success: false, message: '비밀번호가 틀렸습니다.' };
   } catch(e) { return { success: false, message: e.toString() }; }
+}
+// PWA 인증 토큰 (ScriptProperties, 6h) — 공개 웹앱(anyone)에서 doPost 게이트용
+function _pgIssueToken_() {
+  var t = Utilities.getUuid();
+  PropertiesService.getScriptProperties().setProperty('pgtok_' + t, String(Date.now() + 6 * 3600 * 1000));
+  return t;
+}
+function _pgTokOk_(t) {
+  if (!t) return false;
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty('pgtok_' + String(t));
+    if (!v) return false;
+    if (Date.now() > parseInt(v)) { PropertiesService.getScriptProperties().deleteProperty('pgtok_' + String(t)); return false; }
+    return true;
+  } catch(_) { return false; }
 }
 
 function getClassList() {

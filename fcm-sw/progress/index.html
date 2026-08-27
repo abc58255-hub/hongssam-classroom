@@ -16,6 +16,7 @@
   var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbwn_9wAf1Qyb744x-t3b46CkuikXhg748qryip_tMQYpYUDVz65nPuK_rxVN7LUBkHf9g/exec';
   (function () {
     var FNS = ['bulkChangeLessons','bulkCompleteDay','createGroup','createPlan','deleteGroup','deleteMovedInLesson','deletePlan','deleteSemester','deleteSyllabusCheck','generateAndApplySchedule','getClassList','getGroups','getPlanList','getSemesterList','getSyllabusData','getSyllabusPlanById','getTimetableList','renamePlan','saveMovedInLesson','saveSylClassList','saveSyllabusCheck','saveSyllabusPlan','saveSyllabusPlanById','updateGroup','verifyTeacher'];
+    var AUTH_TOKEN = localStorage.getItem('pg_tok') || '';   // verifyTeacher가 발급, 모든 요청에 첨부
     function makeRunner() {
       var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
       var r = {};
@@ -24,9 +25,15 @@
       FNS.forEach(function (name) {
         r[name] = function () {
           var args = Array.prototype.slice.call(arguments);
-          fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args }) })
+          fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args, token: AUTH_TOKEN }) })
             .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-            .then(function (data) { if (data && data.ok) return data.result; throw new Error((data && data.error) || '서버 오류'); })
+            .then(function (data) {
+              if (data && data.ok) {
+                if (name === 'verifyTeacher' && data.result && data.result.token) { AUTH_TOKEN = data.result.token; try { localStorage.setItem('pg_tok', AUTH_TOKEN); } catch (_) {} }
+                return data.result;
+              }
+              throw new Error((data && data.error) || '서버 오류');
+            })
             .then(function (result) { ok(result); }, function (e) { fail(e); });
         };
       });
