@@ -357,21 +357,35 @@
     }
   }
 
-  // 판정 공통 처리 (한 명 해결 → RV.current에서 제거)
-  function _resolve(sid, kind){
+  // 판정 처리. 통과=서버 저장 성공해야 완료(실패 시 학생 유지→재시도). 실패/킵=즉시.
+  var _saving = {};
+  function _finishLocal(sid, kind){
     var name=_name(sid);
     if(RV.mode!=='dup') RV.pool=RV.pool.filter(function(x){return x!==sid;});
-    if(kind==='pass'){
-      RV.pass++; RV.done.push(sid); COUNTS[sid]=(COUNTS[sid]||0)+1;
-      google.script.run.withFailureHandler(function(e){ toast('⚠ 도장 저장 실패: '+e.message); })
-        .withSuccessHandler(function(res){ if(res&&res.needAuth) toast('🔒 인증 필요'); }).recordReviewPass(sid, name, TOK);
-      toast('✅ '+name+' 통과! 도장 +1');
-    } else if(kind==='fail'){ RV.done.push(sid); toast('❌ '+name+' 실패'); }
+    if(kind==='fail'){ RV.done.push(sid); toast('❌ '+name+' 실패'); }
     else { if(RV.kept.indexOf(sid)<0) RV.kept.push(sid); toast('🔖 '+name+' 킵'); }
-    RV.current = (RV.current||[]).filter(function(x){return x!==sid;});
+    RV.current=(RV.current||[]).filter(function(x){return x!==sid;});
   }
-  function judge(kind){ if(!RV||!RV.current||!RV.current.length) return; _resolve(RV.current[0], kind); render(); }
-  function judgeOne(sid, kind){ if(!RV||(RV.current||[]).indexOf(sid)<0) return; _resolve(sid, kind); render(); }
+  function _resolve(sid, kind){
+    var name=_name(sid);
+    if(kind!=='pass'){ _finishLocal(sid, kind); render(); return; }
+    if(_saving[sid]) return;
+    _saving[sid]=true;
+    toast('💾 '+name+' 도장 저장 중…');
+    google.script.run
+      .withFailureHandler(function(e){ delete _saving[sid]; toast('⚠ 저장 실패 — 다시 눌러주세요'); })
+      .withSuccessHandler(function(res){
+        delete _saving[sid];
+        if(res && res.needAuth){ toast('🔒 인증 필요'); return; }
+        RV.pass++; RV.done.push(sid); COUNTS[sid]=(COUNTS[sid]||0)+1;
+        if(RV.mode!=='dup') RV.pool=RV.pool.filter(function(x){return x!==sid;});
+        RV.current=(RV.current||[]).filter(function(x){return x!==sid;});
+        toast('✅ '+name+' 통과! 도장 +1');
+        render();
+      }).recordReviewPass(sid, name, TOK);
+  }
+  function judge(kind){ if(!RV||!RV.current||!RV.current.length) return; _resolve(RV.current[0], kind); }
+  function judgeOne(sid, kind){ if(!RV||(RV.current||[]).indexOf(sid)<0) return; _resolve(sid, kind); }
 
   function finish(){
     if(!RV) return;
