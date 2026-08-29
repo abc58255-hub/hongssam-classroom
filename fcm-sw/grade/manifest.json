@@ -1,0 +1,14 @@
+{
+  "name": "과제채점",
+  "short_name": "과제채점",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f1f5f9",
+  "theme_color": "#1e3a8a",
+  "icons": [
+    { "src": "./icon-grade-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-grade-180.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

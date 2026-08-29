@@ -94,6 +94,30 @@ function doGet() {
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+// ── PWA(Pages) 프론트 → GAS 백엔드 호출 (google.script.run 어댑터) ──
+// text/plain {fn,args,token} → {ok,result|error}. teacherLogin 외 전부 토큰 검사(공개 웹앱 보안).
+var RPC_WHITELIST = ['aiGradeSubmission','approveResubmitRequest','bulkPublishTasks','cancelBestWork','changeBestScope','clearStudentReply','deleteRubric','deleteTask','getAchievements','getApiSettings','getAppLinkUrl','getDashboardData','getNotifyLog','getNotifySettings','getRubrics','getSecureFileBase64','getTasksOnly','installAutoNotifyTriggers','resetStudentPassword','runAICheatCheck','saveAiGradeResult','saveAiGradeTempResult','saveApiSetting','saveAppLinkUrl','saveFeedback','saveMultiAnnotatedImages','saveNewTask','saveRubric','sendPushToUnsubmitted','setNotifySettings','teacherLogin','toggleTaskVisibility','updateTaskSettings','uploadRubricFile','validateTeacherSession'];
+var RPC_NOAUTH = ['teacherLogin'];   // 로그인만 토큰 불필요
+function _atOk_(token) {
+  try { var v = ClassCore.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; }
+}
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    if (RPC_NOAUTH.indexOf(req.fn) < 0 && !_atOk_(req.token)) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: '로그인이 필요해요', needAuth: true })).setMimeType(ContentService.MimeType.JSON);
+    }
+    var fn = globalThis[req.fn];
+    if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
+    out = { ok: true, result: fn.apply(null, req.args || []) };
+  } catch (err) {
+    out = { ok: false, error: String(err && err.message || err) };
+  }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
 function _serviceUrl_() {
   try { return ScriptApp.getService().getUrl() || ''; } catch(_) { return ''; }
 }
