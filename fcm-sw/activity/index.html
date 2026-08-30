@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <link rel="apple-touch-icon" href="./icon-activity-180.png">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="창체관리">
+  <meta name="theme-color" content="#10b981">
+  <script>
+    var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbx-4x3u4lfmoVydcQId4J8_GgJOB8ut80ryJCasYzWshdLZQYjENyo9SBtBUMyJFPpMag/exec';
+    (function () {
+      var FNS = ["deleteActivity", "getActivities", "getRoster", "getSubmissions", "saveActivity", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+      var TOKKEY = 'changche_token';
+      function makeRunner() {
+        var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
+        var r = {};
+        r.withSuccessHandler = function (fn) { if (fn) ok = fn; return r; };
+        r.withFailureHandler = function (fn) { if (fn) fail = fn; return r; };
+        FNS.forEach(function (name) {
+          r[name] = function () {
+            var args = Array.prototype.slice.call(arguments);
+            var body = { fn: name, args: args };
+            if (TOKKEY) { try { body.token = localStorage.getItem(TOKKEY) || ''; } catch (_) {} }
+            fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+              .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+              .then(function (data) { if (data && data.ok) return data.result; throw new Error((data && data.error) || '서버 오류'); })
+              .then(function (result) { ok(result); }, function (e) { fail(e); });
+          };
+        });
+        return r;
+      }
+      var s = {}; Object.defineProperty(s, 'run', { get: makeRunner }); window.google = { script: s };
+    })();
+  </script>
+
+<base target="_top">
+<meta charset="UTF-8">
+<title>창체 관리</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; background: #f1f5f9; color: #0f172a; }
+  .hidden { display: none !important; }
+
+  /* 로그인 */
+  #login { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #0d9488, #0f766e); }
+  .login-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); width: 340px; text-align: center; }
+  .login-card h1 { font-size: 22px; margin-bottom: 6px; }
+  .login-card p { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+  .login-card input { width: 100%; padding: 13px 15px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; margin-bottom: 14px; }
+  .login-card input:focus { outline: none; border-color: #0d9488; }
+  .btn { background: #0d9488; color: white; border: none; padding: 13px 20px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; transition: 0.2s; }
+  .btn:hover { background: #0f766e; }
+  .btn.sm { width: auto; padding: 8px 14px; font-size: 13px; }
+  .btn.gray { background: #64748b; }
+  .btn.gray:hover { background: #475569; }
+  .btn.red { background: #ef4444; }
+  .btn.red:hover { background: #dc2626; }
+
+  /* 레이아웃 */
+  header { background: white; padding: 16px 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 18px; }
+  header .spacer { flex: 1; }
+  .tabs { display: flex; gap: 8px; padding: 16px 24px 0; }
+  .tab { padding: 10px 18px; border-radius: 12px 12px 0 0; background: #e2e8f0; color: #64748b; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .tab.active { background: white; color: #0d9488; box-shadow: 0 -2px 6px rgba(0,0,0,0.04); }
+  main { padding: 0 24px 40px; }
+  .panel { background: white; border-radius: 0 12px 12px 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  label { display: block; font-size: 13px; font-weight: 700; color: #475569; margin: 12px 0 5px; }
+  input[type=text], textarea, select { width: 100%; padding: 11px 13px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: #0d9488; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+  th { background: #f8fafc; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; }
+  tr:hover td { background: #f8fafc; }
+  .cat-tag { display: inline-block; padding: 3px 10px; border-radius: 20px; background: #ccfbf1; color: #0f766e; font-size: 12px; font-weight: 700; }
+  .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 14px; }
+  .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 8px; }
+  .act-card { border: 2px solid #e2e8f0; border-radius: 14px; padding: 18px; transition: 0.2s; }
+  .act-card:hover { border-color: #0d9488; box-shadow: 0 6px 18px rgba(13,148,136,0.12); }
+  .act-card h3 { font-size: 16px; margin-bottom: 6px; }
+  .act-card .desc { color: #64748b; font-size: 13px; margin: 8px 0 14px; white-space: pre-wrap; }
+  .act-card .actions { display: flex; gap: 8px; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 12px 22px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 100; opacity: 0; transition: 0.3s; }
+  .toast.show { opacity: 1; }
+  .sub-section h2 { font-size: 16px; margin-bottom: 4px; }
+  .muted { color: #64748b; font-size: 13px; }
+  .filter-bar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .filter-bar select { width: auto; min-width: 180px; }
+</style>
+</head>
+<body>
+
+<!-- 로그인 -->
+<div id="login">
+  <div class="login-card">
+    <h1>📓 창체 관리</h1>
+    <p>교사 비밀번호로 로그인하세요</p>
+    <input type="password" id="pw" placeholder="교사 비밀번호" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" onclick="doLogin()">로그인</button>
+  </div>
+</div>
+
+<!-- 메인 -->
+<div id="app" class="hidden">
+  <header>
+    <h1>📓 창체(학급활동) 관리</h1>
+    <div class="spacer"></div>
+    <button class="btn sm gray" onclick="doLogout()">로그아웃</button>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="manage" onclick="switchTab('manage')">📝 활동 관리</div>
+    <div class="tab" data-tab="status" onclick="switchTab('status')">📊 제출 현황</div>
+  </div>
+
+  <main>
+    <!-- 활동 관리 -->
+    <div class="panel" id="tab-manage">
+      <div class="sub-section">
+        <h2 id="formTitle">새 활동 만들기</h2>
+        <p class="muted">학생들이 제출할 창의적 체험활동을 등록합니다.</p>
+        <div class="row">
+          <div style="flex:1; min-width:160px;">
+            <label>카테고리</label>
+            <select id="f-category">
+              <option>자율활동</option>
+              <option>동아리활동</option>
+              <option>봉사활동</option>
+              <option>진로활동</option>
+              <option>기타</option>
+            </select>
+          </div>
+          <div style="flex:2; min-width:200px;">
+            <label>활동명</label>
+            <input type="text" id="f-name" placeholder="예: 학급 자치회의">
+          </div>
+        </div>
+        <label>설명</label>
+        <textarea id="f-desc" placeholder="학생에게 보여줄 활동 안내"></textarea>
+        <label>폼링크 (선택)</label>
+        <input type="text" id="f-formUrl" placeholder="외부 구글폼 링크 (없으면 비워두세요)">
+        <label>필드 설정 JSON (고급, 선택)</label>
+        <textarea id="f-fields" placeholder='예: ["역할","소감"] — 비워두면 기본 항목 사용'></textarea>
+        <input type="hidden" id="f-rowIdx" value="">
+        <div style="margin-top:16px; display:flex; gap:10px;">
+          <button class="btn sm" onclick="saveAct()">저장</button>
+          <button class="btn sm gray hidden" id="cancelEdit" onclick="resetForm()">취소</button>
+        </div>
+      </div>
+
+      <hr style="margin:24px 0; border:none; border-top:1px solid #e2e8f0;">
+
+      <h2 style="font-size:16px; margin-bottom:10px;">등록된 활동</h2>
+      <div id="actList" class="card-grid"></div>
+    </div>
+
+    <!-- 제출 현황 -->
+    <div class="panel hidden" id="tab-status">
+      <div class="filter-bar">
+        <span class="muted">활동별 필터:</span>
+        <select id="filterAct" onchange="renderSubs()"><option value="">전체 활동</option></select>
+        <button class="btn sm gray" onclick="loadSubs()">새로고침</button>
+      </div>
+      <div id="subTable"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var TOKEN = localStorage.getItem('changche_token') || '';
+  var SUBS = { activities: [], submissions: [] };
+  var ROSTER = [];
+  var HOMEROOM = '';
+
+  // ── 인증 ──
+  function doLogin() {
+    var pw = document.getElementById('pw').value;
+    if (!pw) return;
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success && res.token) {
+        TOKEN = res.token;
+        localStorage.setItem('changche_token', TOKEN);
+        showApp();
+      } else {
+        toast(res && res.message ? res.message : '비밀번호가 틀렸습니다');
+      }
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).teacherLogin(pw);
+  }
+
+  function doLogout() {
+    google.script.run.teacherLogout(TOKEN);
+    localStorage.removeItem('changche_token');
+    TOKEN = '';
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('login').classList.remove('hidden');
+  }
+
+  function checkSession() {
+    if (!TOKEN) return;
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) showApp();
+    }).validateTeacherSession(TOKEN);
+  }
+
+  function showApp() {
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    loadActs(); loadRoster();
+  }
+
+  function loadRoster() {
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) return;
+      HOMEROOM = res.homeroom || '';
+      var rows = res.roster || [];
+      ROSTER = [];
+      for (var i = 1; i < rows.length; i++) {
+        var sid = String(rows[i][1] || '').trim(); if (!sid) continue;
+        var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+        if (HOMEROOM && cls !== HOMEROOM) continue; // 담임반만 대상
+        ROSTER.push({ id: sid, name: String(rows[i][2] || '').trim() });
+      }
+      ROSTER.sort(function(a,b){ return a.id.localeCompare(b.id); });
+    }).getRoster();
+  }
+
+  // ── 탭 ──
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
+    document.getElementById('tab-manage').classList.toggle('hidden', name !== 'manage');
+    document.getElementById('tab-status').classList.toggle('hidden', name !== 'status');
+    if (name === 'status') loadSubs();
+  }
+
+  // ── 활동 관리 ──
+  function loadActs() {
+    google.script.run.withSuccessHandler(function(res) {
+      var el = document.getElementById('actList');
+      if (!res || !res.success || !res.activities.length) {
+        el.innerHTML = '<p class="empty">아직 등록된 활동이 없습니다.</p>';
+        return;
+      }
+      el.innerHTML = res.activities.map(function(a) {
+        return '<div class="act-card">' +
+          '<span class="cat-tag">' + esc(a.category) + '</span>' +
+          '<h3 style="margin-top:8px;">' + esc(a.name) + '</h3>' +
+          '<div class="desc">' + (esc(a.desc) || '<span class="muted">설명 없음</span>') + '</div>' +
+          (a.formUrl ? '<a href="'+esc(a.formUrl)+'" target="_blank" class="muted">🔗 폼 링크</a>' : '') +
+          '<div class="actions" style="margin-top:12px;">' +
+            '<button class="btn sm gray" onclick=\'editAct(' + JSON.stringify(a).replace(/\'/g,"&#39;") + ')\'>수정</button>' +
+            '<button class="btn sm red" onclick="delAct(' + a.rowIdx + ')">삭제</button>' +
+          '</div></div>';
+      }).join('');
+    }).getActivities();
+  }
+
+  function saveAct() {
+    var data = {
+      rowIdx:   document.getElementById('f-rowIdx').value ? Number(document.getElementById('f-rowIdx').value) : 0,
+      category: document.getElementById('f-category').value,
+      name:     document.getElementById('f-name').value.trim(),
+      desc:     document.getElementById('f-desc').value.trim(),
+      formUrl:  document.getElementById('f-formUrl').value.trim(),
+      fields:   document.getElementById('f-fields').value.trim() || '[]'
+    };
+    if (!data.name) { toast('활동명을 입력하세요'); return; }
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { toast('저장됨'); resetForm(); loadActs(); }
+      else toast(res && res.message ? res.message : '저장 실패');
+    }).saveActivity(data);
+  }
+
+  function editAct(a) {
+    document.getElementById('f-rowIdx').value = a.rowIdx;
+    document.getElementById('f-category').value = a.category || '자율활동';
+    document.getElementById('f-name').value = a.name || '';
+    document.getElementById('f-desc').value = a.desc || '';
+    document.getElementById('f-formUrl').value = a.formUrl || '';
+    document.getElementById('f-fields').value = a.fields || '';
+    document.getElementById('formTitle').textContent = '활동 수정';
+    document.getElementById('cancelEdit').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetForm() {
+    document.getElementById('f-rowIdx').value = '';
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-desc').value = '';
+    document.getElementById('f-formUrl').value = '';
+    document.getElementById('f-fields').value = '';
+    document.getElementById('formTitle').textContent = '새 활동 만들기';
+    document.getElementById('cancelEdit').classList.add('hidden');
+  }
+
+  function delAct(rowIdx) {
+    uiConfirm('이 활동을 삭제할까요?\n(제출 기록은 유지됩니다)', function(){
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) { toast('삭제됨'); loadActs(); }
+        else toast(res && res.message ? res.message : '삭제 실패');
+      }).deleteActivity(rowIdx);
+    }, {icon:'🗑', danger:true, okText:'삭제'});
+  }
+
+  // ── 제출 현황 ──
+  function loadSubs() {
+    document.getElementById('subTable').innerHTML = '<p class="empty">불러오는 중...</p>';
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) { document.getElementById('subTable').innerHTML = '<p class="empty">불러오기 실패</p>'; return; }
+      SUBS = res;
+      var sel = document.getElementById('filterAct');
+      sel.innerHTML = '<option value="">전체 활동</option>' +
+        res.activities.map(function(a){ return '<option value="'+esc(a.name)+'">'+esc(a.name)+'</option>'; }).join('');
+      renderSubs();
+    }).getSubmissions();
+  }
+
+  function renderSubs() {
+    var filter = document.getElementById('filterAct').value;
+    var rows = SUBS.submissions.filter(function(s){ return !filter || s.activity === filter; });
+
+    // 미제출자 현황 (특정 활동 선택 시, 담임반 명부 기준)
+    var missingHtml = '';
+    if (filter && ROSTER.length) {
+      var submittedIds = {};
+      SUBS.submissions.forEach(function(s){ if (s.activity === filter) submittedIds[s.id] = true; });
+      var missing = ROSTER.filter(function(st){ return !submittedIds[st.id]; });
+      missingHtml = '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 14px;margin-bottom:14px;">' +
+        '<b style="color:#dc2626;">❌ 미제출자 ' + missing.length + '/' + ROSTER.length + '명</b> <span class="muted">— ' + esc(filter) + (HOMEROOM ? ' / ' + esc(HOMEROOM) : '') + '</span>' +
+        '<div style="margin-top:6px;font-size:13px;color:#991b1b;line-height:1.7;">' +
+          (missing.length ? missing.map(function(m){ return esc(m.id) + ' ' + esc(m.name); }).join(', ') : '전원 제출 완료! 🎉') +
+        '</div></div>';
+    } else if (!filter && ROSTER.length) {
+      missingHtml = '<p class="muted" style="margin-bottom:10px;">위에서 활동을 선택하면 미제출자 현황이 표시돼요.</p>';
+    }
+
+    var tableHtml;
+    if (!rows.length) {
+      tableHtml = '<p class="empty">제출 기록이 없습니다.</p>';
+    } else {
+      tableHtml = '<table><thead><tr><th>날짜</th><th>학번</th><th>이름</th><th>활동</th><th>역할</th><th>소감</th><th>첨부</th></tr></thead><tbody>';
+      tableHtml += rows.map(function(s) {
+        var link = s.url ? '<a href="'+esc(s.url)+'" target="_blank">📎 보기</a>' : '<span class="muted">없음</span>';
+        return '<tr><td>'+esc(s.date)+'</td><td>'+esc(s.id)+'</td><td>'+esc(s.name)+'</td>' +
+          '<td>'+esc(s.activity)+'</td><td>'+esc(s.role)+'</td><td>'+esc(s.reflection)+'</td><td>'+link+'</td></tr>';
+      }).join('');
+      tableHtml += '</tbody></table>';
+    }
+    document.getElementById('subTable').innerHTML = missingHtml + tableHtml;
+  }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  checkSession();
+</script>
+
+<!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
+<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.00.00</span></div>
+<script>
+/* 예쁜 확인/알림창 — 브라우저 기본 confirm/alert 대체 (자체 스타일 포함) */
+(function(){
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function build(msg,opt,withCancel){
+    opt=opt||{};
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+    var lines=String(msg).split('\n').map(esc).join('<br>');
+    ov.innerHTML='<div style="background:#fff;border-radius:18px;padding:24px 22px;width:340px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.28);text-align:center;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">'
+      +'<div style="font-size:32px;margin-bottom:8px;">'+(opt.icon||(withCancel?'❓':'💬'))+'</div>'
+      +'<div style="font-size:15px;font-weight:600;line-height:1.55;margin-bottom:20px;">'+lines+'</div>'
+      +'<div style="display:flex;gap:8px;">'
+        +(withCancel?'<button data-no style="flex:1;padding:12px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;">취소</button>':'')
+        +'<button data-yes style="flex:1;padding:12px;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;color:#fff;background:'+(opt.danger?'#dc2626':'#2563eb')+';">'+(opt.okText||'확인')+'</button>'
+      +'</div></div>';
+    document.body.appendChild(ov); return ov;
+  }
+  window.uiConfirm=function(msg,onOk,opt){var ov=build(msg,opt,true);function c(){ov.remove();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-no]').onclick=c;ov.querySelector('[data-yes]').onclick=function(){c();if(onOk)onOk();};};
+  window.uiAlert=function(msg,cb,opt){var ov=build(msg,opt,false);function c(){ov.remove();if(cb)cb();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-yes]').onclick=c;};
+  window.alert=function(m){window.uiAlert(m);};
+})();
+</script>
+
+</body>
+</html>

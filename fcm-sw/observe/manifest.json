@@ -1,0 +1,24 @@
+{
+  "name": "관찰·신고",
+  "short_name": "관찰·신고",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#dc2626",
+  "theme_color": "#dc2626",
+  "icons": [
+    {
+      "src": "./icon-observe-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-observe-180.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

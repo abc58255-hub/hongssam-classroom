@@ -1,0 +1,24 @@
+{
+  "name": "AI 업무분석",
+  "short_name": "AI 업무분석",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#7c3aed",
+  "theme_color": "#7c3aed",
+  "icons": [
+    {
+      "src": "./icon-ai-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-ai-180.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

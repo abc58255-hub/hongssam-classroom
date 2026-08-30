@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <link rel="apple-touch-icon" href="./icon-notify-180.png">
+  <link rel="manifest" href="./manifest.json">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="알림관리">
+  <meta name="theme-color" content="#d97706">
+  <script>
+    var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzpJFEvuLwIiMZMH5AFpHgAbNuNNkMVFFRpxnN34BPb_wTcKznYXFV9XojLGsRNQLtiHQ/exec';
+    (function () {
+      var FNS = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+      var TOKKEY = 'alarm_token';
+      function makeRunner() {
+        var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
+        var r = {};
+        r.withSuccessHandler = function (fn) { if (fn) ok = fn; return r; };
+        r.withFailureHandler = function (fn) { if (fn) fail = fn; return r; };
+        FNS.forEach(function (name) {
+          r[name] = function () {
+            var args = Array.prototype.slice.call(arguments);
+            var body = { fn: name, args: args };
+            if (TOKKEY) { try { body.token = localStorage.getItem(TOKKEY) || ''; } catch (_) {} }
+            fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(body) })
+              .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
+              .then(function (data) { if (data && data.ok) return data.result; throw new Error((data && data.error) || '서버 오류'); })
+              .then(function (result) { ok(result); }, function (e) { fail(e); });
+          };
+        });
+        return r;
+      }
+      var s = {}; Object.defineProperty(s, 'run', { get: makeRunner }); window.google = { script: s };
+    })();
+  </script>
+
+<base target="_top">
+<meta charset="UTF-8">
+<title>알림 관리</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Apple SD Gothic Neo', sans-serif; background: #f1f5f9; color: #0f172a; }
+  .hidden { display: none !important; }
+
+  #login { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #f59e0b, #d97706); }
+  .login-card { background: white; padding: 40px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.2); width: 340px; text-align: center; }
+  .login-card h1 { font-size: 22px; margin-bottom: 6px; }
+  .login-card p { color: #64748b; font-size: 14px; margin-bottom: 24px; }
+  .login-card input { width: 100%; padding: 13px 15px; border: 2px solid #e2e8f0; border-radius: 12px; font-size: 15px; margin-bottom: 14px; }
+  .login-card input:focus { outline: none; border-color: #f59e0b; }
+
+  .btn { background: #f59e0b; color: white; border: none; padding: 13px 20px; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; transition: 0.2s; }
+  .btn:hover { background: #d97706; }
+  .btn.sm { width: auto; padding: 8px 14px; font-size: 13px; }
+  .btn.gray { background: #64748b; } .btn.gray:hover { background: #475569; }
+  .btn.red { background: #ef4444; } .btn.red:hover { background: #dc2626; }
+  .btn.orange { background: #ea580c; } .btn.orange:hover { background: #c2410c; }
+
+  header { background: white; padding: 16px 24px; display: flex; align-items: center; gap: 14px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); position: sticky; top: 0; z-index: 10; }
+  header h1 { font-size: 18px; }
+  header .spacer { flex: 1; }
+  .tabs { display: flex; gap: 8px; padding: 16px 24px 0; }
+  .tab { padding: 10px 18px; border-radius: 12px 12px 0 0; background: #e2e8f0; color: #64748b; font-weight: 700; font-size: 14px; cursor: pointer; }
+  .tab.active { background: white; color: #d97706; }
+  main { padding: 0 24px 40px; }
+  .panel { background: white; border-radius: 0 12px 12px 12px; padding: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  label { display: block; font-size: 13px; font-weight: 700; color: #475569; margin: 12px 0 5px; }
+  .chk-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; margin-right: 18px; }
+  .chk-label input { width: auto; }
+  input[type=text], input[type=date], textarea, select { width: 100%; padding: 11px 13px; border: 2px solid #e2e8f0; border-radius: 10px; font-size: 14px; font-family: inherit; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: #f59e0b; }
+  textarea { resize: vertical; min-height: 70px; }
+
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+  th, td { padding: 11px 12px; text-align: left; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+  th { background: #f8fafc; font-size: 12px; color: #64748b; }
+  tr:hover td { background: #f8fafc; }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+  .tag.on { background: #dcfce7; color: #16a34a; }
+  .tag.off { background: #e2e8f0; color: #64748b; }
+  .tag.imp { background: #fee2e2; color: #dc2626; }
+  .empty { text-align: center; color: #94a3b8; padding: 40px; font-size: 14px; }
+  .muted { color: #64748b; font-size: 13px; }
+  .notice-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 16px; margin-bottom: 16px; font-size: 13px; color: #92400e; }
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: #0f172a; color: white; padding: 12px 22px; border-radius: 30px; font-size: 14px; font-weight: 700; z-index: 100; opacity: 0; transition: 0.3s; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-card">
+    <h1>🔔 알림 관리</h1>
+    <p>교사 비밀번호로 로그인하세요</p>
+    <input type="password" id="pw" placeholder="교사 비밀번호" onkeydown="if(event.key==='Enter')doLogin()">
+    <button class="btn" onclick="doLogin()">로그인</button>
+  </div>
+</div>
+
+<div id="app" class="hidden">
+  <header>
+    <h1>🔔 알림 관리</h1>
+    <div class="spacer"></div>
+    <button class="btn sm gray" onclick="doLogout()">로그아웃</button>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="board" onclick="switchTab('board')">📺 칠판공지</div>
+    <div class="tab" data-tab="notice" onclick="switchTab('notice')">📢 학급알림</div>
+    <div class="tab" data-tab="push" onclick="switchTab('push')">🔔 푸시 전송</div>
+  </div>
+
+  <main>
+    <!-- 학급알림 -->
+    <div class="panel hidden" id="tab-notice">
+      <h2 id="ntFormTitle" style="font-size:16px;">새 학급알림</h2>
+      <p class="muted">학생 앱(우리반교실)에 표시되는 알림이에요. 표시여부를 끄면 학생에게 숨겨집니다.</p>
+      <div class="row">
+        <div style="flex:2; min-width:200px;">
+          <label>제목</label>
+          <input type="text" id="n-title" placeholder="예: 현장체험학습 안내">
+        </div>
+        <div style="flex:1; min-width:140px;">
+          <label>유형</label>
+          <select id="n-type"><option>알림</option><option>행사</option><option>준비물</option><option>가정통신</option><option>기타</option></select>
+        </div>
+        <div style="flex:1; min-width:140px;">
+          <label>날짜 (D-day용, 선택)</label>
+          <input type="date" id="n-date">
+        </div>
+      </div>
+      <label>내용</label>
+      <textarea id="n-content" placeholder="알림 내용"></textarea>
+      <div style="margin-top:12px;">
+        <label class="chk-label"><input type="checkbox" id="n-visible" checked> 학생에게 표시</label>
+        <label class="chk-label"><input type="checkbox" id="n-important"> ⭐ 중요(상단 고정)</label>
+      </div>
+      <input type="hidden" id="n-rowIdx" value="">
+      <div style="margin-top:16px; display:flex; gap:10px;">
+        <button class="btn sm" onclick="saveNt()">저장</button>
+        <button class="btn sm gray hidden" id="ntCancel" onclick="resetNt()">취소</button>
+      </div>
+
+      <hr style="margin:24px 0; border:none; border-top:1px solid #e2e8f0;">
+      <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+        <h2 style="font-size:16px;">등록된 알림</h2>
+        <button class="btn sm gray" onclick="loadNt()">새로고침</button>
+      </div>
+      <div id="ntTable"></div>
+    </div>
+
+    <!-- 칠판공지 (교실TV알림판) -->
+    <div class="panel" id="tab-board">
+      <div id="boardSetup" class="hidden">
+        <div class="notice-box" style="background:#fef2f2; border-color:#fecaca; color:#991b1b;">
+          교실TV알림판 스프레드시트 ID가 설정되지 않았어요. 알림판 시트(공지사항 탭이 있는 스프레드시트)의 ID를 입력하세요.
+        </div>
+        <label>교실 알림판 스프레드시트 ID</label>
+        <input type="text" id="b-sheetId" placeholder="스프레드시트 URL의 /d/ 와 /edit 사이 값">
+        <div style="margin-top:12px;"><button class="btn sm" onclick="saveBoardId()">저장</button></div>
+      </div>
+
+      <div id="boardMain">
+        <h2 id="bdFormTitle" style="font-size:16px;">칠판공지 작성</h2>
+        <p class="muted">교실 TV에 표시돼요. <b>13시 이전엔 조회, 이후엔 종례</b>가 표시됩니다(종례가 비면 조회 내용 유지).</p>
+        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:12px 14px; margin-top:10px;">
+          <label style="margin-top:0;">📊 기본 슬라이드 URL <span class="muted">(새 공지에 자동으로 채워짐 / 비워두면 항상 이 슬라이드 연결)</span></label>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="b-defaultSlide" placeholder="https://docs.google.com/presentation/.../pub?start=true&loop=true" style="flex:1;">
+            <button class="btn sm" onclick="saveDefaultSlide()" style="white-space:nowrap;">기본값 저장</button>
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:1; min-width:150px;">
+            <label>날짜</label>
+            <input type="date" id="b-date">
+          </div>
+          <div style="flex:1; min-width:150px;">
+            <label>영상 모드</label>
+            <select id="b-videoMode"><option value="보이기">슬라이드+영상 반반</option><option value="가득차게">영상 전체화면</option><option value="소리만">소리만(영상 숨김)</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <div style="flex:1; min-width:240px;">
+            <label>🌅 조회 공지</label>
+            <textarea id="b-announcement" placeholder="아침 조회 공지"></textarea>
+            <label>🌅 조회 전달사항</label>
+            <textarea id="b-notice" placeholder="아침 전달사항"></textarea>
+          </div>
+          <div style="flex:1; min-width:240px;">
+            <label>🌆 종례 공지 <span class="muted">(비우면 조회 내용 유지)</span></label>
+            <textarea id="b-announcementPm" placeholder="종례 공지"></textarea>
+            <label>🌆 종례 전달사항</label>
+            <textarea id="b-noticePm" placeholder="종례 전달사항"></textarea>
+          </div>
+        </div>
+        <label>슬라이드 URL (구글 슬라이드 게시 링크, 선택)</label>
+        <input type="text" id="b-slideUrl" placeholder="https:// (iframe 통째로 붙여도 됨)">
+        <label>유튜브 URL (선택)</label>
+        <input type="text" id="b-videoUrl" placeholder="https://youtu.be/...">
+        <input type="hidden" id="b-rowIdx" value="">
+        <div style="margin-top:16px; display:flex; gap:10px;">
+          <button class="btn sm" onclick="saveBoard()">저장</button>
+          <button class="btn sm gray hidden" id="bdCancel" onclick="resetBoard()">취소</button>
+        </div>
+
+        <hr style="margin:24px 0; border:none; border-top:1px solid #e2e8f0;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:6px;">
+          <h2 style="font-size:16px;">등록된 칠판공지</h2>
+          <button class="btn sm gray" onclick="loadBoard()">새로고침</button>
+        </div>
+        <div id="boardTable"></div>
+      </div>
+    </div>
+
+    <!-- 푸시 전송 -->
+    <div class="panel hidden" id="tab-push">
+      <div class="notice-box">📱 푸시 알림은 <b>앱에서 알림 등록(FCM 토큰 저장)을 완료한 학생</b>에게만 전송돼요. 토큰이 없는 학생은 자동으로 건너뜁니다.</div>
+      <div class="row">
+        <div style="flex:2; min-width:200px;">
+          <label>제목</label>
+          <input type="text" id="p-title" placeholder="알림 제목">
+        </div>
+        <div style="flex:1; min-width:160px;">
+          <label>대상</label>
+          <select id="p-target"><option value="">전체 학생</option></select>
+        </div>
+      </div>
+      <label>내용</label>
+      <textarea id="p-body" placeholder="알림 내용"></textarea>
+      <label>클릭 시 이동할 링크 (선택)</label>
+      <input type="text" id="p-url" placeholder="https:// (비워두면 앱 열기)">
+      <div style="margin-top:16px;">
+        <button class="btn sm orange" id="pushBtn" onclick="doPush()">🔔 푸시 전송</button>
+      </div>
+      <div id="pushResult" style="margin-top:16px;"></div>
+    </div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  var TOKEN = localStorage.getItem('alarm_token') || '';
+  var NOTICES = [];
+  var BOARDS = [];
+  var BOARD_LOADED = false;
+  var DEFAULT_SLIDE = '';
+
+  function doLogin() {
+    var pw = document.getElementById('pw').value;
+    if (!pw) return;
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success && res.token) { TOKEN = res.token; localStorage.setItem('alarm_token', TOKEN); showApp(); }
+      else toast(res && res.message ? res.message : '비밀번호가 틀렸습니다');
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).teacherLogin(pw);
+  }
+  function doLogout() {
+    google.script.run.teacherLogout(TOKEN);
+    localStorage.removeItem('alarm_token'); TOKEN = '';
+    document.getElementById('app').classList.add('hidden');
+    document.getElementById('login').classList.remove('hidden');
+  }
+  function checkSession() {
+    if (!TOKEN) return;
+    google.script.run.withSuccessHandler(function(res){ if (res && res.success) showApp(); }).validateTeacherSession(TOKEN);
+  }
+  function showApp() {
+    document.getElementById('login').classList.add('hidden');
+    document.getElementById('app').classList.remove('hidden');
+    loadBoard(); loadNt(); loadClasses();
+  }
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('active', t.dataset.tab === name); });
+    document.getElementById('tab-notice').classList.toggle('hidden', name !== 'notice');
+    document.getElementById('tab-board').classList.toggle('hidden', name !== 'board');
+    document.getElementById('tab-push').classList.toggle('hidden', name !== 'push');
+    if (name === 'board' && !BOARD_LOADED) loadBoard();
+  }
+
+  // ── 학급알림 ──
+  function loadNt() {
+    google.script.run.withSuccessHandler(function(res) {
+      NOTICES = (res && res.success) ? res.notices : [];
+      renderNt();
+    }).getNotices();
+  }
+  function renderNt() {
+    if (!NOTICES.length) { document.getElementById('ntTable').innerHTML = '<p class="empty">등록된 알림이 없습니다.</p>'; return; }
+    var rows = NOTICES.slice().reverse();
+    var html = '<table><thead><tr><th>제목</th><th>유형</th><th>날짜</th><th>상태</th><th>내용</th><th></th></tr></thead><tbody>';
+    html += rows.map(function(n) {
+      var vis = n.visible ? '<span class="tag on">표시</span>' : '<span class="tag off">숨김</span>';
+      var imp = n.important ? ' <span class="tag imp">⭐중요</span>' : '';
+      return '<tr><td><b>'+esc(n.title)+'</b></td><td>'+esc(n.type)+'</td><td>'+esc(n.date)+'</td>' +
+        '<td>'+vis+imp+'</td><td>'+esc(n.content)+'</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn sm gray" onclick=\'editNt('+JSON.stringify(n).replace(/\'/g,"&#39;")+')\'>수정</button> ' +
+          '<button class="btn sm red" onclick="delNt('+n.rowIdx+')">삭제</button>' +
+        '</td></tr>';
+    }).join('');
+    document.getElementById('ntTable').innerHTML = html + '</tbody></table>';
+  }
+  function saveNt() {
+    var data = {
+      rowIdx: document.getElementById('n-rowIdx').value ? Number(document.getElementById('n-rowIdx').value) : 0,
+      title: document.getElementById('n-title').value.trim(),
+      content: document.getElementById('n-content').value.trim(),
+      type: document.getElementById('n-type').value,
+      date: document.getElementById('n-date').value,
+      visible: document.getElementById('n-visible').checked,
+      important: document.getElementById('n-important').checked
+    };
+    if (!data.title) { toast('제목을 입력하세요'); return; }
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { toast('저장됨'); resetNt(); loadNt(); } else toast('저장 실패');
+    }).saveNotice(data);
+  }
+  function editNt(n) {
+    document.getElementById('n-rowIdx').value = n.rowIdx;
+    document.getElementById('n-title').value = n.title || '';
+    document.getElementById('n-content').value = n.content || '';
+    document.getElementById('n-type').value = n.type || '알림';
+    document.getElementById('n-date').value = n.date || '';
+    document.getElementById('n-visible').checked = !!n.visible;
+    document.getElementById('n-important').checked = !!n.important;
+    document.getElementById('ntFormTitle').textContent = '학급알림 수정';
+    document.getElementById('ntCancel').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function resetNt() {
+    document.getElementById('n-rowIdx').value = '';
+    document.getElementById('n-title').value = '';
+    document.getElementById('n-content').value = '';
+    document.getElementById('n-type').value = '알림';
+    document.getElementById('n-date').value = '';
+    document.getElementById('n-visible').checked = true;
+    document.getElementById('n-important').checked = false;
+    document.getElementById('ntFormTitle').textContent = '새 학급알림';
+    document.getElementById('ntCancel').classList.add('hidden');
+  }
+  function delNt(rowIdx) {
+    uiConfirm('이 알림을 삭제할까요?', function(){
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) { toast('삭제됨'); loadNt(); } else toast('삭제 실패');
+      }).deleteNotice(rowIdx);
+    }, {icon:'🗑', danger:true, okText:'삭제'});
+  }
+
+  // ── 푸시 ──
+  function loadClasses() {
+    google.script.run.withSuccessHandler(function(res) {
+      if (!res || !res.success) return;
+      var sel = document.getElementById('p-target');
+      var opts = '<option value="">전체 학생</option>';
+      (res.classes || []).forEach(function(c){ opts += '<option value="'+esc(c)+'">'+esc(c)+'</option>'; });
+      sel.innerHTML = opts;
+      if (res.homeroom) sel.value = res.homeroom;
+    }).getClassInfo();
+  }
+  function doPush() {
+    var title = document.getElementById('p-title').value.trim();
+    var body = document.getElementById('p-body').value.trim();
+    var target = document.getElementById('p-target').value;
+    var url = document.getElementById('p-url').value.trim();
+    if (!title || !body) { toast('제목과 내용을 입력하세요'); return; }
+    var tgtLabel = target || '전체 학생';
+    uiConfirm(tgtLabel + '에게 푸시를 전송할까요?', function(){
+    var btn = document.getElementById('pushBtn');
+    btn.disabled = true; btn.textContent = '전송 중...';
+    document.getElementById('pushResult').innerHTML = '';
+    google.script.run.withSuccessHandler(function(res) {
+      btn.disabled = false; btn.textContent = '🔔 푸시 전송';
+      if (res && res.success) {
+        document.getElementById('pushResult').innerHTML =
+          '<div class="notice-box" style="background:#ecfdf5; border-color:#a7f3d0; color:#065f46;">✅ 전송 완료 — 성공 <b>'+res.sent+'</b>명, 건너뜀(토큰없음) '+res.skipped+'명</div>';
+        toast('전송 완료');
+      } else {
+        document.getElementById('pushResult').innerHTML = '<div class="notice-box" style="background:#fef2f2; border-color:#fecaca; color:#991b1b;">전송 실패: '+esc(res && res.message ? res.message : '오류')+'</div>';
+      }
+    }).withFailureHandler(function(e){
+      btn.disabled = false; btn.textContent = '🔔 푸시 전송';
+      document.getElementById('pushResult').innerHTML = '<div class="notice-box" style="background:#fef2f2; border-color:#fecaca; color:#991b1b;">오류: '+esc(e.message)+'</div>';
+    }).sendPush(title, body, target, url);
+    }, {icon:'🔔', okText:'전송'});
+  }
+
+  // ── 칠판공지 (교실TV알림판) ──
+  function loadBoard() {
+    BOARD_LOADED = true;
+    document.getElementById('boardTable').innerHTML = '<p class="empty">불러오는 중...</p>';
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.needId) {
+        document.getElementById('boardSetup').classList.remove('hidden');
+        document.getElementById('boardMain').classList.add('hidden');
+        return;
+      }
+      document.getElementById('boardSetup').classList.add('hidden');
+      document.getElementById('boardMain').classList.remove('hidden');
+      if (!document.getElementById('b-date').value) {
+        document.getElementById('b-date').value = new Date(Date.now() + 32400000).toISOString().slice(0,10); // 오늘(KST)
+      }
+      BOARDS = (res && res.success) ? res.boards : [];
+      DEFAULT_SLIDE = (res && res.defaultSlide) || '';
+      document.getElementById('b-defaultSlide').value = DEFAULT_SLIDE;
+      // 새 작성 모드(수정 아님)이고 슬라이드 칸이 비어있으면 기본 슬라이드 자동 입력
+      if (!document.getElementById('b-rowIdx').value && !document.getElementById('b-slideUrl').value) {
+        document.getElementById('b-slideUrl').value = DEFAULT_SLIDE;
+      }
+      renderBoard();
+    }).getBoardNotices();
+  }
+  function saveDefaultSlide() {
+    var url = document.getElementById('b-defaultSlide').value.trim();
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) {
+        DEFAULT_SLIDE = url; toast('기본 슬라이드 저장됨');
+        if (!document.getElementById('b-rowIdx').value) document.getElementById('b-slideUrl').value = url;
+      } else toast('저장 실패');
+    }).setDefaultSlide(url);
+  }
+  function renderBoard() {
+    if (!BOARDS.length) { document.getElementById('boardTable').innerHTML = '<p class="empty">등록된 칠판공지가 없습니다.</p>'; return; }
+    var html = '<table><thead><tr><th>날짜</th><th>조회</th><th>종례</th><th>슬라이드/영상</th><th></th></tr></thead><tbody>';
+    html += BOARDS.map(function(b) {
+      var am = (b.announcement ? '<b>'+esc(b.announcement)+'</b>' : '<span class="muted">-</span>') + (b.notice ? '<br>'+esc(b.notice) : '');
+      var pm = (b.announcementPm ? '<b>'+esc(b.announcementPm)+'</b>' : '<span class="muted">(조회 유지)</span>') + (b.noticePm ? '<br>'+esc(b.noticePm) : '');
+      var media = (b.slideUrl ? '🖼️ 슬라이드 ' : '') + (b.videoUrl ? '▶️ '+esc(b.videoMode) : '');
+      return '<tr><td><b>'+esc(b.date)+'</b></td><td>'+am+'</td><td>'+pm+'</td><td>'+(media||'<span class="muted">-</span>')+'</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="btn sm gray" onclick=\'editBoard('+JSON.stringify(b).replace(/\'/g,"&#39;")+')\'>수정</button> ' +
+          '<button class="btn sm red" onclick="delBoard('+b.rowIdx+')">삭제</button>' +
+        '</td></tr>';
+    }).join('');
+    document.getElementById('boardTable').innerHTML = html + '</tbody></table>';
+  }
+  function saveBoard() {
+    var data = {
+      rowIdx: document.getElementById('b-rowIdx').value ? Number(document.getElementById('b-rowIdx').value) : 0,
+      date: document.getElementById('b-date').value,
+      announcement: document.getElementById('b-announcement').value.trim(),
+      notice: document.getElementById('b-notice').value.trim(),
+      announcementPm: document.getElementById('b-announcementPm').value.trim(),
+      noticePm: document.getElementById('b-noticePm').value.trim(),
+      slideUrl: document.getElementById('b-slideUrl').value.trim(),
+      videoUrl: document.getElementById('b-videoUrl').value.trim(),
+      videoMode: document.getElementById('b-videoMode').value
+    };
+    if (!data.date) { toast('날짜를 선택하세요'); return; }
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { toast('저장됨'); resetBoard(); loadBoard(); } else toast(res && res.message ? res.message : '저장 실패');
+    }).saveBoardData(data);
+  }
+  function editBoard(b) {
+    document.getElementById('b-rowIdx').value = b.rowIdx;
+    document.getElementById('b-date').value = b.date || '';
+    document.getElementById('b-announcement').value = b.announcement || '';
+    document.getElementById('b-notice').value = b.notice || '';
+    document.getElementById('b-announcementPm').value = b.announcementPm || '';
+    document.getElementById('b-noticePm').value = b.noticePm || '';
+    document.getElementById('b-slideUrl').value = b.slideUrl || '';
+    document.getElementById('b-videoUrl').value = b.videoUrl || '';
+    document.getElementById('b-videoMode').value = b.videoMode || '보이기';
+    document.getElementById('bdFormTitle').textContent = '칠판공지 수정 (' + b.date + ')';
+    document.getElementById('bdCancel').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+  function resetBoard() {
+    document.getElementById('b-rowIdx').value = '';
+    ['b-announcement','b-notice','b-announcementPm','b-noticePm','b-videoUrl'].forEach(function(id){ document.getElementById(id).value = ''; });
+    document.getElementById('b-slideUrl').value = DEFAULT_SLIDE; // 새 작성 시 기본 슬라이드 자동 채움
+    document.getElementById('b-videoMode').value = '보이기';
+    document.getElementById('b-date').value = new Date(Date.now() + 32400000).toISOString().slice(0,10); // 기본 = 오늘(KST)
+    document.getElementById('bdFormTitle').textContent = '칠판공지 작성';
+    document.getElementById('bdCancel').classList.add('hidden');
+  }
+  function delBoard(rowIdx) {
+    uiConfirm('이 칠판공지를 삭제할까요?', function(){
+      google.script.run.withSuccessHandler(function(res) {
+        if (res && res.success) { toast('삭제됨'); loadBoard(); } else toast('삭제 실패');
+      }).deleteBoardData(rowIdx);
+    }, {icon:'🗑', danger:true, okText:'삭제'});
+  }
+  function saveBoardId() {
+    var id = document.getElementById('b-sheetId').value.trim();
+    if (!id) { toast('ID를 입력하세요'); return; }
+    // URL을 붙여넣으면 ID만 추출
+    var m = id.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (m) id = m[1];
+    google.script.run.withSuccessHandler(function(res) {
+      if (res && res.success) { toast('등록됨'); loadBoard(); } else toast('등록 실패');
+    }).setBoardSheetId(id);
+  }
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function toast(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 2200);
+  }
+
+  checkSession();
+</script>
+
+<!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
+<div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.00.00</span></div>
+<script>
+/* 예쁜 확인/알림창 — 브라우저 기본 confirm/alert 대체 (자체 스타일 포함) */
+(function(){
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function build(msg,opt,withCancel){
+    opt=opt||{};
+    var ov=document.createElement('div');
+    ov.style.cssText='position:fixed;inset:0;background:rgba(15,23,42,.5);display:flex;align-items:center;justify-content:center;z-index:99999;padding:20px;';
+    var lines=String(msg).split('\n').map(esc).join('<br>');
+    ov.innerHTML='<div style="background:#fff;border-radius:18px;padding:24px 22px;width:340px;max-width:92vw;box-shadow:0 20px 50px rgba(0,0,0,.28);text-align:center;color:#1f2937;font-family:-apple-system,BlinkMacSystemFont,sans-serif;">'
+      +'<div style="font-size:32px;margin-bottom:8px;">'+(opt.icon||(withCancel?'❓':'💬'))+'</div>'
+      +'<div style="font-size:15px;font-weight:600;line-height:1.55;margin-bottom:20px;">'+lines+'</div>'
+      +'<div style="display:flex;gap:8px;">'
+        +(withCancel?'<button data-no style="flex:1;padding:12px;border:1.5px solid #e5e7eb;background:#fff;color:#374151;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;">취소</button>':'')
+        +'<button data-yes style="flex:1;padding:12px;border:none;border-radius:11px;font-size:14px;font-weight:800;cursor:pointer;color:#fff;background:'+(opt.danger?'#dc2626':'#2563eb')+';">'+(opt.okText||'확인')+'</button>'
+      +'</div></div>';
+    document.body.appendChild(ov); return ov;
+  }
+  window.uiConfirm=function(msg,onOk,opt){var ov=build(msg,opt,true);function c(){ov.remove();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-no]').onclick=c;ov.querySelector('[data-yes]').onclick=function(){c();if(onOk)onOk();};};
+  window.uiAlert=function(msg,cb,opt){var ov=build(msg,opt,false);function c(){ov.remove();if(cb)cb();}ov.addEventListener('click',function(e){if(e.target===ov)c();});ov.querySelector('[data-yes]').onclick=c;};
+  window.alert=function(m){window.uiAlert(m);};
+})();
+</script>
+
+</body>
+</html>

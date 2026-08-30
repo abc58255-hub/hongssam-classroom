@@ -618,3 +618,18 @@ function _authRoster_() {
   if (!_authRosterSs_) _authRosterSs_ = SpreadsheetApp.openById(StudentAuth.getAuthSheetId());
   return _authRosterSs_.getSheetByName('학생명부');
 }
+
+
+// ── PWA(Pages) 프론트 → GAS 백엔드 호출 (google.script.run 어댑터) ──
+var RPC_WHITELIST = ["deleteRecord", "ensureReviewCategory", "getClassList", "getInputData", "getReviewCounts", "getTodayRecords", "recordStamp", "refreshRoster", "unlockDojang"];
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    var fn = globalThis[req.fn];
+    if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
+    out = { ok: true, result: fn.apply(null, req.args || []) };
+  } catch (err) { out = { ok: false, error: String(err && err.message || err) }; }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}

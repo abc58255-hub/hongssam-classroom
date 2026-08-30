@@ -1,0 +1,24 @@
+{
+  "name": "창체관리",
+  "short_name": "창체관리",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#10b981",
+  "theme_color": "#10b981",
+  "icons": [
+    {
+      "src": "./icon-activity-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-activity-180.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "name": "알림관리",
+  "short_name": "알림관리",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#d97706",
+  "theme_color": "#d97706",
+  "icons": [
+    {
+      "src": "./icon-notify-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icon-notify-180.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
