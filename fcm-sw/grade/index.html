@@ -14,7 +14,7 @@
   <script>
     var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbxwz13drEZk49iRIym1rUMKluedwwSZmo9P0ZcNRZEOgKtxMpljK0j_dG7ryjuDNcqTdw/exec';
     (function () {
-      var FNS = ['aiGradeSubmission','approveResubmitRequest','bulkPublishTasks','cancelBestWork','changeBestScope','clearStudentReply','deleteRubric','deleteTask','getAchievements','getApiSettings','getAppLinkUrl','getDashboardData','getNotifyLog','getNotifySettings','getRubrics','getSecureFileBase64','getTasksOnly','installAutoNotifyTriggers','resetStudentPassword','runAICheatCheck','saveAiGradeResult','saveAiGradeTempResult','saveApiSetting','saveAppLinkUrl','saveFeedback','saveMultiAnnotatedImages','saveNewTask','saveRubric','sendPushToUnsubmitted','setNotifySettings','teacherLogin','toggleTaskVisibility','updateTaskSettings','uploadRubricFile','uploadTaskProblemImage','saveTaskProblems','validateTeacherSession'];
+      var FNS = ['aiGradeSubmission','approveResubmitRequest','bulkPublishTasks','cancelBestWork','changeBestScope','clearStudentReply','deleteRubric','deleteTask','getAchievements','getApiSettings','getAppLinkUrl','getDashboardData','getNotifyLog','getNotifySettings','getRubrics','getSecureFileBase64','getTasksOnly','installAutoNotifyTriggers','resetStudentPassword','runAICheatCheck','saveAiGradeResult','saveAiGradeTempResult','saveApiSetting','saveAppLinkUrl','saveFeedback','saveMultiAnnotatedImages','saveNewTask','saveRubric','sendPushToUnsubmitted','setNotifySettings','teacherLogin','toggleTaskVisibility','updateTaskSettings','uploadRubricFile','uploadTaskProblemImage','saveTaskProblems','syncAchievementSheet','validateTeacherSession'];
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
         var r = {};
@@ -2460,7 +2460,7 @@
       if(idx >= a.length){
         var payload = a.map(function(p){ return { t: (p.t||'').trim(), img: p.img||'' }; })
                        .filter(function(p){ return p.t || p.img; });
-        google.script.run.withSuccessHandler(function(){ cb && cb(); }).withFailureHandler(function(){ cb && cb(); })
+        google.script.run.withSuccessHandler(function(res){ if(res && res.success===false) uiAlert('문제 저장 실패: ' + (res.message||'')); cb && cb(); }).withFailureHandler(function(e){ uiAlert('문제 저장 실패: ' + ((e&&e.message)||e)); cb && cb(); })
           .saveTaskProblems(taskName, JSON.stringify(payload));
         return;
       }
@@ -2468,8 +2468,9 @@
       if(p.b64){
         google.script.run.withSuccessHandler(function(res){
           if(res && res.success) p.img = res.fileId;
+          else uiAlert('문제 이미지 업로드 실패' + (p.name ? ' (' + p.name + ')' : ''));
           idx++; up();
-        }).withFailureHandler(function(){ idx++; up(); }).uploadTaskProblemImage(taskName, p.name||'problem.jpg', p.mime||'image/jpeg', p.b64);
+        }).withFailureHandler(function(e){ uiAlert('문제 이미지 업로드 실패' + (p.name ? ' (' + p.name + ')' : '') + ': ' + ((e&&e.message)||e)); idx++; up(); }).uploadTaskProblemImage(taskName, p.name||'problem.jpg', p.mime||'image/jpeg', p.b64);
       } else { idx++; up(); }
     }
     up();

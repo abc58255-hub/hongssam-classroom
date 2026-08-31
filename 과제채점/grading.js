@@ -1742,13 +1742,47 @@ var ACHIEVEMENT_STANDARDS = [
   { code:'9수04-07', area:'자료와 가능성', text:'분산과 표준편차를 구하고 자료의 분포를 설명할 수 있다.' },
   { code:'9수04-08', area:'자료와 가능성', text:'공학 도구를 이용하여 자료를 상자그림으로 나타내고 분포를 비교할 수 있다.' },
   { code:'9수04-09', area:'자료와 가능성', text:'자료를 산점도로 나타내고 상관관계를 말할 수 있다.' },
+  // ── 누락분 보강 (2026-09) — 시트는 syncAchievementSheet가 코드순 병합·정렬 ──
+  { code:'9수01-01', area:'수와 연산', text:'소인수분해의 뜻을 알고, 자연수를 소인수의 곱으로 표현할 수 있다.' },
+  { code:'9수01-02', area:'수와 연산', text:'최대공약수와 최소공배수의 성질을 이해하고, 이를 구할 수 있다.' },
+  { code:'9수02-04', area:'변화와 관계', text:'일차방정식을 풀 수 있고, 이를 활용하여 문제를 해결할 수 있다.' },
+  { code:'9수02-08', area:'변화와 관계', text:'지수법칙을 이해한다.' },
+  { code:'9수02-10', area:'변화와 관계', text:'단항식과 다항식의 곱셈, 나눗셈의 원리를 이해하고, 그 계산을 할 수 있다.' },
+  { code:'9수02-12', area:'변화와 관계', text:'일차부등식을 풀 수 있고, 이를 활용하여 문제를 해결할 수 있다.' },
+  { code:'9수02-16', area:'변화와 관계', text:'일차함수의 그래프의 성질을 이해하고, 일차함수의 식과 그래프를 구할 수 있다.' },
+  { code:'9수02-17', area:'변화와 관계', text:'일차함수를 활용하여 문제를 해결할 수 있다.' },
+  { code:'9수02-20', area:'변화와 관계', text:'이차방정식을 풀 수 있고, 이를 활용하여 문제를 해결할 수 있다.' },
+  { code:'9수03-02', area:'도형과 측정', text:'맞꼭지각의 성질과 평행선에서 동위각, 엇각의 성질을 이해한다.' },
+  { code:'9수03-09', area:'도형과 측정', text:'삼각형의 성질을 이해하고 정당화할 수 있다.' },
 ];
 
 // 성취기준 조회 — 시트 '성취기준'이 있으면 교사 편집분, 없으면 코드 시드
+// 시드(ACHIEVEMENT_STANDARDS)에 있는데 성취기준 시트에 없는 코드를 자동 병합 + 코드순 정렬
+// (교사가 편집한 기존 행/내용은 유지, 빠진 코드만 'Y'로 추가)
+function syncAchievementSheet() {
+  try {
+    var ss = _taskSs();
+    var sh = ss.getSheetByName('성취기준');
+    if (!sh || sh.getLastRow() < 2) return seedAchievementSheet(); // 시트 없거나 비었으면 새로 시드
+    var existing = {};
+    var codes = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    codes.forEach(function(r){ var c = String(r[0] || '').trim(); if (c) existing[c] = true; });
+    var toAdd = ACHIEVEMENT_STANDARDS.filter(function(a){ return !existing[a.code]; })
+                                     .map(function(a){ return [a.code, a.area, a.text, 'Y']; });
+    if (toAdd.length) {
+      sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, 4).setValues(toAdd);
+      var last = sh.getLastRow();
+      if (last > 2) sh.getRange(2, 1, last - 1, 4).sort({ column: 1, ascending: true }); // 코드순 정렬
+    }
+    return { success: true, added: toAdd.length };
+  } catch (e) { return { success: false, message: e.toString() }; }
+}
+
 function getAchievements() {
   try {
     var sh = _taskSs().getSheetByName('성취기준');
     if (sh && sh.getLastRow() > 1) {
+      try { syncAchievementSheet(); } catch(_) {} // 빠진 성취기준 자동 병합
       var d = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
       var out = [];
       d.forEach(function(r) {

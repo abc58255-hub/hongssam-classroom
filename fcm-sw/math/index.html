@@ -604,7 +604,7 @@
   }
   function _hasProblems(name) {
     var p = gTaskProblems[name];
-    return !!(p && ((p.problems && p.problems.length) || (p.desc && p.desc.trim())));
+    return !!(p && p.problems && p.problems.length);
   }
   function _problemsInnerHtml(name) {
     var p = gTaskProblems[name]; if (!p) return '';
