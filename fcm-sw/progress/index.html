@@ -802,11 +802,17 @@ function computeWeekLessons(monday){
 function loadWeekTimetable(){
   var wrap=document.getElementById('weekTtWrap');
   if(wrap) wrap.innerHTML='<div class="loading">불러오는 중...</div>';
-  if(timetableCache && timetableCache.length){ renderWeekTimetable(); return; }
+  // 현재 그룹의 학기+시간표를 새로 로드 (다른 학기 시간표 섞임 방지)
+  var loadTt=function(){
+    google.script.run
+      .withSuccessHandler(function(res){ timetableCache=(res&&res.success?res.entries:[])||[]; renderWeekTimetable(); })
+      .withFailureHandler(function(){ timetableCache=[]; renderWeekTimetable(); })
+      .getTimetableList(currentGroupId);
+  };
   google.script.run
-    .withSuccessHandler(function(res){ timetableCache=(res&&res.success?res.entries:[])||[]; renderWeekTimetable(); })
-    .withFailureHandler(function(){ timetableCache=[]; renderWeekTimetable(); })
-    .getTimetableList(currentGroupId);
+    .withSuccessHandler(function(sres){ semestersCache=(sres&&sres.success?sres.semesters:[])||[]; loadTt(); })
+    .withFailureHandler(function(){ loadTt(); })
+    .getSemesterList(currentGroupId);
 }
 
 function renderWeekTimetable(){
@@ -820,9 +826,21 @@ function renderWeekTimetable(){
   for(var i=0;i<5;i++){ var d=new Date(d0); d.setDate(d.getDate()+i); weekDates.push(_ymd(d)); }
 
   var lessonMap=computeWeekLessons(monday);
+
+  // 이번주가 속한 학기만 사용 (다른 학기 시간표 섞임 방지)
+  var curSem=null;
+  (semestersCache||[]).forEach(function(s){ if(s.start&&s.end&&s.start<=today&&today<=s.end) curSem=s; });
+  if(!curSem && (semestersCache||[]).length){
+    var started=(semestersCache||[]).filter(function(s){ return s.start&&s.start<=today; });
+    if(started.length){ started.sort(function(a,b){ return a.start<b.start?1:-1; }); curSem=started[0]; }
+    else { curSem=(semestersCache||[]).slice().sort(function(a,b){ return (a.start||'')<(b.start||'')?-1:1; })[0]; }
+  }
+  var semName=curSem?curSem.name:null;
+
   var grid={}, periods={};
   (timetableCache||[]).forEach(function(entry){
     var cls=entry.cls; if(!cls) return;
+    if(semName && String(entry.semester||'').trim()!==semName) return; // 다른 학기 제외
     DAYS.forEach(function(d,di){
       var p=Number(entry[d])||0; if(p<=0) return;
       var date=weekDates[di];
@@ -851,7 +869,7 @@ function renderWeekTimetable(){
   WEEK_CELLS={}; var _cid=0;
 
   var html='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">'
-    +'<div style="font-size:15px;font-weight:800;color:#1e293b;">🗓️ 이번주 시간표 <span style="font-size:12px;color:#64748b;font-weight:600;">'+mLabel+' ~ '+eLabel+'</span></div>'
+    +'<div style="font-size:15px;font-weight:800;color:#1e293b;">🗓️ 이번주 시간표 <span style="font-size:12px;color:#64748b;font-weight:600;">'+mLabel+' ~ '+eLabel+(semName?' · '+escapeHtml(semName):'')+'</span></div>'
     +'<div style="display:flex;gap:10px;align-items:center;font-size:11px;color:#64748b;">'
     +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2563eb;vertical-align:middle;"></span> 실제(기록)</span>'
     +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fff;border:1px dashed #94a3b8;vertical-align:middle;"></span> 예상</span>'
