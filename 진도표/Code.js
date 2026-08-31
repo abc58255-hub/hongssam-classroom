@@ -231,7 +231,7 @@ function createPlan(data) {
     }
     var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
     sh.appendRow(['_plan_' + id, data.name, '', today, id, data.name]);
-    _ensureSh(ss, '진도계획_' + id, ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
+    _ensureSh(ss, '진도계획_' + id, ['차시','계획내용','제목','메모'], '#1e3a8a');
     return { success: true, id: id };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
@@ -283,13 +283,13 @@ function getSyllabusPlanById(planId) {
   try {
     var pid = planId || '기본';
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, _sn('진도계획', pid), ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
+    var sh = _ensureSh(ss, _sn('진도계획', pid), ['차시','계획내용','제목','메모'], '#1e3a8a');
     var plans = [];
     if (sh.getLastRow() >= 2) {
       var pd = sh.getRange(2, 1, sh.getLastRow()-1, 4).getValues();
       pd.forEach(function(r) {
         if (!r[0]) return;
-        plans.push({ lessonNo: parseInt(r[0])||0, content: String(r[1]||'').trim(), memo: String(r[3]||'').trim() });
+        plans.push({ lessonNo: parseInt(r[0])||0, content: String(r[1]||'').trim(), title: String(r[2]||'').trim(), memo: String(r[3]||'').trim() });
       });
       plans.sort(function(a,b){ return a.lessonNo-b.lessonNo; });
     }
@@ -301,9 +301,9 @@ function saveSyllabusPlanById(plans, planId) {
   try {
     var pid = planId || '기본';
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, _sn('진도계획', pid), ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
+    var sh = _ensureSh(ss, _sn('진도계획', pid), ['차시','계획내용','제목','메모'], '#1e3a8a');
     if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow()-1);
-    var rows = plans.map(function(p){ return [p.lessonNo, p.content||'', '', p.memo||'']; });
+    var rows = plans.map(function(p){ return [p.lessonNo, p.content||'', p.title||'', p.memo||'']; });
     if (rows.length > 0) sh.getRange(2, 1, rows.length, 4).setValues(rows);
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -776,13 +776,13 @@ function getSyllabusData(groupId) {
 
     // 진도계획 (그룹이 참조하는 계획 시트 사용)
     var planId = _getGroupPlanId_(gid, ss);
-    var planSh = _ensureSh(ss, _sn('진도계획', planId), ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
+    var planSh = _ensureSh(ss, _sn('진도계획', planId), ['차시','계획내용','제목','메모'], '#1e3a8a');
     var plans = [];
     if (planSh.getLastRow() >= 2) {
       var pd = planSh.getRange(2, 1, planSh.getLastRow() - 1, 4).getValues();
       pd.forEach(function(r) {
         if (!r[0]) return;
-        plans.push({ lessonNo: parseInt(r[0])||0, content: String(r[1]||'').trim(), material: '', memo: String(r[3]||'').trim() });
+        plans.push({ lessonNo: parseInt(r[0])||0, content: String(r[1]||'').trim(), title: String(r[2]||'').trim(), material: '', memo: String(r[3]||'').trim() });
       });
       plans.sort(function(a,b){ return a.lessonNo - b.lessonNo; });
     }
@@ -862,9 +862,9 @@ function saveSyllabusPlan(plans, groupId) {
     var gid = groupId || '기본';
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var planId = _getGroupPlanId_(gid, ss);
-    var sh = _ensureSh(ss, _sn('진도계획', planId), ['차시','계획내용','수업자료URL','메모'], '#1e3a8a');
+    var sh = _ensureSh(ss, _sn('진도계획', planId), ['차시','계획내용','제목','메모'], '#1e3a8a');
     if (sh.getLastRow() > 1) sh.deleteRows(2, sh.getLastRow() - 1);
-    var rows = plans.map(function(p){ return [p.lessonNo, p.content||'', '', p.memo||'']; });
+    var rows = plans.map(function(p){ return [p.lessonNo, p.content||'', p.title||'', p.memo||'']; });
     if (rows.length > 0) sh.getRange(2, 1, rows.length, 4).setValues(rows);
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }

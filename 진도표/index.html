@@ -161,14 +161,14 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
   <div class="main">
     <!-- 탭 -->
     <div class="tabs">
-      <button id="tab-1" class="tab-btn active" onclick="switchTab(1)">📋 진도표</button>
+      <button id="tab-5" class="tab-btn active" onclick="switchTab(5)">🗓️ 시간표</button>
+      <button id="tab-1" class="tab-btn" onclick="switchTab(1)">📋 진도표</button>
       <button id="tab-2" class="tab-btn" onclick="switchTab(2)">📊 반별 현황</button>
-      <button id="tab-5" class="tab-btn" onclick="switchTab(5)">🗓️ 이번주 시간표</button>
       <button id="tab-4" class="tab-btn" onclick="switchTab(4)">📅 시간표 생성</button>
     </div>
 
     <!-- 탭1: 진도표 -->
-    <div id="tab-content-1">
+    <div id="tab-content-1" style="display:none;">
       <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
         <button onclick="openBulkModal()" style="background:#fff7ed;color:#b45309;border:1px solid #fed7aa;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📅 기간 일괄 변동</button>
         <button onclick="expandAllSylMonths()" style="background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▼ 모두 펼치기</button>
@@ -185,7 +185,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     </div>
 
     <!-- 탭5: 이번주 시간표 -->
-    <div id="tab-content-5" style="display:none;">
+    <div id="tab-content-5">
       <div id="weekTtWrap"><div class="loading">불러오는 중...</div></div>
     </div>
 
@@ -244,12 +244,17 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
 <!-- 계획 편집 모달 -->
 <div id="planEditModal" class="modal-bg">
-  <div class="modal-box" style="max-width:680px;">
-    <h3 id="planEditTitle" style="margin:0 0 6px;font-size:17px;font-weight:800;color:#0f172a;">✏️ 진도 계획 편집</h3>
-    <div id="planEditSubtitle" style="font-size:12px;color:#64748b;margin-bottom:16px;">차시별 계획 내용과 메모를 입력하세요.</div>
-    <div id="planEditRows" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"></div>
-    <button onclick="addPlanRow()" style="background:#f1f5f9;color:#475569;border:1px dashed #cbd5e1;padding:8px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;width:100%;">+ 차시 추가</button>
-    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;">
+  <div class="modal-box" style="max-width:680px;display:flex;flex-direction:column;overflow:hidden;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+      <div>
+        <h3 id="planEditTitle" style="margin:0 0 6px;font-size:17px;font-weight:800;color:#0f172a;">✏️ 진도 계획 편집</h3>
+        <div id="planEditSubtitle" style="font-size:12px;color:#64748b;margin-bottom:14px;">차시별 제목·내용·메모를 입력하세요.</div>
+      </div>
+      <button class="btn btn-gray" onclick="closePlanEdit()" style="flex:none;padding:6px 10px;font-size:16px;line-height:1;" title="닫기">✕</button>
+    </div>
+    <div id="planEditRows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px;overflow-y:auto;flex:1 1 auto;min-height:80px;padding-right:2px;"></div>
+    <button onclick="addPlanRow()" style="background:#f1f5f9;color:#475569;border:1px dashed #cbd5e1;padding:8px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;width:100%;flex:none;">+ 차시 추가</button>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px;padding-top:14px;border-top:1px solid #eef2f7;flex:none;">
       <button class="btn btn-gray" onclick="closePlanEdit()">취소</button>
       <button class="btn btn-primary" onclick="savePlan()" id="savePlanBtn">저장</button>
     </div>
@@ -621,7 +626,7 @@ function loadSyllabusData(forceTab) {
       sylHolidayCache = res.holidays   || {};
       sylTaskRates    = res.taskRates  || {};
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
-      var targetTab = forceTab || [1,2,4].find(function(i) {
+      var targetTab = forceTab || [5,1,2,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
         return el && el.style.display !== 'none';
       }) || 1;
@@ -804,12 +809,18 @@ function renderWeekTimetable(){
   var sun=new Date(d0); sun.setDate(sun.getDate()+4);
   var eLabel=(sun.getMonth()+1)+'/'+sun.getDate();
 
-  var html='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+  // 차시별 제목 맵
+  var planByNo={};
+  (sylPlanCache||[]).forEach(function(pl){ planByNo[pl.lessonNo]={ title:pl.title||'', content:pl.content||'' }; });
+  WEEK_CELLS={}; var _cid=0;
+
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:6px;">'
     +'<div style="font-size:15px;font-weight:800;color:#1e293b;">🗓️ 이번주 시간표 <span style="font-size:12px;color:#64748b;font-weight:600;">'+mLabel+' ~ '+eLabel+'</span></div>'
     +'<div style="display:flex;gap:10px;align-items:center;font-size:11px;color:#64748b;">'
     +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2563eb;vertical-align:middle;"></span> 실제(기록)</span>'
     +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fff;border:1px dashed #94a3b8;vertical-align:middle;"></span> 예상</span>'
-    +'</div></div>';
+    +'</div></div>'
+    +'<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">💡 수업 칸을 누르면 <b>실제 수업 완료</b>로 표시돼요 (다시 누르면 예상으로 되돌림).</div>';
 
   html+='<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;min-width:520px;"><thead><tr>'
     +'<th style="padding:8px;font-size:11px;font-weight:800;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;width:46px;">교시</th>';
@@ -829,25 +840,59 @@ function renderWeekTimetable(){
       var cell=(grid[p]||{})[di];
       var bg=isToday?'#eff6ff':'#fff';
       if(!cell){ html+='<td style="border:1px solid #e2e8f0;background:'+bg+';"></td>'; return; }
-      var noHtml='';
-      var st=String(cell.status||'');
+      var noHtml='', st=String(cell.status||''), special=false;
       if(/휴강|취소/.test(st)){
-        noHtml='<span style="font-size:10px;color:#dc2626;font-weight:700;">휴강</span>';
+        noHtml='<span style="font-size:10px;color:#dc2626;font-weight:700;">휴강</span>'; special=true;
       } else if(st.indexOf('이동')===0){
-        noHtml='<span style="font-size:10px;color:#7c3aed;font-weight:700;">이동</span>';
+        noHtml='<span style="font-size:10px;color:#7c3aed;font-weight:700;">이동</span>'; special=true;
       } else if(cell.no){
         noHtml=cell.actual
           ? '<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:10px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+cell.no+'차시</span>'
           : '<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:10px;background:#fff;border:1px dashed #94a3b8;color:#64748b;font-size:11px;font-weight:700;">'+cell.no+'차시</span>';
       }
-      html+='<td style="padding:6px 4px;text-align:center;border:1px solid #e2e8f0;background:'+bg+';">'
+      var pl=cell.no?planByNo[cell.no]:null;
+      var titleHtml=(pl&&pl.title)?'<div style="font-size:9px;color:'+(cell.actual?'#1d4ed8':'#94a3b8')+';word-break:keep-all;line-height:1.25;margin-top:2px;">'+escapeHtml(pl.title)+'</div>':'';
+      var clickable=cell.no && !special;
+      var attrs=' style="padding:6px 4px;text-align:center;border:1px solid #e2e8f0;background:'+(cell.actual?(isToday?'#dbeafe':'#eff6ff'):bg)+';';
+      if(clickable){
+        var cid=_cid++;
+        WEEK_CELLS[cid]={ cls:cell.cls, date:weekDates[di], no:cell.no, actual:cell.actual };
+        attrs+='cursor:pointer;" onclick="markWeekCell('+cid+')" title="클릭: 실제 수업 완료 토글"';
+      } else { attrs+='"'; }
+      html+='<td'+attrs+'>'
         +'<div style="font-size:12px;font-weight:800;color:#1e293b;">'+escapeHtml(cell.cls)+'</div>'
-        +noHtml+'</td>';
+        +noHtml+titleHtml+'</td>';
     });
     html+='</tr>';
   });
   html+='</tbody></table></div>';
   wrap.innerHTML=html;
+}
+
+var WEEK_CELLS={};
+// 이번주 시간표 칸 클릭 → 실제 수업 완료 토글 (낙관적 업데이트 + 실패 시 롤백)
+function markWeekCell(cid){
+  var c=WEEK_CELLS[cid]; if(!c) return;
+  var key=c.date+'_'+c.cls;
+  var prev=sylCheckCache[key]?JSON.parse(JSON.stringify(sylCheckCache[key])):null;
+  var memo=(sylCheckCache[key]&&sylCheckCache[key].memo)||'';
+  var makeActive=!c.actual;
+  var ln=makeActive?c.no:0;
+  sylCheckCache[key]={ lessonNo:ln, plannedLessonNo:c.no, memo:memo, status:'' };
+  renderWeekTimetable();
+  google.script.run
+    .withFailureHandler(function(e){
+      if(prev) sylCheckCache[key]=prev; else delete sylCheckCache[key];
+      renderWeekTimetable();
+      alert('저장 실패: '+((e&&e.message)||e));
+    })
+    .withSuccessHandler(function(res){
+      if(res && res.success===false){
+        if(prev) sylCheckCache[key]=prev; else delete sylCheckCache[key];
+        renderWeekTimetable(); alert('저장 실패: '+(res.message||''));
+      }
+    })
+    .saveSyllabusCheck({ date:c.date, cls:c.cls, lessonNo:ln, plannedLessonNo:c.no, memo:memo, status:'' }, currentGroupId);
 }
 
 function renderSylTable() {
@@ -1140,6 +1185,7 @@ function renderSylTable() {
             + '<span style="font-size:16px;">📋</span>'
             + '<div style="font-size:12px;min-width:0;">'
               + '<div style="font-weight:800;color:#6366f1;">' + check.plannedLessonNo + '차시 예정</div>'
+              + (pPlan && pPlan.title ? '<div style="font-size:11px;font-weight:700;color:#334155;word-break:keep-all;">' + escapeHtml(pPlan.title) + '</div>' : '')
               + (pPlan && pPlan.content ? '<div style="font-size:10px;color:#374151;word-break:keep-all;">' + escapeHtml(pPlan.content) + '</div>' : '')
             + '</div>'
           + '</div>' + rateHtml + '</td>';
@@ -1163,6 +1209,7 @@ function renderSylTable() {
             + '<span style="font-size:16px;">✅</span>'
             + '<div style="font-size:12px;min-width:0;">'
               + '<div style="font-weight:800;color:' + numColor + ';">' + check.lessonNo + '차시' + badge + '</div>'
+              + (plan && plan.title ? '<div style="font-size:11px;font-weight:700;color:#1e293b;word-break:keep-all;">' + escapeHtml(plan.title) + '</div>' : '')
               + (plan && plan.content ? '<div style="font-size:10px;color:#374151;word-break:keep-all;">' + escapeHtml(plan.content) + '</div>' : '')
               + plannedDiff
               + (check.memo ? '<div style="font-size:9px;color:#6366f1;word-break:keep-all;">' + escapeHtml(check.memo) + '</div>' : '')
@@ -1816,14 +1863,18 @@ function closePlanEdit() {
 }
 
 function addPlanRow(plan) {
-  plan = plan || { lessonNo: (document.querySelectorAll('#planEditRows > div').length + 1), content:'', memo:'' };
+  plan = plan || { lessonNo: (document.querySelectorAll('#planEditRows > div').length + 1), title:'', content:'', memo:'' };
   var div = document.createElement('div');
-  div.style.cssText = 'display:grid;grid-template-columns:52px 1fr 1fr 36px;gap:6px;align-items:start;padding:8px;background:#f8fafc;border-radius:8px;';
+  div.className = 'plan-row';
+  div.style.cssText = 'display:flex;flex-direction:column;gap:6px;padding:10px;background:#f8fafc;border-radius:8px;';
   div.innerHTML =
-    '<div style="text-align:center;font-weight:800;color:#1e3a8a;font-size:13px;padding-top:6px;">' + plan.lessonNo + '차시</div>' +
-    '<input data-lesson="' + plan.lessonNo + '" class="plan-content-input form-input" type="text" placeholder="수업 내용" value="' + escapeHtml(plan.content||'') + '" style="font-size:13px;">' +
-    '<textarea class="plan-memo-input form-input" placeholder="메모 (목표, 준비물, 참고사항 등)" style="font-size:12px;resize:vertical;min-height:36px;height:60px;">' + escapeHtml(plan.memo||'') + '</textarea>' +
-    '<button onclick="this.parentElement.remove()" class="btn btn-danger" style="padding:6px;margin-top:2px;">✕</button>';
+    '<div style="display:flex;align-items:center;gap:8px;">' +
+      '<span style="flex:none;text-align:center;font-weight:800;color:#1e3a8a;font-size:13px;min-width:44px;">' + plan.lessonNo + '차시</span>' +
+      '<input data-lesson="' + plan.lessonNo + '" class="plan-title-input form-input" type="text" placeholder="제목 (예: 일차방정식의 풀이)" value="' + escapeHtml(plan.title||'') + '" style="font-size:13px;font-weight:700;flex:1;">' +
+      '<button onclick="this.closest(\'.plan-row\').remove()" class="btn btn-danger" style="flex:none;padding:6px 9px;">✕</button>' +
+    '</div>' +
+    '<input class="plan-content-input form-input" type="text" placeholder="수업 내용 (다루는 개념·활동)" value="' + escapeHtml(plan.content||'') + '" style="font-size:13px;">' +
+    '<textarea class="plan-memo-input form-input" placeholder="메모 (목표, 준비물, 참고사항 등)" style="font-size:12px;resize:vertical;min-height:36px;height:48px;">' + escapeHtml(plan.memo||'') + '</textarea>';
   document.getElementById('planEditRows').appendChild(div);
 }
 
@@ -1832,10 +1883,12 @@ function savePlan() {
   var rows = document.querySelectorAll('#planEditRows > div');
   var plans = [];
   rows.forEach(function(row, idx) {
+    var titleEl = row.querySelector('.plan-title-input');
+    var title   = titleEl ? titleEl.value.trim() : '';
     var content = row.querySelector('.plan-content-input').value.trim();
     var memoEl  = row.querySelector('.plan-memo-input');
     var memo    = memoEl ? (memoEl.value || memoEl.textContent || '').trim() : '';
-    plans.push({ lessonNo: idx + 1, content: content, material: '', memo: memo });
+    plans.push({ lessonNo: idx + 1, title: title, content: content, material: '', memo: memo });
   });
   if (btn) { btn.disabled = true; btn.textContent = '저장 중...'; }
   var successHandler = function(res) {
