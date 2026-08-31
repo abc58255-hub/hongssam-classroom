@@ -366,22 +366,30 @@
     else { if(RV.kept.indexOf(sid)<0) RV.kept.push(sid); toast('🔖 '+name+' 킵'); }
     RV.current=(RV.current||[]).filter(function(x){return x!==sid;});
   }
+  function _rollbackPass(sid, name, msg){
+    RV.pass=Math.max(0, RV.pass-1);
+    RV.done=RV.done.filter(function(x){return x!==sid;});
+    COUNTS[sid]=Math.max(0, (COUNTS[sid]||1)-1);
+    if(RV.mode!=='dup' && RV.pool.indexOf(sid)<0) RV.pool.push(sid);
+    toast(msg);
+    render();
+  }
   function _resolve(sid, kind){
     var name=_name(sid);
     if(kind!=='pass'){ _finishLocal(sid, kind); render(); return; }
     if(_saving[sid]) return;
     _saving[sid]=true;
-    toast('💾 '+name+' 도장 저장 중…');
+    // 화면은 즉시 통과 처리(낙관적) — 저장은 백그라운드, 실패 시에만 되돌림
+    RV.pass++; RV.done.push(sid); COUNTS[sid]=(COUNTS[sid]||0)+1;
+    if(RV.mode!=='dup') RV.pool=RV.pool.filter(function(x){return x!==sid;});
+    RV.current=(RV.current||[]).filter(function(x){return x!==sid;});
+    toast('✅ '+name+' 통과! 도장 +1');
+    render();
     google.script.run
-      .withFailureHandler(function(e){ delete _saving[sid]; toast('⚠ 저장 실패 — 다시 눌러주세요'); })
+      .withFailureHandler(function(e){ delete _saving[sid]; _rollbackPass(sid, name, '⚠ '+name+' 저장 실패 — 다시 뽑혀요'); })
       .withSuccessHandler(function(res){
         delete _saving[sid];
-        if(res && res.needAuth){ toast('🔒 인증 필요'); return; }
-        RV.pass++; RV.done.push(sid); COUNTS[sid]=(COUNTS[sid]||0)+1;
-        if(RV.mode!=='dup') RV.pool=RV.pool.filter(function(x){return x!==sid;});
-        RV.current=(RV.current||[]).filter(function(x){return x!==sid;});
-        toast('✅ '+name+' 통과! 도장 +1');
-        render();
+        if(res && res.needAuth){ _rollbackPass(sid, name, '🔒 인증 필요 — 저장 안 됨'); return; }
       }).recordReviewPass(sid, name, TOK);
   }
   function judge(kind){ if(!RV||!RV.current||!RV.current.length) return; _resolve(RV.current[0], kind); }
