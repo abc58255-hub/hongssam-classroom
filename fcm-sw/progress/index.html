@@ -201,6 +201,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     <div class="tabs">
       <button id="tab-1" class="tab-btn active" onclick="switchTab(1)">📋 진도표</button>
       <button id="tab-2" class="tab-btn" onclick="switchTab(2)">📊 반별 현황</button>
+      <button id="tab-5" class="tab-btn" onclick="switchTab(5)">🗓️ 이번주 시간표</button>
       <button id="tab-4" class="tab-btn" onclick="switchTab(4)">📅 시간표 생성</button>
     </div>
 
@@ -219,6 +220,11 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
     <!-- 탭2: 반별 현황 -->
     <div id="tab-content-2" style="display:none;">
       <div id="sylStatusBoard"></div>
+    </div>
+
+    <!-- 탭5: 이번주 시간표 -->
+    <div id="tab-content-5" style="display:none;">
+      <div id="weekTtWrap"><div class="loading">불러오는 중...</div></div>
     </div>
 
     <!-- 탭4: 시간표 생성 -->
@@ -664,7 +670,7 @@ function loadSyllabusData(forceTab) {
 
 // ─── 탭 전환 ───
 function switchTab(n) {
-  [1,2,4].forEach(function(i) {
+  [1,2,4,5].forEach(function(i) {
     var btn = document.getElementById('tab-' + i);
     var con = document.getElementById('tab-content-' + i);
     if (!btn || !con) return;
@@ -675,6 +681,7 @@ function switchTab(n) {
   if (n === 1) renderSylTable();
   if (n === 2) renderSylStatusBoard();
   if (n === 4) loadTimetableTab();
+  if (n === 5) loadWeekTimetable();
 }
 
 
@@ -749,6 +756,134 @@ function fillWeek(monday){
       if(res&&res.success){ alert('📅 '+mLabel+' 주 예상 차시 '+items.length+'개를 입력했어요.'); renderSylTable(); }
       else { alert('실패: '+((res&&res.message)||'')); loadSyllabusData(1); }
     }).bulkFillPlanned(items, currentGroupId);
+}
+
+// ===== 이번주 시간표 탭 =====
+// 이번주 반별 차시(실제=기록, 미래=예상) 계산 — fillWeek의 읽기전용 버전(저장 안 함)
+function computeWeekLessons(monday){
+  var d0=new Date(monday+'T09:00:00'), sun=new Date(d0); sun.setDate(sun.getDate()+6);
+  var sunStr=_ymd(sun);
+  var cols=getActiveClasses().filter(function(x){ return x && x!=='undefined'; });
+  var map={};
+  cols.forEach(function(cls){
+    var sched=(sylScheduleCache[cls]||[]).filter(function(x){ return x>=monday && x<=sunStr; }).slice().sort();
+    if(!sched.length) return;
+    var last=0;
+    Object.keys(sylCheckCache).forEach(function(k){
+      if(k.substring(11)!==cls || k.substring(0,10)>=monday) return;
+      var c=sylCheckCache[k], ln=Math.max(Number(c.lessonNo)||0, Number(c.plannedLessonNo)||0); if(ln>last) last=ln;
+    });
+    if(typeof sylMovedInCache!=='undefined' && sylMovedInCache){
+      Object.keys(sylMovedInCache).forEach(function(k){
+        if(k.substring(11)!==cls || k.substring(0,10)>=monday) return;
+        (sylMovedInCache[k]||[]).forEach(function(mi){ var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
+      });
+    }
+    var next=last+1; map[cls]={};
+    sched.forEach(function(dt){
+      var key=dt+'_'+cls, c=sylCheckCache[key];
+      var actualLn=c?Number(c.lessonNo)||0:0;
+      var planLn=c?Number(c.plannedLessonNo)||0:0;
+      var status=c?String(c.status||''):'';
+      if(actualLn>0){ map[cls][dt]={no:actualLn, actual:true, status:status}; if(actualLn>=next) next=actualLn+1; }
+      else if(planLn>0){ map[cls][dt]={no:planLn, actual:false, status:status}; if(planLn>=next) next=planLn+1; }
+      else if(status){ map[cls][dt]={no:null, actual:false, status:status}; }
+      else { map[cls][dt]={no:next, actual:false, status:''}; next++; }
+    });
+  });
+  return map;
+}
+
+function loadWeekTimetable(){
+  var wrap=document.getElementById('weekTtWrap');
+  if(wrap) wrap.innerHTML='<div class="loading">불러오는 중...</div>';
+  if(timetableCache && timetableCache.length){ renderWeekTimetable(); return; }
+  google.script.run
+    .withSuccessHandler(function(res){ timetableCache=(res&&res.success?res.entries:[])||[]; renderWeekTimetable(); })
+    .withFailureHandler(function(){ timetableCache=[]; renderWeekTimetable(); })
+    .getTimetableList(currentGroupId);
+}
+
+function renderWeekTimetable(){
+  var wrap=document.getElementById('weekTtWrap');
+  if(!wrap) return;
+  var today=_ymd(new Date());
+  var monday=getMondayStr(today);
+  var DAYS=['mon','tue','wed','thu','fri'];
+  var DAY_KR={mon:'월',tue:'화',wed:'수',thu:'목',fri:'금'};
+  var d0=new Date(monday+'T09:00:00'), weekDates=[];
+  for(var i=0;i<5;i++){ var d=new Date(d0); d.setDate(d.getDate()+i); weekDates.push(_ymd(d)); }
+
+  var lessonMap=computeWeekLessons(monday);
+  var grid={}, periods={};
+  (timetableCache||[]).forEach(function(entry){
+    var cls=entry.cls; if(!cls) return;
+    DAYS.forEach(function(d,di){
+      var p=Number(entry[d])||0; if(p<=0) return;
+      var date=weekDates[di];
+      if((sylScheduleCache[cls]||[]).indexOf(date)<0) return;
+      periods[p]=true;
+      if(!grid[p]) grid[p]={};
+      var lm=lessonMap[cls] && lessonMap[cls][date];
+      grid[p][di]={ cls:cls, no:lm?lm.no:null, actual:lm?lm.actual:false, status:lm?lm.status:'' };
+    });
+  });
+  var periodList=Object.keys(periods).map(Number).sort(function(a,b){return a-b;});
+
+  if(!periodList.length){
+    wrap.innerHTML='<div style="text-align:center;color:#94a3b8;font-size:14px;padding:40px 16px;line-height:1.7;">'
+      +'📅 이번주 표시할 수업이 없어요.<br><span style="font-size:12px;">시간표가 없으면 <b>시간표 생성</b> 탭에서 교시를 등록하거나,<br>이번주 예정 수업이 있는지 확인해 주세요.</span></div>';
+    return;
+  }
+
+  var mLabel=(d0.getMonth()+1)+'/'+d0.getDate();
+  var sun=new Date(d0); sun.setDate(sun.getDate()+4);
+  var eLabel=(sun.getMonth()+1)+'/'+sun.getDate();
+
+  var html='<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px;">'
+    +'<div style="font-size:15px;font-weight:800;color:#1e293b;">🗓️ 이번주 시간표 <span style="font-size:12px;color:#64748b;font-weight:600;">'+mLabel+' ~ '+eLabel+'</span></div>'
+    +'<div style="display:flex;gap:10px;align-items:center;font-size:11px;color:#64748b;">'
+    +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2563eb;vertical-align:middle;"></span> 실제(기록)</span>'
+    +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fff;border:1px dashed #94a3b8;vertical-align:middle;"></span> 예상</span>'
+    +'</div></div>';
+
+  html+='<div style="overflow-x:auto;"><table style="border-collapse:collapse;width:100%;min-width:520px;"><thead><tr>'
+    +'<th style="padding:8px;font-size:11px;font-weight:800;color:#475569;background:#f1f5f9;border:1px solid #e2e8f0;width:46px;">교시</th>';
+  DAYS.forEach(function(d,di){
+    var isToday=weekDates[di]===today;
+    var dm=weekDates[di].substring(5).replace('-','/');
+    html+='<th style="padding:6px 4px;font-size:12px;font-weight:800;border:1px solid #e2e8f0;'
+      +(isToday?'background:#dbeafe;color:#1d4ed8;':'background:#f8fafc;color:#475569;')+'">'
+      +DAY_KR[d]+(isToday?' ⭐':'')+'<div style="font-size:10px;font-weight:600;color:'+(isToday?'#3b82f6':'#94a3b8')+';">'+dm+'</div></th>';
+  });
+  html+='</tr></thead><tbody>';
+
+  periodList.forEach(function(p){
+    html+='<tr><td style="padding:8px;text-align:center;font-size:12px;font-weight:800;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;">'+p+'교시</td>';
+    DAYS.forEach(function(d,di){
+      var isToday=weekDates[di]===today;
+      var cell=(grid[p]||{})[di];
+      var bg=isToday?'#eff6ff':'#fff';
+      if(!cell){ html+='<td style="border:1px solid #e2e8f0;background:'+bg+';"></td>'; return; }
+      var noHtml='';
+      var st=String(cell.status||'');
+      if(/휴강|취소/.test(st)){
+        noHtml='<span style="font-size:10px;color:#dc2626;font-weight:700;">휴강</span>';
+      } else if(st.indexOf('이동')===0){
+        noHtml='<span style="font-size:10px;color:#7c3aed;font-weight:700;">이동</span>';
+      } else if(cell.no){
+        noHtml=cell.actual
+          ? '<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:10px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+cell.no+'차시</span>'
+          : '<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:10px;background:#fff;border:1px dashed #94a3b8;color:#64748b;font-size:11px;font-weight:700;">'+cell.no+'차시</span>';
+      }
+      html+='<td style="padding:6px 4px;text-align:center;border:1px solid #e2e8f0;background:'+bg+';">'
+        +'<div style="font-size:12px;font-weight:800;color:#1e293b;">'+escapeHtml(cell.cls)+'</div>'
+        +noHtml+'</td>';
+    });
+    html+='</tr>';
+  });
+  html+='</tbody></table></div>';
+  wrap.innerHTML=html;
 }
 
 function renderSylTable() {
