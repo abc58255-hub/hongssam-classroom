@@ -847,11 +847,11 @@ function renderWeekTimetable(){
         noHtml='<span style="font-size:10px;color:#7c3aed;font-weight:700;">이동</span>'; special=true;
       } else if(cell.no){
         noHtml=cell.actual
-          ? '<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:10px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+cell.no+'차시</span>'
-          : '<span style="display:inline-block;margin-top:3px;padding:1px 7px;border-radius:10px;background:#fff;border:1px dashed #94a3b8;color:#64748b;font-size:11px;font-weight:700;">'+cell.no+'차시</span>';
+          ? '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+cell.no+'차시</span>'
+          : '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#fff;border:1px dashed #94a3b8;color:#64748b;font-size:11px;font-weight:700;">'+cell.no+'차시</span>';
       }
       var pl=cell.no?planByNo[cell.no]:null;
-      var titleHtml=(pl&&pl.title)?'<div style="font-size:9px;color:'+(cell.actual?'#1d4ed8':'#94a3b8')+';word-break:keep-all;line-height:1.25;margin-top:2px;">'+escapeHtml(pl.title)+'</div>':'';
+      var titleHtml=(pl&&pl.title)?'<span style="font-size:9px;color:'+(cell.actual?'#1d4ed8':'#94a3b8')+';word-break:keep-all;line-height:1.2;">'+escapeHtml(pl.title)+'</span>':'';
       var clickable=cell.no && !special;
       var attrs=' style="padding:6px 4px;text-align:center;border:1px solid #e2e8f0;background:'+(cell.actual?(isToday?'#dbeafe':'#eff6ff'):bg)+';';
       if(clickable){
@@ -861,7 +861,8 @@ function renderWeekTimetable(){
       } else { attrs+='"'; }
       html+='<td'+attrs+'>'
         +'<div style="font-size:12px;font-weight:800;color:#1e293b;">'+escapeHtml(cell.cls)+'</div>'
-        +noHtml+titleHtml+'</td>';
+        +'<div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:3px;">'+noHtml+titleHtml+'</div>'
+        +'</td>';
     });
     html+='</tr>';
   });
