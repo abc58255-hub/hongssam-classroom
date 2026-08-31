@@ -2209,7 +2209,7 @@
     if (!gAchievements.length) { uiAlert('성취기준을 불러오는 중이에요. 잠시 후 다시 시도해주세요.'); loadAchievements(); return; }
     var selected = (mode === 'new') ? gStdNew : gStdEdit;
     var areas = {};
-    gAchievements.forEach(function(a) { (areas[a.area] = areas[a.area] || []).push(a); });
+    gAchievements.slice().sort(function(x,y){ return String(x.code).localeCompare(String(y.code)); }).forEach(function(a) { (areas[a.area] = areas[a.area] || []).push(a); }); // 문서번호(코드)순
     var html = Object.keys(areas).map(function(area) {
       var items = areas[area].map(function(a) {
         var on = selected.indexOf(a.code) >= 0;
