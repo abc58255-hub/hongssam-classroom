@@ -269,7 +269,8 @@ function getDashboardData(studentId, studentName) {
       let choiceArray = choices ? choices.split(',').map(s => s.trim()).filter(s => s) : [];
       var maxScore = taskData[i][8] ? Number(taskData[i][8]) : 0; // col9 = 만점
       var taskPub = (function(){ var v = String(taskData[i][5] || '').trim(); return v === '일괄공개' || v === '공개'; })(); // col6 = 과제 단위 공개
-      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray, maxScore: maxScore, isPublicTask: taskPub, allowResubmit: String(taskData[i][12] || '').trim() !== 'N' }; // M(13)=재제출허용
+      var _tProblems = (function(){ var v = taskData[i][13]; if (!v) return []; try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch(_) { return []; } })(); // N열 문제(JSON)
+      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray, maxScore: maxScore, isPublicTask: taskPub, allowResubmit: String(taskData[i][12] || '').trim() !== 'N', desc: String(taskData[i][2] || '').trim(), problems: _tProblems }; // M(13)=재제출허용, N(14)=문제
 
       let isExpired = false;
       let hasDeadline = false;
@@ -533,12 +534,20 @@ function getDashboardData(studentId, studentName) {
       }
     } catch(_) {}
 
+    // 과제별 문제(사진·글) 맵 — 학생이 과제 열면 표시
+    var taskProblemsMap = {};
+    Object.keys(taskSettingsMap).forEach(function(tn){
+      var s = taskSettingsMap[tn];
+      if (s && ((s.problems && s.problems.length) || s.desc)) taskProblemsMap[tn] = { desc: s.desc || '', problems: s.problems || [] };
+    });
+
     return {
       history: history.reverse(),
       missingTasks: missingTasks,
       resubmitTasks: resubmitTasks,
       voluntaryTasks: voluntaryTasks,
       rubricTasks: rubricTaskNames,
+      taskProblems: taskProblemsMap,
       unreadFeedbacks: unreadFeedbacks,
       bestWorksMap: bestWorksMap,
       taskOrder: assignedBaseTasks, // 이 학생 반에 배정된 과제만 (갤러리 정렬용)

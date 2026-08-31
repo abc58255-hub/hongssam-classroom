@@ -356,6 +356,9 @@
     <div id="tab1" class="tab-content active">
       <div class="field"><label>어떤 과제를 제출할까요?</label><select id="taskName" onchange="initTaskUI()"><option value="">로딩 중...</option></select></div>
 
+      <!-- 📄 과제 문제 (사진·글) -->
+      <div id="taskProblemPanel" style="display:none;"></div>
+
       <!-- ✅ 반려 사유 박스 (재제출 시 표시) -->
       <div id="rejectionReasonBox" style="display:none; background:#fef2f2; border:2px solid #ef4444; border-radius:12px; padding:16px; margin-bottom:4px;">
         <div id="rejectionReasonTitle" style="font-size:13px; font-weight:800; color:#dc2626; margin-bottom:8px;">🚨 선생님의 반려 사유</div>
@@ -589,6 +592,63 @@
   var gMissingTasks = [];
   var gResubmitTasks = [];
   var gVoluntaryTasks = [];
+  var gTaskProblems = {}; // 과제명 → {desc, problems:[{t,img}]}
+
+  // ── 📄 과제 문제(사진·글) 표시 ──
+  function _mathImgZoom(url) {
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:100000;display:flex;align-items:center;justify-content:center;padding:16px;cursor:zoom-out;';
+    ov.onclick = function(){ document.body.removeChild(ov); };
+    ov.innerHTML = '<img src="' + url + '" style="max-width:98vw;max-height:94vh;border-radius:8px;">';
+    document.body.appendChild(ov);
+  }
+  function _hasProblems(name) {
+    var p = gTaskProblems[name];
+    return !!(p && ((p.problems && p.problems.length) || (p.desc && p.desc.trim())));
+  }
+  function _problemsInnerHtml(name) {
+    var p = gTaskProblems[name]; if (!p) return '';
+    var html = '';
+    if (p.desc && p.desc.trim()) html += '<div style="font-size:13px;color:#334155;line-height:1.6;white-space:pre-wrap;margin-bottom:10px;">' + escapeHtmlM(p.desc) + '</div>';
+    (p.problems || []).forEach(function(pr, i) {
+      html += '<div style="border:1px solid #e5e7eb;border-radius:10px;padding:10px;margin-bottom:8px;background:#fff;">'
+        + '<div style="font-size:12px;font-weight:800;color:#2563eb;margin-bottom:5px;">문제 ' + (i + 1) + '</div>';
+      if (pr.t && String(pr.t).trim()) html += '<div style="font-size:13px;color:#1f2937;line-height:1.55;white-space:pre-wrap;margin-bottom:' + (pr.img ? '8px' : '0') + ';">' + escapeHtmlM(pr.t) + '</div>';
+      if (pr.img) {
+        var thumb = 'https://drive.google.com/thumbnail?id=' + pr.img + '&sz=w1000';
+        var big = 'https://drive.google.com/thumbnail?id=' + pr.img + '&sz=w1600';
+        html += '<img src="' + thumb + '" onclick="_mathImgZoom(\'' + big.replace(/'/g, "\\'") + '\')" style="width:100%;max-width:520px;border-radius:8px;border:1px solid #e5e7eb;cursor:zoom-in;display:block;" loading="lazy">';
+      }
+      html += '</div>';
+    });
+    return html;
+  }
+  function escapeHtmlM(s) { return String(s == null ? '' : s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function renderTaskProblemPanel(name) {
+    var el = document.getElementById('taskProblemPanel'); if (!el) return;
+    if (!_hasProblems(name)) { el.style.display = 'none'; el.innerHTML = ''; return; }
+    el.style.display = 'block';
+    el.innerHTML = '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:8px;">'
+      + '<div style="font-size:13px;font-weight:800;color:#1e40af;margin-bottom:10px;">📄 이 과제의 문제</div>'
+      + _problemsInnerHtml(name) + '</div>';
+  }
+  function openProblems(name) {
+    if (!_hasProblems(name)) return;
+    var ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99990;display:flex;align-items:center;justify-content:center;padding:14px;';
+    ov.onclick = function(e){ if (e.target === ov) document.body.removeChild(ov); };
+    ov.innerHTML = '<div style="background:#fff;border-radius:16px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;padding:18px;">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">'
+        + '<div style="font-size:16px;font-weight:800;color:#0f172a;">📄 ' + escapeHtmlM(name) + '</div>'
+        + '<button onclick="this.closest(\'div[style*=fixed]\').remove()" style="background:#f1f5f9;border:none;width:32px;height:32px;border-radius:8px;font-size:16px;cursor:pointer;">✕</button>'
+      + '</div>' + _problemsInnerHtml(name) + '</div>';
+    document.body.appendChild(ov);
+  }
+  function _mathProbBtn(name) {
+    if (!_hasProblems(name)) return '';
+    var esc = String(name).replace(/'/g, "\\'");
+    return '<button onclick="event.stopPropagation(); openProblems(\'' + esc + '\')" style="margin-top:7px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;padding:4px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">📄 문제 보기</button>';
+  }
   var currentTargetTask = null;
   var selectedChoices = [];
   // ✅ 갤러리 필터용 전역 변수
@@ -1514,6 +1574,7 @@
     gMissingTasks = data.missingTasks;
     gResubmitTasks = data.resubmitTasks;
     gVoluntaryTasks = data.voluntaryTasks || [];
+    gTaskProblems = data.taskProblems || {};
     window._rubricTasks = data.rubricTasks || []; // AI 채점기준 있는 과제명 (제출 후 화면 분기)
 
     var select = document.getElementById('taskName');
@@ -1619,6 +1680,7 @@
                        '<div style="min-width:0;">' +
                          '<div style="font-size:11px; font-weight:800; color:' + cardLabelCol + '; margin-bottom:3px;">' + cardLabel + '</div>' +
                          '<div style="font-size:14px; font-weight:700; color:#9a3412; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + (fbMode && t.prevScore ? ' · 이전 점수 ' + t.prevScore : '') + '</div>' +
+                         _mathProbBtn(t.name) +
                        '</div>' +
                      '</div>' +
                      '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
@@ -1671,6 +1733,7 @@
                      '<div style="min-width:0;">' +
                        '<div style="font-size:11px; font-weight:800; color:#e11d48; margin-bottom:3px;">미제출 · 클릭하여 제출 ▶' + subTxt + '</div>' +
                        '<div style="font-size:14px; font-weight:700; color:#9f1239; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">' + t.name + '</div>' +
+                       _mathProbBtn(t.name) +
                      '</div>' +
                    '</div>' +
                    '<div style="flex-shrink:0;">' + ddayBadge + '</div>' +
@@ -2024,8 +2087,9 @@
     if (!sel.value) {
       choiceArea.style.display = 'none';
       uploadArea.innerHTML = '<div style="text-align:center; padding:20px; color:#9ca3af; border:2px dashed #e5e7eb; border-radius:12px;">과제를 먼저 선택해 주세요.</div>';
-      btn.disabled = true; btn.innerText = '과제를 선택하세요'; 
+      btn.disabled = true; btn.innerText = '과제를 선택하세요';
       btn.style.background = '#2563eb';
+      var _pp = document.getElementById('taskProblemPanel'); if (_pp) { _pp.style.display = 'none'; _pp.innerHTML = ''; }
       return;
     }
 
@@ -2040,6 +2104,9 @@
     currentTargetTask.isResubmit = isResub;
     currentTargetTask.voluntary = isVoluntary;
     selectedChoices = [];
+
+    // 📄 이 과제의 문제(사진·글) 제출화면 상단에 표시
+    renderTaskProblemPanel(currentTargetTask.name);
 
     if (currentTargetTask.isResubmit && currentTargetTask.rejectionFeedback && rejBox) {
       var isFb = !!currentTargetTask.isFeedback;

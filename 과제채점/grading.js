@@ -466,7 +466,8 @@ function parseTasks(ss) {
       rejectDays:   taskData[i][9]  !== '' && taskData[i][9]  != null ? parseInt(taskData[i][9])  : 7,
       feedbackDays: taskData[i][10] !== '' && taskData[i][10] != null ? parseInt(taskData[i][10]) : 7,
       standards: taskData[i][11] ? String(taskData[i][11]).trim() : '', // L열 성취기준
-      allowResubmit: String(taskData[i][12] || '').trim() !== 'N' // M열 재제출허용(기본 허용)
+      allowResubmit: String(taskData[i][12] || '').trim() !== 'N', // M열 재제출허용(기본 허용)
+      problems: (function(){ var v = taskData[i][13]; if (!v) return []; try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch(_) { return []; } })() // N열 문제(JSON)
     });
   }
   tasks.reverse();
@@ -1303,6 +1304,46 @@ function uploadRubricFile(fileName, mimeType, base64Data, taskName) {
     file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
     
     return { success: true, url: file.getUrl(), fileId: file.getId(), name: fileName };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 과제 문제 이미지 업로드 — 과제 폴더 안 '_문제자료' 하위폴더에 공개 저장, 파일ID 반환
+function uploadTaskProblemImage(taskName, fileName, mimeType, base64Data) {
+  try {
+    if (!taskName) return { success: false, message: '과제명이 없습니다.' };
+    const parent = DriveApp.getFolderById(_getParentFolderId_());
+    let taskFolder;
+    const tf = parent.getFoldersByName(taskName);
+    taskFolder = tf.hasNext() ? tf.next() : parent.createFolder(taskName);
+    let probFolder;
+    const pf = taskFolder.getFoldersByName('_문제자료');
+    probFolder = pf.hasNext() ? pf.next() : taskFolder.createFolder('_문제자료');
+    const bytes = Utilities.base64Decode(base64Data);
+    const blob  = Utilities.newBlob(bytes, mimeType, fileName);
+    const file  = probFolder.createFile(blob);
+    file.setName(Date.now() + '_' + fileName);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    return { success: true, fileId: file.getId(), url: file.getUrl(), name: fileName };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// 과제 문제(JSON) 저장 — 과제설정 N열(14). problems=[{t:'텍스트', img:'파일ID'}, ...]
+function saveTaskProblems(taskName, problemsJson) {
+  try {
+    if (!taskName) return { success: false, message: '과제명이 없습니다.' };
+    const s = _taskSs().getSheetByName('과제설정');
+    const d = s.getRange('B:B').getValues().flat();
+    let r = -1;
+    for (let i = 1; i < d.length; i++) { if (String(d[i]).trim() === taskName) { r = i + 1; break; } }
+    if (r < 0) return { success: false, message: '과제를 찾을 수 없습니다.' };
+    let json = '';
+    if (problemsJson) {
+      try { const a = typeof problemsJson === 'string' ? JSON.parse(problemsJson) : problemsJson; json = Array.isArray(a) && a.length ? JSON.stringify(a) : ''; }
+      catch(_) { json = ''; }
+    }
+    s.getRange(r, 14).setValue(json); // N열
+    clearCache();
+    return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 function saveRubric(data) {
