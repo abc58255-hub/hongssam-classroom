@@ -318,7 +318,7 @@
     document.getElementById('drawRow').style.display='none';
     document.getElementById('judgeRow').style.display='none';
     document.getElementById('moreRow').style.display='none';
-    var card=document.getElementById('card'), all=STU.map(function(s){return s.sid;}), t=0, max=(n===1?24:14);
+    var card=document.getElementById('card'), all=STU.map(function(s){return s.sid;}), t=0, max=(n===1?9:6);
     function flash(){
       var prog=t/max, blur=Math.max(0,(1-prog)*7), op=.45+prog*.55;
       if(n===1){
@@ -331,7 +331,7 @@
           +'<div style="font-size:26px;font-weight:900;color:#93c5fd;filter:blur('+blur.toFixed(1)+'px);opacity:'+op.toFixed(2)+';line-height:1.5;">'+names.join(' · ')+'</div>';
       }
       t++; if(t>=max){ land(add ? cur.concat(winners) : winners.slice()); return; }
-      setTimeout(flash, (n===1?40:36)+t*t*.9);
+      setTimeout(flash, (n===1?26:24)+t*t*.5);
     }
     flash();
   }
