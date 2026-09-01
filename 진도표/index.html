@@ -361,8 +361,15 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
       <!-- 날짜 이동 대상 날짜 -->
       <div id="moveDateRow" style="display:none;margin-bottom:12px;background:#f5f3ff;border-radius:8px;padding:10px 12px;border:1px solid #c4b5fd;">
-        <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:5px;">이동할 날짜 선택</div>
-        <input type="date" id="moveDateInput" class="form-input">
+        <div style="font-size:12px;font-weight:700;color:#7c3aed;margin-bottom:5px;">이동할 날짜 · 교시 선택</div>
+        <div style="display:flex;gap:8px;">
+          <input type="date" id="moveDateInput" class="form-input" style="flex:1;">
+          <select id="movePeriodInput" class="form-input" style="width:96px;">
+            <option value="1">1교시</option><option value="2">2교시</option><option value="3">3교시</option>
+            <option value="4">4교시</option><option value="5">5교시</option><option value="6">6교시</option>
+            <option value="7">7교시</option><option value="8">8교시</option>
+          </select>
+        </div>
       </div>
 
       <!-- 차시 선택 -->
@@ -815,6 +822,19 @@ function renderWeekTimetable(){
       grid[p][di]={ cls:cls, no:lm?lm.no:null, actual:lm?lm.actual:false, status:lm?lm.status:'' };
     });
   });
+  // 이동받은 수업(도착) — movedGrid[period][dayIndex] = {cls,no,actual,source}
+  var movedGrid={};
+  Object.keys(sylMovedInCache||{}).forEach(function(k){
+    var tdate=k.substring(0,10), tcls=k.substring(11);
+    var di=weekDates.indexOf(tdate); if(di<0) return; // 이번주 아님
+    (sylMovedInCache[k]||[]).forEach(function(mi){
+      var p=Number(mi.period)||0; if(p<=0) return; // 교시 없는 옛 이동 데이터는 표시 불가
+      var no=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0);
+      periods[p]=true;
+      if(!movedGrid[p]) movedGrid[p]={};
+      movedGrid[p][di]={ cls:tcls, no:no, actual:(Number(mi.lessonNo)>0), source:(mi.sourceDate||'').substring(5).replace('-','/') };
+    });
+  });
   var periodList=Object.keys(periods).map(Number).sort(function(a,b){return a-b;});
 
   if(!periodList.length){
@@ -837,6 +857,7 @@ function renderWeekTimetable(){
     +'<div style="display:flex;gap:10px;align-items:center;font-size:11px;color:#64748b;">'
     +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#2563eb;vertical-align:middle;"></span> 실제(기록)</span>'
     +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#fff;border:1px dashed #94a3b8;vertical-align:middle;"></span> 예상</span>'
+    +'<span><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:#7c3aed;vertical-align:middle;"></span> 이동</span>'
     +'</div></div>'
     +'<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">💡 수업 칸을 누르면 <b>실제 수업 완료</b>로 표시돼요 (다시 누르면 예상으로 되돌림).</div>';
 
@@ -856,31 +877,56 @@ function renderWeekTimetable(){
     DAYS.forEach(function(d,di){
       var isToday=weekDates[di]===today;
       var cell=(grid[p]||{})[di];
+      var moved=(movedGrid[p]||{})[di];
       var bg=isToday?'#eff6ff':'#fff';
-      if(!cell){ html+='<td style="border:1px solid #e2e8f0;background:'+bg+';"></td>'; return; }
-      var noHtml='', st=String(cell.status||''), special=false;
-      if(/휴강|취소/.test(st)){
-        noHtml='<span style="font-size:10px;color:#dc2626;font-weight:700;">휴강</span>'; special=true;
-      } else if(st.indexOf('이동')===0){
-        noHtml='<span style="font-size:10px;color:#7c3aed;font-weight:700;">이동</span>'; special=true;
-      } else if(cell.no){
-        noHtml=cell.actual
-          ? '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+cell.no+'차시</span>'
-          : '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#fff;border:1px dashed #94a3b8;color:#64748b;font-size:11px;font-weight:700;">'+cell.no+'차시</span>';
+      if(!cell && !moved){ html+='<td style="border:1px solid #e2e8f0;background:'+bg+';"></td>'; return; }
+      var clsName=cell?cell.cls:moved.cls, inner='', cellActual=false, clickable=false;
+      // 정규 칸
+      if(cell){
+        var noHtml='', st=String(cell.status||''), special=false;
+        if(/휴강|취소/.test(st)){
+          noHtml='<span style="font-size:10px;color:#dc2626;font-weight:700;">휴강</span>'; special=true;
+        } else if(st.indexOf('이동')===0){
+          var tgt=st.substring(3), per='';
+          var arr=sylMovedInCache[tgt+'_'+cell.cls]||[];
+          for(var _i=0;_i<arr.length;_i++){ if(arr[_i].sourceDate===weekDates[di]){ per=Number(arr[_i].period)||0; break; } }
+          var tgtLabel=(tgt.length>=10)?tgt.substring(5).replace('-','/'):tgt;
+          noHtml='<span style="font-size:9px;color:#7c3aed;font-weight:700;">이동 → '+tgtLabel+(per?' '+per+'교시':'')+'</span>'; special=true;
+        } else if(cell.no){
+          noHtml=cell.actual
+            ? '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;">'+cell.no+'차시</span>'
+            : '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#fff;border:1px dashed #94a3b8;color:#64748b;font-size:11px;font-weight:700;">'+cell.no+'차시</span>';
+        }
+        var pl=cell.no?planByNo[cell.no]:null;
+        var titleHtml=(pl&&pl.title)?'<span style="font-size:9px;color:'+(cell.actual?'#1d4ed8':'#94a3b8')+';word-break:keep-all;line-height:1.2;">'+escapeHtml(pl.title)+'</span>':'';
+        cellActual=cell.actual;
+        if(cell.no && !special) clickable=true;
+        inner+='<div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:3px;">'+noHtml+titleHtml+'</div>';
       }
-      var pl=cell.no?planByNo[cell.no]:null;
-      var titleHtml=(pl&&pl.title)?'<span style="font-size:9px;color:'+(cell.actual?'#1d4ed8':'#94a3b8')+';word-break:keep-all;line-height:1.2;">'+escapeHtml(pl.title)+'</span>':'';
-      var clickable=cell.no && !special;
-      var attrs=' style="padding:6px 4px;text-align:center;border:1px solid #e2e8f0;background:'+(cell.actual?(isToday?'#dbeafe':'#eff6ff'):bg)+';';
+      // 이동받은 칸
+      if(moved){
+        var mBadge=moved.no
+          ? (moved.actual
+             ? '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#7c3aed;color:#fff;font-size:11px;font-weight:800;">'+moved.no+'차시</span>'
+             : '<span style="display:inline-block;padding:1px 7px;border-radius:10px;background:#f5f3ff;border:1px dashed #a78bfa;color:#7c3aed;font-size:11px;font-weight:700;">'+moved.no+'차시</span>')
+          : '';
+        var mpl=moved.no?planByNo[moved.no]:null;
+        var mTitle=(mpl&&mpl.title)?'<span style="font-size:9px;color:#a78bfa;word-break:keep-all;line-height:1.2;">'+escapeHtml(mpl.title)+'</span>':'';
+        inner+='<div style="margin-top:3px;'+(cell?'padding-top:3px;border-top:1px dashed #e2e8f0;':'')+'">'
+          +'<div style="font-size:9px;color:#7c3aed;font-weight:700;">← 이동'+(moved.source?' ('+moved.source+')':'')+'</div>'
+          +'<div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;">'+mBadge+mTitle+'</div>'
+        +'</div>';
+      }
+      var cellBg=(cell&&cellActual)?(isToday?'#dbeafe':'#eff6ff'):bg;
+      var attrs=' style="padding:6px 4px;text-align:center;border:1px solid #e2e8f0;background:'+cellBg+';';
       if(clickable){
         var cid=_cid++;
         WEEK_CELLS[cid]={ cls:cell.cls, date:weekDates[di], no:cell.no, actual:cell.actual };
         attrs+='cursor:pointer;" onclick="markWeekCell('+cid+')" title="클릭: 실제 수업 완료 토글"';
       } else { attrs+='"'; }
       html+='<td'+attrs+'>'
-        +'<div style="font-size:12px;font-weight:800;color:#1e293b;">'+escapeHtml(cell.cls)+'</div>'
-        +'<div style="display:flex;align-items:center;justify-content:center;gap:4px;flex-wrap:wrap;margin-top:3px;">'+noHtml+titleHtml+'</div>'
-        +'</td>';
+        +'<div style="font-size:12px;font-weight:800;color:#1e293b;">'+escapeHtml(clsName)+'</div>'
+        +inner+'</td>';
     });
     html+='</tr>';
   });
@@ -1740,7 +1786,7 @@ function setMovedInMode(srcEncoded, mode) {
   renderSylTable();
   // 서버 저장 (movedIn + source cell 둘 다)
   google.script.run.withSuccessHandler(function(){})
-    .saveMovedInLesson({ date: targetDate, cls: cls, lessonNo: mi.lessonNo, plannedLessonNo: planned, sourceDate: sourceDate, memo: mi.memo || '' }, currentGroupId);
+    .saveMovedInLesson({ date: targetDate, cls: cls, lessonNo: mi.lessonNo, plannedLessonNo: planned, sourceDate: sourceDate, memo: mi.memo || '', period: mi.period || 0 }, currentGroupId);
   google.script.run.withSuccessHandler(function(){})
     .saveSyllabusCheck({ date: sourceDate, cls: cls, lessonNo: mi.lessonNo, plannedLessonNo: planned, memo: '', status: '이동:' + targetDate }, currentGroupId);
 }
@@ -1797,6 +1843,7 @@ function confirmCheck() {
     var targetDate = document.getElementById('moveDateInput').value;
     if (!targetDate) return alert('이동할 날짜를 선택하세요.');
     if (targetDate === date) return alert('같은 날짜로는 이동할 수 없습니다.');
+    var movePeriod = parseInt(document.getElementById('movePeriodInput').value) || 0;
     var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
     if (!lessonNo) return alert('이동할 차시 번호를 입력하세요.');
     document.getElementById('checkDateModal').classList.remove('open');
@@ -1804,17 +1851,17 @@ function confirmCheck() {
     // 출발 날짜: 이동됨 표시 — 아직 안 한 수업이므로 실제는 0, plannedLessonNo로 보존
     sylCheckCache[date + '_' + cls] = { lessonNo: 0, plannedLessonNo: lessonNo, memo: '', status: '이동:' + targetDate };
 
-    // 도착 날짜: 이동받은 수업 추가 (수업 전 상태)
+    // 도착 날짜: 이동받은 수업 추가 (수업 전 상태) + 교시
     var tKey = targetDate + '_' + cls;
     if (!sylMovedInCache[tKey]) sylMovedInCache[tKey] = [];
     sylMovedInCache[tKey] = sylMovedInCache[tKey].filter(function(r){ return r.sourceDate !== date; });
-    sylMovedInCache[tKey].push({ lessonNo: 0, plannedLessonNo: lessonNo, sourceDate: date, memo: memo });
+    sylMovedInCache[tKey].push({ lessonNo: 0, plannedLessonNo: lessonNo, sourceDate: date, memo: memo, period: movePeriod });
 
     renderSylTable();
     google.script.run.withSuccessHandler(function(){})
       .saveSyllabusCheck({ date: date, cls: cls, lessonNo: 0, plannedLessonNo: lessonNo, memo: '', status: '이동:' + targetDate }, currentGroupId);
     google.script.run.withSuccessHandler(function(res){ if (!res.success) alert('오류: ' + (res.message||'')); })
-      .saveMovedInLesson({ date: targetDate, cls: cls, lessonNo: 0, plannedLessonNo: lessonNo, sourceDate: date, memo: memo }, currentGroupId);
+      .saveMovedInLesson({ date: targetDate, cls: cls, lessonNo: 0, plannedLessonNo: lessonNo, sourceDate: date, memo: memo, period: movePeriod }, currentGroupId);
     return;
   }
 
