@@ -3,9 +3,23 @@
 // 인증·설정은 ClassCore 라이브러리에 위임 — 하드코딩 없음
 
 // ── 라우팅 ──
+// 교사포털 프론트는 PWA(fcm-sw/portal)로 단일화됨. GAS URL은 PWA로 리다이렉트만 하고,
+// 백엔드(getPortalData 등 RPC)는 계속 PWA가 사용. (옛 GAS index.html은 미사용)
+var PORTAL_PWA_URL = 'https://abc58255-hub.github.io/hongssam-classroom/portal/';
 function doGet() {
-  try { ClassCore.registerAppUrl('교사포털', _serviceUrl_()); } catch(_) {}
-  return HtmlService.createHtmlOutputFromFile('index')
+  try { ClassCore.registerAppUrl('교사포털', PORTAL_PWA_URL); } catch(_) {}
+  var url = PORTAL_PWA_URL;
+  var html = '<!DOCTYPE html><html><head><meta charset="utf-8">'
+    + '<meta name="viewport" content="width=device-width, initial-scale=1">'
+    + '<meta http-equiv="refresh" content="0; url=' + url + '">'
+    + '<script>try{window.top.location.href=' + JSON.stringify(url) + ';}catch(e){location.href=' + JSON.stringify(url) + ';}</script>'
+    + '<title>교사 포털</title></head>'
+    + '<body style="font-family:-apple-system,sans-serif;text-align:center;padding:48px 20px;color:#334155;">'
+    + '<div style="font-size:15px;">교사 포털이 새 주소로 옮겨졌어요.</div>'
+    + '<div style="margin-top:14px;"><a href="' + url + '" target="_top" style="display:inline-block;background:#0284c7;color:#fff;padding:12px 22px;border-radius:10px;font-weight:800;text-decoration:none;">교사 포털 열기 →</a></div>'
+    + '<div style="margin-top:10px;font-size:12px;color:#94a3b8;">자동으로 이동하지 않으면 위 버튼을 눌러주세요.</div>'
+    + '</body></html>';
+  return HtmlService.createHtmlOutput(html)
     .setTitle('교사 포털')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1');
