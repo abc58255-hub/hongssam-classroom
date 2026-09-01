@@ -604,6 +604,10 @@
   }
   function _hasProblems(name) {
     var p = gTaskProblems[name];
+    return !!(p && ((p.problems && p.problems.length) || (p.desc && p.desc.trim())));
+  }
+  function _taskHasRealProblems(name) {
+    var p = gTaskProblems[name];
     return !!(p && p.problems && p.problems.length);
   }
   function _problemsInnerHtml(name) {
@@ -636,9 +640,10 @@
     var el = document.getElementById('taskProblemPanel'); if (!el) return;
     if (!_hasProblems(name)) { el.style.display = 'none'; el.innerHTML = ''; return; }
     el.style.display = 'block';
+    var hdr = _taskHasRealProblems(name) ? '📄 이 과제의 문제' : '📋 과제 안내';
     el.innerHTML = '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:14px;margin-bottom:8px;">'
       + '<div onclick="toggleProblemPanel()" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;font-size:13px;font-weight:800;color:#1e40af;">'
-        + '<span>📄 이 과제의 문제</span>'
+        + '<span>' + hdr + '</span>'
         + '<span id="taskProblemChev" style="font-size:12px;font-weight:700;color:#3b82f6;">▾ 접기</span>'
       + '</div>'
       + '<div id="taskProblemBody" style="margin-top:10px;">' + _problemsInnerHtml(name) + '</div>'
@@ -659,7 +664,8 @@
   function _mathProbBtn(name) {
     if (!_hasProblems(name)) return '';
     var esc = String(name).replace(/'/g, "\\'");
-    return '<button onclick="event.stopPropagation(); openProblems(\'' + esc + '\')" style="margin-top:7px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;padding:4px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">📄 문제 보기</button>';
+    var label = _taskHasRealProblems(name) ? '📄 문제 보기' : '📋 안내 보기';
+    return '<button onclick="event.stopPropagation(); openProblems(\'' + esc + '\')" style="margin-top:7px;background:#eef2ff;color:#4338ca;border:1px solid #c7d2fe;padding:4px 10px;border-radius:7px;font-size:11px;font-weight:700;cursor:pointer;">' + label + '</button>';
   }
   var currentTargetTask = null;
   var selectedChoices = [];

@@ -538,7 +538,7 @@ function getDashboardData(studentId, studentName) {
     var taskProblemsMap = {};
     Object.keys(taskSettingsMap).forEach(function(tn){
       var s = taskSettingsMap[tn];
-      if (s && s.problems && s.problems.length) taskProblemsMap[tn] = { desc: s.desc || '', problems: s.problems }; // 실제 문제 있을 때만
+      if (s && ((s.problems && s.problems.length) || (s.desc && s.desc.trim()))) taskProblemsMap[tn] = { desc: s.desc || '', problems: s.problems || [] }; // 문제 또는 설명 있을 때
     });
 
     return {
