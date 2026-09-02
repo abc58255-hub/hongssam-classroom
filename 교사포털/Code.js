@@ -36,6 +36,7 @@ var RPC_WHITELIST = [
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
   'getLinks', 'saveLink', 'deleteLink',
+  'sendTvFlash', 'clearTvFlash', 'getTvFlash',
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
   'graphPresetSave', 'graphPresetDelete', 'syncRoster'
 ];
@@ -221,6 +222,31 @@ function saveLink(token, link) {
 function deleteLink(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요' };
   return _lessonCall_({ op: 'deleteLink', id: id });
+}
+
+// ── 📺 TV 실시간 알림(팝업) ── 학생 TV알림판에 즉시 띄우는 flash 메시지 (ScriptProperties)
+var TV_FLASH_KEY = 'tv_flash';
+function sendTvFlash(token, msg) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
+  var text = String(msg == null ? '' : msg).trim();
+  if (!text) return { success: false, message: '보낼 내용을 입력하세요.' };
+  var obj = { id: Date.now(), msg: text, ts: Date.now() };
+  PropertiesService.getScriptProperties().setProperty(TV_FLASH_KEY, JSON.stringify(obj));
+  return { success: true, id: obj.id };
+}
+function clearTvFlash(token) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  // 빈 메시지 + 새 id → TV가 변경을 감지하고 팝업을 닫음
+  PropertiesService.getScriptProperties().setProperty(TV_FLASH_KEY, JSON.stringify({ id: Date.now(), msg: '', ts: Date.now() }));
+  return { success: true };
+}
+function getTvFlash() { // 공개 — TV 화면이 폴링
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty(TV_FLASH_KEY);
+    if (!v) return { id: 0, msg: '' };
+    var o = JSON.parse(v);
+    return { id: o.id || 0, msg: o.msg || '' };
+  } catch (_) { return { id: 0, msg: '' }; }
 }
 
 // 명단 즉시 동기화 — 학생-수학 GAS의 syncRoster(전체 로스터→Supabase students/Auth) 호출.

@@ -31,6 +31,7 @@
       'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
       'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
       'getLinks', 'saveLink', 'deleteLink',
+      'sendTvFlash', 'clearTvFlash', 'getTvFlash',
       'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
       'graphPresetSave', 'graphPresetDelete', 'syncRoster'
     ];
@@ -135,6 +136,7 @@
     <h1 onclick="loadPortal()" style="cursor:pointer;" title="홈으로">🏫 교사 포털</h1>
     <span class="hr-chip hidden" id="hrChip"></span>
     <div class="spacer"></div>
+    <button class="small" onclick="openTvFlash()">📺 TV 알림</button>
     <button class="small" onclick="openLinkAdmin()">🔗 수업 링크</button>
     <button class="small" id="pushBtn" onclick="openPushSetup()">🔔 알림</button>
     <button class="small" onclick="openPwReset()">🔑 비번 초기화</button>
@@ -332,6 +334,44 @@
       toast('✅ 적용됨');
     }).withFailureHandler(function(e){ toast('오류: ' + e.message); openLessonAdmin(); })
       .setLessonGame(TOKEN, { unit: g.unit, game: g.game, title: g.title, url: g.url, scope: g.scope, status: g.status });
+  }
+
+  // ══════════ 📺 TV 실시간 알림 (학생 TV알림판 팝업) ══════════
+  function openTvFlash() {
+    var main = document.getElementById('portalMain');
+    main.innerHTML =
+      '<h2 style="display:flex;align-items:center;gap:10px;font-size:17px;margin:4px 0 14px;"><button class="small" onclick="loadPortal()">← 포털</button><span>📺 TV 실시간 알림</span></h2>'
+      + '<div style="max-width:560px;margin:0 auto;background:#0f172a;border:1px solid #1e293b;border-radius:14px;padding:18px;">'
+        + '<div style="font-size:12px;color:#94a3b8;margin-bottom:8px;">학생들이 보는 <b>TV 알림판</b>에 팝업으로 즉시 표시돼요 (약 3초 내). 「지우기」 전까지 계속 떠 있어요.</div>'
+        + '<textarea id="tvFlashInput" rows="2" placeholder="예) 3번 학생 교무실로 오세요" style="width:100%;box-sizing:border-box;font-size:16px;padding:12px;border-radius:10px;border:1px solid #334155;background:#0b1220;color:#e2e8f0;resize:vertical;"></textarea>'
+        + '<div style="display:flex;gap:8px;margin-top:10px;">'
+          + '<button onclick="tvFlashSend()" style="flex:1;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;background:#2563eb;color:#fff;">📺 TV에 띄우기</button>'
+          + '<button onclick="tvFlashClear()" style="border:none;padding:13px 18px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;background:#334155;color:#e2e8f0;">지우기</button>'
+        + '</div>'
+        + '<div id="tvFlashStatus" style="font-size:12px;color:#64748b;margin-top:14px;">현재 상태 확인 중…</div>'
+      + '</div>';
+    _tvFlashRefresh();
+  }
+  function _tvFlashRefresh() {
+    google.script.run.withSuccessHandler(function(r){
+      var el = document.getElementById('tvFlashStatus'); if (!el) return;
+      if (r && r.msg) el.innerHTML = '🟢 지금 TV에 떠 있음: <b style="color:#e2e8f0;">' + esc(r.msg) + '</b>';
+      else el.innerHTML = '⚫ 지금 떠 있는 알림이 없어요.';
+    }).withFailureHandler(function(){}).getTvFlash();
+  }
+  function tvFlashSend() {
+    var v = (document.getElementById('tvFlashInput').value || '').trim();
+    if (!v) { toast('보낼 내용을 입력하세요.'); return; }
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { toast('📺 TV에 띄웠어요.'); _tvFlashRefresh(); }
+      else { toast('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).sendTvFlash(TOKEN, v);
+  }
+  function tvFlashClear() {
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { toast('지웠어요. TV에서 곧 사라져요.'); var i=document.getElementById('tvFlashInput'); if(i) i.value=''; _tvFlashRefresh(); }
+      else { toast('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ toast('오류: ' + e.message); }).clearTvFlash(TOKEN);
   }
 
   // ══════════ 🔗 수업 링크 보드 (학생 대시보드 상단 카드) ══════════

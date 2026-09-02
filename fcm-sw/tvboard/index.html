@@ -293,9 +293,43 @@
 
     function loadData() { google.script.run.withSuccessHandler(displayData).getTodayData(); }
 
-    window.onload = function() { loadData(); setInterval(loadData, 60000); };
+    // ── 📺 교사 실시간 알림(팝업) — 교사포털 getTvFlash 폴링 ──
+    var TV_FLASH_PORTAL_URL = 'https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+    var _tvFlashLastId = null;
+    function showTvFlash(msg) {
+      var ov = document.getElementById('tvFlashOverlay');
+      if (!ov) {
+        ov = document.createElement('div');
+        ov.id = 'tvFlashOverlay';
+        ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:5vw;';
+        ov.innerHTML = '<div id="tvFlashCard" style="max-width:1100px;width:100%;background:#fff;border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.5);border:6px solid #2563eb;padding:6vh 5vw;text-align:center;animation:tvFlashPop .35s ease-out;">'
+          + '<div style="font-size:clamp(28px,6vw,64px);margin-bottom:2vh;">📢</div>'
+          + '<div id="tvFlashMsg" style="font-size:clamp(32px,7vw,84px);font-weight:900;color:#0f172a;line-height:1.35;word-break:keep-all;white-space:pre-wrap;"></div>'
+          + '</div>';
+        document.body.appendChild(ov);
+      }
+      document.getElementById('tvFlashMsg').textContent = msg;
+      ov.style.display = 'flex';
+      var card = document.getElementById('tvFlashCard');
+      if (card) { card.style.animation = 'none'; void card.offsetWidth; card.style.animation = 'tvFlashPop .35s ease-out'; }
+    }
+    function hideTvFlash() { var ov = document.getElementById('tvFlashOverlay'); if (ov) ov.style.display = 'none'; }
+    function pollTvFlash() {
+      fetch(TV_FLASH_PORTAL_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ fn:'getTvFlash', args:[] }) })
+        .then(function(r){ return r.json(); })
+        .then(function(res){
+          if (!res || !res.ok || !res.result) return;
+          var f = res.result;
+          if (f.id === _tvFlashLastId) return;
+          _tvFlashLastId = f.id;
+          if (f.msg) showTvFlash(f.msg); else hideTvFlash();
+        }).catch(function(){});
+    }
+
+    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); };
     document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; });
   </script>
+  <style>@keyframes tvFlashPop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}</style>
 
 <!-- 앱 버전 (규칙: CLAUDE.md 버전 관리 참고) -->
 <div style="text-align:center; color:#9ca3af; font-size:11px; padding:12px 0 18px; opacity:.85;">Made with ❤️ by 홍쌤 &nbsp;·&nbsp; <span class="app-ver">v1.00.00</span></div>
