@@ -65,8 +65,18 @@ function getTodayData() {
   }
 }
 
+// ── 📺 TV 실시간 알림 — 같은 스프레드시트 '_TV_FLASH' 탭에서 읽음 (알림관리가 씀) ──
+function getTvFlash() {
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_TV_FLASH');
+    if (!sh) return { id: 0, msg: '' };
+    var v = sh.getRange('A2:B2').getValues()[0];
+    return { id: Number(v[0]) || 0, msg: String(v[1] || '') };
+  } catch (_) { return { id: 0, msg: '' }; }
+}
+
 // ── PWA(Pages) 프론트 → GAS 백엔드 호출 (google.script.run 어댑터) ──
-var RPC_WHITELIST = ["getTodayData"];
+var RPC_WHITELIST = ["getTodayData", "getTvFlash"];
 function doPost(e) {
   var out;
   try {

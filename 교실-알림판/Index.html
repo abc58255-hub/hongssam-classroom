@@ -260,8 +260,7 @@
 
     function loadData() { google.script.run.withSuccessHandler(displayData).getTodayData(); }
 
-    // ── 📺 교사 실시간 알림(팝업) — 교사포털 getTvFlash 폴링 ──
-    var TV_FLASH_PORTAL_URL = 'https://script.google.com/macros/s/AKfycbzpJFEvuLwIiMZMH5AFpHgAbNuNNkMVFFRpxnN34BPb_wTcKznYXFV9XojLGsRNQLtiHQ/exec';
+    // ── 📺 교사 실시간 알림(팝업) — 같은 앱 getTvFlash 폴링(same-origin) ──
     var _tvFlashLastId = null;
     function showTvFlash(msg) {
       var ov = document.getElementById('tvFlashOverlay');
@@ -282,15 +281,12 @@
     }
     function hideTvFlash() { var ov = document.getElementById('tvFlashOverlay'); if (ov) ov.style.display = 'none'; }
     function pollTvFlash() {
-      fetch(TV_FLASH_PORTAL_URL, { method:'POST', headers:{'Content-Type':'text/plain;charset=utf-8'}, body: JSON.stringify({ fn:'getTvFlash', args:[] }) })
-        .then(function(r){ return r.json(); })
-        .then(function(res){
-          if (!res || !res.ok || !res.result) return;
-          var f = res.result;
-          if (f.id === _tvFlashLastId) return;
-          _tvFlashLastId = f.id;
-          if (f.msg) showTvFlash(f.msg); else hideTvFlash();
-        }).catch(function(){});
+      google.script.run.withSuccessHandler(function(f){
+        if (!f) return;
+        if (f.id === _tvFlashLastId) return;
+        _tvFlashLastId = f.id;
+        if (f.msg) showTvFlash(f.msg); else hideTvFlash();
+      }).withFailureHandler(function(){}).getTvFlash();
     }
 
     window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); };

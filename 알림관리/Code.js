@@ -178,26 +178,36 @@ function doPost(e) {
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
 }
 
-// ── 📺 TV 실시간 알림(팝업) ── 학생 교실TV알림판에 즉시 띄우는 flash 메시지 (ScriptProperties)
-// 인증: doPost 게이트(_atOk_)가 send/clear 보호. getTvFlash는 RPC_NOAUTH(공개) — TV 화면이 폴링.
-var TV_FLASH_KEY = 'tv_flash';
+// ── 📺 TV 실시간 알림(팝업) ── 교실TV알림판 스프레드시트의 '_TV_FLASH' 탭에 저장(교실-알림판 GAS가 same-origin으로 읽음)
+// 인증: doPost 게이트(_atOk_)가 send/clear 보호. getTvFlash는 RPC_NOAUTH(공개).
+var TV_FLASH_TAB = '_TV_FLASH';
+function _tvFlashSheet_() {
+  var id = _boardSheetId();
+  if (!id) return null;
+  var ss = SpreadsheetApp.openById(id);
+  var sh = ss.getSheetByName(TV_FLASH_TAB);
+  if (!sh) { sh = ss.insertSheet(TV_FLASH_TAB); sh.getRange('A1:B1').setValues([['id', 'msg']]); }
+  return sh;
+}
 function sendTvFlash(msg) {
   var text = String(msg == null ? '' : msg).trim();
   if (!text) return { success: false, message: '보낼 내용을 입력하세요.' };
-  var obj = { id: Date.now(), msg: text, ts: Date.now() };
-  PropertiesService.getScriptProperties().setProperty(TV_FLASH_KEY, JSON.stringify(obj));
-  return { success: true, id: obj.id };
+  var sh = _tvFlashSheet_();
+  if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요. (칠판공지 설정을 먼저 해주세요)' };
+  sh.getRange('A2:B2').setValues([[Date.now(), text]]);
+  return { success: true };
 }
 function clearTvFlash() {
-  // 빈 메시지 + 새 id → TV가 변경을 감지하고 팝업을 닫음
-  PropertiesService.getScriptProperties().setProperty(TV_FLASH_KEY, JSON.stringify({ id: Date.now(), msg: '', ts: Date.now() }));
+  var sh = _tvFlashSheet_();
+  if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요.' };
+  sh.getRange('A2:B2').setValues([[Date.now(), '']]); // 빈 메시지 + 새 id → TV가 팝업 닫음
   return { success: true };
 }
 function getTvFlash() {
   try {
-    var v = PropertiesService.getScriptProperties().getProperty(TV_FLASH_KEY);
-    if (!v) return { id: 0, msg: '' };
-    var o = JSON.parse(v);
-    return { id: o.id || 0, msg: o.msg || '' };
+    var sh = _tvFlashSheet_();
+    if (!sh) return { id: 0, msg: '' };
+    var v = sh.getRange('A2:B2').getValues()[0];
+    return { id: Number(v[0]) || 0, msg: String(v[1] || '') };
   } catch (_) { return { id: 0, msg: '' }; }
 }
