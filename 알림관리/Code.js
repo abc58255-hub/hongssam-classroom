@@ -160,8 +160,8 @@ function deleteBoardData(rowIdx) {
 
 
 // ── PWA(Pages) 프론트 → GAS 백엔드 (google.script.run 어댑터) + 토큰 게이트 ──
-var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "teacherLogin", "teacherLogout", "validateTeacherSession"];
-var RPC_NOAUTH = ['teacherLogin','teacherLogout'];
+var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash']; // getTvFlash=TV 화면 폴링(공개)
 function _atOk_(token) { try { var v = ClassCore.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; } }
 function doPost(e) {
   var out;
@@ -176,4 +176,28 @@ function doPost(e) {
     out = { ok: true, result: fn.apply(null, req.args || []) };
   } catch (err) { out = { ok: false, error: String(err && err.message || err) }; }
   return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}
+
+// ── 📺 TV 실시간 알림(팝업) ── 학생 교실TV알림판에 즉시 띄우는 flash 메시지 (ScriptProperties)
+// 인증: doPost 게이트(_atOk_)가 send/clear 보호. getTvFlash는 RPC_NOAUTH(공개) — TV 화면이 폴링.
+var TV_FLASH_KEY = 'tv_flash';
+function sendTvFlash(msg) {
+  var text = String(msg == null ? '' : msg).trim();
+  if (!text) return { success: false, message: '보낼 내용을 입력하세요.' };
+  var obj = { id: Date.now(), msg: text, ts: Date.now() };
+  PropertiesService.getScriptProperties().setProperty(TV_FLASH_KEY, JSON.stringify(obj));
+  return { success: true, id: obj.id };
+}
+function clearTvFlash() {
+  // 빈 메시지 + 새 id → TV가 변경을 감지하고 팝업을 닫음
+  PropertiesService.getScriptProperties().setProperty(TV_FLASH_KEY, JSON.stringify({ id: Date.now(), msg: '', ts: Date.now() }));
+  return { success: true };
+}
+function getTvFlash() {
+  try {
+    var v = PropertiesService.getScriptProperties().getProperty(TV_FLASH_KEY);
+    if (!v) return { id: 0, msg: '' };
+    var o = JSON.parse(v);
+    return { id: o.id || 0, msg: o.msg || '' };
+  } catch (_) { return { id: 0, msg: '' }; }
 }

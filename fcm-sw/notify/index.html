@@ -10,7 +10,7 @@
   <script>
     var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzpJFEvuLwIiMZMH5AFpHgAbNuNNkMVFFRpxnN34BPb_wTcKznYXFV9XojLGsRNQLtiHQ/exec';
     (function () {
-      var FNS = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+      var FNS = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "teacherLogin", "teacherLogout", "validateTeacherSession"];
       var TOKKEY = 'alarm_token';
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
@@ -108,6 +108,7 @@
 
   <div class="tabs">
     <div class="tab active" data-tab="board" onclick="switchTab('board')">📺 칠판공지</div>
+    <div class="tab" data-tab="flash" onclick="switchTab('flash')">🚨 실시간 알림</div>
     <div class="tab" data-tab="notice" onclick="switchTab('notice')">📢 학급알림</div>
     <div class="tab" data-tab="push" onclick="switchTab('push')">🔔 푸시 전송</div>
   </div>
@@ -237,6 +238,18 @@
       </div>
       <div id="pushResult" style="margin-top:16px;"></div>
     </div>
+
+    <!-- 실시간 알림 (교실TV알림판 팝업) -->
+    <div class="panel hidden" id="tab-flash">
+      <div class="notice-box">📺 학생들이 보는 <b>교실 TV 알림판</b>에 팝업으로 즉시 표시돼요 (약 3초 내). <b>지우기</b> 전까지 계속 떠 있어요.</div>
+      <label>보낼 내용</label>
+      <textarea id="tvFlashInput" placeholder="예) 3번 학생 교무실로 오세요"></textarea>
+      <div style="margin-top:16px; display:flex; gap:8px;">
+        <button class="btn sm orange" style="flex:1;" onclick="tvFlashSend()">📺 TV에 띄우기</button>
+        <button class="btn sm" onclick="tvFlashClear()">지우기</button>
+      </div>
+      <div id="tvFlashStatus" style="margin-top:16px; font-size:13px; color:#64748b;">현재 상태 확인 중…</div>
+    </div>
   </main>
 </div>
 
@@ -278,7 +291,32 @@
     document.getElementById('tab-notice').classList.toggle('hidden', name !== 'notice');
     document.getElementById('tab-board').classList.toggle('hidden', name !== 'board');
     document.getElementById('tab-push').classList.toggle('hidden', name !== 'push');
+    document.getElementById('tab-flash').classList.toggle('hidden', name !== 'flash');
     if (name === 'board' && !BOARD_LOADED) loadBoard();
+    if (name === 'flash') tvFlashRefresh();
+  }
+
+  // ── 🚨 실시간 알림 (교실TV알림판 팝업) ──
+  function tvFlashRefresh() {
+    google.script.run.withSuccessHandler(function(r){
+      var el = document.getElementById('tvFlashStatus'); if (!el) return;
+      if (r && r.msg) el.innerHTML = '🟢 지금 TV에 떠 있음: <b style="color:#0f172a;">' + (r.msg.replace(/</g,'&lt;')) + '</b>';
+      else el.textContent = '⚫ 지금 떠 있는 알림이 없어요.';
+    }).withFailureHandler(function(){}).getTvFlash();
+  }
+  function tvFlashSend() {
+    var v = (document.getElementById('tvFlashInput').value || '').trim();
+    if (!v) { uiAlert('보낼 내용을 입력하세요.'); return; }
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { uiAlert('📺 TV에 띄웠어요.'); tvFlashRefresh(); }
+      else { uiAlert('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).sendTvFlash(v);
+  }
+  function tvFlashClear() {
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { uiAlert('지웠어요. TV에서 곧 사라져요.'); var i=document.getElementById('tvFlashInput'); if(i) i.value=''; tvFlashRefresh(); }
+      else { uiAlert('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).clearTvFlash();
   }
 
   // ── 학급알림 ──
