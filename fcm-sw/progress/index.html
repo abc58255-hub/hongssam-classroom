@@ -1148,8 +1148,9 @@ function renderSylTable() {
       var key   = dateStr + '_' + cls;
       var check = sylCheckCache[key];
 
+      var _hasMovedIn = !!(sylMovedInCache[key] && sylMovedInCache[key].length > 0);
       // 공휴일: 학기설정에 등록된 날 (기록 없을 때만)
-      if (isHoliday && !scheduled && (!check || (!check.lessonNo && !check.status))) {
+      if (isHoliday && !scheduled && (!check || (!check.lessonNo && !check.status)) && !_hasMovedIn) {
         html += '<td style="text-align:center;padding:6px 4px;background:#fef2f2;' + weekBorder + '">'
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
             + '<span style="font-size:16px;">🏖️</span>'
@@ -1158,8 +1159,8 @@ function renderSylTable() {
         return;
       }
 
-      // 시간표에 없고 기록도 없으면 주차 틴트 빈 셀
-      if (!scheduled && (!check || (!check.lessonNo && !check.status))) {
+      // 시간표에 없고 기록도 없으면 주차 틴트 빈 셀 (단, 이동받은 수업이 있으면 아래에서 렌더)
+      if (!scheduled && (!check || (!check.lessonNo && !check.status)) && !_hasMovedIn) {
         html += '<td style="background:' + wc.empty + ';' + weekBorder + '"></td>'; return;
       }
 
