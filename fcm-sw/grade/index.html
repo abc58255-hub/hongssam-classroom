@@ -854,16 +854,19 @@
           <input type="text" id="modalMemoInput" placeholder="간단한 특이사항 입력..." style="width:100%; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:13px; box-sizing:border-box;">
        </div>
 
-       <!-- 점수 + 우수작 선정 (컴팩트) -->
-       <div style="padding:8px 15px 0;">
-          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+       <!-- 점수 · 공개 · 우수작 -->
+       <div style="padding:14px 15px 0;">
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
              <span style="font-size:12px; font-weight:800; color:#64748b; flex-shrink:0;">🎯 점수</span>
-             <div class="eval-row" id="modalEvalRow" style="margin:0; padding:0; display:flex; gap:6px; align-items:center; flex-wrap:wrap; flex:1;"></div>
-             <label style="display:flex; align-items:center; gap:4px; font-weight:bold; color:#059669; cursor:pointer; font-size:12px; white-space:nowrap;">
+             <div class="eval-row" id="modalEvalRow" style="margin:0; padding:0; display:flex; gap:6px; align-items:center; flex-wrap:wrap;"></div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+             <div id="modalPubToggle" style="display:flex;"></div>
+             <label style="display:flex; align-items:center; gap:5px; font-weight:800; color:#059669; cursor:pointer; font-size:13px; white-space:nowrap; background:#ecfdf5; border:1px solid #a7f3d0; padding:7px 12px; border-radius:10px;">
                <input type="checkbox" id="modalBestCheck" onchange="toggleBestSetup()" style="width:16px; height:16px; accent-color:#10b981;"> 🌟 우수작<span id="bestQuestionLabel" style="font-size:11px; color:#059669; font-weight:normal;"></span>
              </label>
           </div>
-          <div id="modalBestOptions" style="display:none; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px;">
+          <div id="modalBestOptions" style="display:none; align-items:center; gap:6px; flex-wrap:wrap; margin-top:8px;">
             <select id="modalBestScope" style="padding:4px 6px; font-size:12px; height:28px; background:#f9fafb; color:#0f172a; border:1px solid #cbd5e1; border-radius:6px; font-weight:bold;"><option value="학급공개">학급공개</option><option value="학년공개" selected>학년공개</option></select>
             <label style="font-size:12px; display:flex; align-items:center; color:#475569; gap:3px; font-weight:bold;"><input type="checkbox" id="modalBestAnon" style="width:15px; height:15px;"> 익명</label>
             <div id="modalBestKeysContainer" style="display:flex; gap:4px; font-size:12px; color:#334155;"></div>
@@ -3007,10 +3010,12 @@
       
     var evalRow = document.getElementById('modalEvalRow');
     if (evalRow) {
-      evalRow.innerHTML =
-        evalLabel +
-        buildScoreHtml('modalScoreInput', evalType, sc) +
-        '<label class="' + (pub ? 'pub-toggle on' : 'pub-toggle') + '" style="margin:0; padding:6px 10px; font-size:12px; height:fit-content;"><input type="checkbox" id="modalPubCheck" ' + (pub ? 'checked' : '') + ' onchange="toggleCardPub(\'modalPubCheck\')"> ' + (pub ? '👀 공개' : '🔒 숨김') + '</label>';
+      evalRow.innerHTML = evalLabel + buildScoreHtml('modalScoreInput', evalType, sc);
+    }
+    var pubBox = document.getElementById('modalPubToggle');
+    if (pubBox) {
+      pubBox.innerHTML =
+        '<label class="' + (pub ? 'pub-toggle on' : 'pub-toggle') + '" style="margin:0; padding:7px 12px; font-size:13px;"><input type="checkbox" id="modalPubCheck" ' + (pub ? 'checked' : '') + ' onchange="toggleCardPub(\'modalPubCheck\')"> ' + (pub ? '👀 공개' : '🔒 숨김') + '</label>';
     }
 
     var _parsedBestKeys = [];
