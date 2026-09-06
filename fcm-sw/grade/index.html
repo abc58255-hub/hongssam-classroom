@@ -704,6 +704,12 @@
   <div style="margin-bottom:15px;"><label class="form-label">대상 반</label><select id="smartClass" class="filter-select" style="width:100%;" onchange="updateSmartModeOptions()"></select></div>
   <div style="margin-bottom:15px;"><label class="form-label">대상 과제</label><select id="smartTask" class="filter-select" style="width:100%;" onchange="updateSmartModeOptions()"></select></div>
   <label style="display:flex; align-items:center; gap:6px; margin-bottom:15px; font-weight:600; cursor:pointer;"><input type="checkbox" id="smartUngraded" checked onchange="updateSmartModeOptions()"> 채점 완료된 학생 건너뛰기</label>
+  <div style="margin-bottom:15px;"><label class="form-label">채점 순서</label>
+    <select id="smartOrder" class="filter-select" style="width:100%;">
+      <option value="id">🔢 학번순 (기본)</option>
+      <option value="submit">🕒 제출한 순서대로 (먼저 낸 사람부터)</option>
+    </select>
+  </div>
   <div id="smartCountBox" style="font-size:13px;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:9px 12px;margin-bottom:15px;display:none;"></div>
 
   <!-- ✅ 채점 모드 선택 -->
@@ -3436,7 +3442,10 @@
         }
       }
       return true;
-    }).sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); });
+    });
+    var smartOrder = document.getElementById('smartOrder') ? document.getElementById('smartOrder').value : 'id';
+    if (smartOrder === 'submit') smartList.sort(function(a, b) { return (a.dateMs || 0) - (b.dateMs || 0); }); // 제출 빠른 순
+    else smartList.sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); }); // 학번순
     if (smartList.length === 0) return uiAlert("해당 조건에 맞는 제출물이 없습니다.");
     smartCache = {};
     smartPrefetchCache = {};
