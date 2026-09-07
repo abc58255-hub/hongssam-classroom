@@ -630,6 +630,25 @@ function saveNewTask(taskData) {
     return { success: true, pushed: pushed };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
+// 학생 제출 기록 1건 삭제 — 제출현황 시트의 해당 행 삭제 (첨부 Drive 파일은 유지)
+// 안전장치: rowIdx 행의 학번(B열)이 studentId와 일치할 때만 삭제 (목록 변동 시 오삭제 방지)
+function deleteSubmission(rowIdx, studentId, taskName) {
+  try {
+    var r = parseInt(rowIdx) || 0;
+    if (r < 2) return { success: false, message: '잘못된 행입니다.' };
+    var s = _taskSs().getSheetByName('제출현황');
+    if (!s) return { success: false, message: '제출현황 시트를 찾을 수 없습니다.' };
+    if (r > s.getLastRow()) return { success: false, message: '목록이 변경됐어요. 새로고침 후 다시 시도해주세요.' };
+    var rowVals = s.getRange(r, 1, 1, 4).getValues()[0];
+    var rid = String(rowVals[1] || '').trim();
+    if (studentId && rid !== String(studentId).trim()) {
+      return { success: false, message: '목록이 변경됐어요. 새로고침 후 다시 시도해주세요.' };
+    }
+    s.deleteRow(r);
+    clearCache();
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
 function deleteTask(taskName) {
   try {
     if (!taskName) return { success: false, message: '과제명이 없습니다.' };

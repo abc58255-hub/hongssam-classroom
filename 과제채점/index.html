@@ -1843,6 +1843,7 @@
           '</div>' +
           '<div style="display:flex; align-items:center; gap:8px; flex-shrink:0;">' +
             bHtml +
+            '<button onclick="event.stopPropagation(); deleteSubmissionUI(' + item.rowIdx + ')" title="이 제출 기록 삭제" style="background:#fef2f2; color:#dc2626; border:1px solid #fecaca; padding:6px 9px; border-radius:8px; font-size:14px; font-weight:800; cursor:pointer; flex-shrink:0;">🗑</button>' +
           '</div>' +
         '</div>' +
         '<div class="card-body-collapse">' +
@@ -2576,6 +2577,19 @@
     else _editGo();
   }
 
+  function deleteSubmissionUI(rowIdx) {
+    var item = allSubmissions.find(function(i){ return i.rowIdx === rowIdx; });
+    if (!item) return;
+    uiConfirm('🗑 이 제출 기록을 삭제할까요?\n\n[' + item.id + '] ' + item.name + '\n' + item.task + ' (' + item.date + ')\n\n⚠️ 목록에서 완전히 삭제됩니다. (첨부 사진은 드라이브에 남아요)\n되돌릴 수 없어요.', function() {
+      google.script.run
+        .withSuccessHandler(function(res) {
+          if (res && res.success) { loadData(); }
+          else uiAlert('삭제 실패: ' + (res && res.message || ''));
+        })
+        .withFailureHandler(function(e){ uiAlert('삭제 실패: ' + e.message); })
+        .deleteSubmission(item.rowIdx, item.id, item.task);
+    });
+  }
   function deleteTaskConfirm(taskName) {
     uiConfirm('"' + taskName + '" 과제를 삭제할까요?\n\n⚠️ 과제설정에서만 제거됩니다.\n학생 제출 기록과 Drive 파일은 그대로 남아요.', function() {
       google.script.run
