@@ -284,6 +284,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">사유 (취소 적용 시)</div>
       <select id="bulkReason" class="form-input">
         <option value="시험">📝 시험 기간</option>
+        <option value="수행평가">📋 수행평가</option>
         <option value="학교행사">🎉 학교 행사</option>
         <option value="체험학습">🏕️ 체험학습</option>
         <option value="휴교">🤒 임시 휴교</option>
@@ -355,6 +356,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
           <button class="cr-btn" data-reason="학교행사" onclick="selectCancelReason('학교행사')">🎉 학교 행사</button>
           <button class="cr-btn" data-reason="체험학습" onclick="selectCancelReason('체험학습')">🏕️ 체험학습</button>
           <button class="cr-btn" data-reason="시험" onclick="selectCancelReason('시험')">📝 시험 기간</button>
+          <button class="cr-btn" data-reason="수행평가" onclick="selectCancelReason('수행평가')">📋 수행평가</button>
           <button class="cr-btn" data-reason="휴교" onclick="selectCancelReason('휴교')">🤒 임시 휴교</button>
         </div>
       </div>
@@ -497,6 +499,7 @@ var CANCEL_REASONS = {
   '학교행사': { emoji: '🎉', label: '학교 행사',  bg: '#fef3c7', color: '#d97706' },
   '체험학습': { emoji: '🏕️', label: '체험학습',   bg: '#dcfce7', color: '#15803d' },
   '시험':    { emoji: '📝', label: '시험 기간',  bg: '#eff6ff', color: '#1d4ed8' },
+  '수행평가': { emoji: '📋', label: '수행평가',   bg: '#f0fdfa', color: '#0d9488' },
   '휴교':    { emoji: '🤒', label: '임시 휴교',  bg: '#fdf4ff', color: '#7c3aed' },
 };
 
@@ -1158,7 +1161,7 @@ function renderSylTable() {
             + (check.memo ? '<span style="font-size:9px;color:#94a3b8;word-break:keep-all;">' + escapeHtml(check.memo) + '</span>' : '')
           + '</div>' + rateHtml + '</td>';
 
-      } else if (status.indexOf('이동:') === 0) {
+      } else if (status.indexOf('이동:') === 0 && status.substring(3) !== dateStr) {
         var targetDate = status.substring(3);
         var tD = new Date(targetDate + 'T09:00:00');
         var tLabel = (tD.getMonth()+1) + '/' + tD.getDate() + ' (' + DAY_KR[tD.getDay()] + ')';
@@ -1843,7 +1846,7 @@ function confirmCheck() {
   if (action === 'move') {
     var targetDate = document.getElementById('moveDateInput').value;
     if (!targetDate) return alert('이동할 날짜를 선택하세요.');
-    if (targetDate === date) return alert('같은 날짜로는 이동할 수 없습니다.');
+    // 같은 날짜 허용 (교시만 바꾸는 경우) — 날짜+교시 둘 다 같으면 무의미하니 안내만
     var movePeriod = parseInt(document.getElementById('movePeriodInput').value) || 0;
     var lessonNo = parseInt(document.getElementById('checkLessonNo').value) || 0;
     if (!lessonNo) return alert('이동할 차시 번호를 입력하세요.');
