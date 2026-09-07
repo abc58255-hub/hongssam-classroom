@@ -160,8 +160,8 @@ function deleteBoardData(rowIdx) {
 
 
 // ── PWA(Pages) 프론트 → GAS 백엔드 (google.script.run 어댑터) + 토큰 게이트 ──
-var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "teacherLogin", "teacherLogout", "validateTeacherSession"];
-var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash']; // getTvFlash=TV 화면 폴링(공개)
+var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTvMusic", "setTvMusicAuto", "getTvMusic", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash','getTvMusic']; // getTvFlash/getTvMusic=TV 화면 폴링(공개)
 function _atOk_(token) { try { var v = ClassCore.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; } }
 function doPost(e) {
   var out;
@@ -210,4 +210,49 @@ function getTvFlash() {
     var v = sh.getRange('A2:B2').getValues()[0];
     return { id: Number(v[0]) || 0, msg: String(v[1] || '') };
   } catch (_) { return { id: 0, msg: '' }; }
+}
+
+// ── 🎵 점심 음악(TV BGM) ── 교실TV알림판 스프레드시트의 '_TV_MUSIC' 탭에 저장
+// 레이아웃(2행): A=수동id  B=수동모드(play|stop)  C=수동URL  D=자동on(1|'')  E=자동시작HH:MM  F=자동종료HH:MM  G=자동URL
+// 인증: setTvMusic/setTvMusicAuto=교사 전용(doPost 게이트). getTvMusic=RPC_NOAUTH(TV 폴링, 공개).
+var TV_MUSIC_TAB = '_TV_MUSIC';
+function _tvMusicSheet_() {
+  var id = _boardSheetId();
+  if (!id) return null;
+  var ss = SpreadsheetApp.openById(id);
+  var sh = ss.getSheetByName(TV_MUSIC_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(TV_MUSIC_TAB);
+    sh.getRange('A1:G1').setValues([['수동id','수동모드','수동URL','자동on','자동시작','자동종료','자동URL']]);
+    sh.getRange('A2:G2').setValues([[0, 'stop', '', '', '', '', '']]);
+  }
+  return sh;
+}
+// 수동 재생/정지 (mode='play'|'stop')
+function setTvMusic(mode, url) {
+  var sh = _tvMusicSheet_();
+  if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요. (칠판공지 설정을 먼저 해주세요)' };
+  var m = (String(mode) === 'play') ? 'play' : 'stop';
+  var u = String(url == null ? '' : url).trim();
+  if (m === 'play' && !u) return { success: false, message: '유튜브 주소를 입력하세요.' };
+  sh.getRange('A2:C2').setValues([[Date.now(), m, u]]);
+  return { success: true };
+}
+// 자동 재생 설정 (on=bool, start/end='HH:MM', url)
+function setTvMusicAuto(on, start, end, url) {
+  var sh = _tvMusicSheet_();
+  if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요.' };
+  sh.getRange('D2:G2').setValues([[ on ? '1' : '', String(start||'').trim(), String(end||'').trim(), String(url||'').trim() ]]);
+  return { success: true };
+}
+function getTvMusic() {
+  try {
+    var sh = _tvMusicSheet_();
+    if (!sh) return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' };
+    var v = sh.getRange('A2:G2').getValues()[0];
+    return {
+      mId: Number(v[0]) || 0, mMode: String(v[1] || 'stop'), mUrl: String(v[2] || ''),
+      aOn: !!String(v[3] || ''), aStart: String(v[4] || ''), aEnd: String(v[5] || ''), aUrl: String(v[6] || '')
+    };
+  } catch (_) { return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' }; }
 }

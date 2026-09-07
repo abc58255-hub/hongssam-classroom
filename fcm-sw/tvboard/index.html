@@ -10,7 +10,7 @@
   <script>
     var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbyl9-rX1YY4hrkEMdGT5uasMF1c38R7qu5I7YpN9vlPl95CYJpXG0ptkNDz0Wlj73jK/exec';
     (function () {
-      var FNS = ["getTodayData", "getTvFlash"];
+      var FNS = ["getTodayData", "getTvFlash", "getTvMusic"];
       var TOKKEY = '';
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
@@ -322,7 +322,57 @@
       }).withFailureHandler(function(){}).getTvFlash();
     }
 
-    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); };
+    // ── 🎵 점심 음악(TV BGM) — 알림관리가 쓴 _TV_MUSIC 폴링. 좌하단 미니 플레이어 + 곡 제목 ──
+    var _ytP=null,_ytReady=false,_musicWant=null,_musicCurUrl='',_musicTitleTimer=null;
+    var _tvMusicLastMId=null,_tvMusicOverride=null;
+    function _initMusicBox(){
+      if(document.getElementById('musicBox'))return;
+      var d=document.createElement('div'); d.id='musicBox';
+      d.style.cssText='position:fixed;bottom:2vw;left:2vw;z-index:500;width:20vw;background:rgba(15,23,42,.85);border-radius:1vw;box-shadow:0 10px 30px rgba(0,0,0,.35);overflow:hidden;display:none;';
+      d.innerHTML='<div id="musicPlayer" style="width:100%;height:11.25vw;background:#000;"></div>'
+        +'<div style="display:flex;align-items:center;gap:.6vw;padding:.7vw 1vw;">'
+        +'<span style="font-size:1.4vw;">🎵</span>'
+        +'<div id="musicTitle" style="flex:1;color:#fff;font-size:1vw;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">점심 음악</div></div>'
+        +'<div id="musicHint" onclick="if(_ytP&&_ytP.playVideo){_ytP.playVideo();}this.style.display=\'none\';" style="display:none;padding:.6vw 1vw;background:rgba(220,38,38,.92);color:#fff;font-size:.85vw;text-align:center;cursor:pointer;">🔊 화면을 클릭하면 음악이 켜져요</div>';
+      document.body.appendChild(d);
+    }
+    function _loadYT(){ _initMusicBox(); if(window.YT&&window.YT.Player){onYouTubeIframeAPIReady();return;} var t=document.createElement('script');t.src='https://www.youtube.com/iframe_api';document.head.appendChild(t); }
+    function onYouTubeIframeAPIReady(){
+      _ytP=new YT.Player('musicPlayer',{height:'100%',width:'100%',
+        playerVars:{autoplay:1,playsinline:1,rel:0,modestbranding:1},
+        events:{onReady:function(){_ytReady=true;if(_musicWant)_applyMusicPlay(_musicWant);},
+          onStateChange:function(e){if(e.data===1){var h=document.getElementById('musicHint');if(h)h.style.display='none';}}}});
+    }
+    function _parseYT(u){return{list:(String(u).match(/[?&]list=([A-Za-z0-9_-]+)/)||[])[1]||'',vid:(String(u).match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([A-Za-z0-9_-]{11})/)||[])[1]||''};}
+    function _applyMusicPlay(w){
+      var box=document.getElementById('musicBox');if(box)box.style.display='block';
+      if(!_ytReady||!_ytP||!_ytP.loadVideoById)return;
+      var p=_parseYT(w.url);
+      try{
+        if(p.list)_ytP.loadPlaylist({list:p.list,listType:'playlist',index:0});
+        else if(p.vid)_ytP.loadVideoById(p.vid);
+        else{var mt=document.getElementById('musicTitle');if(mt)mt.textContent='⚠️ 주소 확인';return;}
+        if(_ytP.setLoop)_ytP.setLoop(true);
+        setTimeout(function(){try{if(_ytP.getPlayerState&&_ytP.getPlayerState()!==1){var h=document.getElementById('musicHint');if(h)h.style.display='block';}}catch(_){}},1600);
+        _startTitlePoll();
+      }catch(_){}
+    }
+    function _stopMusic(){try{if(_ytP&&_ytP.stopVideo)_ytP.stopVideo();}catch(_){}var box=document.getElementById('musicBox');if(box)box.style.display='none';if(_musicTitleTimer){clearInterval(_musicTitleTimer);_musicTitleTimer=null;}}
+    function _startTitlePoll(){if(_musicTitleTimer)clearInterval(_musicTitleTimer);_musicTitleTimer=setInterval(function(){try{var d=_ytP&&_ytP.getVideoData&&_ytP.getVideoData();if(d&&d.title){var mt=document.getElementById('musicTitle');if(mt)mt.textContent=d.title;}}catch(_){}},2000);}
+    function applyMusic(play,url){ if(play&&url){ if(_musicCurUrl!==url){_musicCurUrl=url;_musicWant={url:url};_applyMusicPlay(_musicWant);} } else { if(_musicCurUrl!==''){_musicCurUrl='';_musicWant=null;_stopMusic();} } }
+    function _hhmmNow(){var n=new Date();return (n.getHours()<10?'0':'')+n.getHours()+':'+(n.getMinutes()<10?'0':'')+n.getMinutes();}
+    function tickMusic(d){
+      if(!d)return; var now=_hhmmNow();
+      var inWin=!!(d.aOn&&d.aStart&&d.aEnd&&now>=d.aStart&&now<d.aEnd);
+      var autoKey=inWin?('play:'+d.aUrl):'stop';
+      if(d.mId&&d.mId!==_tvMusicLastMId){_tvMusicLastMId=d.mId;_tvMusicOverride={key:autoKey,mode:d.mMode,url:d.mUrl};applyMusic(d.mMode==='play',d.mUrl);return;}
+      if(_tvMusicOverride&&_tvMusicOverride.key!==autoKey)_tvMusicOverride=null;
+      if(_tvMusicOverride){applyMusic(_tvMusicOverride.mode==='play',_tvMusicOverride.url);return;}
+      applyMusic(inWin,d.aUrl);
+    }
+    function pollTvMusic(){google.script.run.withSuccessHandler(tickMusic).withFailureHandler(function(){}).getTvMusic();}
+
+    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); };
     document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; });
   </script>
   <style>@keyframes tvFlashPop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}</style>

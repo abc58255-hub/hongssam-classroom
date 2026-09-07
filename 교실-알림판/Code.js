@@ -75,8 +75,21 @@ function getTvFlash() {
   } catch (_) { return { id: 0, msg: '' }; }
 }
 
+// ── 🎵 점심 음악(TV BGM) — 같은 스프레드시트 '_TV_MUSIC' 탭에서 읽음 (알림관리가 씀) ──
+function getTvMusic() {
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_TV_MUSIC');
+    if (!sh) return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' };
+    var v = sh.getRange('A2:G2').getValues()[0];
+    return {
+      mId: Number(v[0]) || 0, mMode: String(v[1] || 'stop'), mUrl: String(v[2] || ''),
+      aOn: !!String(v[3] || ''), aStart: String(v[4] || ''), aEnd: String(v[5] || ''), aUrl: String(v[6] || '')
+    };
+  } catch (_) { return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' }; }
+}
+
 // ── PWA(Pages) 프론트 → GAS 백엔드 호출 (google.script.run 어댑터) ──
-var RPC_WHITELIST = ["getTodayData", "getTvFlash"];
+var RPC_WHITELIST = ["getTodayData", "getTvFlash", "getTvMusic"];
 function doPost(e) {
   var out;
   try {

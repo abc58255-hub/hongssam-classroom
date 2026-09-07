@@ -10,7 +10,7 @@
   <script>
     var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzpJFEvuLwIiMZMH5AFpHgAbNuNNkMVFFRpxnN34BPb_wTcKznYXFV9XojLGsRNQLtiHQ/exec';
     (function () {
-      var FNS = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+      var FNS = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTvMusic", "setTvMusicAuto", "getTvMusic", "teacherLogin", "teacherLogout", "validateTeacherSession"];
       var TOKKEY = 'alarm_token';
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
@@ -109,6 +109,7 @@
   <div class="tabs">
     <div class="tab active" data-tab="board" onclick="switchTab('board')">📺 칠판공지</div>
     <div class="tab" data-tab="flash" onclick="switchTab('flash')">🚨 실시간 알림</div>
+    <div class="tab" data-tab="music" onclick="switchTab('music')">🎵 점심 음악</div>
     <div class="tab" data-tab="notice" onclick="switchTab('notice')">📢 학급알림</div>
     <div class="tab" data-tab="push" onclick="switchTab('push')">🔔 푸시 전송</div>
   </div>
@@ -250,6 +251,41 @@
       </div>
       <div id="tvFlashStatus" style="margin-top:16px; font-size:13px; color:#64748b;">현재 상태 확인 중…</div>
     </div>
+
+    <!-- 🎵 점심 음악 (교실TV알림판 BGM) -->
+    <div class="panel hidden" id="tab-music">
+      <div class="notice-box">🎵 <b>교실 TV 알림판</b> 좌하단에 미니 플레이어로 음악이 재생돼요. 유튜브 <b>재생목록 링크</b>를 넣으면 곡이 자동으로 이어집니다.<br><b>⚠️ 소리는 TV 화면을 아침에 한 번 클릭</b>해두면 그 뒤로 원격 제어가 됩니다 (브라우저 자동재생 정책).</div>
+
+      <label>유튜브 링크 (재생목록 또는 단일 영상)</label>
+      <input type="text" id="musicUrl" placeholder="https://youtube.com/playlist?list=... 또는 https://youtu.be/...">
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <button class="btn sm orange" style="flex:1;" onclick="musicPlay()">▶ 지금 재생</button>
+        <button class="btn sm" onclick="musicStop()">⏹ 정지</button>
+      </div>
+      <div id="musicStatus" style="margin-top:14px; font-size:13px; color:#64748b;">현재 상태 확인 중…</div>
+
+      <hr style="margin:22px 0; border:none; border-top:1px solid #e2e8f0;">
+
+      <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+        <input type="checkbox" id="musicAutoOn" style="width:18px; height:18px;"> <b>점심시간 자동 재생</b>
+      </label>
+      <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap;">
+        <div style="flex:1; min-width:120px;">
+          <label style="font-size:13px;">시작 시각</label>
+          <input type="time" id="musicAutoStart" value="12:30">
+        </div>
+        <div style="flex:1; min-width:120px;">
+          <label style="font-size:13px;">종료 시각</label>
+          <input type="time" id="musicAutoEnd" value="13:10">
+        </div>
+      </div>
+      <label style="margin-top:12px; display:block;">자동 재생할 유튜브 링크</label>
+      <input type="text" id="musicAutoUrl" placeholder="https://youtube.com/playlist?list=...">
+      <div style="margin-top:12px;">
+        <button class="btn sm" style="width:100%;" onclick="musicSaveAuto()">💾 자동 재생 설정 저장</button>
+      </div>
+      <div style="margin-top:10px; font-size:12px; color:#94a3b8;">설정한 시간대에 TV가 자동으로 재생/정지해요. 자동재생 중 <b>정지</b>를 누르면 그 시간대 동안만 꺼져요.</div>
+    </div>
   </main>
 </div>
 
@@ -292,8 +328,10 @@
     document.getElementById('tab-board').classList.toggle('hidden', name !== 'board');
     document.getElementById('tab-push').classList.toggle('hidden', name !== 'push');
     document.getElementById('tab-flash').classList.toggle('hidden', name !== 'flash');
+    document.getElementById('tab-music').classList.toggle('hidden', name !== 'music');
     if (name === 'board' && !BOARD_LOADED) loadBoard();
     if (name === 'flash') tvFlashRefresh();
+    if (name === 'music') musicRefresh();
   }
 
   // ── 🚨 실시간 알림 (교실TV알림판 팝업) ──
@@ -317,6 +355,49 @@
       if (r && r.success) { uiAlert('지웠어요. TV에서 곧 사라져요.'); var i=document.getElementById('tvFlashInput'); if(i) i.value=''; tvFlashRefresh(); }
       else { uiAlert('실패: ' + (r && r.message || '')); }
     }).withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).clearTvFlash();
+  }
+
+  // ── 🎵 점심 음악 (교실TV알림판 BGM) ──
+  function musicRefresh() {
+    google.script.run.withSuccessHandler(function(m){
+      if (!m) return;
+      var el = document.getElementById('musicStatus');
+      if (el) {
+        if (m.mMode === 'play' && m.mUrl) el.innerHTML = '🟢 지금 재생 중: <b style="color:#0f172a;">' + esc(m.mUrl) + '</b>';
+        else el.textContent = '⚫ 지금 수동 재생 중인 음악이 없어요. (자동 시간대면 TV가 알아서 틀어요)';
+      }
+      // 자동 설정 채우기
+      var a = document.getElementById('musicAutoOn'); if (a) a.checked = !!m.aOn;
+      if (m.aStart) document.getElementById('musicAutoStart').value = m.aStart;
+      if (m.aEnd) document.getElementById('musicAutoEnd').value = m.aEnd;
+      if (m.aUrl) document.getElementById('musicAutoUrl').value = m.aUrl;
+    }).withFailureHandler(function(){}).getTvMusic();
+  }
+  function musicPlay() {
+    var v = (document.getElementById('musicUrl').value || '').trim();
+    if (!v) { uiAlert('유튜브 링크를 입력하세요.'); return; }
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { uiAlert('▶ TV에서 음악을 재생해요. (소리가 안 나면 TV 화면을 한 번 클릭)'); musicRefresh(); }
+      else { uiAlert('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).setTvMusic('play', v);
+  }
+  function musicStop() {
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { uiAlert('⏹ 음악을 정지했어요.'); musicRefresh(); }
+      else { uiAlert('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).setTvMusic('stop', '');
+  }
+  function musicSaveAuto() {
+    var on = document.getElementById('musicAutoOn').checked;
+    var s = document.getElementById('musicAutoStart').value;
+    var e = document.getElementById('musicAutoEnd').value;
+    var u = (document.getElementById('musicAutoUrl').value || '').trim();
+    if (on && (!s || !e)) { uiAlert('시작·종료 시각을 입력하세요.'); return; }
+    if (on && !u) { uiAlert('자동 재생할 유튜브 링크를 입력하세요.'); return; }
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { uiAlert('💾 자동 재생 설정을 저장했어요.'); musicRefresh(); }
+      else { uiAlert('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(ev){ uiAlert('오류: ' + ev.message); }).setTvMusicAuto(on, s, e, u);
   }
 
   // ── 학급알림 ──
