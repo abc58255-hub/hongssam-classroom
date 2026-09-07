@@ -1540,8 +1540,8 @@
       let st = i.status;
       if (statF === "has_message" && !i.message) return false;
       if (statF === "has_reply"   && !i.reply)   return false;  
-      if (statF === "not_completed" && (st === "채점완료" || st === "이전기록채점완료")) return false;
-      if (statF === "hide_done_resub" && (st === "채점완료" || st === "이전기록채점완료" || st === "재제출요청")) return false;
+      if (statF === "not_completed" && (st === "채점완료" || st === "이전기록채점완료" || st === "재제출완료")) return false;
+      if (statF === "hide_done_resub" && (st === "채점완료" || st === "이전기록채점완료" || st === "재제출요청" || st === "재제출완료")) return false;
       if (statF === "regrade_pending" && !(String(i.task).includes('(재제출)') && (st === "" || st === "채점중" || st === "임시저장"))) return false;
       if (statF === "ai_graded") {
         var hasAi = aiGradePending[i.rowIdx] || (i.aiGradeTemp && typeof i.aiGradeTemp === 'object');
