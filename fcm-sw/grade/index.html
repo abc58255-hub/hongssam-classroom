@@ -2909,9 +2909,16 @@
     updateUndoButtons();
     clearStampOverlay();
     var modeLabel = (isSmartMode && smartMode === 'question' && filterKey) ? ' [' + filterKey + ']' : '';
-    document.getElementById('modalTitleText').innerText = isSmartMode
-      ? '[' + item.id + '] ' + item.name + modeLabel + ' (' + (smartIdx+1) + '/' + smartList.length + ')'
-      : '[' + item.id + '] ' + item.name;
+    var taskChip = isSmartMode
+      ? ' <span style="font-size:11px;font-weight:800;color:#0f172a;background:#7dd3fc;padding:2px 8px;border-radius:10px;margin:0 4px;vertical-align:middle;">' + escapeHtml(String(item.task).split(' (')[0]) + '</span>'
+      : '';
+    if (isSmartMode) {
+      document.getElementById('modalTitleText').innerHTML =
+        '[' + escapeHtml(String(item.id)) + '] ' + escapeHtml(String(item.name)) + taskChip + escapeHtml(modeLabel)
+        + ' <span style="opacity:.7;font-weight:700;">(' + (smartIdx+1) + '/' + smartList.length + ')</span>';
+    } else {
+      document.getElementById('modalTitleText').innerText = '[' + item.id + '] ' + item.name;
+    }
     var tabs = document.getElementById('multiPicTabs');
     if (keys.length > 1) {
       tabs.style.display = 'flex';
