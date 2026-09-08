@@ -1103,18 +1103,33 @@ function processForm(formData) {
       finalUrls[f.key] = classFolder.createFile(blob).getUrl(); 
     });
 
-    sheet.appendRow([
+    // ✅ 미채점 원본 중복 방지: 아직 채점 안 한(status="") 같은 과제 원본 행이 이미 있으면
+    //    새 행을 추가하지 말고 그 행을 덮어씀 (두 번 탭·폼 잔류로 인한 중복 제출 방지).
+    //    재제출("(재제출)")·voluntary 경로는 여기 오지 않음 → 이력/재채점 흐름은 그대로 유지.
+    var overwriteRow = 0;
+    if (!isResubmit) {
+      for (let i = records.length - 1; i >= 1; i--) {
+        if (String(records[i][1] || "").trim() === inputId &&
+            String(records[i][3] || "").trim() === baseTaskName &&
+            String(records[i][10] || "").trim() === "") {
+          overwriteRow = i + 1; break;
+        }
+      }
+    }
+    var rowData = [
       now, inputId, inputName, finalTaskName, formData.level, formData.message,
       JSON.stringify(finalUrls), "", JSON.stringify(fileHashObj), "", "", "", "", "", "", ""
-    ]);
+    ];
+    if (overwriteRow) sheet.getRange(overwriteRow, 1, 1, rowData.length).setValues([rowData]);
+    else sheet.appendRow(rowData);
     _clearHistoryCache();
 
     // 📣 교사 푸시 — 재제출은 기본 켜짐(교사가 재채점해야 함), 첫 제출은 기본 꺼짐
     if (isResubmit) _notifyTeacher_('재제출', '🔄 재제출 도착', className + ' ' + inputName + ' — ' + baseTaskName);
     else _notifyTeacher_('제출', '📥 과제 제출', className + ' ' + inputName + ' — ' + baseTaskName);
 
-    // ✅ 방금 추가한 행 번호를 반환 (AI 자동 채점 호출용)
-    const newRowIdx = sheet.getLastRow();
+    // ✅ 방금 추가/갱신한 행 번호를 반환 (AI 자동 채점 호출용)
+    const newRowIdx = overwriteRow || sheet.getLastRow();
     return { success: true, rowIdx: newRowIdx };
   } catch (error) {
     return { success: false, message: error.toString() };
