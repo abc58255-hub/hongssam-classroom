@@ -289,10 +289,23 @@
     body.theme-football { background: linear-gradient(180deg,#ffffff 0%,#eef2f9 100%) fixed; }
     .theme-football .banner-img { background-image: linear-gradient(135deg,#1d2d5c,#0a1440); }
 
-    /* ⚾ 호랑이 야구 (레드 & 블랙 핀스트라이프) */
-    .theme-tigers { --banner-a:rgba(127,29,29,.5); --banner-b:rgba(26,26,26,.92); --accent:#d61f2b; --tab-accent:#7f1d1d; --radius-card:14px; }
-    body.theme-tigers { background-color:#fff5f5; background-image: repeating-linear-gradient(90deg, rgba(214,31,43,.10) 0 1px, transparent 1px 13px); }
-    .theme-tigers .banner-img { background-image: linear-gradient(135deg,#d61f2b,#1a1a1a); }
+    /* ⚾ 호랑이 야구 (기아 느낌) — 레드&블랙, 유니폼 핀스트라이프 + 호랑이 줄무늬 + 저지풍 */
+    .theme-tigers { --banner-a:rgba(180,20,30,.5); --banner-b:rgba(17,17,17,.94); --accent:#d61f2b; --tab-accent:#a10f1a; --radius-card:12px; --radius-btn:10px; }
+    body.theme-tigers { background-color:#fbeeec;
+      background-image:
+        repeating-linear-gradient(90deg, rgba(214,31,43,.10) 0 2px, transparent 2px 15px),      /* 유니폼 세로 핀스트라이프 */
+        repeating-linear-gradient(115deg, rgba(17,17,17,.05) 0 14px, transparent 14px 40px); }   /* 은은한 호랑이 대각 줄무늬 */
+    .theme-tigers .card { box-shadow:0 8px 22px rgba(180,20,30,.16); border:1px solid #efd3d0; }
+    .theme-tigers .card::before { content:''; display:block; height:10px; background-image:repeating-linear-gradient(90deg,#d61f2b 0 4px,#ffffff 4px 10px); border-bottom:2px solid #111; }   /* 셸 상단 저지 플래킷 */
+    .theme-tigers .banner-img {
+      background-image:
+        repeating-linear-gradient(60deg, rgba(0,0,0,.20) 0 8px, transparent 8px 22px),           /* 호랑이 줄무늬 오버레이 */
+        linear-gradient(135deg,#e11d2a 0%,#b0111b 55%,#111 100%); }
+    .theme-tigers .banner-title { font-family:'Black Han Sans','Pretendard',sans-serif; letter-spacing:1px; text-shadow:2px 2px 0 rgba(0,0,0,.4); }
+    .theme-tigers .sec-card { border-left:4px solid #d61f2b; }                                     /* 콘텐츠 카드 저지 라인 */
+    .theme-tigers button.primary-btn { background:linear-gradient(135deg,#e11d2a,#a10f1a); box-shadow:0 4px 0 #7f0d14; }
+    .theme-tigers .tab-btn.active { background:#111; color:#fde047; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+    .theme-tigers .refresh-btn { border:2px solid rgba(255,255,255,.55); }
 
     /* 🏴‍☠️ 해적 (바다 모험) */
     .theme-pirate { --banner-a:rgba(124,45,18,.55); --banner-b:rgba(12,74,110,.9); --accent:#dc2626; --tab-accent:#b45309; --radius-card:18px; }
@@ -839,8 +852,8 @@
       fx: [ { ch: '🍬', mode: 'fall', n: 8, s1: 12, s2: 22 }, { ch: '🍭', mode: 'fall', n: 3, s1: 14, s2: 20 }, { ch: '⭐', mode: 'twinkle', n: 8, s1: 8, s2: 14 } ] },
     { key: 'football', name: '축구',   emoji: '⚽', cls: 'theme-football', dots: ['#132257', '#ffffff', '#1d2d5c'],
       fx: [ { ch: '⚽', mode: 'swimR', n: 2, s1: 16, s2: 24 }, { ch: '⚽', mode: 'fall', n: 3, s1: 12, s2: 18 }, { ch: '✨', mode: 'twinkle', n: 5, s1: 7, s2: 11 } ] },
-    { key: 'tigers',   name: '호랑이', emoji: '🐯', cls: 'theme-tigers',   dots: ['#d61f2b', '#1a1a1a', '#fecaca'],
-      fx: [ { ch: '⚾', mode: 'fall', n: 6, s1: 12, s2: 20 }, { ch: '🐯', mode: 'swimR', n: 1, s1: 22, s2: 28 }, { ch: '🔥', mode: 'rise', n: 3, s1: 12, s2: 18 } ] },
+    { key: 'tigers',   name: '호랑이', emoji: '🐯', cls: 'theme-tigers',   dots: ['#d61f2b', '#111111', '#fde047'], font: 'sports',
+      fx: [ { ch: '⚾', mode: 'fall', n: 7, s1: 12, s2: 20 }, { ch: '🐯', mode: 'swimR', n: 1, s1: 24, s2: 30 }, { ch: '🐾', mode: 'fall', n: 4, s1: 12, s2: 18 }, { ch: '🔥', mode: 'rise', n: 2, s1: 12, s2: 16 } ] },
     { key: 'pirate',   name: '해적',   emoji: '🏴‍☠️', cls: 'theme-pirate', dots: ['#dc2626', '#fde68a', '#0ea5e9'],
       fx: [ { ch: '👒', mode: 'fall', n: 3, s1: 16, s2: 22 }, { ch: '🏴‍☠️', mode: 'swimR', n: 1, s1: 24, s2: 30 }, { ch: '⚓', mode: 'fall', n: 2, s1: 14, s2: 20 }, { ch: '🫧', mode: 'rise', n: 6, s1: 10, s2: 18 } ] },
     { key: 'blade',    name: '검',     emoji: '⚔️', cls: 'theme-blade',    dots: ['#ea580c', '#052e16', '#fb923c'],
@@ -861,6 +874,11 @@
       lk.id = id; lk.rel = 'stylesheet';
       lk.href = 'https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap';
       document.head.appendChild(lk);
+    } else if (kind === 'sports') {
+      var lk2 = document.createElement('link');
+      lk2.id = id; lk2.rel = 'stylesheet';
+      lk2.href = 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap';
+      document.head.appendChild(lk2);
     }
   }
 
