@@ -284,6 +284,27 @@
     body.theme-candy { background: linear-gradient(180deg,#fef2f8 0%,#fae8ff 35%,#e0f2fe 70%,#dcfce7 100%) fixed; }
     .theme-candy .banner-img { background-image: linear-gradient(135deg,#f9a8d4,#a21caf); }
 
+    /* ⚽ 축구 (네이비 & 화이트) */
+    .theme-football { --banner-a:rgba(10,20,64,.55); --banner-b:rgba(10,20,64,.92); --accent:#132257; --tab-accent:#0a1440; --radius-card:16px; }
+    body.theme-football { background: linear-gradient(180deg,#ffffff 0%,#eef2f9 100%) fixed; }
+    .theme-football .banner-img { background-image: linear-gradient(135deg,#1d2d5c,#0a1440); }
+
+    /* ⚾ 호랑이 야구 (레드 & 블랙 핀스트라이프) */
+    .theme-tigers { --banner-a:rgba(127,29,29,.5); --banner-b:rgba(26,26,26,.92); --accent:#d61f2b; --tab-accent:#7f1d1d; --radius-card:14px; }
+    body.theme-tigers { background-color:#fff5f5; background-image: repeating-linear-gradient(90deg, rgba(214,31,43,.10) 0 1px, transparent 1px 13px); }
+    .theme-tigers .banner-img { background-image: linear-gradient(135deg,#d61f2b,#1a1a1a); }
+
+    /* 🏴‍☠️ 해적 (바다 모험) */
+    .theme-pirate { --banner-a:rgba(124,45,18,.55); --banner-b:rgba(12,74,110,.9); --accent:#dc2626; --tab-accent:#b45309; --radius-card:18px; }
+    body.theme-pirate { background: linear-gradient(180deg,#e0f2fe 0%,#7dd3fc 55%,#0ea5e9 100%) fixed; }
+    .theme-pirate .banner-img { background-image: linear-gradient(135deg,#f59e0b,#7c2d12); }
+
+    /* ⚔️ 검 (일본풍 체크 + 불꽃, 어두운 배경) */
+    .theme-blade { --banner-a:rgba(124,45,18,.5); --banner-b:rgba(10,15,13,.92); --accent:#ea580c; --tab-accent:#9a3412; --radius-card:12px; }
+    body.theme-blade { background-color:#0a0f0d; background-image: conic-gradient(#064e3b 90deg, #0a0f0d 90deg 180deg, #064e3b 180deg 270deg, #0a0f0d 270deg); background-size:46px 46px; }
+    .theme-blade .banner-img { background-image: linear-gradient(135deg,#9a3412,#0a0f0d); }
+    .theme-blade #themeFx span { color:#fb923c; text-shadow: 0 0 8px rgba(251,146,60,.85); }
+
     /* ══════════ 통일 UI 토큰 ══════════
        색: 제목 네이비(#1e3a8a) / 값 파랑(#2563eb) / 본문 회색 계열 / 상태색만 예외(성공·경고·위험·우수작 앰버)
        크기: 캡션 11px, 본문 13px, 제목 15px, 값 17px / 모서리: 카드 16px, 내부 10px */
@@ -815,7 +836,15 @@
     { key: 'neon',    name: '네온',  emoji: '🎮', cls: 'theme-neon',   dots: ['#22d3ee', '#0a0a16', '#e879f9'],
       fx: [ { ch: '✦', mode: 'twinkle', n: 20, s1: 8, s2: 16 }, { ch: '⚡', mode: 'fall', n: 3, s1: 14, s2: 20 } ] },
     { key: 'candy',   name: '캔디',  emoji: '🌈', cls: 'theme-candy',  dots: ['#ec4899', '#fae8ff', '#a5f3fc'],
-      fx: [ { ch: '🍬', mode: 'fall', n: 8, s1: 12, s2: 22 }, { ch: '🍭', mode: 'fall', n: 3, s1: 14, s2: 20 }, { ch: '⭐', mode: 'twinkle', n: 8, s1: 8, s2: 14 } ] }
+      fx: [ { ch: '🍬', mode: 'fall', n: 8, s1: 12, s2: 22 }, { ch: '🍭', mode: 'fall', n: 3, s1: 14, s2: 20 }, { ch: '⭐', mode: 'twinkle', n: 8, s1: 8, s2: 14 } ] },
+    { key: 'football', name: '축구',   emoji: '⚽', cls: 'theme-football', dots: ['#132257', '#ffffff', '#1d2d5c'],
+      fx: [ { ch: '⚽', mode: 'swimR', n: 2, s1: 16, s2: 24 }, { ch: '⚽', mode: 'fall', n: 3, s1: 12, s2: 18 }, { ch: '✨', mode: 'twinkle', n: 5, s1: 7, s2: 11 } ] },
+    { key: 'tigers',   name: '호랑이', emoji: '🐯', cls: 'theme-tigers',   dots: ['#d61f2b', '#1a1a1a', '#fecaca'],
+      fx: [ { ch: '⚾', mode: 'fall', n: 6, s1: 12, s2: 20 }, { ch: '🐯', mode: 'swimR', n: 1, s1: 22, s2: 28 }, { ch: '🔥', mode: 'rise', n: 3, s1: 12, s2: 18 } ] },
+    { key: 'pirate',   name: '해적',   emoji: '🏴‍☠️', cls: 'theme-pirate', dots: ['#dc2626', '#fde68a', '#0ea5e9'],
+      fx: [ { ch: '👒', mode: 'fall', n: 3, s1: 16, s2: 22 }, { ch: '🏴‍☠️', mode: 'swimR', n: 1, s1: 24, s2: 30 }, { ch: '⚓', mode: 'fall', n: 2, s1: 14, s2: 20 }, { ch: '🫧', mode: 'rise', n: 6, s1: 10, s2: 18 } ] },
+    { key: 'blade',    name: '검',     emoji: '⚔️', cls: 'theme-blade',    dots: ['#ea580c', '#052e16', '#fb923c'],
+      fx: [ { ch: '🔥', mode: 'rise', n: 8, s1: 12, s2: 22 }, { ch: '⚔️', mode: 'fall', n: 2, s1: 16, s2: 22 }, { ch: '✦', mode: 'twinkle', n: 6, s1: 8, s2: 13 } ] }
   ];
 
   // 테마 폰트는 선택했을 때만 로드 (평소 로딩 속도에 영향 없음)
