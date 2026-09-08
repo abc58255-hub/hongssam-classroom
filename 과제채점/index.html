@@ -3277,7 +3277,7 @@
         box.innerHTML = '과제를 선택하면 채점할 학생 수가 표시돼요.';
         return;
       }
-      var total = 0, todo = 0;
+      var total = 0;
       (allSubmissions || []).forEach(function(i) {
         var safeId = String(i.id || '');
         var iCls = safeId.length >= 2 ? safeId.substring(0,1) + '학년 ' + safeId.substring(1,2) + '반' : '기타';
@@ -3285,12 +3285,16 @@
         if (String(i.task).split(' (재제출)')[0].split(' (')[0] !== tsk) return;
         if (i.status === '이전기록채점완료') return;
         total++;
-        if (i.status !== '채점완료') todo++;
       });
+      // 실제 시작과 동일한 필터로 '채점할 인원' 계산 (미리보기≠실제 불일치 방지)
+      var modeElP = document.querySelector('input[name="smartMode"]:checked');
+      var modeP = modeElP ? modeElP.value : 'student';
+      var qKeyP = (modeP === 'question' && document.getElementById('smartQuestionKey')) ? document.getElementById('smartQuestionKey').value : null;
+      var gradeable = _smartCandidates(cls, tsk, skipDone, modeP, qKeyP).length;
       var clsLabel = (cls === 'all') ? '전체 반' : cls;
       box.style.display = 'block';
-      box.innerHTML = '📋 <b>' + clsLabel + '</b> 제출 <b>' + total + '명</b>'
-        + (skipDone ? ' · 채점할 학생 <b style="color:#ea580c;">' + todo + '명</b>' : '');
+      box.innerHTML = '📋 <b>' + clsLabel + '</b> 제출 <b>' + total + '명</b> · 채점할 <b style="color:#ea580c;">' + gradeable + '명</b>'
+        + (total > gradeable ? '<br><span style="font-size:11px;color:#94a3b8;">※ 재제출 대기·이력 등 ' + (total - gradeable) + '명은 연속채점에서 제외돼요</span>' : '');
     })();
 
     var modeBtnQuestion = document.getElementById('modeBtnQuestion');
@@ -3381,6 +3385,39 @@
     selDisplay.innerText = '✅ 선택된 문항: ' + key;
   }
   var smartCache = {}, smartPrefetchCache = {};
+
+  // 연속채점 대상 후보 — 미리보기 인원수와 실제 시작이 반드시 같은 필터를 쓰도록 공용화
+  // (재제출요청=학생 재제출 대기, 재제출로 대체된 원본, 이전기록채점완료는 연속채점 대상에서 제외)
+  function _smartCandidates(cls, tsk, skipDone, mode, qKey) {
+    if (!tsk) return [];
+    var resubIds = {};
+    allSubmissions.forEach(function(i) {
+      var tb = String(i.task).split(' (재제출)')[0].split(' (')[0];
+      if (tb === tsk && String(i.task).includes('(재제출)')) resubIds[i.id] = true;
+    });
+    return allSubmissions.filter(function(i) {
+      var safeId = String(i.id || "");
+      var iCls = safeId.length >= 2 ? (safeId.substring(0,1) + "학년 " + safeId.substring(1,2) + "반") : "기타";
+      if (cls !== "all" && iCls !== cls) return false;
+      var taskBase = String(i.task).split(' (재제출)')[0].split(' (')[0];
+      if (taskBase !== tsk) return false;
+      if (i.status === "이전기록채점완료") return false;
+      if (i.status === "재제출요청") return false;
+      var isOriginal = !String(i.task).includes('(재제출)');
+      if (isOriginal && resubIds[i.id]) return false;
+      if (skipDone && i.status === "채점완료") return false;
+      if (mode === 'question' && qKey) {
+        var url = i.urls ? i.urls[qKey] : null;
+        if (!url || url === "첨부파일 없음") return false;
+        if (skipDone) {
+          var qStatus = i.perQuestionData && i.perQuestionData[qKey] ? i.perQuestionData[qKey].status : '';
+          if (qStatus === '완료' || qStatus === '반려검토') return false;
+        }
+      }
+      return true;
+    });
+  }
+
   function startSmartMode() {
     var cls = document.getElementById('smartClass').value;
     var tsk = document.getElementById('smartTask').value;
@@ -3401,34 +3438,7 @@
       qKey = document.getElementById('smartQuestionKey').value;
       if (!qKey) return uiAlert("채점할 문항을 선택하세요.");
     }
-    var resubIds = {};
-    allSubmissions.forEach(function(i) {
-      var taskBase = String(i.task).split(' (재제출)')[0].split(' (')[0];
-      if (taskBase === tsk && String(i.task).includes('(재제출)')) {
-        resubIds[i.id] = true;
-      }
-    });
-    smartList = allSubmissions.filter(function(i) {
-      var safeId = String(i.id || "");
-      var iCls = safeId.substring(0,1) + "학년 " + safeId.substring(1,2) + "반";
-      if (cls !== "all" && iCls !== cls) return false;
-      var taskBase = String(i.task).split(' (재제출)')[0].split(' (')[0];
-      if (taskBase !== tsk) return false;
-      if (i.status === "이전기록채점완료") return false;
-      if (i.status === "재제출요청") return false;
-      var isOriginal = !String(i.task).includes('(재제출)');
-      if (isOriginal && resubIds[i.id]) return false;
-      if (skipDone && i.status === "채점완료") return false;
-      if (mode === 'question' && qKey) {
-        var url = i.urls ? i.urls[qKey] : null;
-        if (!url || url === "첨부파일 없음") return false;
-        if (skipDone) {
-          var qStatus = i.perQuestionData && i.perQuestionData[qKey] ? i.perQuestionData[qKey].status : '';
-          if (qStatus === '완료' || qStatus === '반려검토') return false;
-        }
-      }
-      return true;
-    });
+    smartList = _smartCandidates(cls, tsk, skipDone, mode, qKey);
     var smartOrder = document.getElementById('smartOrder') ? document.getElementById('smartOrder').value : 'id';
     if (smartOrder === 'submit') smartList.sort(function(a, b) { return (a.dateMs || 0) - (b.dateMs || 0); }); // 제출 빠른 순
     else smartList.sort(function(a, b) { return String(a.id).localeCompare(String(b.id)); }); // 학번순
