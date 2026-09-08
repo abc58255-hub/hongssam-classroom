@@ -400,6 +400,10 @@ function getDashboardData(studentId, studentName) {
           if (aiRaw.startsWith('{')) aiGradeTemp = JSON.parse(aiRaw);
         } catch(e) {}
 
+        // AI 채점 실패기록(col29) — 결과 없고 아직 교사가 안 본 상태에서만 노출 → 학생 카드에 '다시 시도' 버튼
+        let aiError = '';
+        try { const _ae = String(historyData[i][28] || "").trim(); if (_ae && !aiGradeTemp && status === '') aiError = _ae; } catch(e) {}
+
         let item = {
           rowIdx: i + 1,
           date: historyData[i][0] ? Utilities.formatDate(new Date(historyData[i][0]), "Asia/Seoul", "MM/dd HH:mm") : "",
@@ -412,6 +416,7 @@ function getDashboardData(studentId, studentName) {
           perQuestionData: perQuestionData,
           isUnread: (fb !== "" || isMyBest) && isSeen === "",
           aiGradeTemp: aiGradeTemp,
+          aiError: aiError,
           totalRank: myTotalRank,
           classRank: myClassRank,
           deadline: taskDeadlineMap[baseName] ? taskDeadlineMap[baseName].main : null,
@@ -1437,37 +1442,75 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName, prevAi
     });
 
     const sysMsg = { role: 'system', content: '당신은 수학 채점 AI입니다. 반드시 JSON 객체만 반환하세요. 설명, 마크다운, 추가 텍스트 없이 오직 { } 형태의 JSON만 출력하세요.' };
-    const res = UrlFetchApp.fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'post',
-      headers: {
-        'Authorization': 'Bearer ' + cfg.openrouterKey,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://script.google.com',
-        'X-Title': 'Student Auto Grade'
-      },
-      payload: JSON.stringify({
-        model: cfg.model,
-        messages: [sysMsg, { role: 'user', content: content }],
-        max_tokens: 4000,
-        temperature: 0.2
-      }),
-      muteHttpExceptions: true
+    const payload = JSON.stringify({
+      model: cfg.model,
+      messages: [sysMsg, { role: 'user', content: content }],
+      max_tokens: 4000,
+      temperature: 0.2
     });
 
-    if (res.getResponseCode() !== 200) {
+    // ── 재시도 + 지수 백오프 ── 간헐적 실패(429 한도·503 과부하·5xx·네트워크·빈응답·JSON깨짐) 자동 복구.
+    // 비재시도(키/권한/요청형식 4xx)는 즉시 중단. 최종 실패는 col29(AI채점오류)에 기록하고 col23은 비워둠(재시도·교사채점 가능).
+    var result = null, lastErr = 'AI 채점 실패', attempt = 0;
+    var MAX_ATTEMPTS = 3;
+    while (attempt < MAX_ATTEMPTS) {
+      attempt++;
       try {
-        var errJson = JSON.parse(res.getContentText());
-        var raw = (errJson.error && errJson.error.metadata && errJson.error.metadata.raw) || '';
-        var msg = (errJson.error && errJson.error.message) || res.getContentText().substring(0, 200);
-        return { success: false, message: 'API 오류 ' + res.getResponseCode() + ': ' + msg + (raw ? ' | ' + raw : '') };
-      } catch(e) { return { success: false, message: 'API 오류 ' + res.getResponseCode() }; }
+        var res = UrlFetchApp.fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'post',
+          headers: {
+            'Authorization': 'Bearer ' + cfg.openrouterKey,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://script.google.com',
+            'X-Title': 'Student Auto Grade'
+          },
+          payload: payload,
+          muteHttpExceptions: true
+        });
+        var code = res.getResponseCode();
+        if (code === 429 || code === 503 || code >= 500) {   // 일시적 → 재시도
+          lastErr = 'AI 서버 혼잡 (' + code + ')';
+          if (attempt < MAX_ATTEMPTS) { Utilities.sleep(1200 * attempt); continue; }
+          break;
+        }
+        if (code !== 200) {   // 키/권한/요청형식 등 → 재시도 무의미
+          try {
+            var errJson = JSON.parse(res.getContentText());
+            var raw = (errJson.error && errJson.error.metadata && errJson.error.metadata.raw) || '';
+            var msg = (errJson.error && errJson.error.message) || res.getContentText().substring(0, 200);
+            lastErr = 'API 오류 ' + code + ': ' + msg + (raw ? ' | ' + raw : '');
+          } catch(e2) { lastErr = 'API 오류 ' + code; }
+          break;
+        }
+        var body = JSON.parse(res.getContentText());
+        var contentText = body && body.choices && body.choices[0] && body.choices[0].message && body.choices[0].message.content;
+        if (!contentText) {   // 빈 응답 → 재시도
+          lastErr = 'AI 빈 응답';
+          if (attempt < MAX_ATTEMPTS) { Utilities.sleep(1200 * attempt); continue; }
+          break;
+        }
+        var text = String(contentText).trim().replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
+        var parsed = _parseAiJsonLoose_(text);
+        if (!parsed) {   // JSON 깨짐 → 재시도
+          lastErr = 'JSON 파싱 실패: ' + text.substring(0, 120);
+          if (attempt < MAX_ATTEMPTS) { Utilities.sleep(1000 * attempt); continue; }
+          break;
+        }
+        result = parsed;
+        break;
+      } catch (fetchErr) {   // 네트워크/타임아웃 → 재시도
+        lastErr = '네트워크 오류: ' + (fetchErr && fetchErr.message || fetchErr);
+        if (attempt < MAX_ATTEMPTS) { Utilities.sleep(1200 * attempt); continue; }
+        break;
+      }
     }
 
-    let text = JSON.parse(res.getContentText()).choices[0].message.content.trim();
-    text = text.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
-    const result = _parseAiJsonLoose_(text);
-    if (!result) return { success: false, message: 'JSON 파싱 실패: ' + text.substring(0, 150) };
+    if (!result) {
+      try { sheet.getRange(rowIdx, 29).setValue('⚠️ ' + lastErr + ' @ ' + Utilities.formatDate(new Date(), 'Asia/Seoul', 'MM/dd HH:mm') + ' (' + attempt + '회 시도)'); } catch(_) {}
+      return { success: false, canRetry: true, attempts: attempt, message: lastErr };
+    }
 
+    try { sheet.getRange(rowIdx, 29).setValue(''); } catch(_) {}   // 이전 실패기록 삭제
     sheet.getRange(rowIdx, 23).setValue(JSON.stringify(result));
 
     // ✅ [추가] 실시간 등수 확인 및 칭찬 멘트 생성

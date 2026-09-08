@@ -1907,7 +1907,12 @@
         }
 
         var gradingPlaceholder = '';
-        if (!item.aiGradeTemp && !item.feedback && item.status === '' && !item.score) {
+        if (item.aiError && !item.aiGradeTemp && !item.feedback && item.status === '' && !item.score) {
+          gradingPlaceholder = '<div style="background:#fef2f2; border:1px dashed #fca5a5; border-radius:10px; padding:12px 14px; margin-top:12px; text-align:center;">'
+            + '<div style="font-size:13px; color:#dc2626; font-weight:700; margin-bottom:8px;">⚠️ AI 채점에 실패했어요</div>'
+            + '<button onclick="retryAiGrade(this, ' + item.rowIdx + ', \'' + String(item.task).replace(/\\/g,"\\\\").replace(/'/g, "\\'") + '\')" style="background:#0284c7; color:white; border:none; padding:8px 20px; border-radius:8px; font-size:13px; font-weight:800; cursor:pointer;">🔄 다시 채점하기</button>'
+            + '</div>';
+        } else if (!item.aiGradeTemp && !item.feedback && item.status === '' && !item.score) {
           gradingPlaceholder = '<div style="background:#fef9c3; border:1px dashed #fde047; border-radius:10px; padding:10px 14px; margin-top:12px; text-align:center;">'
             + '<span style="font-size:13px; color:#a16207; font-weight:700;">⏳ AI 채점 진행 중... 새로고침해서 확인해보세요</span>'
             + '</div>';
@@ -2593,9 +2598,45 @@
     } else {
       var skipBox = document.getElementById('aiGradeSkippedBox');
       var errMsg = (aiRes && aiRes.message) ? aiRes.message : '';
-      if (skipBox && errMsg) skipBox.innerHTML = '<div style="background:#fef2f2;border:1px dashed #fca5a5;border-radius:12px;padding:14px 16px;margin-bottom:16px;"><div style="font-size:12px;color:#dc2626;line-height:1.6;">⚠️ AI 채점 오류<br><span style="color:#94a3b8;">' + errMsg + '</span></div></div>';
+      var retryBtn = rowIdx ? '<button onclick="retryAiGradeInline(' + rowIdx + ', \'' + String(taskName||'').replace(/\\/g,"\\\\").replace(/'/g, "\\'") + '\')" style="background:#0284c7;color:white;border:none;padding:10px 22px;border-radius:8px;font-size:14px;font-weight:800;cursor:pointer;margin-top:4px;">🔄 다시 시도</button>' : '';
+      if (skipBox) skipBox.innerHTML = '<div style="background:#fef2f2;border:1px dashed #fca5a5;border-radius:12px;padding:14px 16px;margin-bottom:16px;text-align:center;"><div style="font-size:13px;color:#dc2626;font-weight:700;line-height:1.6;margin-bottom:2px;">⚠️ AI 채점에 실패했어요</div>' + (errMsg ? '<div style="font-size:11px;color:#94a3b8;margin-bottom:10px;">' + errMsg + '</div>' : '<div style="height:8px;"></div>') + retryBtn + '</div>';
       if (skipBox) skipBox.style.display = 'block';
     }
+  }
+
+  // ── AI 채점 다시 시도 (제출 직후 결과화면) ──
+  function retryAiGradeInline(rowIdx, taskName) {
+    var skipBox = document.getElementById('aiGradeSkippedBox'); if (skipBox) skipBox.style.display = 'none';
+    var loader = document.getElementById('aiGradingLoader'); if (loader) loader.style.display = 'block';
+    var bar = document.getElementById('aiProgressBar'); if (bar) bar.style.width = '40%';
+    google.script.run
+      .withSuccessHandler(function(aiRes) {
+        if (loader) loader.style.display = 'none';
+        renderAiResult(aiRes, 2, rowIdx, taskName);
+      })
+      .withFailureHandler(function(err) {
+        if (loader) loader.style.display = 'none';
+        renderAiResult({ success: false, message: (err && err.message) ? err.message : String(err) }, 2, rowIdx, taskName);
+      })
+      .autoGradeNewSubmission(rowIdx, taskName, currentUser.id, currentUser.name);
+  }
+
+  // ── AI 채점 다시 시도 (대시보드 과제 카드) ──
+  function retryAiGrade(btn, rowIdx, taskName) {
+    if (btn) { btn.disabled = true; btn.textContent = '🤖 다시 채점 중...'; }
+    google.script.run
+      .withSuccessHandler(function(aiRes) {
+        if (aiRes && aiRes.success) { refreshData(); }
+        else {
+          if (btn) { btn.disabled = false; btn.textContent = '🔄 다시 채점하기'; }
+          uiAlert('아직 실패했어요.\n' + (aiRes && aiRes.message ? aiRes.message : '') + '\n\n잠시 후 다시 눌러보세요.');
+        }
+      })
+      .withFailureHandler(function(err) {
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 다시 채점하기'; }
+        uiAlert('오류가 났어요: ' + (err && err.message ? err.message : err));
+      })
+      .autoGradeNewSubmission(rowIdx, taskName, currentUser.id, currentUser.name);
   }
 
   // ── 보완하기: 제출 화면으로 돌아가 다시 첨부 ──
