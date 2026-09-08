@@ -261,6 +261,29 @@
     .theme-dark { --bg:#0f172a; --banner-a:rgba(31,41,55,.5); --banner-b:rgba(3,7,18,.88); --accent:#4f46e5; --tab-accent:#3730a3; }
     .theme-dark .banner-img { background-image: linear-gradient(135deg,#1f2937,#0f172a); }
 
+    /* 🌇 노을 (선셋) */
+    .theme-sunset { --banner-a:rgba(194,65,12,.5); --banner-b:rgba(136,19,55,.9); --accent:#f97316; --tab-accent:#c2410c; --radius-card:22px; }
+    body.theme-sunset { background: linear-gradient(180deg,#fff7ed 0%,#fed7aa 40%,#fdba74 70%,#fb7185 100%) fixed; }
+    .theme-sunset .banner-img { background-image: linear-gradient(135deg,#fdba74,#be123c); }
+
+    /* 🌲 숲 (포레스트) */
+    .theme-forest { --banner-a:rgba(22,101,52,.55); --banner-b:rgba(20,83,45,.9); --accent:#16a34a; --tab-accent:#166534; --radius-card:20px; }
+    body.theme-forest { background: linear-gradient(180deg,#f0fdf4 0%,#dcfce7 60%,#bbf7d0 100%) fixed; }
+    .theme-forest .banner-img { background-image: linear-gradient(135deg,#86efac,#166534); }
+
+    /* 🎮 네온 (사이버 — 어두운 배경 + 형광) */
+    .theme-neon { --banner-a:rgba(14,116,144,.45); --banner-b:rgba(10,10,22,.9); --accent:#22d3ee; --tab-accent:#0e7490; --radius-card:14px; }
+    body.theme-neon { background-color:#0a0a16; background-image: linear-gradient(rgba(34,211,238,.05) 1px,transparent 1px), linear-gradient(90deg,rgba(232,121,249,.05) 1px,transparent 1px); background-size:34px 34px; }
+    .theme-neon .banner-img { background-image: linear-gradient(135deg,#1e1b4b,#0a0a16); }
+    .theme-neon .card { box-shadow: 0 0 0 1px rgba(34,211,238,.35), 0 0 20px rgba(34,211,238,.12); }
+    .theme-neon button.primary-btn { box-shadow: 0 0 14px rgba(34,211,238,.5); }
+    .theme-neon #themeFx span { color:#22d3ee; text-shadow: 0 0 8px rgba(34,211,238,.9); }
+
+    /* 🌈 캔디 (파스텔) */
+    .theme-candy { --banner-a:rgba(162,28,175,.45); --banner-b:rgba(190,24,93,.85); --accent:#ec4899; --tab-accent:#a21caf; --radius-card:24px; --radius-btn:18px; }
+    body.theme-candy { background: linear-gradient(180deg,#fef2f8 0%,#fae8ff 35%,#e0f2fe 70%,#dcfce7 100%) fixed; }
+    .theme-candy .banner-img { background-image: linear-gradient(135deg,#f9a8d4,#a21caf); }
+
     /* ══════════ 통일 UI 토큰 ══════════
        색: 제목 네이비(#1e3a8a) / 값 파랑(#2563eb) / 본문 회색 계열 / 상태색만 예외(성공·경고·위험·우수작 앰버)
        크기: 캡션 11px, 본문 13px, 제목 15px, 값 17px / 모서리: 카드 16px, 내부 10px */
@@ -784,7 +807,15 @@
     { key: 'note',    name: '노트',  emoji: '📓', cls: 'theme-note',   dots: ['#b45309', '#fffdf7', '#d6d3d1'], font: 'note',
       fx: [ { ch: '✏️', mode: 'fall', n: 4, s1: 13, s2: 19 }, { ch: '📐', mode: 'fall', n: 2, s1: 12, s2: 17 }, { ch: '➗', mode: 'fall', n: 2, s1: 11, s2: 15 } ] },
     { key: 'dark',    name: '다크',  emoji: '🌙', cls: 'theme-dark',   dots: ['#4f46e5', '#0f172a', '#1f2937'],
-      fx: [ { ch: '✨', mode: 'twinkle', n: 8, s1: 8, s2: 13 } ] }
+      fx: [ { ch: '✨', mode: 'twinkle', n: 8, s1: 8, s2: 13 } ] },
+    { key: 'sunset',  name: '노을',  emoji: '🌇', cls: 'theme-sunset', dots: ['#f97316', '#fed7aa', '#be123c'],
+      fx: [ { ch: '🐦', mode: 'swimR', n: 2, s1: 16, s2: 22 }, { ch: '☁️', mode: 'swimL', n: 2, s1: 22, s2: 34 }, { ch: '✨', mode: 'twinkle', n: 6, s1: 7, s2: 12 } ] },
+    { key: 'forest',  name: '숲',    emoji: '🌲', cls: 'theme-forest', dots: ['#16a34a', '#f0fdf4', '#bbf7d0'],
+      fx: [ { ch: '🍃', mode: 'fall', n: 10, s1: 12, s2: 22 }, { ch: '🦋', mode: 'swimR', n: 2, s1: 16, s2: 22 }, { ch: '🌿', mode: 'fall', n: 3, s1: 12, s2: 18 } ] },
+    { key: 'neon',    name: '네온',  emoji: '🎮', cls: 'theme-neon',   dots: ['#22d3ee', '#0a0a16', '#e879f9'],
+      fx: [ { ch: '✦', mode: 'twinkle', n: 20, s1: 8, s2: 16 }, { ch: '⚡', mode: 'fall', n: 3, s1: 14, s2: 20 } ] },
+    { key: 'candy',   name: '캔디',  emoji: '🌈', cls: 'theme-candy',  dots: ['#ec4899', '#fae8ff', '#a5f3fc'],
+      fx: [ { ch: '🍬', mode: 'fall', n: 8, s1: 12, s2: 22 }, { ch: '🍭', mode: 'fall', n: 3, s1: 14, s2: 20 }, { ch: '⭐', mode: 'twinkle', n: 8, s1: 8, s2: 14 } ] }
   ];
 
   // 테마 폰트는 선택했을 때만 로드 (평소 로딩 속도에 영향 없음)
