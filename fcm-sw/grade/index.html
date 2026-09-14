@@ -23,10 +23,20 @@
           r[name] = function () {
             var args = Array.prototype.slice.call(arguments);
             var tok = ''; try { tok = sessionStorage.getItem('teacherToken') || ''; } catch (_) {}
-            fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args, token: tok }) })
-              .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-              .then(function (data) { if (data && data.ok) return data.result; throw new Error((data && data.error) || '서버 오류'); })
-              .then(function (result) { ok(result); }, function (e) { fail(e); });
+            var attempt = 0;
+            function run() {
+              attempt++;
+              fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args, token: tok }) })
+                .then(function (res) { if (!res.ok) { var e = new Error('HTTP ' + res.status); e._net = true; throw e; } return res.json(); })
+                .then(function (data) { if (data && data.ok) return data.result; throw new Error((data && data.error) || '서버 오류'); })
+                .then(function (result) { ok(result); }, function (e) {
+                  // GAS 2-홉 리다이렉트 간헐 실패(echo 404·CORS·네트워크)만 자동 재시도 (최대 3회, 백오프)
+                  var isNet = e && (e._net || /Failed to fetch|NetworkError|Load failed|HTTP (0|4\d\d|5\d\d)/i.test(e.message || ''));
+                  if (isNet && attempt < 3) { setTimeout(run, 600 * attempt); }
+                  else { fail(e); }
+                });
+            }
+            run();
           };
         });
         return r;
@@ -39,6 +49,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
   <title>교사 통합 대시보드</title>
   
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="수학교실">

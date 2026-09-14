@@ -7,6 +7,7 @@
 <link rel="apple-touch-icon" href="./icon-progress-180.png">
 <link rel="icon" type="image/png" href="./icon-progress-180.png">
 <link rel="manifest" href="./manifest.json">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="진도표">
@@ -25,16 +26,26 @@
       FNS.forEach(function (name) {
         r[name] = function () {
           var args = Array.prototype.slice.call(arguments);
-          fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args, token: AUTH_TOKEN }) })
-            .then(function (res) { if (!res.ok) throw new Error('HTTP ' + res.status); return res.json(); })
-            .then(function (data) {
-              if (data && data.ok) {
-                if (name === 'verifyTeacher' && data.result && data.result.token) { AUTH_TOKEN = data.result.token; try { localStorage.setItem('pg_tok', AUTH_TOKEN); } catch (_) {} }
-                return data.result;
-              }
-              throw new Error((data && data.error) || '서버 오류');
-            })
-            .then(function (result) { ok(result); }, function (e) { fail(e); });
+          var attempt = 0;
+          function run() {
+            attempt++;
+            fetch(GAS_EXEC_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: name, args: args, token: AUTH_TOKEN }) })
+              .then(function (res) { if (!res.ok) { var er = new Error('HTTP ' + res.status); er._net = true; throw er; } return res.json(); })
+              .then(function (data) {
+                if (data && data.ok) {
+                  if (name === 'verifyTeacher' && data.result && data.result.token) { AUTH_TOKEN = data.result.token; try { localStorage.setItem('pg_tok', AUTH_TOKEN); } catch (_) {} }
+                  return data.result;
+                }
+                throw new Error((data && data.error) || '서버 오류');
+              })
+              .then(function (result) { ok(result); }, function (e) {
+                // GAS 2-홉 리다이렉트 간헐 실패(echo 404·CORS·네트워크)만 자동 재시도 (최대 3회, 백오프)
+                var isNet = e && (e._net || /Failed to fetch|NetworkError|Load failed|HTTP (0|4\d\d|5\d\d)/i.test(e.message || ''));
+                if (isNet && attempt < 3) { setTimeout(run, 600 * attempt); }
+                else { fail(e); }
+              });
+          }
+          run();
         };
       });
       return r;
