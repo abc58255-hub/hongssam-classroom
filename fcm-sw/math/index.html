@@ -284,10 +284,23 @@
     body.theme-candy { background: linear-gradient(180deg,#fef2f8 0%,#fae8ff 35%,#e0f2fe 70%,#dcfce7 100%) fixed; }
     .theme-candy .banner-img { background-image: linear-gradient(135deg,#f9a8d4,#a21caf); }
 
-    /* ⚽ 축구 (네이비 & 화이트) */
-    .theme-football { --banner-a:rgba(10,20,64,.55); --banner-b:rgba(10,20,64,.92); --accent:#132257; --tab-accent:#0a1440; --radius-card:16px; }
-    body.theme-football { background: linear-gradient(180deg,#ffffff 0%,#eef2f9 100%) fixed; }
-    .theme-football .banner-img { background-image: linear-gradient(135deg,#1d2d5c,#0a1440); }
+    /* ⚽ 축구 (토트넘 느낌) — 네이비&화이트 킷, 핀스트라이프 + 저지 디테일 */
+    .theme-football { --banner-a:rgba(10,20,64,.5); --banner-b:rgba(10,20,64,.94); --accent:#132257; --tab-accent:#0a1440; --radius-card:14px; --radius-btn:10px; }
+    body.theme-football { background-color:#f4f6fb;
+      background-image:
+        repeating-linear-gradient(90deg, rgba(19,34,87,.06) 0 2px, transparent 2px 16px),   /* 킷 핀스트라이프 */
+        linear-gradient(180deg,#ffffff 0%,#e8edf6 100%); background-attachment:fixed; }
+    .theme-football .card { box-shadow:0 8px 22px rgba(19,34,87,.14); border:1px solid #dfe5f0; }
+    .theme-football .card::before { content:''; display:block; height:9px; background:#132257; border-bottom:3px solid #ffffff; }   /* 저지 카라 */
+    .theme-football .banner-img {
+      background-image:
+        linear-gradient(115deg, transparent 46%, rgba(255,255,255,.85) 46% 52%, transparent 52%),  /* 흰 사쉬 */
+        linear-gradient(135deg,#1d2d5c,#0a1440); }
+    .theme-football .banner-title { font-family:'Black Han Sans','Pretendard',sans-serif; letter-spacing:1px; text-shadow:2px 2px 0 rgba(0,0,0,.35); }
+    .theme-football .sec-card { border-left:4px solid #132257; }
+    .theme-football button.primary-btn { background:linear-gradient(135deg,#1d2d5c,#0a1440); box-shadow:0 4px 0 #060d29; }
+    .theme-football .tab-btn.active { background:#132257; color:#ffffff; }
+    .theme-football .refresh-btn { border:2px solid rgba(255,255,255,.5); }
 
     /* ⚾ 호랑이 야구 (기아 느낌) — 레드&블랙, 유니폼 핀스트라이프 + 호랑이 줄무늬 + 저지풍 */
     .theme-tigers { --banner-a:rgba(180,20,30,.5); --banner-b:rgba(17,17,17,.94); --accent:#d61f2b; --tab-accent:#a10f1a; --radius-card:12px; --radius-btn:10px; }
@@ -307,15 +320,34 @@
     .theme-tigers .tab-btn.active { background:#111; color:#fde047; box-shadow:0 2px 8px rgba(0,0,0,.25); }
     .theme-tigers .refresh-btn { border:2px solid rgba(255,255,255,.55); }
 
-    /* 🏴‍☠️ 해적 (바다 모험) */
-    .theme-pirate { --banner-a:rgba(124,45,18,.55); --banner-b:rgba(12,74,110,.9); --accent:#dc2626; --tab-accent:#b45309; --radius-card:18px; }
-    body.theme-pirate { background: linear-gradient(180deg,#e0f2fe 0%,#7dd3fc 55%,#0ea5e9 100%) fixed; }
-    .theme-pirate .banner-img { background-image: linear-gradient(135deg,#f59e0b,#7c2d12); }
+    /* 🏴‍☠️ 해적 (원피스 느낌) — 낡은 보물지도 양피지 + 나무·밧줄, 수배서풍 배너 */
+    .theme-pirate { --banner-a:rgba(74,37,3,.55); --banner-b:rgba(40,20,2,.9); --accent:#b91c1c; --tab-accent:#7c2d12; --radius-card:14px; --radius-btn:10px; }
+    body.theme-pirate { background-color:#efdcb4;
+      background-image:
+        radial-gradient(circle at 18% 22%, rgba(120,72,20,.18), transparent 32%),
+        radial-gradient(circle at 82% 68%, rgba(120,72,20,.16), transparent 34%),
+        repeating-linear-gradient(0deg, rgba(120,72,20,.05) 0 1px, transparent 1px 26px),    /* 지도 격자 */
+        repeating-linear-gradient(90deg, rgba(120,72,20,.05) 0 1px, transparent 1px 26px),
+        linear-gradient(180deg,#f0e0bb,#e6cf9e); background-attachment:fixed; }
+    .theme-pirate .card { border:2px solid #a97142; box-shadow:0 8px 20px rgba(69,26,3,.18); }
+    .theme-pirate .card::before { content:''; display:block; height:10px; background-image:repeating-linear-gradient(45deg,#c68a3f 0 7px,#8b5a2b 7px 14px); }   /* 밧줄 */
+    .theme-pirate .banner-img { background-image: linear-gradient(135deg,#8b5a2b,#4a2503); }
+    .theme-pirate .banner-title { font-family:Georgia,'Times New Roman',serif; font-weight:900; letter-spacing:2px; text-shadow:2px 2px 0 rgba(0,0,0,.45); }
+    .theme-pirate .sec-card { border:1px solid #d8c39a; }
+    .theme-pirate button.primary-btn { background:linear-gradient(135deg,#b91c1c,#7c2d12); box-shadow:0 4px 0 #5a1e0c; }
+    .theme-pirate .tab-btn.active { background:#7c2d12; color:#fde68a; }
+    .theme-pirate .refresh-btn { border:2px solid rgba(255,255,255,.4); }
 
-    /* ⚔️ 검 (일본풍 체크 + 불꽃, 어두운 배경) */
-    .theme-blade { --banner-a:rgba(124,45,18,.5); --banner-b:rgba(10,15,13,.92); --accent:#ea580c; --tab-accent:#9a3412; --radius-card:12px; }
-    body.theme-blade { background-color:#0a0f0d; background-image: conic-gradient(#064e3b 90deg, #0a0f0d 90deg 180deg, #064e3b 180deg 270deg, #0a0f0d 270deg); background-size:46px 46px; }
-    .theme-blade .banner-img { background-image: linear-gradient(135deg,#9a3412,#0a0f0d); }
+    /* ⚔️ 검 (귀멸 느낌) — 이치마츠 체크 + 다이쇼 햇살 배너 + 타오르는 불꽃(붓글씨) */
+    .theme-blade { --banner-a:rgba(124,45,18,.45); --banner-b:rgba(10,15,13,.94); --accent:#ea580c; --tab-accent:#9a3412; --radius-card:10px; --radius-btn:8px; }
+    body.theme-blade { background-color:#0a0f0d; background-image: conic-gradient(#0c3b2a 90deg, #0a0f0d 90deg 180deg, #0c3b2a 180deg 270deg, #0a0f0d 270deg); background-size:48px 48px; }
+    body.theme-blade::after { content:''; position:fixed; left:0; right:0; bottom:0; height:90px; background:linear-gradient(0deg, rgba(234,88,12,.4), rgba(234,88,12,.12) 45%, transparent); pointer-events:none; z-index:0; animation:bladeFlame 2.6s ease-in-out infinite; }
+    @keyframes bladeFlame { 0%,100%{ opacity:.6; } 50%{ opacity:1; } }
+    .theme-blade .banner-img { background-image: repeating-conic-gradient(from 0deg at 50% 118%, rgba(255,255,255,.06) 0 6deg, transparent 6deg 12deg), linear-gradient(135deg,#9a3412,#0a0f0d); }  /* 다이쇼 햇살 + 불꽃 */
+    .theme-blade .banner-title { font-family:'Nanum Brush Script','Pretendard',cursive; font-size:150%; text-shadow:2px 2px 4px rgba(0,0,0,.6); }
+    .theme-blade .sec-card { border-left:4px solid #ea580c; }
+    .theme-blade button.primary-btn { background:linear-gradient(135deg,#ea580c,#9a3412); box-shadow:0 0 14px rgba(234,88,12,.5); }
+    .theme-blade .tab-btn.active { background:#ea580c; color:#0a0f0d; }
     .theme-blade #themeFx span { color:#fb923c; text-shadow: 0 0 8px rgba(251,146,60,.85); }
 
     /* ══════════ 통일 UI 토큰 ══════════
@@ -850,14 +882,14 @@
       fx: [ { ch: '✦', mode: 'twinkle', n: 20, s1: 8, s2: 16 }, { ch: '⚡', mode: 'fall', n: 3, s1: 14, s2: 20 } ] },
     { key: 'candy',   name: '캔디',  emoji: '🌈', cls: 'theme-candy',  dots: ['#ec4899', '#fae8ff', '#a5f3fc'],
       fx: [ { ch: '🍬', mode: 'fall', n: 8, s1: 12, s2: 22 }, { ch: '🍭', mode: 'fall', n: 3, s1: 14, s2: 20 }, { ch: '⭐', mode: 'twinkle', n: 8, s1: 8, s2: 14 } ] },
-    { key: 'football', name: '축구',   emoji: '⚽', cls: 'theme-football', dots: ['#132257', '#ffffff', '#1d2d5c'],
-      fx: [ { ch: '⚽', mode: 'swimR', n: 2, s1: 16, s2: 24 }, { ch: '⚽', mode: 'fall', n: 3, s1: 12, s2: 18 }, { ch: '✨', mode: 'twinkle', n: 5, s1: 7, s2: 11 } ] },
+    { key: 'football', name: '축구',   emoji: '⚽', cls: 'theme-football', dots: ['#132257', '#ffffff', '#c8a24a'], font: 'sports',
+      fx: [ { ch: '⚽', mode: 'swimR', n: 2, s1: 16, s2: 24 }, { ch: '⚽', mode: 'fall', n: 3, s1: 12, s2: 18 }, { ch: '🐓', mode: 'swimR', n: 1, s1: 20, s2: 26 }, { ch: '✨', mode: 'twinkle', n: 5, s1: 7, s2: 11 } ] },
     { key: 'tigers',   name: '호랑이', emoji: '🐯', cls: 'theme-tigers',   dots: ['#d61f2b', '#111111', '#fde047'], font: 'sports',
       fx: [ { ch: '⚾', mode: 'fall', n: 7, s1: 12, s2: 20 }, { ch: '🐯', mode: 'swimR', n: 1, s1: 24, s2: 30 }, { ch: '🐾', mode: 'fall', n: 4, s1: 12, s2: 18 }, { ch: '🔥', mode: 'rise', n: 2, s1: 12, s2: 16 } ] },
-    { key: 'pirate',   name: '해적',   emoji: '🏴‍☠️', cls: 'theme-pirate', dots: ['#dc2626', '#fde68a', '#0ea5e9'],
-      fx: [ { ch: '👒', mode: 'fall', n: 3, s1: 16, s2: 22 }, { ch: '🏴‍☠️', mode: 'swimR', n: 1, s1: 24, s2: 30 }, { ch: '⚓', mode: 'fall', n: 2, s1: 14, s2: 20 }, { ch: '🫧', mode: 'rise', n: 6, s1: 10, s2: 18 } ] },
-    { key: 'blade',    name: '검',     emoji: '⚔️', cls: 'theme-blade',    dots: ['#ea580c', '#052e16', '#fb923c'],
-      fx: [ { ch: '🔥', mode: 'rise', n: 8, s1: 12, s2: 22 }, { ch: '⚔️', mode: 'fall', n: 2, s1: 16, s2: 22 }, { ch: '✦', mode: 'twinkle', n: 6, s1: 8, s2: 13 } ] }
+    { key: 'pirate',   name: '해적',   emoji: '🏴‍☠️', cls: 'theme-pirate', dots: ['#b91c1c', '#e6cf9e', '#8b5a2b'],
+      fx: [ { ch: '👒', mode: 'fall', n: 3, s1: 16, s2: 22 }, { ch: '🏴‍☠️', mode: 'swimR', n: 1, s1: 24, s2: 30 }, { ch: '⚓', mode: 'fall', n: 2, s1: 14, s2: 20 }, { ch: '🗺️', mode: 'fall', n: 1, s1: 16, s2: 20 }, { ch: '💰', mode: 'fall', n: 1, s1: 14, s2: 18 } ] },
+    { key: 'blade',    name: '검',     emoji: '⚔️', cls: 'theme-blade',    dots: ['#ea580c', '#0c3b2a', '#fb923c'], font: 'brush',
+      fx: [ { ch: '🔥', mode: 'rise', n: 9, s1: 12, s2: 24 }, { ch: '⚔️', mode: 'fall', n: 2, s1: 16, s2: 22 }, { ch: '🗡️', mode: 'fall', n: 1, s1: 16, s2: 20 }, { ch: '✦', mode: 'twinkle', n: 6, s1: 8, s2: 13 } ] }
   ];
 
   // 테마 폰트는 선택했을 때만 로드 (평소 로딩 속도에 영향 없음)
@@ -879,6 +911,11 @@
       lk2.id = id; lk2.rel = 'stylesheet';
       lk2.href = 'https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap';
       document.head.appendChild(lk2);
+    } else if (kind === 'brush') {
+      var lk3 = document.createElement('link');
+      lk3.id = id; lk3.rel = 'stylesheet';
+      lk3.href = 'https://fonts.googleapis.com/css2?family=Nanum+Brush+Script&display=swap';
+      document.head.appendChild(lk3);
     }
   }
 
