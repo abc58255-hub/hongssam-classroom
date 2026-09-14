@@ -88,8 +88,32 @@ function getTvMusic() {
   } catch (_) { return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' }; }
 }
 
+// ── 💬 우리반 응원문구 — 같은 스프레드시트 '_CHEER' 탭에서 읽음 (학생-담임이 씀, 알림관리가 관리) ──
+function getCheers() {
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_CHEER');
+    if (!sh) return { on:false, style:'popup', list:[] };
+    var cfg = sh.getRange('G1:H1').getValues()[0];
+    var on = !!String(cfg[0]||''); var style = String(cfg[1]||'popup');
+    var list = [];
+    if (on) {
+      var last = sh.getLastRow();
+      if (last >= 2) {
+        var rows = sh.getRange(2, 1, last - 1, 6).getValues();
+        for (var i = 0; i < rows.length; i++) {
+          if (String(rows[i][5]||'') === 'del') continue;
+          var t = String(rows[i][4]||'').trim();
+          if (!t) continue;
+          list.push({ id: Number(rows[i][0])||0, name: String(rows[i][2]||''), cls: String(rows[i][3]||''), text: t });
+        }
+      }
+    }
+    return { on:on, style:style, list:list };
+  } catch(_) { return { on:false, style:'popup', list:[] }; }
+}
+
 // ── PWA(Pages) 프론트 → GAS 백엔드 호출 (google.script.run 어댑터) ──
-var RPC_WHITELIST = ["getTodayData", "getTvFlash", "getTvMusic"];
+var RPC_WHITELIST = ["getTodayData", "getTvFlash", "getTvMusic", "getCheers"];
 function doPost(e) {
   var out;
   try {

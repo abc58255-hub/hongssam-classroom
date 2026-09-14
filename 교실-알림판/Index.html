@@ -339,7 +339,55 @@
     }
     function pollTvMusic(){google.script.run.withSuccessHandler(tickMusic).withFailureHandler(function(){}).getTvMusic();}
 
-    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); };
+    // ── 💬 우리반 응원문구 표시 (팝업 / 리스트 / 롤링페이퍼) — 알림관리가 켜고 스타일 지정, 학생-담임이 입력 ──
+    (function(){ var st=document.createElement('style'); st.textContent='@keyframes cheerPop{0%{transform:translateX(-50%) scale(.8);opacity:0}60%{transform:translateX(-50%) scale(1.05)}100%{transform:translateX(-50%) scale(1);opacity:1}}@keyframes cheerMarquee{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}'; document.head.appendChild(st); })();
+    function _ce(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+    var _cheerSig='', _cheerPopupTimer=null, _cheerPopupIdx=0;
+    var _cheerColors=['#fef08a','#bbf7d0','#bfdbfe','#fbcfe8','#fed7aa','#ddd6fe','#a7f3d0'];
+    function _cheerBox(){ var b=document.getElementById('cheerLayer'); if(!b){ b=document.createElement('div'); b.id='cheerLayer'; b.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:400;'; document.body.appendChild(b); } return b; }
+    function applyCheers(d){
+      if(!d) return;
+      var sig=(d.on?'1':'0')+'|'+d.style+'|'+(d.list||[]).map(function(c){return c.id;}).join(',');
+      if(sig===_cheerSig) return;
+      _cheerSig=sig;
+      var box=_cheerBox();
+      if(_cheerPopupTimer){ clearInterval(_cheerPopupTimer); _cheerPopupTimer=null; }
+      if(!d.on || !d.list || !d.list.length){ box.innerHTML=''; box.style.display='none'; return; }
+      box.style.display='block';
+      if(d.style==='list') renderCheerList(box,d.list);
+      else if(d.style==='rolling') renderCheerRolling(box,d.list);
+      else startCheerPopup(box,d.list);
+    }
+    function startCheerPopup(box,list){
+      box.innerHTML='<div id="cheerPop" style="position:fixed;left:50%;bottom:4vh;transform:translateX(-50%);max-width:72vw;background:rgba(255,255,255,.97);border:4px solid #f59e0b;border-radius:24px;padding:2.4vh 3vw;box-shadow:0 20px 50px rgba(0,0,0,.35);text-align:center;">'
+        +'<div style="font-size:1vw;font-weight:800;color:#f59e0b;margin-bottom:.6vh;">💬 우리반 응원</div>'
+        +'<div id="cheerPopText" style="font-size:2.4vw;font-weight:900;color:#0f172a;line-height:1.35;word-break:keep-all;"></div>'
+        +'<div id="cheerPopName" style="font-size:1.2vw;font-weight:700;color:#64748b;margin-top:.8vh;"></div></div>';
+      _cheerPopupIdx=0;
+      var show=function(){ var c=list[_cheerPopupIdx%list.length]; _cheerPopupIdx++;
+        var tx=document.getElementById('cheerPopText'), nm=document.getElementById('cheerPopName'), card=document.getElementById('cheerPop');
+        if(!tx) return;
+        tx.textContent='“'+c.text+'”'; nm.textContent='— '+(c.name||'익명')+(c.cls?(' · '+c.cls):'');
+        if(card){ card.style.animation='none'; void card.offsetWidth; card.style.animation='cheerPop .4s ease-out'; }
+      };
+      show(); _cheerPopupTimer=setInterval(show,5000);
+    }
+    function renderCheerList(box,list){
+      var items=list.slice(0,12).map(function(c){ return '<span style="display:inline-block;background:rgba(255,255,255,.96);border-radius:18px;padding:.7vh 1.2vw;margin:0 .5vw;font-size:1.4vw;font-weight:700;color:#0f172a;box-shadow:0 3px 8px rgba(0,0,0,.18);">💬 '+_ce(c.text)+' <span style="color:#f59e0b;font-size:1.1vw;">'+_ce(c.name||'')+'</span></span>'; }).join('');
+      box.innerHTML='<div style="position:fixed;left:0;right:0;bottom:0;background:linear-gradient(0deg,rgba(15,23,42,.82),transparent);padding:2.2vh 0 1.4vh;overflow:hidden;white-space:nowrap;">'
+        +'<div style="display:inline-block;white-space:nowrap;animation:cheerMarquee 32s linear infinite;padding-left:100%;">'+items+items+'</div></div>';
+    }
+    function renderCheerRolling(box,list){
+      var notes=list.slice(0,14).map(function(c,i){
+        var col=_cheerColors[i%_cheerColors.length];
+        var top=8+((i*37)%72), left=3+((i*53)%78), rot=((i*47)%14)-7;
+        return '<div style="position:absolute;top:'+top+'vh;left:'+left+'vw;width:16vw;background:'+col+';padding:1.3vh 1vw;border-radius:6px;box-shadow:0 6px 14px rgba(0,0,0,.25);transform:rotate('+rot+'deg);font-size:1.2vw;font-weight:700;color:#1f2937;word-break:keep-all;">💬 '+_ce(c.text)+'<div style="font-size:.95vw;color:#6b7280;margin-top:.4vh;text-align:right;">- '+_ce(c.name||'')+'</div></div>';
+      }).join('');
+      box.innerHTML=notes;
+    }
+    function pollCheers(){ google.script.run.withSuccessHandler(applyCheers).withFailureHandler(function(){}).getCheers(); }
+
+    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); pollCheers(); setInterval(pollCheers, 4000); };
     document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; });
   </script>
   <style>@keyframes tvFlashPop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}</style>

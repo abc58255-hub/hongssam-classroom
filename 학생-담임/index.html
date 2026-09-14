@@ -117,6 +117,17 @@
         <div id="noticeList"></div>
       </div>
 
+      <!-- 💬 우리반 응원 남기기 (칠판 TV에 표시) -->
+      <div style="background:linear-gradient(135deg,#fff7ed,#ffedd5); border:1px solid #fed7aa; border-radius:16px; padding:14px 16px; margin-bottom:14px;">
+        <div style="font-size:15px; font-weight:800; color:#b45309; margin-bottom:8px;">💬 우리반 응원 남기기 <span style="font-size:11px; font-weight:600; color:#a16207;">(칠판 TV에 떠요!)</span></div>
+        <textarea id="cheerText" rows="2" maxlength="60" placeholder="예) 오늘도 우리반 파이팅! 다들 시험 잘 보자 💪" style="width:100%; padding:12px; border:2px solid #fed7aa; border-radius:12px; font-size:14px; background:#fffdf7; color:#1e293b; font-family:inherit; box-sizing:border-box; resize:vertical;"></textarea>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+          <span style="font-size:11px; color:#a16207;">이름과 함께 표시돼요 · 최대 60자</span>
+          <button id="cheerBtn" class="primary-btn" style="width:auto; padding:10px 22px; background:linear-gradient(to right,#f59e0b,#f97316);" onclick="submitCheer()">응원 보내기 📨</button>
+        </div>
+        <div id="cheerStatus" style="font-size:12px; color:#16a34a; margin-top:6px; min-height:16px;"></div>
+      </div>
+
       <div class="tab-container">
         <button class="tab-btn active" id="btnTab1" onclick="switchTab(1)">📝 활동 남기기</button>
         <button class="tab-btn" id="btnTab2" onclick="switchTab(2)">📂 내 기록장</button>
@@ -303,6 +314,31 @@
         }
       })
       .submitReport({ studentId: currentUser.id, studentName: currentUser.name, category: cat, content: content });
+  }
+
+  // ===== 💬 우리반 응원 남기기 (칠판 TV 표시) =====
+  function submitCheer() {
+    var t = (document.getElementById('cheerText').value || '').trim();
+    var st = document.getElementById('cheerStatus');
+    if (!t) { st.style.color = '#dc2626'; st.innerText = '응원문구를 입력해주세요.'; return; }
+    var btn = document.getElementById('cheerBtn');
+    btn.disabled = true; btn.innerText = '보내는 중...';
+    google.script.run
+      .withSuccessHandler(function(res) {
+        btn.disabled = false; btn.innerText = '응원 보내기 📨';
+        if (res && res.success) {
+          document.getElementById('cheerText').value = '';
+          st.style.color = '#16a34a'; st.innerText = '✅ 칠판 TV에 올라갔어요!';
+          setTimeout(function(){ st.innerText = ''; }, 4000);
+        } else {
+          st.style.color = '#dc2626'; st.innerText = (res && res.message) ? res.message : '전송에 실패했어요.';
+        }
+      })
+      .withFailureHandler(function(e) {
+        btn.disabled = false; btn.innerText = '응원 보내기 📨';
+        st.style.color = '#dc2626'; st.innerText = '오류: ' + e.message;
+      })
+      .submitCheer(currentUser.id, currentUser.name, t);
   }
 
   // ===== 💝 칭찬 기능 =====

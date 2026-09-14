@@ -570,3 +570,44 @@ function saveSheetId(input) {
     return { success: false, message: '스프레드시트를 열 수 없어요. ID와 접근 권한을 확인해주세요.' };
   }
 }
+
+// ── 💬 우리반 응원문구 — 교실 TV 알림판('_CHEER' 탭)에 저장 → TV에 표시(즉시 노출, 교사가 삭제 관리) ──
+function _cheerBoard_() {
+  var id = '';
+  try { id = StudentAuth.getConfig('알림판시트ID', ''); } catch(_) {}
+  if (!id) return null;
+  var ss;
+  try { ss = SpreadsheetApp.openById(id); } catch(_) { return null; }
+  var sh = ss.getSheetByName('_CHEER');
+  if (!sh) {
+    sh = ss.insertSheet('_CHEER');
+    sh.getRange('A1:H1').setValues([['id','학번','이름','반','문구','상태','on','style']]);
+    sh.getRange('G1:H1').setValues([['', 'popup']]);
+  }
+  return sh;
+}
+function submitCheer(studentId, studentName, text) {
+  try {
+    var t = String(text || '').trim();
+    if (!t) return { success: false, message: '응원문구를 입력해주세요.' };
+    if (t.length > 60) t = t.substring(0, 60);
+    var sh = _cheerBoard_();
+    if (!sh) return { success: false, message: '아직 칠판(TV) 연결이 안 됐어요. 선생님께 문의하세요.' };
+    var sid = String(studentId || '').trim();
+    var name = String(studentName || '').trim();
+    var cls = sid.length >= 2 ? (sid.substring(0,1) + '학년 ' + sid.substring(1,2) + '반') : '';
+    // 도배 방지: 최근 10초 내 같은 학생 재제출 차단
+    var last = sh.getLastRow();
+    if (last >= 2) {
+      var n = Math.min(20, last - 1);
+      var recent = sh.getRange(last - n + 1, 1, n, 2).getValues();
+      var now = Date.now();
+      for (var i = recent.length - 1; i >= 0; i--) {
+        if (String(recent[i][1]||'').trim() === sid && (now - (Number(recent[i][0])||0)) < 10000)
+          return { success: false, message: '너무 빨라요! 잠시 후 다시 보내주세요. 🙂' };
+      }
+    }
+    sh.appendRow([Date.now(), sid, name, cls, t, '']);
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}

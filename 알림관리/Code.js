@@ -160,7 +160,7 @@ function deleteBoardData(rowIdx) {
 
 
 // ── PWA(Pages) 프론트 → GAS 백엔드 (google.script.run 어댑터) + 토큰 게이트 ──
-var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTvMusic", "setTvMusicAuto", "getTvMusic", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
 var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash','getTvMusic']; // getTvFlash/getTvMusic=TV 화면 폴링(공개)
 function _atOk_(token) { try { var v = ClassCore.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; } }
 function doPost(e) {
@@ -255,4 +255,62 @@ function getTvMusic() {
       aOn: !!String(v[3] || ''), aStart: String(v[4] || ''), aEnd: String(v[5] || ''), aUrl: String(v[6] || '')
     };
   } catch (_) { return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' }; }
+}
+
+// ── 💬 우리반 응원문구(칠판공지 표시) ── 보드 시트 '_CHEER' 탭에 저장
+// 레이아웃: 1행 헤더 A~F + 설정 G1(on 1/''), H1(style popup|list|rolling) / 데이터 A2~: id·학번·이름·반·문구·상태('' 보임 / 'del' 숨김)
+// 입력=우리반교실(학생-담임)에서, 표시=교실 TV, 관리(설정·삭제)=여기(알림관리)
+var CHEER_TAB = '_CHEER';
+function _cheerSheet_() {
+  var id = _boardSheetId();
+  if (!id) return null;
+  var ss = SpreadsheetApp.openById(id);
+  var sh = ss.getSheetByName(CHEER_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(CHEER_TAB);
+    sh.getRange('A1:H1').setValues([['id','학번','이름','반','문구','상태','on','style']]);
+    sh.getRange('G1:H1').setValues([['', 'popup']]);   // 기본 꺼짐, 팝업 스타일
+  }
+  return sh;
+}
+function getCheerConfig() {
+  try { var sh = _cheerSheet_(); if (!sh) return { on:false, style:'popup' };
+    var v = sh.getRange('G1:H1').getValues()[0];
+    return { on: !!String(v[0]||''), style: String(v[1]||'popup') };
+  } catch(_) { return { on:false, style:'popup' }; }
+}
+function setCheerConfig(on, style) {
+  var sh = _cheerSheet_(); if (!sh) return { success:false, message:'알림판 시트가 연결되지 않았어요. (칠판공지 설정을 먼저 해주세요)' };
+  var st = ['popup','list','rolling'].indexOf(String(style)) >= 0 ? String(style) : 'popup';
+  sh.getRange('G1:H1').setValues([[ on ? '1' : '', st ]]);
+  return { success:true };
+}
+function getCheerAdmin() {
+  var cfg = getCheerConfig();
+  var sh = _cheerSheet_();
+  var list = [];
+  if (sh) {
+    var last = sh.getLastRow();
+    if (last >= 2) {
+      var rows = sh.getRange(2, 1, last - 1, 6).getValues();
+      for (var i = 0; i < rows.length; i++) {
+        if (String(rows[i][5]||'') === 'del') continue;
+        if (!String(rows[i][4]||'').trim()) continue;
+        list.push({ rowIdx: i+2, name: String(rows[i][2]||''), cls: String(rows[i][3]||''), text: String(rows[i][4]||'') });
+      }
+    }
+  }
+  list.reverse();   // 최신 먼저
+  return { on: cfg.on, style: cfg.style, list: list };
+}
+function deleteCheer(rowIdx) {
+  var sh = _cheerSheet_(); if (!sh) return { success:false };
+  try { sh.getRange(Number(rowIdx), 6).setValue('del'); return { success:true }; }
+  catch(e) { return { success:false, message: e.toString() }; }
+}
+function clearCheers() {
+  var sh = _cheerSheet_(); if (!sh) return { success:false };
+  var last = sh.getLastRow();
+  if (last >= 2) sh.getRange(2, 6, last - 1, 1).setValue('del');   // 전부 숨김(기록은 남김)
+  return { success:true };
 }
