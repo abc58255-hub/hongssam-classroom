@@ -300,6 +300,14 @@
         <option value="list">📜 리스트 — 흐르는 띠(자막)</option>
         <option value="rolling">🧷 롤링페이퍼 — 포스트잇 흩뿌리기</option>
       </select>
+      <label style="margin-top:14px; display:block;">표시 시간 <span style="font-size:12px; color:#94a3b8; font-weight:600;">(지나면 TV에서 자동으로 사라져요)</span></label>
+      <select id="cheerTtl" onchange="cheerToggle()" style="width:100%; padding:11px; border:2px solid #e2e8f0; border-radius:10px; font-size:15px;">
+        <option value="10">10분 지나면 사라짐</option>
+        <option value="30">30분 지나면 사라짐</option>
+        <option value="60">1시간 지나면 사라짐</option>
+        <option value="180">3시간 지나면 사라짐</option>
+        <option value="0">계속 유지 (안 사라짐)</option>
+      </select>
       <div style="margin-top:18px; display:flex; justify-content:space-between; align-items:center;">
         <b style="font-size:14px;">받은 응원 (<span id="cheerCount">0</span>)</b>
         <button class="btn sm" onclick="cheerClear()">전체 지우기</button>
@@ -428,6 +436,7 @@
       if (!d) return;
       var onEl = document.getElementById('cheerOn'); if (onEl) onEl.checked = !!d.on;
       if (d.style && document.getElementById('cheerStyle')) document.getElementById('cheerStyle').value = d.style;
+      if (document.getElementById('cheerTtl') && d.ttl != null) document.getElementById('cheerTtl').value = String(d.ttl);
       var list = d.list || [];
       var cnt = document.getElementById('cheerCount'); if (cnt) cnt.textContent = list.length;
       var el = document.getElementById('cheerList'); if (!el) return;
@@ -443,8 +452,9 @@
   function cheerToggle() {
     var on = document.getElementById('cheerOn').checked;
     var style = document.getElementById('cheerStyle').value;
+    var ttl = document.getElementById('cheerTtl') ? document.getElementById('cheerTtl').value : 30;
     google.script.run.withSuccessHandler(function(r){ if (!(r && r.success)) uiAlert('실패: ' + (r && r.message || '')); })
-      .withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).setCheerConfig(on, style);
+      .withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).setCheerConfig(on, style, ttl);
   }
   function cheerDelete(rowIdx) {
     google.script.run.withSuccessHandler(function(){ cheerRefresh(); }).withFailureHandler(function(){}).deleteCheer(rowIdx);

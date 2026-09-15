@@ -344,7 +344,7 @@
     function _ce(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
     var _cheerSig='', _cheerPopupTimer=null, _cheerPopupIdx=0;
     var _cheerColors=['#fef08a','#bbf7d0','#bfdbfe','#fbcfe8','#fed7aa','#ddd6fe','#a7f3d0'];
-    function _cheerBox(){ var b=document.getElementById('cheerLayer'); if(!b){ b=document.createElement('div'); b.id='cheerLayer'; b.style.cssText='position:fixed;inset:0;pointer-events:none;z-index:400;'; document.body.appendChild(b); } return b; }
+    function _cheerBox(){ var b=document.getElementById('cheerLayer'); if(!b){ b=document.createElement('div'); b.id='cheerLayer'; b.style.cssText='position:fixed;left:0;right:0;bottom:0;height:30vh;pointer-events:none;z-index:400;overflow:hidden;'; document.body.appendChild(b); } return b; }
     function applyCheers(d){
       if(!d) return;
       var sig=(d.on?'1':'0')+'|'+d.style+'|'+(d.list||[]).map(function(c){return c.id;}).join(',');
@@ -378,10 +378,10 @@
         +'<div style="display:inline-block;white-space:nowrap;animation:cheerMarquee 32s linear infinite;padding-left:100%;">'+items+items+'</div></div>';
     }
     function renderCheerRolling(box,list){
-      var notes=list.slice(0,14).map(function(c,i){
+      var notes=list.slice(0,10).map(function(c,i){
         var col=_cheerColors[i%_cheerColors.length];
-        var top=8+((i*37)%72), left=3+((i*53)%78), rot=((i*47)%14)-7;
-        return '<div style="position:absolute;top:'+top+'vh;left:'+left+'vw;width:16vw;background:'+col+';padding:1.3vh 1vw;border-radius:6px;box-shadow:0 6px 14px rgba(0,0,0,.25);transform:rotate('+rot+'deg);font-size:1.2vw;font-weight:700;color:#1f2937;word-break:keep-all;">💬 '+_ce(c.text)+'<div style="font-size:.95vw;color:#6b7280;margin-top:.4vh;text-align:right;">- '+_ce(c.name||'')+'</div></div>';
+        var top=1+((i*29)%16), left=2+((i*53)%80), rot=((i*47)%12)-6;   // 하단 띠(30vh) 안에서만 흩뿌림
+        return '<div style="position:absolute;top:'+top+'vh;left:'+left+'vw;width:15vw;background:'+col+';padding:1vh 1vw;border-radius:6px;box-shadow:0 6px 14px rgba(0,0,0,.3);transform:rotate('+rot+'deg);font-size:1.15vw;font-weight:700;color:#1f2937;word-break:keep-all;">💬 '+_ce(c.text)+'<div style="font-size:.9vw;color:#6b7280;margin-top:.3vh;text-align:right;">- '+_ce(c.name||'')+'</div></div>';
       }).join('');
       box.innerHTML=notes;
     }

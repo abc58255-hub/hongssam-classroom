@@ -93,8 +93,11 @@ function getCheers() {
   try {
     var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_CHEER');
     if (!sh) return { on:false, style:'popup', list:[] };
-    var cfg = sh.getRange('G1:H1').getValues()[0];
+    var cfg = sh.getRange('G1:I1').getValues()[0];
     var on = !!String(cfg[0]||''); var style = String(cfg[1]||'popup');
+    var ttlRaw = String(cfg[2]||'').trim();
+    var ttlMs = (ttlRaw === '' ? 30 : (Number(ttlRaw) || 0)) * 60000;   // 미설정=30분, 0=안 사라짐
+    var now = Date.now();
     var list = [];
     if (on) {
       var last = sh.getLastRow();
@@ -104,7 +107,9 @@ function getCheers() {
           if (String(rows[i][5]||'') === 'del') continue;
           var t = String(rows[i][4]||'').trim();
           if (!t) continue;
-          list.push({ id: Number(rows[i][0])||0, name: String(rows[i][2]||''), cls: String(rows[i][3]||''), text: t });
+          var mid = Number(rows[i][0]) || 0;
+          if (ttlMs > 0 && mid > 0 && (now - mid) > ttlMs) continue;   // 시간 지난 응원 제외(자동 소멸)
+          list.push({ id: mid, name: String(rows[i][2]||''), cls: String(rows[i][3]||''), text: t });
         }
       }
     }

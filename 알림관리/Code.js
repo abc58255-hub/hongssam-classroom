@@ -274,15 +274,18 @@ function _cheerSheet_() {
   return sh;
 }
 function getCheerConfig() {
-  try { var sh = _cheerSheet_(); if (!sh) return { on:false, style:'popup' };
-    var v = sh.getRange('G1:H1').getValues()[0];
-    return { on: !!String(v[0]||''), style: String(v[1]||'popup') };
-  } catch(_) { return { on:false, style:'popup' }; }
+  try { var sh = _cheerSheet_(); if (!sh) return { on:false, style:'popup', ttl:30 };
+    var v = sh.getRange('G1:I1').getValues()[0];
+    var ttlRaw = String(v[2]||'').trim();
+    var ttl = ttlRaw === '' ? 30 : (Number(ttlRaw) || 0);   // 미설정=30분 기본, 0=안 사라짐
+    return { on: !!String(v[0]||''), style: String(v[1]||'popup'), ttl: ttl };
+  } catch(_) { return { on:false, style:'popup', ttl:30 }; }
 }
-function setCheerConfig(on, style) {
+function setCheerConfig(on, style, ttl) {
   var sh = _cheerSheet_(); if (!sh) return { success:false, message:'알림판 시트가 연결되지 않았어요. (칠판공지 설정을 먼저 해주세요)' };
   var st = ['popup','list','rolling'].indexOf(String(style)) >= 0 ? String(style) : 'popup';
-  sh.getRange('G1:H1').setValues([[ on ? '1' : '', st ]]);
+  var tt = (ttl === '' || ttl == null) ? 30 : (Number(ttl) || 0);
+  sh.getRange('G1:I1').setValues([[ on ? '1' : '', st, tt ]]);
   return { success:true };
 }
 function getCheerAdmin() {
@@ -301,7 +304,7 @@ function getCheerAdmin() {
     }
   }
   list.reverse();   // 최신 먼저
-  return { on: cfg.on, style: cfg.style, list: list };
+  return { on: cfg.on, style: cfg.style, ttl: cfg.ttl, list: list };
 }
 function deleteCheer(rowIdx) {
   var sh = _cheerSheet_(); if (!sh) return { success:false };
