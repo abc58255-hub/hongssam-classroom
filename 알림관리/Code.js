@@ -160,7 +160,7 @@ function deleteBoardData(rowIdx) {
 
 
 // ── PWA(Pages) 프론트 → GAS 백엔드 (google.script.run 어댑터) + 토큰 게이트 ──
-var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTtsOn", "ttsTest", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
 var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash','getTvMusic']; // getTvFlash/getTvMusic=TV 화면 폴링(공개)
 function _atOk_(token) { try { var v = ClassCore.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; } }
 function doPost(e) {
@@ -206,10 +206,24 @@ function clearTvFlash() {
 function getTvFlash() {
   try {
     var sh = _tvFlashSheet_();
-    if (!sh) return { id: 0, msg: '' };
-    var v = sh.getRange('A2:B2').getValues()[0];
-    return { id: Number(v[0]) || 0, msg: String(v[1] || '') };
-  } catch (_) { return { id: 0, msg: '' }; }
+    if (!sh) return { id: 0, msg: '', tts: false, testId: 0 };
+    var v = sh.getRange('A2:D2').getValues()[0];   // A=id B=msg C=TTS on D=테스트신호
+    return { id: Number(v[0]) || 0, msg: String(v[1] || ''), tts: !!String(v[2]||''), testId: Number(v[3]) || 0 };
+  } catch (_) { return { id: 0, msg: '', tts: false, testId: 0 }; }
+}
+// 🔊 실시간 알림 음성 읽기(TTS) on/off
+function setTtsOn(on) {
+  var sh = _tvFlashSheet_();
+  if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요.' };
+  sh.getRange('C2').setValue(on ? '1' : '');
+  return { success: true };
+}
+// 🔊 소리 테스트 — TV가 "소리 테스트입니다"를 읽음 (TTS on/off와 무관, 잠금 해제 확인용)
+function ttsTest() {
+  var sh = _tvFlashSheet_();
+  if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요.' };
+  sh.getRange('D2').setValue(Date.now());
+  return { success: true };
 }
 
 // ── 🎵 점심 음악(TV BGM) ── 교실TV알림판 스프레드시트의 '_TV_MUSIC' 탭에 저장

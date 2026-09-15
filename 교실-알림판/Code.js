@@ -69,10 +69,10 @@ function getTodayData() {
 function getTvFlash() {
   try {
     var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_TV_FLASH');
-    if (!sh) return { id: 0, msg: '' };
-    var v = sh.getRange('A2:B2').getValues()[0];
-    return { id: Number(v[0]) || 0, msg: String(v[1] || '') };
-  } catch (_) { return { id: 0, msg: '' }; }
+    if (!sh) return { id: 0, msg: '', tts: false, testId: 0 };
+    var v = sh.getRange('A2:D2').getValues()[0];   // A=id B=msg C=TTS on D=테스트신호
+    return { id: Number(v[0]) || 0, msg: String(v[1] || ''), tts: !!String(v[2]||''), testId: Number(v[3]) || 0 };
+  } catch (_) { return { id: 0, msg: '', tts: false, testId: 0 }; }
 }
 
 // ── 🎵 점심 음악(TV BGM) — 같은 스프레드시트 '_TV_MUSIC' 탭에서 읽음 (알림관리가 씀) ──

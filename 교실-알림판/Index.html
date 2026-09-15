@@ -280,12 +280,38 @@
       if (card) { card.style.animation = 'none'; void card.offsetWidth; card.style.animation = 'tvFlashPop .35s ease-out'; }
     }
     function hideTvFlash() { var ov = document.getElementById('tvFlashOverlay'); if (ov) ov.style.display = 'none'; }
+    // ── 🔊 실시간 알림 TTS(음성 읽기) + 소리 잠금 상태 배지 ──
+    var _ttsCtx=null, _ttsUnlocked=false, _ttsLastTest=null;
+    function _ttsBadge(){ var b=document.getElementById('ttsBadge'); if(!b){ b=document.createElement('div'); b.id='ttsBadge'; b.style.cssText='position:fixed;top:1vw;left:1vw;z-index:600;padding:.6vw 1.1vw;border-radius:40px;font-size:1.1vw;font-weight:800;display:flex;align-items:center;gap:.4vw;box-shadow:0 4px 12px rgba(0,0,0,.28);'; document.body.appendChild(b);} return b; }
+    function _updTtsBadge(){ var b=_ttsBadge();
+      if(_ttsUnlocked){ b.style.background='#dcfce7'; b.style.color='#166534'; b.style.transition=''; b.style.opacity='1'; b.textContent='🔊 소리 준비됨';
+        setTimeout(function(){ if(_ttsUnlocked){ b.style.transition='opacity 1s'; b.style.opacity='0'; } },4000); }
+      else { b.style.transition=''; b.style.opacity='1'; b.style.background='#fee2e2'; b.style.color='#b91c1c'; b.textContent='🔇 소리 꺼짐 — 화면을 한 번 눌러주세요'; }
+    }
+    function _ttsUnlock(){ if(_ttsUnlocked) return;
+      try{ _ttsCtx=_ttsCtx||new (window.AudioContext||window.webkitAudioContext)(); if(_ttsCtx.state!=='running') _ttsCtx.resume(); }catch(_){}
+      try{ var u=new SpeechSynthesisUtterance(' '); u.volume=0; speechSynthesis.speak(u); }catch(_){}
+      _ttsUnlocked=true; _updTtsBadge();
+    }
+    function _speak(text){ if(!text||!window.speechSynthesis) return;
+      try{ if(_ttsCtx && _ttsCtx.state!=='running') _ttsCtx.resume();
+        var u=new SpeechSynthesisUtterance(String(text)); u.lang='ko-KR'; u.rate=1;
+        var vs=speechSynthesis.getVoices()||[]; var ko=vs.filter(function(v){return /ko/i.test(v.lang);})[0]; if(ko) u.voice=ko;
+        speechSynthesis.cancel(); speechSynthesis.speak(u);
+      }catch(_){}
+    }
     function pollTvFlash() {
       google.script.run.withSuccessHandler(function(f){
         if (!f) return;
-        if (f.id === _tvFlashLastId) return;
-        _tvFlashLastId = f.id;
-        if (f.msg) showTvFlash(f.msg); else hideTvFlash();
+        if (f.id !== _tvFlashLastId) {
+          _tvFlashLastId = f.id;
+          if (f.msg) { showTvFlash(f.msg); if (f.tts && _ttsUnlocked) _speak(f.msg); }
+          else hideTvFlash();
+        }
+        if (f.testId) {
+          if (_ttsLastTest === null) _ttsLastTest = f.testId;          // 첫 폴은 기록만(과거 테스트 무시)
+          else if (f.testId !== _ttsLastTest) { _ttsLastTest = f.testId; _speak('소리 테스트입니다. 잘 들리면 준비 완료예요.'); }
+        }
       }).withFailureHandler(function(){}).getTvFlash();
     }
 
@@ -387,8 +413,9 @@
     }
     function pollCheers(){ google.script.run.withSuccessHandler(applyCheers).withFailureHandler(function(){}).getCheers(); }
 
-    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); pollCheers(); setInterval(pollCheers, 4000); };
-    document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; });
+    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); pollCheers(); setInterval(pollCheers, 4000); _updTtsBadge(); };
+    document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; _ttsUnlock(); });
+    document.body.addEventListener('touchstart', function() { _ttsUnlock(); }, { passive: true });
   </script>
   <style>@keyframes tvFlashPop{0%{transform:scale(.7);opacity:0}60%{transform:scale(1.04)}100%{transform:scale(1);opacity:1}}</style>
 
