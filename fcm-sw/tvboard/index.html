@@ -373,10 +373,15 @@
     function _applyMusicPlay(w){
       var box=document.getElementById('musicBox');if(box)box.style.display='block';
       if(!_ytReady||!_ytP||!_ytP.loadVideoById)return;
-      var p=_parseYT(w.url);
+      // 여러 줄 입력 지원: 줄바꿈·공백·쉼표로 나눠 각 링크에서 영상ID/재생목록ID 추출
+      var lines=String(w.url).split(/[\s,]+/).filter(Boolean);
+      var ids=[], listId='';
+      for(var i=0;i<lines.length;i++){ var pp=_parseYT(lines[i]); if(pp.vid)ids.push(pp.vid); else if(pp.list&&!listId)listId=pp.list; }
       try{
-        if(p.list)_ytP.loadPlaylist({list:p.list,listType:'playlist',index:0});
-        else if(p.vid)_ytP.loadVideoById(p.vid);
+        if(lines.length>1 && ids.length>1)_ytP.loadPlaylist({playlist:ids,index:0});   // 여러 링크 → 나만의 재생목록
+        else if(lines.length===1 && listId)_ytP.loadPlaylist({list:listId,listType:'playlist',index:0});   // 한 줄이 재생목록 링크
+        else if(ids.length===1)_ytP.loadVideoById(ids[0]);   // 단일 영상
+        else if(listId)_ytP.loadPlaylist({list:listId,listType:'playlist',index:0});
         else{var mt=document.getElementById('musicTitle');if(mt)mt.textContent='⚠️ 주소 확인';return;}
         if(_ytP.setLoop)_ytP.setLoop(true);
         setTimeout(function(){try{if(_ytP.getPlayerState&&_ytP.getPlayerState()!==1){var h=document.getElementById('musicHint');if(h)h.style.display='block';}}catch(_){}},1600);

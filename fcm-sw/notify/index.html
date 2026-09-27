@@ -266,8 +266,8 @@
     <div class="panel hidden" id="tab-music">
       <div class="notice-box">🎵 <b>교실 TV 알림판</b> 좌하단에 미니 플레이어로 음악이 재생돼요. 유튜브 <b>재생목록 링크</b>를 넣으면 곡이 자동으로 이어집니다.<br><b>⚠️ 소리는 TV 화면을 아침에 한 번 클릭</b>해두면 그 뒤로 원격 제어가 됩니다 (브라우저 자동재생 정책).</div>
 
-      <label>유튜브 링크 (재생목록 또는 단일 영상)</label>
-      <input type="text" id="musicUrl" placeholder="https://youtube.com/playlist?list=... 또는 https://youtu.be/...">
+      <label>유튜브 링크 <span style="font-size:12px; color:#94a3b8; font-weight:600;">(재생목록 링크 1개, 또는 영상 링크를 여러 줄 붙여넣기)</span></label>
+      <textarea id="musicUrl" rows="4" placeholder="여러 곡을 이어 틀려면 한 줄에 하나씩 붙여넣기:&#10;https://youtu.be/aaaa&#10;https://youtu.be/bbbb&#10;https://youtu.be/cccc&#10;&#10;또는 재생목록 링크 1개: https://youtube.com/playlist?list=..." style="width:100%; box-sizing:border-box; resize:vertical; font-family:inherit;"></textarea>
       <div style="margin-top:12px; display:flex; gap:8px;">
         <button class="btn sm orange" style="flex:1;" onclick="musicPlay()">▶ 지금 재생</button>
         <button class="btn sm" onclick="musicStop()">⏹ 정지</button>
@@ -289,8 +289,8 @@
           <input type="time" id="musicAutoEnd" value="13:10">
         </div>
       </div>
-      <label style="margin-top:12px; display:block;">자동 재생할 유튜브 링크</label>
-      <input type="text" id="musicAutoUrl" placeholder="https://youtube.com/playlist?list=...">
+      <label style="margin-top:12px; display:block;">자동 재생할 유튜브 링크 <span style="font-size:12px; color:#94a3b8; font-weight:600;">(재생목록 1개 또는 영상 여러 줄)</span></label>
+      <textarea id="musicAutoUrl" rows="3" placeholder="한 줄에 하나씩, 또는 재생목록 링크 1개" style="width:100%; box-sizing:border-box; resize:vertical; font-family:inherit;"></textarea>
       <div style="margin-top:12px;">
         <button class="btn sm" style="width:100%;" onclick="musicSaveAuto()">💾 자동 재생 설정 저장</button>
       </div>
