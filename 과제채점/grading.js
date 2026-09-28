@@ -467,7 +467,8 @@ function parseTasks(ss) {
       feedbackDays: taskData[i][10] !== '' && taskData[i][10] != null ? parseInt(taskData[i][10]) : 7,
       standards: taskData[i][11] ? String(taskData[i][11]).trim() : '', // L열 성취기준
       allowResubmit: String(taskData[i][12] || '').trim() !== 'N', // M열 재제출허용(기본 허용)
-      problems: (function(){ var v = taskData[i][13]; if (!v) return []; try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch(_) { return []; } })() // N열 문제(JSON)
+      problems: (function(){ var v = taskData[i][13]; if (!v) return []; try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch(_) { return []; } })(), // N열 문제(JSON)
+      passLine: String(taskData[i][14] || '').trim() // O열 AI통과제 통과선(비면 통과제 off)
     });
   }
   tasks.reverse();
@@ -478,8 +479,8 @@ function parseSubmissions(ss) {
   const sheet = ss.getSheetByName('제출현황');
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
-  // getDataRange 대신 필요한 열만 읽기 (A~AA = 1~27열)
-  const subData = sheet.getRange(2, 1, lastRow - 1, 27).getValues();
+  // getDataRange 대신 필요한 열만 읽기 (A~AD = 1~30열; AD=30=AI통과 도전횟수)
+  const subData = sheet.getRange(2, 1, lastRow - 1, 30).getValues();
   const submissions = [];
 
   // ✅ [추가] 과제별 실시간 등수 계산용 객체
@@ -560,6 +561,8 @@ function parseSubmissions(ss) {
       resubDeadline: subData[i][24] instanceof Date ? Utilities.formatDate(subData[i][24], 'Asia/Seoul', 'yyyy-MM-dd') : (String(subData[i][24] || '').trim() || undefined),
       returnType:    String(subData[i][25] || '').trim() || undefined,
       returnCount:   subData[i][26] !== '' && subData[i][26] != null ? parseInt(subData[i][26]) : 0,
+      // 🎯 AI 통과제 도전횟수 (AD열=30, index29)
+      gateAttempt: (subData[i][29] !== '' && subData[i][29] != null) ? parseInt(subData[i][29]) : 0,
       // ✅ [추가] 계산된 등수를 데이터에 포함
       totalRank: myTotalRank,
       classRank: myClassRank
@@ -618,7 +621,7 @@ function saveNewTask(taskData) {
     const existing = sheet.getRange("B:B").getValues().flat();
     if (existing.includes(taskData.name)) return { success: false, message: "이미 같은 이름의 과제가 존재합니다." };
     // 열: I(9)만점 J(10)반려기한 K(11)피드백기한 L(12)성취기준 — 생성·수정 일치
-    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList, taskData.maxScore || '', parseInt(taskData.rejectDays) || 7, parseInt(taskData.feedbackDays) || 7, taskData.standards || '', taskData.allowResubmit === false ? 'N' : '']); // M(13)=재제출허용('N'=금지)
+    sheet.appendRow([new Date(), taskData.name, taskData.desc, taskData.deadlines, taskData.evalType, taskData.isPublic ? "일괄공개" : "비공개", taskData.reqPics, taskData.choiceList, taskData.maxScore || '', parseInt(taskData.rejectDays) || 7, parseInt(taskData.feedbackDays) || 7, taskData.standards || '', taskData.allowResubmit === false ? 'N' : '', '', taskData.passLine || '']); // M(13)=재제출허용, N(14)=문제(별도저장), O(15)=AI통과선
     const parentFolder = DriveApp.getFolderById(_getParentFolderId_());
     let taskFolder = parentFolder.createFolder(taskData.name);
     let deadlineObj = JSON.parse(taskData.deadlines);
@@ -645,6 +648,22 @@ function deleteSubmission(rowIdx, studentId, taskName) {
       return { success: false, message: '목록이 변경됐어요. 새로고침 후 다시 시도해주세요.' };
     }
     s.deleteRow(r);
+    clearCache();
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+// 🎯 AI 통과제 교사 수동 처리 — decision: 'pass'(통과확정)·'retry'(다시제출)·'reopen'(오통과 되돌리기)
+function teacherGateDecision(rowIdx, decision) {
+  try {
+    var r = parseInt(rowIdx) || 0;
+    if (r < 2) return { success: false, message: '잘못된 행입니다.' };
+    var s = _taskSs().getSheetByName('제출현황');
+    if (!s || r > s.getLastRow()) return { success: false, message: '목록이 변경됐어요. 새로고침 해주세요.' };
+    var map = { pass: '채점완료', retry: 'AI재도전', reopen: '교사확인' };
+    var st = map[String(decision)] || '';
+    if (!st) return { success: false, message: '알 수 없는 처리입니다.' };
+    s.getRange(r, 11).setValue(st);        // K열 상태
+    s.getRange(r, 24).setValue(new Date()); // X열 상태변경일시
     clearCache();
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
@@ -682,6 +701,7 @@ function updateTaskSettings(t) {
     if (t.feedbackDays != null) s.getRange(r, 11).setValue(parseInt(t.feedbackDays) || 7);
     if (t.standards != null)    s.getRange(r, 12).setValue(t.standards); // L열 성취기준
     if (t.allowResubmit != null) s.getRange(r, 13).setValue(t.allowResubmit === false ? 'N' : ''); // M열 재제출허용
+    if (t.passLine != null)      s.getRange(r, 15).setValue(t.passLine); // O열 AI통과선(비면 통과제 off)
     clearCache();
     // 🔔 마감일 변경/신규 반 추가 시 해당 학생만 알림
     var pushed = _notifyTaskDeadlineChange_(t.originalName, oldDeadlines, t.deadlines);

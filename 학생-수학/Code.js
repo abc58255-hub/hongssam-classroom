@@ -86,7 +86,7 @@ var RPC_WHITELIST = [
   'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
   'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
   'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
-  'logFeatureUse', 'setStudentPassword', 'reviseSubmission', 'saveFcmToken'
+  'logFeatureUse', 'setStudentPassword', 'reviseSubmission', 'saveFcmToken', 'retryPassGate'
 ];
 
 function doPost(e) {
@@ -270,7 +270,7 @@ function getDashboardData(studentId, studentName) {
       var maxScore = taskData[i][8] ? Number(taskData[i][8]) : 0; // col9 = 만점
       var taskPub = (function(){ var v = String(taskData[i][5] || '').trim(); return v === '일괄공개' || v === '공개'; })(); // col6 = 과제 단위 공개
       var _tProblems = (function(){ var v = taskData[i][13]; if (!v) return []; try { var a = JSON.parse(v); return Array.isArray(a) ? a : []; } catch(_) { return []; } })(); // N열 문제(JSON)
-      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray, maxScore: maxScore, isPublicTask: taskPub, allowResubmit: String(taskData[i][12] || '').trim() !== 'N', desc: String(taskData[i][2] || '').trim(), problems: _tProblems }; // M(13)=재제출허용, N(14)=문제
+      taskSettingsMap[tName] = { reqPics: taskData[i][6] ? parseInt(taskData[i][6]) : 1, choiceArray: choiceArray, maxScore: maxScore, isPublicTask: taskPub, allowResubmit: String(taskData[i][12] || '').trim() !== 'N', desc: String(taskData[i][2] || '').trim(), problems: _tProblems, passLine: String(taskData[i][14] || '').trim() }; // M(13)=재제출허용, N(14)=문제, O(15)=AI통과선
 
       let isExpired = false;
       let hasDeadline = false;
@@ -417,6 +417,8 @@ function getDashboardData(studentId, studentName) {
           isUnread: (fb !== "" || isMyBest) && isSeen === "",
           aiGradeTemp: aiGradeTemp,
           aiError: aiError,
+          passLine: ts.passLine || '',
+          gateAttempt: parseInt(historyData[i][29] || '0') || 0,
           totalRank: myTotalRank,
           classRank: myClassRank,
           deadline: taskDeadlineMap[baseName] ? taskDeadlineMap[baseName].main : null,
@@ -1311,10 +1313,10 @@ function _taskScaleFromSettings(taskName) {
   try {
     var sh = _taskSs_().getSheetByName('과제설정');
     if (!sh || sh.getLastRow() < 2) return {};
-    var d = sh.getRange(2, 1, sh.getLastRow() - 1, 9).getValues();
+    var d = sh.getRange(2, 1, sh.getLastRow() - 1, 15).getValues();
     for (var i = 0; i < d.length; i++) {
       if (String(d[i][1] || '').trim() === taskName)
-        return { evalType: String(d[i][4] || '').trim(), maxScore: Number(d[i][8] || 0) };
+        return { evalType: String(d[i][4] || '').trim(), maxScore: Number(d[i][8] || 0), passLine: String(d[i][14] || '').trim() };  // O열 통과선
     }
   } catch(_) {}
   return {};
@@ -1341,7 +1343,8 @@ function _getRubricByTaskName(taskName) {
           maxScore: mx,
           criteria: String(data[i][3] || '').trim(),
           files: files,
-          questions: questions
+          questions: questions,
+          passLine: ov.passLine || ''   // AI통과제 통과선(비면 off)
         };
       }
     }
@@ -1513,6 +1516,24 @@ function autoGradeNewSubmission(rowIdx, taskName, studentId, studentName, prevAi
     try { sheet.getRange(rowIdx, 29).setValue(''); } catch(_) {}   // 이전 실패기록 삭제
     sheet.getRange(rowIdx, 23).setValue(JSON.stringify(result));
 
+    // ── 🎯 AI 통과제 판정 (통과선 있을 때만) ──
+    //   확신 high만 자동판정, 통과선 이상=AI통과(잠금) / 미달=AI재도전 / 그 외(확신낮음·3회소진)=교사확인
+    if (rubric.passLine) {
+      var _attempt = parseInt(sheet.getRange(rowIdx, 30).getValue() || '0') || 0;
+      if (_attempt < 1) { _attempt = 1; try { sheet.getRange(rowIdx, 30).setValue(1); } catch(_){} }   // 첫 제출=1회차
+      var g = _passGateJudge_(result, rubric.passLine, rubric.evalType, _attempt);
+      var stMap = { pass: 'AI통과', retry: 'AI재도전', hold: '교사확인' };
+      try {
+        sheet.getRange(rowIdx, 11).setValue(stMap[g.outcome] || '');   // K열 상태
+        sheet.getRange(rowIdx, 24).setValue(new Date());               // X열 상태변경일시
+      } catch(_){}
+      result.gate = { on: true, outcome: g.outcome, attempt: _attempt, max: 3, passLine: rubric.passLine, reason: g.reason };
+      if (g.outcome === 'hold') {   // 교사확인 필요할 때만 교사 푸시(도배 방지)
+        var _cls = String(studentId).length >= 2 ? (String(studentId).substring(0,1) + '학년 ' + String(studentId).substring(1,2) + '반') : '';
+        try { _notifyTeacher_('통과보류', '🧑‍🏫 AI 통과 확인 필요', _cls + ' ' + studentName + ' — ' + baseTask + ' (' + g.reason + ')'); } catch(_){}
+      }
+    }
+
     // ✅ [추가] 실시간 등수 확인 및 칭찬 멘트 생성
     const rankData = getSubmitRank(studentId, baseTask);
     if (rankData.success) {
@@ -1587,6 +1608,85 @@ function reviseSubmission(rowIdx, taskName, studentId, studentName, filesData) {
       aiError: aiRes.success ? null : (aiRes.message || ''),
       revisionsLeft: 2 - (used + 1)
     };
+  } catch(e) {
+    return { success: false, message: e.toString() };
+  }
+}
+
+// ── 🎯 AI 통과제 판정 헬퍼 ──
+// 등급/점수를 통과선과 비교. 확신 high가 아니거나 needsReview면 교사보류.
+function _passGateRank_(v) {
+  var m = { 'A':5,'B':4,'C':3,'D':2, '상':3,'중':2,'하':1, 'Pass':1,'통과':1,'P':1, 'Fail':0,'미통과':0,'F':0 };
+  var k = String(v == null ? '' : v).trim();
+  return m.hasOwnProperty(k) ? m[k] : null;
+}
+function _passGateJudge_(result, passLine, evalType, attempt) {
+  var conf = String(result && result.confidence || '').toLowerCase();
+  if (conf !== 'high' || (result && result.needsReview)) return { outcome: 'hold', reason: 'AI 확신 낮음' };
+  var passed = false;
+  var plNum = parseFloat(passLine);
+  if (!isNaN(plNum) && result && result.score != null && result.score !== '') {
+    passed = Number(result.score) >= plNum;                       // 점수 통과선
+  } else {
+    var gr = _passGateRank_(result && result.grade);
+    var pr = _passGateRank_(passLine);
+    if (gr == null || pr == null || pr <= 0) return { outcome: 'hold', reason: '등급 해석 불가' };
+    passed = gr >= pr;                                            // 등급 통과선
+  }
+  if (passed) return { outcome: 'pass', reason: '통과선 충족' };
+  if (attempt >= 3) return { outcome: 'hold', reason: '3회 도전 소진' };
+  return { outcome: 'retry', reason: '통과선 미달' };
+}
+
+// ── 🎯 AI 통과제 다시 도전: 사진 덮어쓰고 재채점 → 재판정 (최대 3회, 마감 전) ──
+function retryPassGate(rowIdx, taskName, studentId, studentName, filesData) {
+  try {
+    var sheet = _taskSs_().getSheetByName('제출현황');
+    if (!_verifyRowOwner_(sheet, rowIdx, studentId)) return { success: false, message: '권한이 없어요.' };
+    var status = String(sheet.getRange(rowIdx, 11).getValue() || '').trim();
+    if (status !== 'AI재도전') return { success: false, message: '지금은 다시 도전할 수 있는 상태가 아니에요.', locked: true };
+    var baseTask = String(taskName).split(' (')[0];
+    var className = String(studentId).length >= 2 ? (String(studentId).substring(0,1) + '학년 ' + String(studentId).substring(1,2) + '반') : '기타';
+
+    // 마감 검증 (본 마감 전까지만 재도전)
+    try {
+      var taskSheet = _taskSs_().getSheetByName('과제설정');
+      var td = taskSheet.getDataRange().getValues();
+      for (var k = 1; k < td.length; k++) {
+        if (String(td[k][1] || '').trim() === baseTask) {
+          var dStr = String(td[k][3] || '').trim();
+          if (dStr && dStr.charAt(0) === '{') {
+            var dl = JSON.parse(dStr); var mainDl = dl[className] || dl['all'];
+            if (mainDl && new Date(mainDl) < new Date()) return { success: false, message: '⏰ 마감이 지나 다시 도전할 수 없어요.' };
+          }
+          break;
+        }
+      }
+    } catch(_){}
+
+    var attempt = parseInt(sheet.getRange(rowIdx, 30).getValue() || '1') || 1;
+    if (attempt >= 3) { sheet.getRange(rowIdx, 11).setValue('교사확인'); return { success: false, message: '3번 다 도전했어요. 선생님이 확인해요.', exhausted: true }; }
+
+    var incoming = filesData || [];
+    if (!incoming.length) return { success: false, message: '사진을 첨부해주세요.' };
+    var parentFolder = DriveApp.getFolderById(_getParentFolderId_());
+    var taskFolder = parentFolder.getFoldersByName(baseTask).hasNext() ? parentFolder.getFoldersByName(baseTask).next() : parentFolder.createFolder(baseTask);
+    var classFolder = taskFolder.getFoldersByName(className).hasNext() ? taskFolder.getFoldersByName(className).next() : taskFolder.createFolder(className);
+    var newUrls = {}, hashObj = {};
+    incoming.forEach(function(f) {
+      var bytes = Utilities.base64Decode(f.b64);
+      var blob = Utilities.newBlob(bytes, f.mime || 'image/jpeg', '[' + studentId + '] ' + studentName + '_' + baseTask + '_도전' + (attempt + 1) + '_' + f.key + '.jpg');
+      newUrls[f.key] = classFolder.createFile(blob).getUrl();
+      hashObj[f.key] = getHash(bytes);
+    });
+    sheet.getRange(rowIdx, 7).setValue(JSON.stringify(newUrls));
+    sheet.getRange(rowIdx, 9).setValue(JSON.stringify(hashObj));
+    sheet.getRange(rowIdx, 23).setValue('');              // 이전 AI 결과 비움
+    sheet.getRange(rowIdx, 30).setValue(attempt + 1);     // 도전 횟수 +1 (autoGrade가 이 값으로 판정)
+    sheet.getRange(rowIdx, 11).setValue('');              // 상태 초기화(재채점 위해)
+    _clearHistoryCache();
+
+    return autoGradeNewSubmission(rowIdx, baseTask, studentId, studentName, null);
   } catch(e) {
     return { success: false, message: e.toString() };
   }

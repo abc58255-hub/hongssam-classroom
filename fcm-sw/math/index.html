@@ -38,7 +38,7 @@
         'verifyLogin', 'getDashboardData', 'getMyGrades', 'getMyDojang',
         'getSecureFileBase64', 'processForm', 'getSubmitRank', 'autoGradeNewSubmission',
         'markBestSeen', 'markFeedbacksAsSeen', 'saveStudentReply', 'requestResubmission',
-        'logFeatureUse', 'setStudentPassword', 'reviseSubmission', 'saveFcmToken'
+        'logFeatureUse', 'setStudentPassword', 'reviseSubmission', 'saveFcmToken', 'retryPassGate'
       ];
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[GAS RPC]', e); };
@@ -2033,10 +2033,32 @@
             + '</div>';
         }
 
+        // 🎯 AI 통과제 상태 박스 (참고채점·진행중 대체)
+        var gateBox = '';
+        if (item.passLine) {
+          var _escg = function(s){ return String(s==null?'':s).replace(/</g,'&lt;'); };
+          var _gfb = (item.aiGradeTemp && (item.aiGradeTemp.overallFeedback || item.aiGradeTemp.feedback)) || '';
+          if (item.status === 'AI통과') {
+            aiRefBox=''; gradingPlaceholder='';
+            gateBox = '<div style="background:#f0fdf4;border:1.5px solid #86efac;border-radius:10px;padding:12px 14px;margin-top:12px;text-align:center;"><span style="font-size:15px;font-weight:900;color:#166534;">🎉 통과! 잘했어요</span></div>';
+          } else if (item.status === 'AI재도전') {
+            aiRefBox=''; gradingPlaceholder='';
+            var _left = Math.max(0, 3 - (item.gateAttempt||1));
+            gateBox = '<div style="background:#fff7ed;border:1.5px solid #fed7aa;border-radius:10px;padding:12px 14px;margin-top:12px;">'
+              + '<div style="font-size:13px;font-weight:800;color:#b45309;margin-bottom:4px;">📝 아직이에요 — 다시 도전! (남은 기회 ' + _left + '번)</div>'
+              + (_gfb ? '<div style="font-size:12px;color:#334155;line-height:1.6;margin-bottom:8px;">💬 ' + _escg(_gfb) + '</div>' : '')
+              + '<button onclick="startGateRetry(' + item.rowIdx + ',\'' + String(item.task).replace(/'/g,"\\'") + '\')" style="background:linear-gradient(to right,#f59e0b,#f97316);color:white;border:none;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;width:100%;">📸 고쳐서 다시 도전</button>'
+              + '</div>';
+          } else if (item.status === '교사확인') {
+            aiRefBox=''; gradingPlaceholder='';
+            gateBox = '<div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-top:12px;text-align:center;"><span style="font-size:13px;font-weight:800;color:#1e40af;">🧑‍🏫 선생님이 확인 중이에요</span></div>';
+          }
+        }
+
         hHtml += '<div class="' + cardClass + '" id="histCard_' + item.rowIdx + '">' + bestBadge +
           '<div style="font-weight:700; font-size:15px; color:#1e3a8a; margin-bottom:4px; display:flex; align-items:center; flex-wrap:wrap; gap:4px;"><span>' + item.task + '</span>' + badge + newBadge + scoreBadge + rankBadge + '</div>' +
           '<div style="font-size:12px; color:#6b7280;">' + item.date + '</div>' +
-          carouselHtml + rejectBox + feedHtml + aiRefBox + gradingPlaceholder + replySection + '</div>';
+          carouselHtml + rejectBox + feedHtml + aiRefBox + gradingPlaceholder + gateBox + replySection + '</div>';
       });
       historyDiv.innerHTML = hHtml;
     }
@@ -2443,7 +2465,8 @@
       base64Files.push({ key: fObj.key, b64: b64Data, mime: 'image/jpeg', name: fObj.file.name });
       filesProcessedCount++;
       if (filesProcessedCount === filesToProcess.length) {
-        if (window._reviseMode) doRevise(base64Files);
+        if (window._gateRetryMode) doGateRetry(base64Files);
+        else if (window._reviseMode) doRevise(base64Files);
         else sendToServer(currentTargetTask.isResubmit ? "true" : "false", base64Files);
       }
     }
@@ -2670,6 +2693,12 @@
     document.getElementById('aiGradeResultBox').style.display = 'none';
     document.getElementById('aiGradeSkippedBox').style.display = 'none';
 
+    // 🎯 AI 통과제 과제 → 통과/재도전/교사확인 전용 화면 (일반 참고채점·보완루프 대체)
+    if (aiRes && aiRes.success && aiRes.result && aiRes.result.gate && aiRes.result.gate.on) {
+      renderGateResult(aiRes.result, rowIdx, taskName);
+      return;
+    }
+
     if (aiRes && aiRes.success && aiRes.result) {
       var r = aiRes.result;
       var scoreText = r.grade || (r.perQuestion
@@ -2755,6 +2784,93 @@
   }
 
   // ── 보완하기: 제출 화면으로 돌아가 다시 첨부 ──
+  // ── 🎯 AI 통과제 결과 화면 (통과/재도전/교사확인) ──
+  function renderGateResult(r, rowIdx, taskName) {
+    var g = r.gate || {}; var fb = r.overallFeedback || r.feedback || '';
+    var box = document.getElementById('aiGradeSkippedBox'); if (!box) return;
+    var title = document.getElementById('successBannerTitle');
+    var esc = function(s){ return String(s==null?'':s).replace(/</g,'&lt;'); };
+    var html = '';
+    if (g.outcome === 'pass') {
+      if (title) title.textContent = '통과했어요! 🎉';
+      html = '<div style="background:#f0fdf4;border:2px solid #86efac;border-radius:16px;padding:22px 18px;text-align:center;">'
+        + '<div style="font-size:52px;margin-bottom:6px;">🎉</div>'
+        + '<div style="font-size:20px;font-weight:900;color:#166534;margin-bottom:6px;">통과! 🏆</div>'
+        + '<div style="font-size:14px;color:#15803d;">AI 채점 기준을 통과했어요. 잘했어요!</div>'
+        + (fb ? '<div style="font-size:13px;color:#334155;background:#fff;border-radius:10px;padding:10px 12px;margin-top:12px;line-height:1.6;text-align:left;">💬 ' + esc(fb) + '</div>' : '')
+        + '</div>';
+    } else if (g.outcome === 'retry') {
+      if (title) title.textContent = '조금만 더! 💪';
+      var left = Math.max(0, (g.max || 3) - (g.attempt || 1));
+      html = '<div style="background:#fff7ed;border:2px solid #fed7aa;border-radius:16px;padding:20px 18px;text-align:center;">'
+        + '<div style="font-size:44px;margin-bottom:6px;">📝</div>'
+        + '<div style="font-size:18px;font-weight:900;color:#b45309;margin-bottom:4px;">아직이에요! 다시 도전해볼까요?</div>'
+        + '<div style="font-size:12px;color:#a16207;margin-bottom:10px;">도전 ' + (g.attempt||1) + '/' + (g.max||3) + ' · 남은 기회 ' + left + '번</div>'
+        + (fb ? '<div style="font-size:14px;color:#334155;background:#fff;border-radius:10px;padding:12px 14px;line-height:1.6;text-align:left;margin-bottom:14px;">💬 <b>이렇게 고쳐볼까요?</b><br>' + esc(fb) + '</div>' : '')
+        + '<button class="primary-btn" style="background:linear-gradient(to right,#f59e0b,#f97316);" onclick="startGateRetry(' + rowIdx + ',\'' + String(taskName).replace(/'/g,"\\'") + '\')">📸 고쳐서 다시 도전</button>'
+        + '</div>';
+    } else {   // hold = 교사확인
+      if (title) title.textContent = '제출 완료! 🧑‍🏫';
+      html = '<div style="background:#eff6ff;border:2px solid #bfdbfe;border-radius:16px;padding:22px 18px;text-align:center;">'
+        + '<div style="font-size:44px;margin-bottom:6px;">🧑‍🏫</div>'
+        + '<div style="font-size:18px;font-weight:900;color:#1e40af;margin-bottom:6px;">선생님이 확인할 거예요</div>'
+        + '<div style="font-size:13px;color:#1d4ed8;line-height:1.6;">' + (g.reason === '3회 도전 소진' ? '3번 도전했어요. 이제 선생님이 직접 봐주실 거예요!' : 'AI가 판단하기 애매해서 선생님이 직접 확인해요.') + '</div>'
+        + '</div>';
+    }
+    box.innerHTML = html; box.style.display = 'block';
+    var back = document.getElementById('successBackBtn'); if (back) back.style.display = 'block';
+  }
+
+  // 통과제 다시 도전: 제출 폼으로 이동
+  function startGateRetry(rowIdx, taskName) {
+    window._gateRetryMode = { rowIdx: rowIdx, taskName: taskName };
+    document.getElementById('successMsg').style.display = 'none';
+    document.getElementById('dashboardScreen').style.display = 'block';
+    switchTab(1);
+    var tsel = document.getElementById('taskName');
+    if (tsel && taskName) tsel.value = taskName;
+    initTaskUI();
+    document.getElementById('submitStatus').innerText = '';
+    uiAlert('📸 다시 도전! 고친 사진을 첨부한 뒤 제출하면 AI가 다시 확인해줘요.');
+  }
+
+  // 통과제 재도전 전송 → 같은 행 덮어쓰기 + 재채점·재판정
+  function doGateRetry(base64FilesArray) {
+    var gm = window._gateRetryMode; if (!gm) return;
+    document.getElementById('dashboardScreen').style.display = 'none';
+    document.getElementById('submitRankBox').style.display = 'none';
+    document.getElementById('successMsg').style.display = 'block';
+    document.getElementById('aiGradeResultBox').style.display = 'none';
+    document.getElementById('aiGradeSkippedBox').style.display = 'none';
+    document.getElementById('aiSelfLoopBox').style.display = 'none';
+    document.getElementById('successBackBtn').style.display = 'none';
+    document.getElementById('successBannerTitle').textContent = 'AI가 다시 확인 중... 🤖';
+    var loader = document.getElementById('aiGradingLoader'); loader.style.display = 'block';
+    var bar = document.getElementById('aiProgressBar'); var progress = 0;
+    var progressTimer = setInterval(function(){ progress += 3; if (progress > 90) progress = 90; if (bar) bar.style.width = progress + '%'; }, 400);
+    google.script.run
+      .withFailureHandler(function(err) {
+        clearInterval(progressTimer); loader.style.display = 'none';
+        document.getElementById('successBackBtn').style.display = 'block';
+        uiAlert('재도전 전송 오류: ' + (err && err.message ? err.message : err));
+      })
+      .withSuccessHandler(function(res) {
+        clearInterval(progressTimer); if (bar) bar.style.width = '100%';
+        setTimeout(function() {
+          loader.style.display = 'none'; window._gateRetryMode = null;
+          if (res && res.success && res.result) {
+            renderAiResult({ success: true, result: res.result }, 0, gm.rowIdx, gm.taskName);
+          } else {
+            var sb = document.getElementById('aiGradeSkippedBox');
+            sb.innerHTML = '<div style="background:#fef2f2;border:1px dashed #fca5a5;border-radius:12px;padding:14px 16px;"><div style="font-size:13px;color:#dc2626;line-height:1.6;">⚠️ ' + (res && res.message ? res.message : '다시 도전에 실패했어요.') + '</div></div>';
+            sb.style.display = 'block';
+          }
+          document.getElementById('successBackBtn').style.display = 'block';
+        }, 400);
+      })
+      .retryPassGate(gm.rowIdx, gm.taskName, currentUser.id, currentUser.name, base64FilesArray);
+  }
+
   function startRevise() {
     var st = window._aiLoopState;
     if (!st || st.revisionsLeft <= 0) return;
