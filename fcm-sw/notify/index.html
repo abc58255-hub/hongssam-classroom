@@ -253,13 +253,14 @@
       <div id="tvFlashStatus" style="margin-top:16px; font-size:13px; color:#64748b;">현재 상태 확인 중…</div>
 
       <hr style="margin:18px 0; border:none; border-top:1px solid #e2e8f0;">
+      <div style="font-size:13px; color:#334155; margin-bottom:10px;">🔔 새 알림이 뜨면 TV에서 <b>띵동 소리</b>가 자동으로 나요. (아이패드에서도 잘 나요)</div>
       <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-        <input type="checkbox" id="ttsOn" onchange="ttsToggle()" style="width:18px; height:18px;"> <b>🔊 실시간 알림을 TV가 음성으로 읽어주기</b>
+        <input type="checkbox" id="ttsOn" onchange="ttsToggle()" style="width:18px; height:18px;"> <b>🗣️ 띵동에 더해 음성으로도 읽어주기</b> <span style="font-size:11px; color:#94a3b8;">(아이패드는 음성 제한)</span>
       </label>
       <div style="margin-top:10px;">
-        <button class="btn sm" style="width:100%;" onclick="soundTest()">🔊 소리 테스트 (TV에서 소리 나는지 확인)</button>
+        <button class="btn sm" style="width:100%;" onclick="soundTest()">🔊 소리 테스트 (TV에서 띵동 나는지 확인)</button>
       </div>
-      <div style="font-size:12px; color:#94a3b8; margin-top:8px; line-height:1.6;">TV 화면을 아침에 <b>한 번 클릭</b>해야 소리가 나요. TV 화면 왼쪽 위 배지가 <b>🔊 소리 준비됨</b>이면 OK, <b>🔇</b>면 화면을 한 번 눌러주세요.</div>
+      <div style="font-size:12px; color:#94a3b8; margin-top:8px; line-height:1.6;">TV 화면을 아침에 <b>한 번 클릭</b>해야 소리가 나요. TV 왼쪽 위 배지가 <b>🔊 소리 준비됨</b>이면 OK, <b>🔇</b>면 화면을 한 번 눌러주세요. 뜬 알림은 TV에서 <b>× 버튼</b>으로 닫을 수 있어요.</div>
     </div>
 
     <!-- 🎵 점심 음악 (교실TV알림판 BGM) -->

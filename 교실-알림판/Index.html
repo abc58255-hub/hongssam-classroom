@@ -268,7 +268,8 @@
         ov = document.createElement('div');
         ov.id = 'tvFlashOverlay';
         ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(15,23,42,.72);display:flex;align-items:center;justify-content:center;padding:5vw;';
-        ov.innerHTML = '<div id="tvFlashCard" style="max-width:1100px;width:100%;background:#fff;border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.5);border:6px solid #2563eb;padding:6vh 5vw;text-align:center;animation:tvFlashPop .35s ease-out;">'
+        ov.innerHTML = '<div id="tvFlashCard" style="position:relative;max-width:1100px;width:100%;background:#fff;border-radius:28px;box-shadow:0 30px 80px rgba(0,0,0,.5);border:6px solid #2563eb;padding:6vh 5vw;text-align:center;animation:tvFlashPop .35s ease-out;">'
+          + '<button onclick="hideTvFlash()" style="position:absolute;top:2vh;right:2vh;width:clamp(44px,5vw,64px);height:clamp(44px,5vw,64px);border-radius:50%;border:none;background:#f1f5f9;color:#475569;font-size:clamp(24px,3vw,40px);font-weight:900;cursor:pointer;line-height:1;">×</button>'
           + '<div style="font-size:clamp(28px,6vw,64px);margin-bottom:2vh;">📢</div>'
           + '<div id="tvFlashMsg" style="font-size:clamp(32px,7vw,84px);font-weight:900;color:#0f172a;line-height:1.35;word-break:keep-all;white-space:pre-wrap;"></div>'
           + '</div>';
@@ -284,6 +285,24 @@
     var _ttsCtx=null, _ttsUnlocked=false, _ttsLastTest=null;
     function _ttsVoices(){ try{ return speechSynthesis.getVoices()||[]; }catch(_){ return []; } }
     try{ if(window.speechSynthesis){ speechSynthesis.onvoiceschanged=function(){ _ttsVoices(); }; _ttsVoices(); } }catch(_){}   // 크롬: 음성 목록 비동기 로드 미리 트리거
+    // 🔔 띵동 소리 (Web Audio — 아이패드에서도 잘 남). 두 음(높→낮) 짧게
+    function _chime(){
+      try{
+        if(!_ttsCtx) _ttsCtx=new (window.AudioContext||window.webkitAudioContext)();
+        if(_ttsCtx.state!=='running') _ttsCtx.resume();
+        var t=_ttsCtx.currentTime;
+        [[880,0],[660,0.18]].forEach(function(p){
+          var o=_ttsCtx.createOscillator(), g=_ttsCtx.createGain();
+          o.type='sine'; o.frequency.value=p[0];
+          o.connect(g); g.connect(_ttsCtx.destination);
+          var s=t+p[1];
+          g.gain.setValueAtTime(0.0001,s);
+          g.gain.exponentialRampToValueAtTime(0.5,s+0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001,s+0.35);
+          o.start(s); o.stop(s+0.4);
+        });
+      }catch(_){}
+    }
     function _ttsBadge(){ var b=document.getElementById('ttsBadge'); if(!b){ b=document.createElement('div'); b.id='ttsBadge'; b.style.cssText='position:fixed;top:1vw;left:1vw;z-index:600;padding:.6vw 1.1vw;border-radius:40px;font-size:1.1vw;font-weight:800;display:flex;align-items:center;gap:.4vw;box-shadow:0 4px 12px rgba(0,0,0,.28);'; document.body.appendChild(b);} return b; }
     function _updTtsBadge(){ var b=_ttsBadge();
       if(_ttsUnlocked){ b.style.background='#dcfce7'; b.style.color='#166534'; b.style.transition=''; b.style.opacity='1'; b.textContent='🔊 소리 준비됨';
@@ -313,12 +332,12 @@
         if (!f) return;
         if (f.id !== _tvFlashLastId) {
           _tvFlashLastId = f.id;
-          if (f.msg) { showTvFlash(f.msg); if (f.tts && _ttsUnlocked) _speak(f.msg); }
+          if (f.msg) { showTvFlash(f.msg); if (_ttsUnlocked) _chime(); if (f.tts && _ttsUnlocked) _speak(f.msg); }
           else hideTvFlash();
         }
         if (f.testId) {
           if (_ttsLastTest === null) _ttsLastTest = f.testId;          // 첫 폴은 기록만(과거 테스트 무시)
-          else if (f.testId !== _ttsLastTest) { _ttsLastTest = f.testId; _speak('소리 테스트입니다. 잘 들리면 준비 완료예요.'); }
+          else if (f.testId !== _ttsLastTest) { _ttsLastTest = f.testId; _chime(); _speak('소리 테스트입니다. 잘 들리면 준비 완료예요.'); }
         }
       }).withFailureHandler(function(){}).getTvFlash();
     }
