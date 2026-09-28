@@ -282,6 +282,8 @@
     function hideTvFlash() { var ov = document.getElementById('tvFlashOverlay'); if (ov) ov.style.display = 'none'; }
     // ── 🔊 실시간 알림 TTS(음성 읽기) + 소리 잠금 상태 배지 ──
     var _ttsCtx=null, _ttsUnlocked=false, _ttsLastTest=null;
+    function _ttsVoices(){ try{ return speechSynthesis.getVoices()||[]; }catch(_){ return []; } }
+    try{ if(window.speechSynthesis){ speechSynthesis.onvoiceschanged=function(){ _ttsVoices(); }; _ttsVoices(); } }catch(_){}   // 크롬: 음성 목록 비동기 로드 미리 트리거
     function _ttsBadge(){ var b=document.getElementById('ttsBadge'); if(!b){ b=document.createElement('div'); b.id='ttsBadge'; b.style.cssText='position:fixed;top:1vw;left:1vw;z-index:600;padding:.6vw 1.1vw;border-radius:40px;font-size:1.1vw;font-weight:800;display:flex;align-items:center;gap:.4vw;box-shadow:0 4px 12px rgba(0,0,0,.28);'; document.body.appendChild(b);} return b; }
     function _updTtsBadge(){ var b=_ttsBadge();
       if(_ttsUnlocked){ b.style.background='#dcfce7'; b.style.color='#166534'; b.style.transition=''; b.style.opacity='1'; b.textContent='🔊 소리 준비됨';
@@ -294,11 +296,17 @@
       _ttsUnlocked=true; _updTtsBadge();
     }
     function _speak(text){ if(!text||!window.speechSynthesis) return;
-      try{ if(_ttsCtx && _ttsCtx.state!=='running') _ttsCtx.resume();
-        var u=new SpeechSynthesisUtterance(String(text)); u.lang='ko-KR'; u.rate=1;
-        var vs=speechSynthesis.getVoices()||[]; var ko=vs.filter(function(v){return /ko/i.test(v.lang);})[0]; if(ko) u.voice=ko;
-        speechSynthesis.cancel(); speechSynthesis.speak(u);
-      }catch(_){}
+      try{ if(_ttsCtx && _ttsCtx.state!=='running') _ttsCtx.resume(); }catch(_){}
+      function go(){
+        try{
+          speechSynthesis.cancel();
+          var u=new SpeechSynthesisUtterance(String(text)); u.lang='ko-KR'; u.rate=1;
+          var vs=_ttsVoices(); var ko=vs.filter(function(v){return /ko/i.test(v.lang);})[0]; if(ko) u.voice=ko;
+          speechSynthesis.speak(u);
+          setTimeout(function(){ try{ if(speechSynthesis.paused) speechSynthesis.resume(); }catch(_){} }, 150);   // 크롬: 시작 직후 멈춤 방지 넛지
+        }catch(_){}
+      }
+      if(_ttsVoices().length===0){ setTimeout(go, 350); } else { go(); }   // 음성 목록 아직이면 잠깐 뒤 재시도
     }
     function pollTvFlash() {
       google.script.run.withSuccessHandler(function(f){
