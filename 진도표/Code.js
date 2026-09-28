@@ -395,21 +395,62 @@ function _deleteRowsByGroupId_(ss, sheetName, id) {
 // 시트: 학기설정 — A=그룹ID, B=학기명, C=시작일, D=종료일, E=공휴일(쉼표)
 // =====================================================
 
+// 시험일정 직렬화: "1차:2026-10-20~2026-10-22,2차:2026-12-15~2026-12-17"
+function _parseExams_(str) {
+  if (!str) return [];
+  return String(str).split(',').map(function(s){ return s.trim(); }).filter(Boolean).map(function(tok){
+    var ci = tok.indexOf(':');
+    var name = ci >= 0 ? tok.substring(0, ci).trim() : '시험';
+    var range = ci >= 0 ? tok.substring(ci + 1).trim() : tok.trim();
+    var rp = range.split('~');
+    var start = (rp[0] || '').trim();
+    var end = (rp[1] || rp[0] || '').trim();
+    return (start) ? { name: name, start: start, end: end } : null;
+  }).filter(Boolean);
+}
+function _serializeExams_(exams) {
+  return (exams || []).map(function(e){ return String(e.name||'시험').trim() + ':' + String(e.start||'').trim() + '~' + String(e.end||e.start||'').trim(); }).join(',');
+}
+// 시험 기간 날짜 전체를 {yyyy-MM-dd:true} 집합으로 (수업일 제외용)
+function _examDaysSet_(exams) {
+  var set = {};
+  (exams || []).forEach(function(e){
+    if (!e.start) return;
+    var cur = new Date(e.start + 'T09:00:00');
+    var end = new Date((e.end || e.start) + 'T09:00:00');
+    var guard = 0;
+    while (cur <= end && guard < 60) { set[Utilities.formatDate(cur, 'Asia/Seoul', 'yyyy-MM-dd')] = true; cur.setDate(cur.getDate()+1); guard++; }
+  });
+  return set;
+}
+// 그룹의 모든 학기에 걸친 시험 목록 (시작일 오름차순)
+function _getExamsForGroup_(gid, ss) {
+  var sh = ss.getSheetByName('학기설정');
+  var out = [];
+  if (sh && sh.getLastRow() >= 2) {
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+    rows.forEach(function(r){ if (String(r[0]).trim() === gid && r[5]) out = out.concat(_parseExams_(r[5])); });
+  }
+  out.sort(function(a,b){ return (a.start||'') < (b.start||'') ? -1 : 1; });
+  return out;
+}
+
 function getSemesterList(groupId) {
   try {
     var gid = groupId || '기본';
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, '학기설정', ['그룹ID','학기명','시작일','종료일','공휴일(쉼표구분)'], '#0284c7');
+    var sh = _ensureSh(ss, '학기설정', ['그룹ID','학기명','시작일','종료일','공휴일(쉼표구분)','시험일정'], '#0284c7');
     var semesters = [];
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
       rows.forEach(function(r) {
         if (String(r[0]).trim() !== gid) return;
         semesters.push({
           name:     String(r[1] || '').trim(),
           start:    r[2] ? Utilities.formatDate(new Date(r[2]), 'Asia/Seoul', 'yyyy-MM-dd') : '',
           end:      r[3] ? Utilities.formatDate(new Date(r[3]), 'Asia/Seoul', 'yyyy-MM-dd') : '',
-          holidays: r[4] ? String(r[4]).split(',').map(function(d){return d.trim();}).filter(Boolean) : []
+          holidays: r[4] ? String(r[4]).split(',').map(function(d){return d.trim();}).filter(Boolean) : [],
+          exams:    _parseExams_(r[5])
         });
       });
     }
@@ -422,18 +463,19 @@ function saveSemester(groupId, data) {
     var gid = groupId || '기본';
     if (!data.name) return { success: false, message: '학기명을 입력하세요.' };
     var ss = SpreadsheetApp.openById(SHEET_ID);
-    var sh = _ensureSh(ss, '학기설정', ['그룹ID','학기명','시작일','종료일','공휴일(쉼표구분)'], '#0284c7');
+    var sh = _ensureSh(ss, '학기설정', ['그룹ID','학기명','시작일','종료일','공휴일(쉼표구분)','시험일정'], '#0284c7');
+    var examStr = _serializeExams_(data.exams);
     var found = false;
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
       for (var i = 0; i < rows.length; i++) {
         if (String(rows[i][0]).trim() === gid && String(rows[i][1]).trim() === data.name) {
-          sh.getRange(i + 2, 1, 1, 5).setValues([[gid, data.name, data.start, data.end, (data.holidays||[]).join(',')]]);
+          sh.getRange(i + 2, 1, 1, 6).setValues([[gid, data.name, data.start, data.end, (data.holidays||[]).join(','), examStr]]);
           found = true; break;
         }
       }
     }
-    if (!found) sh.appendRow([gid, data.name, data.start, data.end, (data.holidays||[]).join(',')]);
+    if (!found) sh.appendRow([gid, data.name, data.start, data.end, (data.holidays||[]).join(','), examStr]);
     return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
@@ -529,12 +571,15 @@ function _computeSchedule_(gid, ss) {
   var ttSh  = ss.getSheetByName('시간표설정');
   var sems  = [];
   if (semSh && semSh.getLastRow() >= 2) {
-    var sr = semSh.getRange(2, 1, semSh.getLastRow()-1, 5).getValues();
+    var sr = semSh.getRange(2, 1, semSh.getLastRow()-1, 6).getValues();
     sr.forEach(function(r) {
       if (String(r[0]).trim() !== gid) return;
       if (!r[2] || !r[3]) return;
       var hols = {};
       if (r[4]) String(r[4]).split(',').forEach(function(d){ if (d.trim()) hols[d.trim()] = true; });
+      // 시험 기간도 수업일에서 제외 (공휴일과 동일 처리)
+      var exDays = _examDaysSet_(_parseExams_(r[5]));
+      Object.keys(exDays).forEach(function(d){ hols[d] = true; });
       sems.push({
         name:     String(r[1]||'').trim(),
         start:    Utilities.formatDate(new Date(r[2]), 'Asia/Seoul', 'yyyy-MM-dd'),
@@ -853,7 +898,40 @@ function getSyllabusData(groupId) {
     }
 
     var taskRates = _getTaskRatesForGroup_(ss, classes);
-    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates, taskRates: taskRates };
+
+    // ── 🎯 시험까지 남은 차시 (반별) — 다음 시험 자동 타깃 ──
+    var examInfo = null;
+    try {
+      var exams = _getExamsForGroup_(gid, ss);
+      var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
+      var nextExam = null;
+      for (var ei = 0; ei < exams.length; ei++) { if (exams[ei].start >= today) { nextExam = exams[ei]; break; } }
+      if (nextExam) {
+        var totalPlans = plans.length;   // 계획된 총 차시 수
+        var remaining = {}, needed = {};
+        classes.forEach(function(cls) {
+          var days = schedule[cls] || [];
+          var cnt = 0, curActual = 0;
+          // 이 반의 현재 실제차시(최대 기록) — 진도계획 대비 경고용
+          Object.keys(checks).forEach(function(k) {
+            if (k.substring(k.indexOf('_') + 1) !== cls) return;
+            var c = checks[k]; if (c && String(c.status||'').indexOf('취소') !== 0 && c.lessonNo > curActual) curActual = c.lessonNo;
+          });
+          days.forEach(function(d) {
+            if (d < today || d >= nextExam.start) return;          // 오늘 ~ 시험 시작 전날
+            var ck = checks[d + '_' + cls];
+            if (ck && String(ck.status||'').indexOf('취소') === 0) return;  // 취소된 날 제외
+            if (d === today && ck && ck.lessonNo > 0) return;              // 오늘 이미 수업 기록했으면 제외
+            cnt++;
+          });
+          remaining[cls] = cnt;
+          needed[cls] = Math.max(0, totalPlans - curActual);              // 남은 진도 계획 차시
+        });
+        examInfo = { name: nextExam.name, start: nextExam.start, end: nextExam.end, remaining: remaining, needed: needed };
+      }
+    } catch(_) {}
+
+    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates, taskRates: taskRates, examInfo: examInfo };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

@@ -272,6 +272,18 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
           <div id="ttHolChips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
           <input type="hidden" id="ttSemHolidays">
         </div>
+        <div style="margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:4px;">📊 시험 일정 <span style="font-weight:400;">(등록하면 시험까지 남은 차시가 차시표에 표시돼요 · 시험 기간은 수업일에서 제외)</span></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;">
+            <input type="text" id="ttExamName" class="form-input" placeholder="이름 (예: 1차)" style="max-width:110px;">
+            <input type="date" id="ttExamStart" class="form-input" style="max-width:155px;" title="시작일">
+            <span style="color:#94a3b8;">~</span>
+            <input type="date" id="ttExamEnd" class="form-input" style="max-width:155px;" title="종료일(하루면 시작일과 동일)">
+            <button type="button" class="btn btn-gray" style="font-size:12px;padding:8px 12px;" onclick="addExamF()">+ 추가</button>
+          </div>
+          <div id="ttExamChips" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
+          <input type="hidden" id="ttSemExams">
+        </div>
         <div style="font-size:12px;font-weight:700;color:#334155;margin-bottom:8px;">반별 수업 요일 <span style="font-weight:400;color:#64748b;">(교시 번호 입력, 수업 없는 날은 빈칸)</span></div>
         <div id="ttClassGrid" style="overflow-x:auto;margin-bottom:14px;"></div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
@@ -526,6 +538,7 @@ var sylPlanCache     = [];
 var sylCheckCache    = {};
 var sylScheduleCache = {};
 var sylHolidayCache  = {};
+var sylExamInfo      = null;
 var sylMovedInCache  = {};
 var sylCollapsedMonths = (function() {
   try { return JSON.parse(localStorage.getItem('syl_collapsed_months') || '{}'); }
@@ -684,6 +697,7 @@ function loadSyllabusData(forceTab) {
       sylScheduleCache= res.schedule   || {};
       sylHolidayCache = res.holidays   || {};
       sylTaskRates    = res.taskRates  || {};
+      sylExamInfo     = res.examInfo   || null;
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
       var targetTab = forceTab || [5,1,2,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
@@ -2080,11 +2094,19 @@ function renderSylStatusBoard() {
     var pct = effective > 0 ? Math.round(done/effective*100) : 0;
     var color = pct === 100 ? '#10b981' : pct >= 50 ? '#3b82f6' : '#f59e0b';
     var lastPlan = lastLessonNo ? sylPlanCache.find(function(p){ return p.lessonNo === lastLessonNo; }) : null;
+    // 🎯 시험까지 남은 차시 칩
+    var examChip = '';
+    if (sylExamInfo && sylExamInfo.remaining && sylExamInfo.remaining[cls] != null) {
+      var rem = sylExamInfo.remaining[cls];
+      var need = (sylExamInfo.needed && sylExamInfo.needed[cls] != null) ? sylExamInfo.needed[cls] : null;
+      var warn = (need != null && rem < need);
+      examChip = '<div style="margin-bottom:8px;"><span style="display:inline-block;background:' + (warn?'#fef2f2':'#ecfeff') + ';color:' + (warn?'#dc2626':'#0e7490') + ';border:1px solid ' + (warn?'#fecaca':'#a5f3fc') + ';border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;">📊 ' + escapeHtml(sylExamInfo.name) + '까지 ' + rem + '차시' + (warn?' ⚠️':'') + '</span>' + (warn?' <span style="font-size:11px;color:#dc2626;font-weight:700;">계획 '+need+'차시 남음, 속도 내세요!</span>':'') + '</div>';
+    }
     html += '<div class="status-card" style="border-top:4px solid ' + color + ';">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
         '<div style="font-size:16px;font-weight:800;color:#0f172a;">' + escapeHtml(cls) + '</div>' +
         '<div style="font-size:13px;font-weight:800;color:' + color + ';">' + done + ' / ' + effective + '일</div>' +
-      '</div>' +
+      '</div>' + examChip +
       '<div style="background:#f1f5f9;border-radius:20px;height:8px;overflow:hidden;margin-bottom:10px;">' +
         '<div style="background:' + color + ';height:100%;width:' + pct + '%;border-radius:20px;transition:0.3s;"></div>' +
       '</div>' +
@@ -2233,6 +2255,44 @@ function removeHoliday(i) {
   list.splice(i, 1);
   _holSave(list);
 }
+
+// ── 📊 시험 일정 칩 (저장 형식: #ttSemExams = "1차:2026-10-20~2026-10-22,2차:...") ──
+function _examListF() {
+  var raw = document.getElementById('ttSemExams').value.trim();
+  if (!raw) return [];
+  return raw.split(',').map(function(s){ return s.trim(); }).filter(Boolean).map(function(tok){
+    var ci = tok.indexOf(':'); var name = ci>=0 ? tok.substring(0,ci).trim() : '시험';
+    var rng = (ci>=0 ? tok.substring(ci+1) : tok).split('~');
+    return { name: name, start: (rng[0]||'').trim(), end: (rng[1]||rng[0]||'').trim() };
+  }).filter(function(e){ return e.start; });
+}
+function _examSaveF(list) {
+  list.sort(function(a,b){ return (a.start||'') < (b.start||'') ? -1 : 1; });
+  document.getElementById('ttSemExams').value = list.map(function(e){ return e.name + ':' + e.start + '~' + (e.end||e.start); }).join(',');
+  renderExamChips();
+}
+function renderExamChips() {
+  var box = document.getElementById('ttExamChips'); if (!box) return;
+  var list = _examListF();
+  box.innerHTML = list.length === 0
+    ? '<span style="font-size:12px;color:#94a3b8;">등록한 시험이 없어요.</span>'
+    : list.map(function(e, i) {
+        var r = e.start.substring(5).replace('-', '/') + (e.end && e.end !== e.start ? ('~' + e.end.substring(5).replace('-', '/')) : '');
+        return '<span class="hol-chip" style="background:#ecfeff;color:#0e7490;border-color:#a5f3fc;" title="' + e.start + '~' + e.end + '">📊 ' + e.name + ' ' + r + '<b onclick="removeExamF(' + i + ')">×</b></span>';
+      }).join('');
+}
+function addExamF() {
+  var name = (document.getElementById('ttExamName').value || '').trim();
+  var s = document.getElementById('ttExamStart').value;
+  var e = document.getElementById('ttExamEnd').value || s;
+  if (!name) return alert('시험 이름을 입력하세요. (예: 1차)');
+  if (!s) return alert('시험 시작일을 선택하세요.');
+  if (e < s) return alert('종료일이 시작일보다 빠를 수 없어요.');
+  var list = _examListF(); list.push({ name: name, start: s, end: e });
+  _examSaveF(list);
+  document.getElementById('ttExamName').value = ''; document.getElementById('ttExamStart').value = ''; document.getElementById('ttExamEnd').value = '';
+}
+function removeExamF(i) { var list = _examListF(); list.splice(i, 1); _examSaveF(list); }
 function addKrHolidays() {
   var start = document.getElementById('ttSemStart').value;
   var end = document.getElementById('ttSemEnd').value;
@@ -2256,6 +2316,8 @@ function cancelTtEdit() {
   document.getElementById('ttSemEnd').value = '';
   document.getElementById('ttSemHolidays').value = '';
   renderHolChips();
+  document.getElementById('ttSemExams').value = '';
+  renderExamChips();
   document.getElementById('ttFormTitleText').textContent = '📝 시간표 등록';
   document.getElementById('ttCancelEditBtn').style.display = 'none';
   document.getElementById('ttSaveBtn').textContent = '💾 시간표 저장';
@@ -2272,6 +2334,8 @@ function editTimetableEntry(semName) {
   document.getElementById('ttSemEnd').value = sem ? sem.end : '';
   document.getElementById('ttSemHolidays').value = sem ? (sem.holidays||[]).join(', ') : '';
   renderHolChips();
+  document.getElementById('ttSemExams').value = (sem && sem.exams) ? sem.exams.map(function(e){ return e.name + ':' + e.start + '~' + (e.end||e.start); }).join(',') : '';
+  renderExamChips();
   document.getElementById('ttFormTitleText').textContent = '✏️ 수정: ' + semName;
   document.getElementById('ttCancelEditBtn').style.display = 'inline-block';
   document.getElementById('ttSaveStatus').textContent = '';
@@ -2330,7 +2394,7 @@ function saveAndGenerateSchedule() {
       statusEl.style.color = '#ef4444';
       statusEl.textContent = '❌ 오류: ' + e.message;
     })
-    .generateAndApplySchedule(currentGroupId, { name: semName, start: semStart, end: semEnd, holidays: holidays }, ttArray);
+    .generateAndApplySchedule(currentGroupId, { name: semName, start: semStart, end: semEnd, holidays: holidays, exams: _examListF() }, ttArray);
 }
 
 function renderSavedTimetableList() {
