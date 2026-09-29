@@ -899,35 +899,41 @@ function getSyllabusData(groupId) {
 
     var taskRates = _getTaskRatesForGroup_(ss, classes);
 
-    // ── 🎯 시험까지 남은 차시 (반별) — 다음 시험 자동 타깃 ──
+    // ── 🎯 시험까지 남은 차시 (반별) — 미래 시험 전부(1차·2차…) 한 번에 ──
     var examInfo = null;
     try {
-      var exams = _getExamsForGroup_(gid, ss);
+      var allExams = _getExamsForGroup_(gid, ss);
       var today = Utilities.formatDate(new Date(), 'Asia/Seoul', 'yyyy-MM-dd');
-      var nextExam = null;
-      for (var ei = 0; ei < exams.length; ei++) { if (exams[ei].start >= today) { nextExam = exams[ei]; break; } }
-      if (nextExam) {
+      var futureExams = allExams.filter(function(e){ return e.start >= today; });
+      if (futureExams.length) {
         var totalPlans = plans.length;   // 계획된 총 차시 수
-        var remaining = {}, needed = {};
+        // 반별 현재 실제차시(최대 기록) → 진도계획 대비 경고용
+        var needed = {};
         classes.forEach(function(cls) {
-          var days = schedule[cls] || [];
-          var cnt = 0, curActual = 0;
-          // 이 반의 현재 실제차시(최대 기록) — 진도계획 대비 경고용
+          var curActual = 0;
           Object.keys(checks).forEach(function(k) {
             if (k.substring(k.indexOf('_') + 1) !== cls) return;
             var c = checks[k]; if (c && String(c.status||'').indexOf('취소') !== 0 && c.lessonNo > curActual) curActual = c.lessonNo;
           });
-          days.forEach(function(d) {
-            if (d < today || d >= nextExam.start) return;          // 오늘 ~ 시험 시작 전날
-            var ck = checks[d + '_' + cls];
-            if (ck && String(ck.status||'').indexOf('취소') === 0) return;  // 취소된 날 제외
-            if (d === today && ck && ck.lessonNo > 0) return;              // 오늘 이미 수업 기록했으면 제외
-            cnt++;
-          });
-          remaining[cls] = cnt;
-          needed[cls] = Math.max(0, totalPlans - curActual);              // 남은 진도 계획 차시
+          needed[cls] = Math.max(0, totalPlans - curActual);
         });
-        examInfo = { name: nextExam.name, start: nextExam.start, end: nextExam.end, remaining: remaining, needed: needed };
+        var examsOut = futureExams.map(function(exam) {
+          var remaining = {};
+          classes.forEach(function(cls) {
+            var days = schedule[cls] || [];
+            var cnt = 0;
+            days.forEach(function(d) {
+              if (d < today || d >= exam.start) return;                    // 오늘 ~ 시험 시작 전날
+              var ck = checks[d + '_' + cls];
+              if (ck && String(ck.status||'').indexOf('취소') === 0) return; // 취소된 날 제외
+              if (d === today && ck && ck.lessonNo > 0) return;             // 오늘 이미 수업 기록했으면 제외
+              cnt++;
+            });
+            remaining[cls] = cnt;
+          });
+          return { name: exam.name, start: exam.start, end: exam.end, remaining: remaining };
+        });
+        examInfo = { exams: examsOut, needed: needed };
       }
     } catch(_) {}
 

@@ -186,6 +186,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
     <!-- 탭5: 이번주 시간표 -->
     <div id="tab-content-5">
+      <div id="examBanner" style="display:none;"></div>
       <div id="weekTtWrap"><div class="loading">불러오는 중...</div></div>
     </div>
 
@@ -297,6 +298,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
       <select id="bulkReason" class="form-input">
         <option value="시험">📝 시험 기간</option>
         <option value="수행평가">📋 수행평가</option>
+        <option value="자습">📖 자습</option>
         <option value="학교행사">🎉 학교 행사</option>
         <option value="체험학습">🏕️ 체험학습</option>
         <option value="휴교">🤒 임시 휴교</option>
@@ -369,6 +371,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
           <button class="cr-btn" data-reason="체험학습" onclick="selectCancelReason('체험학습')">🏕️ 체험학습</button>
           <button class="cr-btn" data-reason="시험" onclick="selectCancelReason('시험')">📝 시험 기간</button>
           <button class="cr-btn" data-reason="수행평가" onclick="selectCancelReason('수행평가')">📋 수행평가</button>
+          <button class="cr-btn" data-reason="자습" onclick="selectCancelReason('자습')">📖 자습</button>
           <button class="cr-btn" data-reason="휴교" onclick="selectCancelReason('휴교')">🤒 임시 휴교</button>
         </div>
       </div>
@@ -513,6 +516,7 @@ var CANCEL_REASONS = {
   '체험학습': { emoji: '🏕️', label: '체험학습',   bg: '#dcfce7', color: '#15803d' },
   '시험':    { emoji: '📝', label: '시험 기간',  bg: '#eff6ff', color: '#1d4ed8' },
   '수행평가': { emoji: '📋', label: '수행평가',   bg: '#f0fdfa', color: '#0d9488' },
+  '자습':    { emoji: '📖', label: '자습',      bg: '#f1f5f9', color: '#475569' },
   '휴교':    { emoji: '🤒', label: '임시 휴교',  bg: '#fdf4ff', color: '#7c3aed' },
 };
 
@@ -804,6 +808,7 @@ function loadWeekTimetable(){
 function renderWeekTimetable(){
   var wrap=document.getElementById('weekTtWrap');
   if(!wrap) return;
+  renderExamBanner();
   var today=_ymd(new Date());
   var monday=getMondayStr(today);
   var DAYS=['mon','tue','wed','thu','fri'];
@@ -2008,6 +2013,50 @@ function saveSylSettings() {
   renderSylTable();
 }
 
+// 🎯 한 반의 시험별 남은차시 칩들 (반별현황 카드용)
+function _examChipsFor(cls) {
+  if (!sylExamInfo || !sylExamInfo.exams || !sylExamInfo.exams.length) return '';
+  var need = (sylExamInfo.needed && sylExamInfo.needed[cls] != null) ? sylExamInfo.needed[cls] : null;
+  var chips = sylExamInfo.exams.map(function(ex) {
+    var rem = ex.remaining ? ex.remaining[cls] : null;
+    if (rem == null) return '';
+    var warn = (need != null && rem < need);
+    return '<span style="display:inline-block;background:' + (warn?'#fef2f2':'#ecfeff') + ';color:' + (warn?'#dc2626':'#0e7490') + ';border:1px solid ' + (warn?'#fecaca':'#a5f3fc') + ';border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;">📊 ' + escapeHtml(ex.name) + '까지 ' + rem + '차시' + (warn?' ⚠️':'') + '</span>';
+  }).filter(Boolean).join(' ');
+  return chips ? ('<div style="margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap;">' + chips + '</div>') : '';
+}
+
+// 🎯 진도표 상단 요약 배너 (시험별 · 반별 남은차시 한눈에) — 컨테이너 id='examBanner'
+function renderExamBanner() {
+  var box = document.getElementById('examBanner');
+  if (!box) return;
+  if (!sylExamInfo || !sylExamInfo.exams || !sylExamInfo.exams.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined' && (sylScheduleCache[x]||[]).length > 0; });
+  if (!cols.length) { box.innerHTML = ''; box.style.display = 'none'; return; }
+  var need = sylExamInfo.needed || {};
+  var rows = sylExamInfo.exams.map(function(ex) {
+    var cells = cols.map(function(cls) {
+      var rem = ex.remaining ? ex.remaining[cls] : null; if (rem == null) return '';
+      var warn = (need[cls] != null && rem < need[cls]);
+      return '<span style="font-size:12px;color:#334155;white-space:nowrap;">' + escapeHtml(cls) + ' <b style="color:' + (warn?'#dc2626':'#0e7490') + ';">' + rem + (warn?'⚠️':'') + '</b></span>';
+    }).filter(Boolean).join('<span style="color:#cbd5e1;">·</span> ');
+    var dLeft = _daysUntil(ex.start);
+    return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:6px 0;">'
+      + '<span style="font-size:13px;font-weight:800;color:#0e7490;white-space:nowrap;">📊 ' + escapeHtml(ex.name) + '까지'
+      + (dLeft != null ? ' <span style="font-weight:600;color:#64748b;">(' + dLeft + '일)</span>' : '') + '</span>'
+      + '<span style="display:flex;flex-wrap:wrap;gap:8px;">' + cells + '</span></div>';
+  }).join('');
+  box.innerHTML = '<div style="background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:10px 14px;margin-bottom:12px;">' + rows + '</div>';
+  box.style.display = 'block';
+}
+function _daysUntil(dateStr) {
+  try {
+    var today = new Date(); today.setHours(0,0,0,0);
+    var t = new Date(dateStr + 'T00:00:00');
+    return Math.max(0, Math.round((t - today) / 86400000));
+  } catch(_) { return null; }
+}
+
 // ─── 반별 현황 ───
 function renderSylStatusBoard() {
   var board = document.getElementById('sylStatusBoard');
@@ -2047,14 +2096,8 @@ function renderSylStatusBoard() {
     var pct = effective > 0 ? Math.round(done/effective*100) : 0;
     var color = pct === 100 ? '#10b981' : pct >= 50 ? '#3b82f6' : '#f59e0b';
     var lastPlan = lastLessonNo ? sylPlanCache.find(function(p){ return p.lessonNo === lastLessonNo; }) : null;
-    // 🎯 시험까지 남은 차시 칩
-    var examChip = '';
-    if (sylExamInfo && sylExamInfo.remaining && sylExamInfo.remaining[cls] != null) {
-      var rem = sylExamInfo.remaining[cls];
-      var need = (sylExamInfo.needed && sylExamInfo.needed[cls] != null) ? sylExamInfo.needed[cls] : null;
-      var warn = (need != null && rem < need);
-      examChip = '<div style="margin-bottom:8px;"><span style="display:inline-block;background:' + (warn?'#fef2f2':'#ecfeff') + ';color:' + (warn?'#dc2626':'#0e7490') + ';border:1px solid ' + (warn?'#fecaca':'#a5f3fc') + ';border-radius:20px;padding:3px 10px;font-size:12px;font-weight:800;">📊 ' + escapeHtml(sylExamInfo.name) + '까지 ' + rem + '차시' + (warn?' ⚠️':'') + '</span>' + (warn?' <span style="font-size:11px;color:#dc2626;font-weight:700;">계획 '+need+'차시 남음, 속도 내세요!</span>':'') + '</div>';
-    }
+    // 🎯 시험까지 남은 차시 칩 (미래 시험 전부: 1차·2차…)
+    var examChip = _examChipsFor(cls);
     html += '<div class="status-card" style="border-top:4px solid ' + color + ';">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
         '<div style="font-size:16px;font-weight:800;color:#0f172a;">' + escapeHtml(cls) + '</div>' +
