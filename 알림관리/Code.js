@@ -160,7 +160,7 @@ function deleteBoardData(rowIdx) {
 
 
 // ── PWA(Pages) 프론트 → GAS 백엔드 (google.script.run 어댑터) + 토큰 게이트 ──
-var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTtsOn", "ttsTest", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTtsOn", "ttsTest", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getMusicPresets", "saveMusicPreset", "deleteMusicPreset", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
 var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash','getTvMusic']; // getTvFlash/getTvMusic=TV 화면 폴링(공개)
 function _atOk_(token) { try { var v = ClassCore.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; } }
 function doPost(e) {
@@ -269,6 +269,50 @@ function getTvMusic() {
       aOn: !!String(v[3] || ''), aStart: String(v[4] || ''), aEnd: String(v[5] || ''), aUrl: String(v[6] || '')
     };
   } catch (_) { return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' }; }
+}
+
+// ── 🎵 저장된 재생목록(프리셋) ── 보드 시트 '_MUSIC_LIST' 탭 (A=이름, B=링크들)
+var MUSIC_LIST_TAB = '_MUSIC_LIST';
+function _musicListSheet_() {
+  var id = _boardSheetId();
+  if (!id) return null;
+  var ss = SpreadsheetApp.openById(id);
+  var sh = ss.getSheetByName(MUSIC_LIST_TAB);
+  if (!sh) { sh = ss.insertSheet(MUSIC_LIST_TAB); sh.getRange('A1:B1').setValues([['이름','링크들']]); }
+  return sh;
+}
+function getMusicPresets() {
+  try {
+    var sh = _musicListSheet_(); if (!sh) return { presets: [] };
+    var out = [];
+    if (sh.getLastRow() >= 2) {
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+      rows.forEach(function(r){ var n = String(r[0]||'').trim(); if (n) out.push({ name: n, urls: String(r[1]||'').trim() }); });
+    }
+    return { presets: out };
+  } catch(_) { return { presets: [] }; }
+}
+function saveMusicPreset(name, urls) {
+  var sh = _musicListSheet_(); if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요.' };
+  var n = String(name||'').trim(); var u = String(urls||'').trim();
+  if (!n) return { success: false, message: '재생목록 이름을 입력하세요.' };
+  if (!u) return { success: false, message: '유튜브 링크를 입력하세요.' };
+  var found = false;
+  if (sh.getLastRow() >= 2) {
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    for (var i = 0; i < rows.length; i++) { if (String(rows[i][0]).trim() === n) { sh.getRange(i + 2, 1, 1, 2).setValues([[n, u]]); found = true; break; } }
+  }
+  if (!found) sh.appendRow([n, u]);
+  return { success: true };
+}
+function deleteMusicPreset(name) {
+  var sh = _musicListSheet_(); if (!sh) return { success: false };
+  var n = String(name||'').trim();
+  if (sh.getLastRow() >= 2) {
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+    for (var i = rows.length - 1; i >= 0; i--) { if (String(rows[i][0]).trim() === n) sh.deleteRow(i + 2); }
+  }
+  return { success: true };
 }
 
 // ── 💬 우리반 응원문구(칠판공지 표시) ── 보드 시트 '_CHEER' 탭에 저장

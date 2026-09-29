@@ -10,7 +10,7 @@
   <script>
     var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbzpJFEvuLwIiMZMH5AFpHgAbNuNNkMVFFRpxnN34BPb_wTcKznYXFV9XojLGsRNQLtiHQ/exec';
     (function () {
-      var FNS = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTtsOn", "ttsTest", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+      var FNS = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTtsOn", "ttsTest", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getMusicPresets", "saveMusicPreset", "deleteMusicPreset", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
       var TOKKEY = 'alarm_token';
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
@@ -265,15 +265,23 @@
 
     <!-- 🎵 점심 음악 (교실TV알림판 BGM) -->
     <div class="panel hidden" id="tab-music">
-      <div class="notice-box">🎵 <b>교실 TV 알림판</b> 좌하단에 미니 플레이어로 음악이 재생돼요. 유튜브 <b>재생목록 링크</b>를 넣으면 곡이 자동으로 이어집니다.<br><b>⚠️ 소리는 TV 화면을 아침에 한 번 클릭</b>해두면 그 뒤로 원격 제어가 됩니다 (브라우저 자동재생 정책).</div>
+      <div class="notice-box">🎵 <b>교실 TV 알림판</b> 좌하단에 미니 플레이어로 음악이 재생돼요. <b>재생목록을 미리 저장</b>해두고 ▶ 버튼으로 트세요.<br><b>⚠️ 소리는 TV 화면을 아침에 한 번 클릭</b>해두면 그 뒤로 원격 제어가 됩니다 (브라우저 자동재생 정책).</div>
 
-      <label>유튜브 링크 <span style="font-size:12px; color:#94a3b8; font-weight:600;">(재생목록 링크 1개, 또는 영상 링크를 여러 줄 붙여넣기)</span></label>
-      <textarea id="musicUrl" rows="4" placeholder="여러 곡을 이어 틀려면 한 줄에 하나씩 붙여넣기:&#10;https://youtu.be/aaaa&#10;https://youtu.be/bbbb&#10;https://youtu.be/cccc&#10;&#10;또는 재생목록 링크 1개: https://youtube.com/playlist?list=..." style="width:100%; box-sizing:border-box; resize:vertical; font-family:inherit;"></textarea>
-      <div style="margin-top:12px; display:flex; gap:8px;">
-        <button class="btn sm orange" style="flex:1;" onclick="musicPlay()">▶ 지금 재생</button>
-        <button class="btn sm" onclick="musicStop()">⏹ 정지</button>
+      <div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px;">📻 저장된 재생목록</div>
+      <div id="musicPresetList" style="margin-bottom:8px;">불러오는 중…</div>
+      <div id="musicStatus" style="margin:10px 0 4px; font-size:13px; color:#64748b;">현재 상태 확인 중…</div>
+      <button class="btn sm" style="width:100%;" onclick="musicStop()">⏹ 정지</button>
+
+      <hr style="margin:22px 0; border:none; border-top:1px solid #e2e8f0;">
+
+      <div style="font-size:14px; font-weight:800; color:#0f172a; margin-bottom:8px;">➕ 재생목록 추가 / 수정</div>
+      <input type="text" id="musicPresetName" placeholder="재생목록 이름 (예: 잔잔한 점심)" style="width:100%; box-sizing:border-box; padding:10px; border:2px solid #e2e8f0; border-radius:10px; font-size:14px; margin-bottom:8px;">
+      <label style="font-size:12px; color:#94a3b8; font-weight:600;">유튜브 링크 (재생목록 링크 1개, 또는 영상 링크를 여러 줄)</label>
+      <textarea id="musicUrl" rows="4" placeholder="한 줄에 하나씩:&#10;https://youtu.be/aaaa&#10;https://youtu.be/bbbb&#10;&#10;또는 재생목록 링크 1개: https://youtube.com/playlist?list=..." style="width:100%; box-sizing:border-box; resize:vertical; font-family:inherit; margin-top:4px;"></textarea>
+      <div style="margin-top:10px; display:flex; gap:8px;">
+        <button class="btn sm orange" style="flex:1;" onclick="musicSavePreset()">💾 재생목록 저장</button>
+        <button class="btn sm" onclick="musicPlay()">▶ 저장 없이 바로 재생</button>
       </div>
-      <div id="musicStatus" style="margin-top:14px; font-size:13px; color:#64748b;">현재 상태 확인 중…</div>
 
       <hr style="margin:22px 0; border:none; border-top:1px solid #e2e8f0;">
 
@@ -409,13 +417,16 @@
   }
 
   // ── 🎵 점심 음악 (교실TV알림판 BGM) ──
+  var gMusicPresets = [];
   function musicRefresh() {
     google.script.run.withSuccessHandler(function(m){
       if (!m) return;
       var el = document.getElementById('musicStatus');
       if (el) {
-        if (m.mMode === 'play' && m.mUrl) el.innerHTML = '🟢 지금 재생 중: <b style="color:#0f172a;">' + esc(m.mUrl) + '</b>';
-        else el.textContent = '⚫ 지금 수동 재생 중인 음악이 없어요. (자동 시간대면 TV가 알아서 틀어요)';
+        if (m.mMode === 'play' && m.mUrl) {
+          var pn = null; (gMusicPresets||[]).forEach(function(p){ if (p.urls === m.mUrl) pn = p.name; });
+          el.innerHTML = '🟢 지금 재생 중: <b style="color:#0f172a;">' + (pn ? esc(pn) : esc(m.mUrl.split('\n')[0]) + ((m.mUrl.split('\n').length>1)?(' 외 '+(m.mUrl.split('\n').length-1)+'곡'):'')) + '</b>';
+        } else el.textContent = '⚫ 지금 수동 재생 중인 음악이 없어요. (자동 시간대면 TV가 알아서 틀어요)';
       }
       // 자동 설정 채우기
       var a = document.getElementById('musicAutoOn'); if (a) a.checked = !!m.aOn;
@@ -423,6 +434,56 @@
       if (m.aEnd) document.getElementById('musicAutoEnd').value = m.aEnd;
       if (m.aUrl) document.getElementById('musicAutoUrl').value = m.aUrl;
     }).withFailureHandler(function(){}).getTvMusic();
+    musicLoadPresets();
+  }
+  function musicLoadPresets() {
+    google.script.run.withSuccessHandler(function(res){
+      gMusicPresets = (res && res.presets) || [];
+      var box = document.getElementById('musicPresetList'); if (!box) return;
+      if (!gMusicPresets.length) { box.innerHTML = '<p style="font-size:13px; color:#94a3b8;">저장된 재생목록이 없어요. 아래에서 추가하세요.</p>'; return; }
+      box.innerHTML = gMusicPresets.map(function(p, i){
+        var cnt = p.urls ? p.urls.split(/[\s,]+/).filter(Boolean).length : 0;
+        return '<div style="display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:8px;">'
+          + '<div style="flex:1; min-width:0;"><div style="font-size:14px; font-weight:800; color:#0f172a;">🎵 ' + esc(p.name) + '</div>'
+          + '<div style="font-size:11px; color:#94a3b8;">' + (cnt>1 ? (cnt + '곡') : '재생목록/단일') + '</div></div>'
+          + '<button class="btn sm orange" style="padding:6px 14px;" onclick="musicPlayPreset(' + i + ')">▶ 재생</button>'
+          + '<button onclick="musicEditPreset(' + i + ')" style="background:#e0f2fe; color:#0369a1; border:none; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer;">✏️</button>'
+          + '<button onclick="musicDeletePreset(' + i + ')" style="background:#fee2e2; color:#dc2626; border:none; border-radius:8px; padding:6px 10px; font-size:12px; font-weight:700; cursor:pointer;">🗑</button>'
+          + '</div>';
+      }).join('');
+    }).withFailureHandler(function(){}).getMusicPresets();
+  }
+  function musicPlayPreset(i) {
+    var p = gMusicPresets[i]; if (!p) return;
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) { uiAlert('▶ "' + p.name + '" 재생! (소리 안 나면 TV 화면 한 번 클릭)'); musicRefresh(); }
+      else { uiAlert('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).setTvMusic('play', p.urls);
+  }
+  function musicEditPreset(i) {
+    var p = gMusicPresets[i]; if (!p) return;
+    document.getElementById('musicPresetName').value = p.name;
+    document.getElementById('musicUrl').value = p.urls;
+    document.getElementById('musicPresetName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  function musicDeletePreset(i) {
+    var p = gMusicPresets[i]; if (!p) return;
+    uiConfirm('"' + p.name + '" 재생목록을 삭제할까요?', function(){
+      google.script.run.withSuccessHandler(function(){ musicLoadPresets(); }).withFailureHandler(function(){}).deleteMusicPreset(p.name);
+    });
+  }
+  function musicSavePreset() {
+    var name = (document.getElementById('musicPresetName').value || '').trim();
+    var urls = (document.getElementById('musicUrl').value || '').trim();
+    if (!name) { uiAlert('재생목록 이름을 입력하세요.'); return; }
+    if (!urls) { uiAlert('유튜브 링크를 입력하세요.'); return; }
+    google.script.run.withSuccessHandler(function(r){
+      if (r && r.success) {
+        uiAlert('💾 "' + name + '" 저장 완료!');
+        document.getElementById('musicPresetName').value = ''; document.getElementById('musicUrl').value = '';
+        musicLoadPresets();
+      } else { uiAlert('실패: ' + (r && r.message || '')); }
+    }).withFailureHandler(function(e){ uiAlert('오류: ' + e.message); }).saveMusicPreset(name, urls);
   }
   function musicPlay() {
     var v = (document.getElementById('musicUrl').value || '').trim();
