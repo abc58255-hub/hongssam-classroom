@@ -542,6 +542,7 @@ var sylCheckCache    = {};
 var sylScheduleCache = {};
 var sylHolidayCache  = {};
 var sylExamInfo      = null;
+var sylExamDayCache  = {};   // {yyyy-MM-dd: 시험명}
 var sylMovedInCache  = {};
 var sylCollapsedMonths = (function() {
   try { return JSON.parse(localStorage.getItem('syl_collapsed_months') || '{}'); }
@@ -702,6 +703,7 @@ function loadSyllabusData(forceTab) {
       sylHolidayCache = res.holidays   || {};
       sylTaskRates    = res.taskRates  || {};
       sylExamInfo     = res.examInfo   || null;
+      sylExamDayCache = res.examDays   || {};
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
       var targetTab = forceTab || [5,1,2,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
@@ -1064,6 +1066,8 @@ function renderSylTable() {
   });
   // 공휴일도 표에 포함
   Object.keys(sylHolidayCache).forEach(function(d){ allDates[d] = true; });
+  // 시험 기간도 표에 포함
+  Object.keys(sylExamDayCache).forEach(function(d){ allDates[d] = true; });
   // 이동받은 수업이 있는 날짜도 표에 포함
   Object.keys(sylMovedInCache).forEach(function(key) {
     if (key.length < 11) return;
@@ -1152,17 +1156,19 @@ function renderSylTable() {
 
     var dow = d.getDay();
     var isHoliday = !!sylHolidayCache[dateStr];
-    var dayColor = (dow === 0 || isHoliday) ? '#dc2626' : dow === 6 ? '#2563eb' : '#1e293b';
-    var dateCellBg = isHoliday ? '#fef2f2' : wc.date;
+    var isExam = !isHoliday && !!sylExamDayCache[dateStr];
+    var examNm = isExam ? sylExamDayCache[dateStr] : '';
+    var dayColor = (dow === 0 || isHoliday) ? '#dc2626' : isExam ? '#0e7490' : dow === 6 ? '#2563eb' : '#1e293b';
+    var dateCellBg = isHoliday ? '#fef2f2' : isExam ? '#ecfeff' : wc.date;
     var rowDisplay = sylCollapsedMonths[monthKey] ? 'display:none;' : '';
     html += '<tr class="syl-row" data-month="' + monthKey + '" style="' + rowDisplay + '">'
       + '<td style="padding:8px 14px;white-space:nowrap;font-size:13px;font-weight:700;background:' + dateCellBg + ';' + weekBorder + '">'
         + '<span style="color:' + dayColor + ';">' + (d.getMonth()+1) + '/' + d.getDate() + ' (' + DAY_KR[dow] + ')'
-        + (isHoliday ? ' <span style="font-size:11px;">🏖️</span>' : '') + '</span>'
+        + (isHoliday ? ' <span style="font-size:11px;">🏖️</span>' : '') + (isExam ? ' <span style="font-size:11px;">📊</span>' : '') + '</span>'
         + (isNewWeek ? ' <span onclick="event.stopPropagation();fillWeek(\'' + curMonday + '\')" title="이 주 예정일에 각 반 예상 차시 자동 입력 (빈 칸만)" style="display:inline-block;margin-left:6px;font-size:10px;background:#7c3aed;color:#fff;padding:2px 7px;border-radius:9px;cursor:pointer;font-weight:800;white-space:nowrap;">📅 주간 예상</span>' : '')
         + (function() {
             // 그날 예정 수업의 처리 상태에 따라 버튼 모양 결정: 전부 처리됨 → 초록 "완료됨", 남음 → 회색 버튼
-            if (isHoliday) return '';
+            if (isHoliday || isExam) return '';
             var sched = 0, pending = 0;
             cols.forEach(function(c3) {
               if ((sylScheduleCache[c3] || []).indexOf(dateStr) < 0) return;
@@ -1188,6 +1194,15 @@ function renderSylTable() {
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
             + '<span style="font-size:16px;">🏖️</span>'
             + '<span style="font-size:9px;color:#dc2626;font-weight:700;">공휴일</span>'
+          + '</div></td>';
+        return;
+      }
+      // 시험 기간: 학기설정 시험일정에 등록된 날 (기록 없을 때만)
+      if (isExam && !scheduled && (!check || (!check.lessonNo && !check.status)) && !_hasMovedIn) {
+        html += '<td style="text-align:center;padding:6px 4px;background:#ecfeff;' + weekBorder + '">'
+          + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
+            + '<span style="font-size:16px;">📊</span>'
+            + '<span style="font-size:9px;color:#0e7490;font-weight:700;">' + escapeHtml(examNm) + '</span>'
           + '</div></td>';
         return;
       }
@@ -1370,7 +1385,8 @@ function renderSylTable() {
     + '<span style="background:#fefce8;padding:1px 5px;border-radius:4px;color:#92400e;">✅ 추가 = 임시/보충</span>'
     + '<span>🔄 = 날짜 이동됨</span>'
     + '<span style="background:#fef2f2;padding:1px 5px;border-radius:4px;color:#dc2626;">🏖️ = 공휴일</span>'
-    + '<span>🚫 = 취소 &nbsp; 🎉=학교행사 &nbsp; 🏕️=체험학습 &nbsp; 📝=시험 &nbsp; 🤒=휴교</span>'
+    + '<span style="background:#ecfeff;padding:1px 5px;border-radius:4px;color:#0e7490;">📊 = 시험 기간</span>'
+    + '<span>🚫 = 취소 &nbsp; 🎉=학교행사 &nbsp; 🏕️=체험학습 &nbsp; 📝=시험 &nbsp; 🤒=휴교 &nbsp; 📖=자습</span>'
     + '<span>☐ = 미기록</span>'
     + '<span style="color:#94a3b8;">&nbsp;셀 클릭 → 기록 · 열 [+] → 수업 추가</span></div>';
   wrap.innerHTML = html;

@@ -899,6 +899,15 @@ function getSyllabusData(groupId) {
 
     var taskRates = _getTaskRatesForGroup_(ss, classes);
 
+    // 시험 기간 날짜 → {yyyy-MM-dd: 시험명} (진도표 표에 시험 행으로 표시)
+    var examDays = {};
+    try {
+      _getExamsForGroup_(gid, ss).forEach(function(e){
+        var dset = _examDaysSet_([e]);
+        Object.keys(dset).forEach(function(d){ examDays[d] = e.name; });
+      });
+    } catch(_) {}
+
     // ── 🎯 시험까지 남은 차시 (반별) — 미래 시험 전부(1차·2차…) 한 번에 ──
     var examInfo = null;
     try {
@@ -937,7 +946,7 @@ function getSyllabusData(groupId) {
       }
     } catch(_) {}
 
-    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates, taskRates: taskRates, examInfo: examInfo };
+    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates, taskRates: taskRates, examInfo: examInfo, examDays: examDays };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
