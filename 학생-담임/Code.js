@@ -169,7 +169,7 @@ function getHomeroomData(studentId) {
   }
 
   let activeSurvey = null; const svSheet = _surveySs_().getSheetByName("설문목록");
-  if(svSheet) { let svData = svSheet.getDataRange().getValues(); for(let i=1; i<svData.length; i++) { if(svData[i][3] === "진행중") { activeSurvey = { id: svData[i][0], title: svData[i][2], questions: svData[i][4] }; break; } } }
+  if(svSheet) { let svData = svSheet.getDataRange().getValues(); for(let i=1; i<svData.length; i++) { if(svData[i][3] === "진행중") { activeSurvey = { id: svData[i][0], title: svData[i][2], questions: svData[i][4], guide: String(svData[i][5] || '').trim() }; break; } } }
 
   let hasSubmittedSurvey = false;
   if(activeSurvey) {
