@@ -784,7 +784,9 @@
     mHtml += '<div style="font-size:13px; color:#b91c1c; background:#fee2e2; padding:8px; border-radius:6px;"><b>🚨 미제출자:</b> ' + (missingStudents.map(function(s) { return s.name; }).join(', ') || '없음 (전원 제출 완료!)') + '</div></div>';
     if (resList.length === 0) { area.innerHTML = mHtml + '<div style="text-align:center; padding:30px;">아직 응답한 학생이 없습니다.</div>'; return; }
     let qData = JSON.parse(sv.questions);
-    let html = mHtml + '<div style="display:flex; justify-content:space-between; align-items:baseline; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;"><h3 style="margin:0; color:#b45309;">' + sv.title + ' 전체 통계</h3></div>';
+    let html = mHtml + '<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:20px; border-bottom:2px solid #e2e8f0; padding-bottom:10px;"><h3 style="margin:0; color:#b45309;">' + sv.title + ' 전체 통계</h3>'
+      + '<label style="font-size:13px;color:#1d4ed8;cursor:pointer;display:inline-flex;align-items:center;gap:6px;font-weight:700;background:#eff6ff;padding:7px 13px;border-radius:9px;border:1px solid #bfdbfe;white-space:nowrap;"><input type="checkbox" id="svShowAllNames" onchange="toggleAllSurveyNames()" style="width:16px;height:16px;cursor:pointer;"> 👤 작성자 이름 모두 표시</label>'
+      + '</div>';
     qData.forEach(function(q, idx) {
       var posterBtn = q.type === 'dynamic'
         ? '<button onclick="openPosterPrompt(\'' + svId + '\',' + idx + ')" style="background:#7c3aed;color:white;border:none;padding:7px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;">🎨 포스터 디자인 만들기</button>'
@@ -1135,6 +1137,12 @@
   function toggleSurveyNames(idx) {
     var checked = document.getElementById('svShowName-'+idx).checked;
     document.querySelectorAll('#svtxt-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'inline' : 'none'; });
+  }
+  // 👤 모든 주관식 작성자 이름을 한 번에 표시/숨김
+  function toggleAllSurveyNames() {
+    var on = document.getElementById('svShowAllNames').checked;
+    document.querySelectorAll('#surveyStatsList .sv-author').forEach(function(el){ el.style.display = on ? 'inline' : 'none'; });
+    document.querySelectorAll('#surveyStatsList input[id^="svShowName-"]').forEach(function(cb){ cb.checked = on; });
   }
   function navSurveyViewer(dir) { currentViewerIdx += dir; renderSurveyViewer(); }
   function renderSurveyViewer() {
