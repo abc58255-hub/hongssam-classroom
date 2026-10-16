@@ -49,7 +49,7 @@ function doGet() {
 }
 
 // PWA(Pages) 프론트에서 google.script.run 어댑터로 호출 — text/plain {fn,args} → {ok,result|error}
-var RPC_WHITELIST = ['bulkChangeLessons','bulkCompleteDay','bulkFillPlanned','createGroup','createPlan','deleteGroup','deleteMovedInLesson','deletePlan','deleteSemester','deleteSyllabusCheck','generateAndApplySchedule','getClassList','getGroups','getPlanList','getSemesterList','getSyllabusData','getSyllabusPlanById','getTimetableList','renamePlan','saveMovedInLesson','saveSylClassList','saveSyllabusCheck','saveSyllabusPlan','saveSyllabusPlanById','updateGroup','verifyTeacher'];
+var RPC_WHITELIST = ['bulkChangeLessons','bulkCompleteDay','bulkFillPlanned','createGroup','createPlan','deleteGroup','deleteMovedInLesson','deletePlan','deleteSemester','deleteSyllabusCheck','generateAndApplySchedule','getClassList','getGroups','getPlanList','getSemesterList','getSyllabusData','getSyllabusPlanById','getTimetableList','renamePlan','saveMovedInLesson','saveSylClassList','saveSyllabusCheck','saveSyllabusPlan','saveSyllabusPlanById','updateGroup','verifyTeacher','getDayOverrides','saveDayOverride','deleteDayOverride'];
 function doPost(e) {
   var out;
   try {
@@ -566,6 +566,74 @@ function deleteTimetable(groupId, cls, semester) {
 // =====================================================
 
 // 내부 헬퍼: 시트에 쓰지 않고 { cls: ['yyyy-MM-dd', ...] } 반환
+// ── 📌 특일(그날만) 시간표 ── 시트 '특일시간표': A=그룹ID, B=날짜, C=반, D=교시
+// 한 날짜에 행이 하나라도 있으면 '그날은 특일'로 간주 → 주간 시간표 무시, 이 행들로 대체.
+// 교시>0 = 그 반 수업(해당 교시), 교시=0 = 그 반 수업 없음(날짜 표시용 마커).
+function _dayOverrideSheet_(ss) {
+  return _ensureSh(ss, '특일시간표', ['그룹ID','날짜','반','교시'], '#9333ea');
+}
+// → { dates: {날짜:true}, lessons: {날짜: {반: 교시(>0)}} }
+function _getDayOverrides_(gid, ss) {
+  var out = { dates: {}, lessons: {} };
+  var sh = ss.getSheetByName('특일시간표');
+  if (!sh || sh.getLastRow() < 2) return out;
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+  rows.forEach(function(r) {
+    if (String(r[0]).trim() !== gid) return;
+    var date = r[1] instanceof Date ? Utilities.formatDate(r[1], 'Asia/Seoul', 'yyyy-MM-dd') : String(r[1] || '').trim();
+    if (!date) return;
+    out.dates[date] = true;
+    var cls = String(r[2] || '').trim();
+    var period = parseInt(r[3]) || 0;
+    if (cls && period > 0) { if (!out.lessons[date]) out.lessons[date] = {}; out.lessons[date][cls] = period; }
+  });
+  return out;
+}
+function getDayOverrides(groupId) {
+  try {
+    var gid = groupId || '기본';
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    return { success: true, overrides: _getDayOverrides_(gid, ss) };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+// perClass = [{ cls, period }] (period 0/빈값 = 수업 없음) — 해당 날짜 기존 특일행 전부 교체
+function saveDayOverride(groupId, date, perClass) {
+  try {
+    var gid = groupId || '기본';
+    if (!date) return { success: false, message: '날짜를 선택하세요.' };
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = _dayOverrideSheet_(ss);
+    // 기존 같은 날짜 행 삭제
+    if (sh.getLastRow() >= 2) {
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+      for (var i = rows.length - 1; i >= 0; i--) {
+        var dStr = rows[i][1] instanceof Date ? Utilities.formatDate(rows[i][1], 'Asia/Seoul', 'yyyy-MM-dd') : String(rows[i][1] || '').trim();
+        if (String(rows[i][0]).trim() === gid && dStr === date) sh.deleteRow(i + 2);
+      }
+    }
+    // 새로 기록 (모든 반 행 기록 → 날짜가 '특일'로 마킹됨)
+    (perClass || []).forEach(function(pc) {
+      var cls = String(pc.cls || '').trim(); if (!cls) return;
+      sh.appendRow([gid, date, cls, parseInt(pc.period) || 0]);
+    });
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+function deleteDayOverride(groupId, date) {
+  try {
+    var gid = groupId || '기본';
+    var ss = SpreadsheetApp.openById(SHEET_ID);
+    var sh = ss.getSheetByName('특일시간표');
+    if (!sh || sh.getLastRow() < 2) return { success: true };
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 2).getValues();
+    for (var i = rows.length - 1; i >= 0; i--) {
+      var dStr = rows[i][1] instanceof Date ? Utilities.formatDate(rows[i][1], 'Asia/Seoul', 'yyyy-MM-dd') : String(rows[i][1] || '').trim();
+      if (String(rows[i][0]).trim() === gid && dStr === date) sh.deleteRow(i + 2);
+    }
+    return { success: true };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
 function _computeSchedule_(gid, ss) {
   var semSh = ss.getSheetByName('학기설정');
   var ttSh  = ss.getSheetByName('시간표설정');
@@ -624,6 +692,25 @@ function _computeSchedule_(gid, ss) {
   Object.keys(schedule).forEach(function(cls){
     result[cls] = Object.keys(schedule[cls]).sort();
   });
+
+  // ── 📌 특일 시간표 적용 ── 특일 날짜는 주간 시간표 무시, 특일 수업으로 대체
+  var ov = _getDayOverrides_(gid, ss);
+  var ovDates = Object.keys(ov.dates);
+  if (ovDates.length) {
+    // 1) 특일 날짜를 모든 반의 주간 일정에서 제거
+    Object.keys(result).forEach(function(cls){
+      result[cls] = result[cls].filter(function(d){ return !ov.dates[d]; });
+    });
+    // 2) 특일 수업(교시>0) 주입
+    ovDates.forEach(function(date){
+      var byCls = ov.lessons[date] || {};
+      Object.keys(byCls).forEach(function(cls){
+        if (!result[cls]) result[cls] = [];
+        if (result[cls].indexOf(date) < 0) result[cls].push(date);
+      });
+    });
+    Object.keys(result).forEach(function(cls){ result[cls].sort(); });
+  }
   return result;
 }
 
@@ -946,7 +1033,8 @@ function getSyllabusData(groupId) {
       }
     } catch(_) {}
 
-    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates, taskRates: taskRates, examInfo: examInfo, examDays: examDays };
+    var dayOverrides = _getDayOverrides_(gid, ss);
+    return { success: true, plans: plans, checks: checks, movedIn: movedIn, classes: classes, schedule: schedule, holidays: holidayDates, taskRates: taskRates, examInfo: examInfo, examDays: examDays, dayOverrides: dayOverrides };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 

@@ -251,6 +251,30 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
         <div id="savedTimetableList"><div class="loading" style="padding:20px;">불러오는 중...</div></div>
       </div>
 
+      <!-- 📌 특일(그날만) 시간표 -->
+      <div class="section-card">
+        <div class="section-title">📌 특일(그날만) 시간표</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px;line-height:1.6;">행사·요일 변경·보강으로 <b>특정 날만 시간표가 다를 때</b> 설정해요. 반별로 교시를 직접 넣거나, 특정 요일 시간표를 통째로 복사할 수 있어요. <b>그날은 이 설정이 주간 시간표를 대체</b>합니다.</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+          <input type="date" id="ovDate" class="form-input" style="max-width:170px;" onchange="ovLoadDate()">
+          <select id="ovCopyDay" class="form-input" style="max-width:150px;">
+            <option value="">요일 복사…</option>
+            <option value="mon">월요일 시간표</option>
+            <option value="tue">화요일 시간표</option>
+            <option value="wed">수요일 시간표</option>
+            <option value="thu">목요일 시간표</option>
+            <option value="fri">금요일 시간표</option>
+          </select>
+          <button type="button" class="btn btn-gray" style="font-size:12px;padding:8px 12px;" onclick="ovCopyWeekday()">⬇ 복사</button>
+        </div>
+        <div id="ovClassGrid" style="margin-bottom:10px;"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="ovSave()" style="padding:9px 18px;font-size:14px;">💾 특일 시간표 저장</button>
+          <div id="ovSaveStatus" style="font-size:13px;"></div>
+        </div>
+        <div id="ovSavedList" style="margin-top:14px;"></div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -494,6 +518,7 @@ var sylScheduleCache = {};
 var sylHolidayCache  = {};
 var sylExamInfo      = null;
 var sylExamDayCache  = {};   // {yyyy-MM-dd: 시험명}
+var sylDayOverrides  = { dates:{}, lessons:{} };   // 특일 시간표 {dates:{날짜:true}, lessons:{날짜:{반:교시}}}
 var sylMovedInCache  = {};
 var sylCollapsedMonths = (function() {
   try { return JSON.parse(localStorage.getItem('syl_collapsed_months') || '{}'); }
@@ -655,6 +680,7 @@ function loadSyllabusData(forceTab) {
       sylTaskRates    = res.taskRates  || {};
       sylExamInfo     = res.examInfo   || null;
       sylExamDayCache = res.examDays   || {};
+      sylDayOverrides = res.dayOverrides || { dates:{}, lessons:{} };
       sylClassList    = (res.classes && res.classes.length > 0) ? res.classes : (allClasses.length > 0 ? allClasses.slice() : []);
       var targetTab = forceTab || [5,1,2,4].find(function(i) {
         var el = document.getElementById('tab-content-'+i);
@@ -839,6 +865,7 @@ function renderWeekTimetable(){
     DAYS.forEach(function(d,di){
       var p=Number(entry[d])||0; if(p<=0) return;
       var date=weekDates[di];
+      if(sylDayOverrides.dates && sylDayOverrides.dates[date]) return; // 특일 날짜는 아래 ovGrid로 처리
       if((sylScheduleCache[cls]||[]).indexOf(date)<0) return; // 이번주 이 날 예정 수업 아님
       periods[p]=true;
       if(!grid[p]) grid[p]={};
@@ -859,6 +886,20 @@ function renderWeekTimetable(){
       movedGrid[p][di]={ cls:tcls, no:no, actual:(Number(mi.lessonNo)>0), source:(mi.sourceDate||'').substring(5).replace('-','/') };
     });
   });
+  // 📌 특일 시간표 수업 (특일 날짜의 반별 교시로 배치)
+  var ovGrid={};
+  Object.keys((sylDayOverrides&&sylDayOverrides.dates)||{}).forEach(function(date){
+    var di=weekDates.indexOf(date); if(di<0) return;
+    var byCls=(sylDayOverrides.lessons||{})[date]||{};
+    Object.keys(byCls).forEach(function(cls){
+      var p=Number(byCls[cls])||0; if(p<=0) return;
+      var lm=lessonMap[cls] && lessonMap[cls][date];
+      periods[p]=true;
+      if(!ovGrid[p]) ovGrid[p]={};
+      ovGrid[p][di]={ cls:cls, no:lm?lm.no:null, actual:lm?lm.actual:false, status:lm?lm.status:'' };
+    });
+  });
+
   var periodList=Object.keys(periods).map(Number).sort(function(a,b){return a-b;});
 
   if(!periodList.length){
@@ -900,7 +941,9 @@ function renderWeekTimetable(){
     html+='<tr><td style="padding:8px;text-align:center;font-size:12px;font-weight:800;color:#64748b;background:#f8fafc;border:1px solid #e2e8f0;">'+p+'교시</td>';
     DAYS.forEach(function(d,di){
       var isToday=weekDates[di]===today;
-      var cell=(grid[p]||{})[di];
+      var ovCell=(ovGrid[p]||{})[di];
+      var cell=(grid[p]||{})[di] || ovCell;
+      var isOv=!!ovCell && !(grid[p]||{})[di];
       var moved=(movedGrid[p]||{})[di];
       var bg=isToday?'#eff6ff':'#fff';
       if(!cell && !moved){ html+='<td style="border:1px solid #e2e8f0;background:'+bg+';"></td>'; return; }
@@ -949,7 +992,7 @@ function renderWeekTimetable(){
         attrs+='cursor:pointer;" onclick="markWeekCell('+cid+')" title="클릭: 실제 수업 완료 토글"';
       } else { attrs+='"'; }
       html+='<td'+attrs+'>'
-        +'<div style="font-size:12px;font-weight:800;color:#1e293b;">'+escapeHtml(clsName)+'</div>'
+        +'<div style="font-size:12px;font-weight:800;color:#1e293b;">'+escapeHtml(clsName)+(isOv?' <span style="font-size:9px;color:#9333ea;background:#faf5ff;border:1px solid #e9d5ff;padding:0 4px;border-radius:6px;vertical-align:middle;">📌특일</span>':'')+'</div>'
         +inner+'</td>';
     });
     html+='</tr>';
@@ -2161,8 +2204,9 @@ function loadTimetableTab() {
         .withSuccessHandler(function(res2) {
           timetableCache = (res2.success ? res2.entries : []) || [];
           renderSavedTimetableList();
+          ovRenderSavedList(); ovRenderGrid({});
         })
-        .withFailureHandler(function(){ timetableCache = []; renderSavedTimetableList(); })
+        .withFailureHandler(function(){ timetableCache = []; renderSavedTimetableList(); ovRenderSavedList(); ovRenderGrid({}); })
         .getTimetableList(currentGroupId);
     })
     .withFailureHandler(function(){ semestersCache = []; renderSavedTimetableList(); })
@@ -2407,6 +2451,78 @@ function saveAndGenerateSchedule() {
       statusEl.textContent = '❌ 오류: ' + e.message;
     })
     .generateAndApplySchedule(currentGroupId, { name: semName, start: semStart, end: semEnd, holidays: holidays, exams: _examListF() }, ttArray);
+}
+
+// ── 📌 특일(그날만) 시간표 편집 ──
+function ovActiveClasses(){ return getActiveClasses().filter(function(x){ return x && x!=='undefined'; }); }
+function ovSemForDate(date){
+  var s=(semestersCache||[]).filter(function(x){ return x.start && x.end && x.start<=date && date<=x.end; })[0];
+  return s ? s.name : ((semestersCache||[])[0] ? semestersCache[0].name : '');
+}
+function ovRenderGrid(prefill){
+  var grid=document.getElementById('ovClassGrid'); if(!grid) return;
+  var cols=ovActiveClasses();
+  if(!cols.length){ grid.innerHTML='<div style="color:#94a3b8;font-size:13px;">반 목록이 없어요.</div>'; return; }
+  grid.innerHTML=cols.map(function(cls){
+    var p=(prefill && prefill[cls]!=null) ? prefill[cls] : '';
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">'
+      +'<span style="min-width:70px;font-size:13px;font-weight:700;color:#334155;">'+escapeHtml(cls)+'</span>'
+      +'<input type="number" class="ov-period" data-cls="'+escapeHtml(cls)+'" min="0" max="12" value="'+p+'" placeholder="교시 (빈칸=수업 없음)" style="width:180px;padding:7px;border:2px solid #e2e8f0;border-radius:8px;font-size:13px;">'
+      +'</div>';
+  }).join('');
+}
+function ovLoadDate(){
+  var date=document.getElementById('ovDate').value;
+  var pre=(date && sylDayOverrides.dates[date]) ? (sylDayOverrides.lessons[date]||{}) : {};
+  ovRenderGrid(pre);
+}
+function ovCopyWeekday(){
+  var day=document.getElementById('ovCopyDay').value;
+  if(!day){ alert('복사할 요일을 선택하세요.'); return; }
+  var date=document.getElementById('ovDate').value;
+  var semName=ovSemForDate(date);
+  var pre={};
+  (timetableCache||[]).forEach(function(e){
+    if(!e.cls) return;
+    if(semName && String(e.semester||'').trim()!==semName) return;
+    var p=Number(e[day])||0; if(p>0) pre[e.cls]=p;
+  });
+  ovRenderGrid(pre);
+}
+function ovSave(){
+  var date=document.getElementById('ovDate').value;
+  if(!date){ alert('날짜를 먼저 선택하세요.'); return; }
+  var perClass=[];
+  document.querySelectorAll('#ovClassGrid .ov-period').forEach(function(inp){
+    perClass.push({ cls: inp.dataset.cls, period: parseInt(inp.value)||0 });
+  });
+  var st=document.getElementById('ovSaveStatus'); st.style.color='#64748b'; st.textContent='저장 중...';
+  google.script.run
+    .withSuccessHandler(function(r){
+      if(r&&r.success){ st.style.color='#16a34a'; st.textContent='✅ '+date+' 특일 시간표 저장 완료!'; loadSyllabusData(); setTimeout(function(){ st.textContent=''; },3500); }
+      else { st.style.color='#ef4444'; st.textContent='실패: '+((r&&r.message)||''); }
+    })
+    .withFailureHandler(function(e){ st.style.color='#ef4444'; st.textContent='오류: '+e.message; })
+    .saveDayOverride(currentGroupId, date, perClass);
+}
+function ovDelete(date){
+  if(!confirm(date+' 특일 시간표를 삭제하고 주간 시간표로 되돌릴까요?')) return;
+  google.script.run.withSuccessHandler(function(){ loadSyllabusData(); }).withFailureHandler(function(e){ alert('삭제 실패: '+e.message); }).deleteDayOverride(currentGroupId, date);
+}
+function ovEdit(date){ document.getElementById('ovDate').value=date; ovLoadDate(); var el=document.getElementById('ovDate'); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); }
+function ovRenderSavedList(){
+  var box=document.getElementById('ovSavedList'); if(!box) return;
+  var dates=Object.keys((sylDayOverrides&&sylDayOverrides.dates)||{}).sort();
+  if(!dates.length){ box.innerHTML='<div style="font-size:12px;color:#94a3b8;">등록된 특일 시간표가 없어요.</div>'; return; }
+  box.innerHTML='<div style="font-size:12px;font-weight:700;color:#64748b;margin-bottom:6px;">📌 등록된 특일</div>'+dates.map(function(d){
+    var ls=(sylDayOverrides.lessons&&sylDayOverrides.lessons[d])||{};
+    var summary=Object.keys(ls).map(function(c){ return escapeHtml(c)+' '+ls[c]+'교시'; }).join(', ')||'전 반 수업 없음';
+    return '<div style="display:flex;align-items:center;gap:8px;background:#faf5ff;border:1px solid #e9d5ff;border-radius:10px;padding:8px 12px;margin-bottom:6px;">'
+      +'<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:800;color:#6b21a8;">📌 '+d+'</div><div style="font-size:11px;color:#7c3aed;word-break:break-all;">'+summary+'</div></div>'
+      +'<button onclick="ovEdit(\''+d+'\')" style="background:#e0f2fe;color:#0369a1;border:none;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">✏️</button>'
+      +'<button onclick="ovDelete(\''+d+'\')" style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;cursor:pointer;">🗑</button>'
+      +'</div>';
+  }).join('');
 }
 
 function renderSavedTimetableList() {
