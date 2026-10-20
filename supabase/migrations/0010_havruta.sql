@@ -8,6 +8,8 @@ create table if not exists public.havruta_sessions (
   class_scope  text not null,                       -- 'N학년 M반'
   unit         text not null default '',            -- 단원명(표시용)
   sub_units    text not null default '',            -- 소단원 라벨(줄바꿈 구분, 비면 ①~⑤ 번호)
+  n_words      int not null default 2,              -- 소단원당 단어 입력칸 수
+  n_questions  int not null default 2,              -- 소단원당 질문 입력칸 수
   stage        text not null default 'submit',      -- 'submit' | 'vote' | 'discuss'
   focus_q      bigint,                              -- 오늘의 질문(havruta_questions.id)
   active       boolean not null default true,
@@ -27,6 +29,7 @@ create table if not exists public.havruta_questions (
   word        text not null default '',             -- 중요한 단어
   question    text not null default '',             -- 질문
   votes       int not null default 0,               -- 득표(트리거로 집계)
+  candidate   boolean not null default false,        -- 교사가 투표 후보로 지정
   created_at  timestamptz not null default now()
 );
 create index if not exists havruta_questions_session on public.havruta_questions(session_id);

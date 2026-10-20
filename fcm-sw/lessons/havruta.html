@@ -105,52 +105,56 @@
     else renderDiscuss();
   }
 
-  // ── 제출 단계 ──
+  // ── 제출 단계 ── 소단원 선택 → 단어 N개 + 질문 M개 (분리 입력)
+  function nWords(){ return Math.max(1, Number(SESSION&&SESSION.n_words)||2); }
+  function nQ(){ return Math.max(1, Number(SESSION&&SESSION.n_questions)||2); }
   function renderSubmit(){
     var subs=subLabels();
     var chips=subs.map(function(lb,i){ return '<div class="chip'+(i===SUBIDX?' on':'')+'" onclick="SUBIDX='+i+';renderSubmit()">'+CIRC[i]+' '+esc(lb)+'</div>'; }).join('');
+    var wIn=''; for(var a=0;a<nWords();a++) wIn+='<input type="text" class="wIn" placeholder="중요한 단어 '+(a+1)+'" style="margin-bottom:6px;">';
+    var qIn=''; for(var b=0;b<nQ();b++) qIn+='<textarea class="qIn" placeholder="질문 '+(b+1)+'" style="margin-bottom:6px;"></textarea>';
     var html='<div class="card">'
       +'<label>소단원 선택</label><div class="chips">'+chips+'</div>'
-      +'<label>중요한 단어</label><input type="text" id="qWord" placeholder="예: 닮음비">'
-      +'<label>가장 중요한 질문</label><textarea id="qText" placeholder="교과서를 읽고 궁금한 점을 질문으로 적어요"></textarea>'
-      +'<label style="display:flex;align-items:center;gap:7px;font-weight:600;margin-top:12px;"><input type="checkbox" id="qAnon" style="width:17px;height:17px;"> 익명으로 내기</label>'
-      +'<button class="btn" onclick="submitQ()">질문 제출하기</button>'
+      +'<label>🔑 중요한 단어</label>'+wIn
+      +'<label>❓ 가장 중요한 질문</label>'+qIn
+      +'<label style="display:flex;align-items:center;gap:7px;font-weight:600;margin-top:10px;"><input type="checkbox" id="qAnon" style="width:17px;height:17px;"> 익명으로 내기</label>'
+      +'<button class="btn" onclick="submitQ()">제출하기</button>'
       +'</div><div id="mine"></div>';
     document.getElementById('main').innerHTML=html;
     renderMine();
   }
   function submitQ(){
-    var word=(document.getElementById('qWord').value||'').trim();
-    var q=(document.getElementById('qText').value||'').trim();
     var anon=document.getElementById('qAnon').checked;
-    if(!q){ toast('질문을 입력해요'); return; }
-    sb.from('havruta_questions').insert({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, anon:anon, word:word, question:q })
-      .then(function(r){ if(r.error){ toast('오류: '+r.error.message); return; } document.getElementById('qWord').value=''; document.getElementById('qText').value=''; toast('제출 완료! ✨'); renderMine(); });
+    var rows=[];
+    document.querySelectorAll('.wIn').forEach(function(el){ var w=(el.value||'').trim(); if(w) rows.push({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, anon:anon, word:w, question:'' }); });
+    document.querySelectorAll('.qIn').forEach(function(el){ var q=(el.value||'').trim(); if(q) rows.push({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, anon:anon, word:'', question:q }); });
+    if(!rows.length){ toast('단어나 질문을 하나 이상 적어요'); return; }
+    sb.from('havruta_questions').insert(rows).then(function(r){ if(r.error){ toast('오류: '+r.error.message); return; } toast(rows.length+'개 제출 완료! ✨'); renderSubmit(); });
   }
   function renderMine(){
     var box=document.getElementById('mine'); if(!box) return;
     sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).eq('student_id',USER.studentId).order('created_at',{ascending:false})
-      .then(function(r){ var rows=r.data||[];
-        if(!rows.length){ box.innerHTML=''; return; }
-        box.innerHTML='<div class="card"><div style="font-size:13px;font-weight:800;color:#4338ca;margin-bottom:8px;">내가 낸 질문 ('+rows.length+')</div>'
-          +rows.map(function(x){ return '<div class="q">'+(x.word?'<span class="word">'+esc(x.word)+'</span><br>':'')+'<span class="txt">'+CIRC[(x.sub_unit||1)-1]+' '+esc(x.question)+'</span>'
-            +' <button onclick="delQ('+x.id+')" style="float:right;background:none;border:none;color:#cbd5e1;font-size:16px;cursor:pointer;">🗑</button></div>'; }).join('')+'</div>';
+      .then(function(r){ var all=r.data||[]; var qs=all.filter(function(x){return String(x.question||'').trim();}); var ws=all.filter(function(x){return String(x.word||'').trim();});
+        if(!all.length){ box.innerHTML=''; return; }
+        var h='<div class="card"><div style="font-size:13px;font-weight:800;color:#4338ca;margin-bottom:8px;">내가 낸 것 — 질문 '+qs.length+' · 단어 '+ws.length+'</div>';
+        h+=qs.map(function(x){ return '<div class="q"><span class="txt">'+CIRC[(x.sub_unit||1)-1]+' '+esc(x.question)+'</span><button onclick="delQ('+x.id+')" style="float:right;background:none;border:none;color:#cbd5e1;font-size:16px;cursor:pointer;">🗑</button></div>'; }).join('');
+        if(ws.length) h+='<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'+ws.map(function(x){ return '<span class="word" style="cursor:pointer;" onclick="delQ('+x.id+')" title="삭제">'+esc(x.word)+' ✕</span>'; }).join('')+'</div>';
+        box.innerHTML=h+'</div>';
       });
   }
   function delQ(id){ sb.from('havruta_questions').delete().eq('id',id).then(function(){ renderMine(); }); }
 
-  // ── 투표 단계 ──
+  // ── 투표 단계 ── 선생님이 고른 후보 질문만
   function renderVote(){
-    sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).order('sub_unit',{ascending:true}).order('created_at',{ascending:true})
-      .then(function(r){ var rows=r.data||[];
+    sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).eq('candidate',true).order('sub_unit',{ascending:true}).order('created_at',{ascending:true})
+      .then(function(r){ var rows=(r.data||[]).filter(function(x){return String(x.question||'').trim();});
         var used=Object.keys(MYVOTES).length;
-        var head='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;">👍 가장 중요하다고 생각하는 질문에 투표! <span style="font-size:12px;color:#94a3b8;">(남은 표 '+(VOTE_CAP-used)+'/'+VOTE_CAP+')</span></div></div>';
-        if(!rows.length){ document.getElementById('main').innerHTML=head+'<div class="muted">아직 질문이 없어요.</div>'; return; }
+        var head='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;">👍 가장 중요한 질문에 투표! <span style="font-size:12px;color:#94a3b8;">(남은 표 '+(VOTE_CAP-used)+'/'+VOTE_CAP+')</span></div></div>';
+        if(!rows.length){ document.getElementById('main').innerHTML=head+'<div class="muted">선생님이 투표할 질문을 고르는 중이에요… 🤔</div>'; return; }
         var html=head+rows.map(function(x){
           var voted=!!MYVOTES[x.id];
           var who=x.anon?'익명':esc(x.name);
           return '<div class="q"><span class="txt">'+CIRC[(x.sub_unit||1)-1]+' '+esc(x.question)+'</span>'
-            +(x.word?'<div style="margin-top:3px;"><span class="word">'+esc(x.word)+'</span></div>':'')
             +'<div class="meta">'+who+'</div>'
             +'<button class="vote-btn'+(voted?' voted':'')+'" onclick="toggleVote('+x.id+')">'+(voted?'✓ 투표함':'👍 투표')+' <b>'+(x.votes||0)+'</b></button></div>';
         }).join('');
