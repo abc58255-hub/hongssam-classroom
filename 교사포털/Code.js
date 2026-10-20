@@ -37,7 +37,8 @@ var RPC_WHITELIST = [
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
   'getLinks', 'saveLink', 'deleteLink',
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
-  'graphPresetSave', 'graphPresetDelete', 'syncRoster'
+  'graphPresetSave', 'graphPresetDelete', 'syncRoster',
+  'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose'
 ];
 
 function doPost(e) {
@@ -184,6 +185,27 @@ function graphClear(token, id) {
 function graphClose(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'graphClose', id: id });
+}
+// ── 하브루타(짝 질문) 교사 제어 ──
+function havrutaOpen(token, session) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요. 새로고침 후 다시 로그인해주세요.' };
+  return _lessonCall_({ op: 'havrutaOpen', session: session });
+}
+function havrutaStage(token, id, stage) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'havrutaStage', id: id, stage: stage });
+}
+function havrutaFocus(token, id, focus_q) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'havrutaFocus', id: id, focus_q: focus_q });
+}
+function havrutaDeleteQ(token, qid) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'havrutaDeleteQ', qid: qid });
+}
+function havrutaClose(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'havrutaClose', id: id });
 }
 // 실제 학생이 있는 반 목록만 반환 — 학번(sid) 앞2자리로 유도해 학생앱 className과 형식 일치 보장
 function graphClasses(token) {

@@ -163,6 +163,49 @@ Deno.serve(async (req) => {
       return Response.json({ success: true });
     }
 
+    // ── 하브루타(짝 질문) 교사 제어 ──
+    // 세션 열기: {op:'havrutaOpen', session:{class_scope, unit}} — 기존 활성 세션 종료 후 새로
+    if (body.op === "havrutaOpen") {
+      const S = body.session ?? {};
+      const cls = String(S.class_scope ?? "").trim();
+      if (!cls) return Response.json({ success: false, message: "반이 없습니다." }, { status: 400 });
+      await admin0.from("havruta_sessions").update({ active: false }).eq("class_scope", cls).eq("active", true);
+      const row = { class_scope: cls, unit: String(S.unit ?? "").trim(), sub_units: String(S.sub_units ?? "").trim(), stage: "submit", active: true };
+      let ins = await admin0.from("havruta_sessions").insert(row).select("id").single();
+      if (ins.error) {
+        await admin0.from("havruta_sessions").update({ active: false }).eq("class_scope", cls).eq("active", true);
+        ins = await admin0.from("havruta_sessions").insert(row).select("id").single();
+      }
+      if (ins.error) return Response.json({ success: false, message: ins.error.message }, { status: 500 });
+      return Response.json({ success: true, id: ins.data.id });
+    }
+    // 단계 전환: {op:'havrutaStage', id, stage:'submit'|'vote'|'discuss'}
+    if (body.op === "havrutaStage") {
+      const st = ["submit", "vote", "discuss"].includes(String(body.stage)) ? String(body.stage) : "submit";
+      const { error } = await admin0.from("havruta_sessions").update({ stage: st }).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 오늘의 질문 선정: {op:'havrutaFocus', id, focus_q}
+    if (body.op === "havrutaFocus") {
+      const fq = body.focus_q == null ? null : Number(body.focus_q);
+      const { error } = await admin0.from("havruta_sessions").update({ focus_q: fq }).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 질문 삭제(부적절): {op:'havrutaDeleteQ', qid}
+    if (body.op === "havrutaDeleteQ") {
+      const { error } = await admin0.from("havruta_questions").delete().eq("id", Number(body.qid));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 세션 닫기: {op:'havrutaClose', id}
+    if (body.op === "havrutaClose") {
+      const { error } = await admin0.from("havruta_sessions").update({ active: false }).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
     // 게임 등록/수정 모드: {games:[{unit,game,title,url,scope,status}]}
     if (Array.isArray(body.games)) {
       const okStatus = ["hidden", "open", "free"];

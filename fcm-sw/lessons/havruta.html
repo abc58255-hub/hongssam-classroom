@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>하브루타 질문</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase-config.js"></script>
+<script src="./lessons-common.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;background:#f3f4f6;color:#1e293b;padding:14px;max-width:560px;margin:0 auto;-webkit-tap-highlight-color:transparent;}
+  .card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:16px;margin-bottom:12px;}
+  .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .hd h1{font-size:18px;font-weight:900;color:#4338ca;}
+  .stage-badge{font-size:12px;font-weight:800;padding:4px 10px;border-radius:20px;}
+  .stg-submit{background:#dbeafe;color:#1d4ed8;} .stg-vote{background:#fef3c7;color:#b45309;} .stg-discuss{background:#dcfce7;color:#15803d;}
+  label{font-size:13px;font-weight:700;color:#475569;display:block;margin:10px 0 5px;}
+  input[type=text],textarea,select{width:100%;padding:11px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:15px;background:#f9fafb;font-family:inherit;}
+  textarea{resize:vertical;min-height:60px;}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px;}
+  .chip{padding:8px 12px;border:2px solid #e5e7eb;border-radius:10px;font-size:13px;font-weight:700;background:#fff;color:#475569;cursor:pointer;}
+  .chip.on{background:#4338ca;border-color:#4338ca;color:#fff;}
+  .btn{width:100%;padding:14px;background:#4338ca;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;margin-top:12px;}
+  .btn:disabled{background:#cbd5e1;}
+  .q{background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:8px;}
+  .q .word{font-size:11px;font-weight:800;color:#7c3aed;background:#f3e8ff;display:inline-block;padding:2px 8px;border-radius:8px;margin-bottom:4px;}
+  .q .txt{font-size:14px;color:#0f172a;line-height:1.5;word-break:keep-all;}
+  .q .meta{font-size:11px;color:#94a3b8;margin-top:4px;}
+  .vote-btn{display:inline-flex;align-items:center;gap:5px;background:#fff;border:2px solid #fde68a;color:#b45309;border-radius:20px;padding:6px 14px;font-size:14px;font-weight:800;cursor:pointer;margin-top:8px;}
+  .vote-btn.voted{background:#f59e0b;border-color:#f59e0b;color:#fff;}
+  .muted{color:#94a3b8;font-size:14px;text-align:center;padding:30px 10px;line-height:1.6;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:.3s;pointer-events:none;z-index:999;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+  <div class="hd">
+    <h1>💬 하브루타 질문</h1>
+    <span id="stageBadge" class="stage-badge stg-submit">준비 중</span>
+  </div>
+  <div id="unitLine" style="font-size:13px;color:#64748b;font-weight:700;margin-bottom:10px;"></div>
+  <div id="main"><div class="muted">불러오는 중…</div></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  var USER=null, sb=null, SESSION=null, SUBIDX=0, MYVOTES={}, VOTE_CAP=3;
+  var CIRC=['①','②','③','④','⑤','⑥','⑦','⑧'];
+
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1800); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function subLabels(){
+    var raw=(SESSION&&SESSION.sub_units||'').trim();
+    if(raw) return raw.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean);
+    return ['소단원 1','소단원 2','소단원 3','소단원 4','소단원 5'];
+  }
+
+  LessonHub.init({ onReady: function(user){ USER=user; sb=LessonHub.client; findSession(); } });
+
+  function findSession(){
+    sb.from('havruta_sessions').select('*').eq('class_scope', USER.className).eq('active', true)
+      .order('created_at',{ascending:false}).limit(1)
+      .then(function(r){
+        SESSION=(r.data&&r.data[0])||null;
+        if(!SESSION){ document.getElementById('main').innerHTML='<div class="muted">아직 하브루타가 열리지 않았어요.<br>선생님이 시작하면 여기에 나타나요! 🙂</div>'; subscribeSession(); return; }
+        loadMyVotes().then(render);
+        subscribeSession(); subscribeQuestions();
+      });
+  }
+  function subscribeSession(){
+    sb.channel('hv-sess-'+USER.className)
+      .on('postgres_changes',{event:'*',schema:'public',table:'havruta_sessions',filter:'class_scope=eq.'+USER.className},
+        function(){ findSessionRefresh(); }).subscribe();
+  }
+  function findSessionRefresh(){
+    sb.from('havruta_sessions').select('*').eq('class_scope',USER.className).eq('active',true).order('created_at',{ascending:false}).limit(1)
+      .then(function(r){ var s=(r.data&&r.data[0])||null;
+        if(!s){ SESSION=null; document.getElementById('main').innerHTML='<div class="muted">하브루타가 종료됐어요. 수고했어요! 👏</div>'; document.getElementById('stageBadge').textContent='종료'; return; }
+        var newSess=!SESSION||SESSION.id!==s.id; SESSION=s;
+        loadMyVotes().then(render);
+      });
+  }
+  function subscribeQuestions(){
+    sb.channel('hv-q-'+SESSION.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'havruta_questions',filter:'session_id=eq.'+SESSION.id}, function(){ render(); })
+      .subscribe();
+  }
+  function loadMyVotes(){
+    MYVOTES={};
+    return sb.from('havruta_votes').select('question_id').eq('session_id',SESSION.id).eq('student_id',USER.studentId)
+      .then(function(r){ (r.data||[]).forEach(function(v){ MYVOTES[v.question_id]=true; }); });
+  }
+
+  function render(){
+    if(!SESSION) return;
+    var badge=document.getElementById('stageBadge');
+    var stMap={submit:['제출 단계','stg-submit'],vote:['투표 단계','stg-vote'],discuss:['토론 단계','stg-discuss']};
+    var sm=stMap[SESSION.stage]||stMap.submit;
+    badge.textContent=sm[0]; badge.className='stage-badge '+sm[1];
+    document.getElementById('unitLine').textContent=SESSION.unit?('📖 '+SESSION.unit):'';
+    if(SESSION.stage==='submit') renderSubmit();
+    else if(SESSION.stage==='vote') renderVote();
+    else renderDiscuss();
+  }
+
+  // ── 제출 단계 ──
+  function renderSubmit(){
+    var subs=subLabels();
+    var chips=subs.map(function(lb,i){ return '<div class="chip'+(i===SUBIDX?' on':'')+'" onclick="SUBIDX='+i+';renderSubmit()">'+CIRC[i]+' '+esc(lb)+'</div>'; }).join('');
+    var html='<div class="card">'
+      +'<label>소단원 선택</label><div class="chips">'+chips+'</div>'
+      +'<label>중요한 단어</label><input type="text" id="qWord" placeholder="예: 닮음비">'
+      +'<label>가장 중요한 질문</label><textarea id="qText" placeholder="교과서를 읽고 궁금한 점을 질문으로 적어요"></textarea>'
+      +'<label style="display:flex;align-items:center;gap:7px;font-weight:600;margin-top:12px;"><input type="checkbox" id="qAnon" style="width:17px;height:17px;"> 익명으로 내기</label>'
+      +'<button class="btn" onclick="submitQ()">질문 제출하기</button>'
+      +'</div><div id="mine"></div>';
+    document.getElementById('main').innerHTML=html;
+    renderMine();
+  }
+  function submitQ(){
+    var word=(document.getElementById('qWord').value||'').trim();
+    var q=(document.getElementById('qText').value||'').trim();
+    var anon=document.getElementById('qAnon').checked;
+    if(!q){ toast('질문을 입력해요'); return; }
+    sb.from('havruta_questions').insert({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, anon:anon, word:word, question:q })
+      .then(function(r){ if(r.error){ toast('오류: '+r.error.message); return; } document.getElementById('qWord').value=''; document.getElementById('qText').value=''; toast('제출 완료! ✨'); renderMine(); });
+  }
+  function renderMine(){
+    var box=document.getElementById('mine'); if(!box) return;
+    sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).eq('student_id',USER.studentId).order('created_at',{ascending:false})
+      .then(function(r){ var rows=r.data||[];
+        if(!rows.length){ box.innerHTML=''; return; }
+        box.innerHTML='<div class="card"><div style="font-size:13px;font-weight:800;color:#4338ca;margin-bottom:8px;">내가 낸 질문 ('+rows.length+')</div>'
+          +rows.map(function(x){ return '<div class="q">'+(x.word?'<span class="word">'+esc(x.word)+'</span><br>':'')+'<span class="txt">'+CIRC[(x.sub_unit||1)-1]+' '+esc(x.question)+'</span>'
+            +' <button onclick="delQ('+x.id+')" style="float:right;background:none;border:none;color:#cbd5e1;font-size:16px;cursor:pointer;">🗑</button></div>'; }).join('')+'</div>';
+      });
+  }
+  function delQ(id){ sb.from('havruta_questions').delete().eq('id',id).then(function(){ renderMine(); }); }
+
+  // ── 투표 단계 ──
+  function renderVote(){
+    sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).order('sub_unit',{ascending:true}).order('created_at',{ascending:true})
+      .then(function(r){ var rows=r.data||[];
+        var used=Object.keys(MYVOTES).length;
+        var head='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;">👍 가장 중요하다고 생각하는 질문에 투표! <span style="font-size:12px;color:#94a3b8;">(남은 표 '+(VOTE_CAP-used)+'/'+VOTE_CAP+')</span></div></div>';
+        if(!rows.length){ document.getElementById('main').innerHTML=head+'<div class="muted">아직 질문이 없어요.</div>'; return; }
+        var html=head+rows.map(function(x){
+          var voted=!!MYVOTES[x.id];
+          var who=x.anon?'익명':esc(x.name);
+          return '<div class="q"><span class="txt">'+CIRC[(x.sub_unit||1)-1]+' '+esc(x.question)+'</span>'
+            +(x.word?'<div style="margin-top:3px;"><span class="word">'+esc(x.word)+'</span></div>':'')
+            +'<div class="meta">'+who+'</div>'
+            +'<button class="vote-btn'+(voted?' voted':'')+'" onclick="toggleVote('+x.id+')">'+(voted?'✓ 투표함':'👍 투표')+' <b>'+(x.votes||0)+'</b></button></div>';
+        }).join('');
+        document.getElementById('main').innerHTML=html;
+      });
+  }
+  function toggleVote(qid){
+    var voted=!!MYVOTES[qid];
+    if(voted){ sb.from('havruta_votes').delete().eq('question_id',qid).eq('student_id',USER.studentId).then(function(){ delete MYVOTES[qid]; renderVote(); }); return; }
+    if(Object.keys(MYVOTES).length>=VOTE_CAP){ toast('표를 다 썼어요 ('+VOTE_CAP+'표)'); return; }
+    sb.from('havruta_votes').insert({ session_id:SESSION.id, question_id:qid, student_id:USER.studentId })
+      .then(function(r){ if(r.error){ toast('오류: '+r.error.message); return; } MYVOTES[qid]=true; renderVote(); });
+  }
+
+  // ── 토론 단계 ──
+  function renderDiscuss(){
+    if(!SESSION.focus_q){ document.getElementById('main').innerHTML='<div class="muted">선생님이 오늘의 질문을 고르는 중이에요… 🤔</div>'; return; }
+    sb.from('havruta_questions').select('*').eq('id',SESSION.focus_q).single()
+      .then(function(r){ var x=r.data;
+        if(!x){ document.getElementById('main').innerHTML='<div class="muted">질문을 불러오는 중…</div>'; return; }
+        document.getElementById('main').innerHTML='<div class="card" style="text-align:center;background:linear-gradient(135deg,#ecfdf5,#d1fae5);border:2px solid #86efac;">'
+          +'<div style="font-size:13px;font-weight:800;color:#15803d;margin-bottom:10px;">🌟 오늘의 질문</div>'
+          +'<div style="font-size:20px;font-weight:900;color:#065f46;line-height:1.5;word-break:keep-all;">'+esc(x.question)+'</div>'
+          +(x.word?'<div style="margin-top:12px;"><span class="word">'+esc(x.word)+'</span></div>':'')
+          +'<div class="meta" style="margin-top:10px;">'+(x.anon?'익명':esc(x.name))+' · 👍 '+(x.votes||0)+'</div></div>'
+          +'<div class="muted">짝과 이 질문으로 하브루타 토론을 해봐요! 💬</div>';
+      });
+  }
+</script>
+</body>
+</html>
