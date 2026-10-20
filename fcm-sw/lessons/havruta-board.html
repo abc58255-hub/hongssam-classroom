@@ -57,7 +57,7 @@
   <div class="ctl" id="ctl" style="display:none;">
     <select id="clsSel"></select>
     <input type="text" id="unitInp" placeholder="단원명 (예: 도형의 닮음과 피타고라스)" style="width:240px;">
-    <input type="text" id="subInp" placeholder="소단원 (쉼표/줄바꿈, 비우면 1~5)" style="width:240px;">
+    <textarea id="subInp" placeholder="소단원 (한 줄에 하나, 비우면 1~5)" rows="1" style="width:240px;resize:vertical;font-family:inherit;min-height:34px;"></textarea>
     <button onclick="openSession()">세션 열기</button>
     <span class="sp"></span>
     <button class="stagebtn" id="st-submit" onclick="setStage('submit')">① 제출</button>
