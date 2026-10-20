@@ -63,6 +63,7 @@
     <button class="stagebtn" id="st-submit" onclick="setStage('submit')">① 제출</button>
     <button class="stagebtn" id="st-vote" onclick="setStage('vote')">② 투표</button>
     <button class="stagebtn" id="st-discuss" onclick="setStage('discuss')">③ 토론</button>
+    <button id="kwBtn" onclick="toggleKw()">☁️ 키워드</button>
     <button onclick="togglePresent()">🖥️ 전시</button>
     <button class="warn" onclick="closeSession()">닫기</button>
   </div>
@@ -139,15 +140,34 @@
   function stageBtns(){
     ['submit','vote','discuss'].forEach(function(s){ var b=document.getElementById('st-'+s); if(b) b.classList.toggle('active', SESSION&&SESSION.stage===s); });
   }
+  var KWVIEW=false;
+  function toggleKw(){ KWVIEW=!KWVIEW; var b=document.getElementById('kwBtn'); if(b) b.classList.toggle('on',KWVIEW); render(); }
   function render(){
     stageBtns();
+    var kb=document.getElementById('kwBtn'); if(kb) kb.classList.toggle('on',KWVIEW);
     var wrap=document.getElementById('wrap');
     if(!SESSION){ wrap.innerHTML='<div class="empty">반을 고르고 "세션 열기"를 누르세요.</div>'; return; }
     var head='<div class="title">💬 '+(SESSION.unit?esc(SESSION.unit):'하브루타 질문')+'</div>'
-      +'<div class="sub">'+esc(SESSION.class_scope)+' · '+({submit:'질문 제출 단계 — 교과서를 읽고 질문을 만들어요',vote:'투표 단계 — 가장 중요한 질문을 골라요',discuss:'토론 단계'}[SESSION.stage]||'')+' · 질문 '+QS.length+'개</div>';
+      +'<div class="sub">'+esc(SESSION.class_scope)+' · '+(KWVIEW?'자주 나온 키워드 모음':({submit:'질문 제출 단계 — 교과서를 읽고 질문을 만들어요',vote:'투표 단계 — 가장 중요한 질문을 골라요',discuss:'토론 단계'}[SESSION.stage]||''))+' · 질문 '+QS.length+'개</div>';
+    if(KWVIEW){ wrap.innerHTML=head+renderKeywords(); return; }
     if(SESSION.stage==='discuss'){ wrap.innerHTML=head+renderFocus(); return; }
     if(SESSION.stage==='vote'){ wrap.innerHTML=head+renderVote(); return; }
     wrap.innerHTML=head+renderSubmit();
+  }
+  // ☁️ 자주 나온 키워드(중요한 단어) — 빈도순, 많을수록 크게
+  function renderKeywords(){
+    var cnt={}, disp={};
+    QS.forEach(function(q){ var w=String(q.word||'').trim(); if(!w) return; var k=w.toLowerCase(); cnt[k]=(cnt[k]||0)+1; if(!disp[k]) disp[k]=w; });
+    var arr=Object.keys(cnt).map(function(k){ return {w:disp[k],n:cnt[k]}; }).sort(function(a,b){ return b.n-a.n; });
+    if(!arr.length) return '<div class="empty">아직 입력된 키워드가 없어요.<br><span style="font-size:1vw;">학생이 질문과 함께 "중요한 단어"를 적으면 모여요.</span></div>';
+    var max=arr[0].n;
+    var chips=arr.map(function(x){
+      var ratio=x.n/max; var fs=(1.3+ratio*3.2).toFixed(2); // 1.3vw~4.5vw
+      var col=ratio>0.66?'#fff':ratio>0.33?'#c7d2fe':'#94a3b8';
+      var bg=ratio>0.66?'#4338ca':ratio>0.33?'#312e81':'#1e293b';
+      return '<span style="display:inline-flex;align-items:baseline;gap:.4vw;background:'+bg+';color:'+col+';padding:.5vw 1.1vw;border-radius:40px;margin:.5vw;font-weight:900;font-size:'+fs+'vw;line-height:1.1;">'+esc(x.w)+'<span style="font-size:1vw;opacity:.75;">'+x.n+'</span></span>';
+    }).join('');
+    return '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:center;padding:3vh 2vw;">'+chips+'</div>';
   }
   function subName(i){ var raw=(SESSION.sub_units||'').trim(); var arr=raw?raw.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean):['소단원 1','소단원 2','소단원 3','소단원 4','소단원 5']; return arr[i]||('소단원 '+(i+1)); }
   function qCard(x,opts){ opts=opts||{};
