@@ -47,7 +47,9 @@ create unique index if not exists havruta_votes_once on public.havruta_votes (qu
 create index if not exists havruta_votes_session on public.havruta_votes(session_id);
 
 -- 득표 집계 트리거 (votes 테이블 ↔ questions.votes 동기화)
-create or replace function public.havruta_vote_sync() returns trigger language plpgsql as $$
+-- SECURITY DEFINER: 학생 권한으로 트리거가 돌 때 havruta_questions UPDATE가 RLS에 막히므로 소유자 권한으로 우회
+create or replace function public.havruta_vote_sync() returns trigger language plpgsql
+  security definer set search_path = public as $$
 begin
   if (tg_op = 'INSERT') then
     update public.havruta_questions set votes = votes + 1 where id = new.question_id;
