@@ -28,16 +28,17 @@
   .wrap{padding:2vw 2.5vw;}
   .title{font-size:2.4vw;font-weight:900;color:#fff;margin-bottom:.5vw;}
   .sub{font-size:1.2vw;color:#94a3b8;margin-bottom:1.5vw;}
-  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;}
-  .col{background:#1e293b;border-radius:14px;padding:12px;}
-  .col h3{font-size:1.1vw;font-weight:900;color:#a5b4fc;margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid #334155;}
-  .qc{background:#0f172a;border:1px solid #334155;border-radius:10px;padding:9px 11px;margin-bottom:7px;position:relative;}
-  .qc .w{font-size:.85vw;font-weight:800;color:#c4b5fd;background:#312e81;display:inline-block;padding:1px 7px;border-radius:7px;margin-bottom:3px;}
-  .qc .t{font-size:1vw;color:#f1f5f9;line-height:1.45;word-break:keep-all;}
-  .qc .m{font-size:.8vw;color:#64748b;margin-top:4px;}
-  .qc .del{position:absolute;top:6px;right:8px;background:none;border:none;color:#475569;font-size:14px;cursor:pointer;}
-  .qc .votes{display:inline-block;background:#f59e0b;color:#06281a;font-weight:900;font-size:.9vw;padding:1px 9px;border-radius:12px;margin-top:5px;}
-  .qc .pick{background:#22c55e;color:#06281a;border:none;border-radius:8px;padding:3px 10px;font-size:.85vw;font-weight:800;cursor:pointer;margin-left:6px;}
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
+  .col{background:#1e293b;border-radius:12px;padding:9px;}
+  .col h3{font-size:1vw;font-weight:900;color:#a5b4fc;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #334155;}
+  .qc{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 8px;margin-bottom:5px;position:relative;}
+  .qc .w{font-size:.8vw;font-weight:800;color:#c4b5fd;background:#312e81;display:inline-block;padding:1px 6px;border-radius:6px;margin-bottom:2px;}
+  .qc .t{font-size:.92vw;color:#f1f5f9;line-height:1.3;word-break:keep-all;display:block;padding-right:14px;}
+  .qc .m{font-size:.72vw;color:#64748b;margin-top:1px;}
+  .qc .del{position:absolute;top:3px;right:5px;background:none;border:none;color:#475569;font-size:13px;cursor:pointer;line-height:1;}
+  .qc .votes{display:inline-block;background:#f59e0b;color:#06281a;font-weight:900;font-size:.85vw;padding:0 8px;border-radius:12px;}
+  .qc .rankb{font-size:.9vw;font-weight:900;color:#fbbf24;}
+  .qc .pick{background:#22c55e;color:#06281a;border:none;border-radius:8px;padding:2px 9px;font-size:.8vw;font-weight:800;cursor:pointer;}
   .rank1{border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.3);}
   .qc.cand{border-color:#f59e0b;background:#2a2410;}
   .candbtn{margin-top:6px;background:none;border:1px solid #475569;color:#94a3b8;border-radius:8px;padding:3px 10px;font-size:.85vw;font-weight:700;cursor:pointer;}
@@ -64,6 +65,7 @@
     <textarea id="subInp" placeholder="소단원 (한 줄에 하나, 비우면 1~5)" rows="1" style="width:240px;resize:vertical;font-family:inherit;min-height:34px;"></textarea>
     <label style="font-size:12px;color:#94a3b8;">단어<input type="number" id="nwInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
     <label style="font-size:12px;color:#94a3b8;">질문<input type="number" id="nqInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
+    <label style="font-size:12px;color:#94a3b8;">투표<input type="number" id="nvInp" value="2" min="1" max="9" style="width:48px;margin-left:4px;"></label>
     <button onclick="openSession()">세션 열기</button>
     <span class="sp"></span>
     <button class="stagebtn" id="st-submit" onclick="setStage('submit')">① 제출</button>
@@ -132,7 +134,8 @@
     var subs=document.getElementById('subInp').value.trim();
     var nw=parseInt(document.getElementById('nwInp').value)||2;
     var nq=parseInt(document.getElementById('nqInp').value)||2;
-    portalRPC('havrutaOpen',[TOK,{class_scope:cls,unit:unit,sub_units:subs,n_words:nw,n_questions:nq}]).then(function(res){
+    var nv=parseInt(document.getElementById('nvInp').value)||2;
+    portalRPC('havrutaOpen',[TOK,{class_scope:cls,unit:unit,sub_units:subs,n_words:nw,n_questions:nq,n_votes:nv}]).then(function(res){
       if(res&&res.success){ toast('세션을 열었어요'); loadActive(cls); }
       else toast('실패: '+((res&&res.message)||''));
     }).catch(function(e){ toast('오류: '+e.message); });
@@ -225,7 +228,9 @@
       +'<span class="t">'+esc(x.question)+'</span>'
       +'<div class="m">'+nameOf(x)+'</div>'
       +(opts.showVotes
-         ? '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;"><span class="votes">👍 '+(x.votes||0)+'</span>'
+         ? '<div style="margin-top:4px;display:flex;align-items:center;gap:6px;">'
+           +(opts.rankN?'<span class="rankb">'+(['🥇','🥈','🥉'][opts.rankN-1]||opts.rankN+'위')+'</span>':'')
+           +'<span class="votes">👍 '+(x.votes||0)+'</span>'
            +(opts.pick?'<button class="candbtn'+(foc?' on':'')+'" onclick="pickFocus('+x.id+','+(x.sub_unit||1)+','+(!foc)+')">'+(foc?'⭐ 선정됨':'☆ 오늘의 질문')+'</button>':'')
            +'</div>'
          : '')
@@ -238,7 +243,7 @@
       var list=QS.filter(function(q){ return (q.sub_unit||1)-1===i && String(q.question||'').trim(); });
       if(opts.sortVotes) list.sort(function(a,b){ return (b.votes||0)-(a.votes||0); });
       cols+='<div class="col"><h3>'+CIRC[i]+' '+esc(subName(i))+' <span style="color:#64748b;font-weight:600;">('+list.length+')</span></h3>'
-        +(list.length?list.map(function(x){return qCard(x,opts);}).join(''):'<div style="color:#475569;font-size:.9vw;padding:6px;">아직 없어요</div>')+'</div>';
+        +(list.length?list.map(function(x,idx){ var o={}; for(var k in opts)o[k]=opts[k]; if(opts.sortVotes&&opts.showVotes&&(x.votes||0)>0){ o.rankN=idx+1; o.rank1=(idx===0); } return qCard(x,o); }).join(''):'<div style="color:#475569;font-size:.9vw;padding:6px;">아직 없어요</div>')+'</div>';
     })(i); }
     return '<div class="cols padlet">'+cols+'</div>';
   }

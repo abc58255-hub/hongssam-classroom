@@ -172,6 +172,7 @@ Deno.serve(async (req) => {
       await admin0.from("havruta_sessions").update({ active: false }).eq("class_scope", cls).eq("active", true);
       const row = { class_scope: cls, unit: String(S.unit ?? "").trim(), sub_units: String(S.sub_units ?? "").trim(),
         n_words: Math.max(1, Number(S.n_words) || 2), n_questions: Math.max(1, Number(S.n_questions) || 2),
+        n_votes: Math.max(1, Number(S.n_votes) || 2),
         show_names: S.show_names !== false, stage: "submit", active: true };
       let ins = await admin0.from("havruta_sessions").insert(row).select("id").single();
       if (ins.error) {

@@ -46,7 +46,8 @@
   <div class="toast" id="toast"></div>
 
 <script>
-  var USER=null, sb=null, SESSION=null, SUBIDX=0, VIDX=0, MYVOTES={}, QSUB={}, VOTE_PER_SUB=2;
+  var USER=null, sb=null, SESSION=null, SUBIDX=0, VIDX=0, MYVOTES={}, QSUB={};
+  function VOTE_PER_SUB(){ return Math.max(1, Number(SESSION&&SESSION.n_votes)||2); }
   var CIRC=['①','②','③','④','⑤','⑥','⑦','⑧'];
 
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1800); }
@@ -157,6 +158,7 @@
     sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).order('sub_unit',{ascending:true}).order('votes',{ascending:false}).order('created_at',{ascending:true})
       .then(function(r){ var rows=(r.data||[]).filter(function(x){return String(x.question||'').trim();});
         QSUB={}; rows.forEach(function(x){ QSUB[x.id]=(x.sub_unit||1); });
+        var cap=VOTE_PER_SUB();
         var subs=subLabels();
         if(VIDX<0) VIDX=0; if(VIDX>subs.length-1) VIDX=subs.length-1;
         if(!rows.length){ document.getElementById('main').innerHTML='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;">👍 투표</div></div><div class="muted">아직 질문이 없어요… 🤔</div>'; return; }
@@ -164,16 +166,16 @@
         var chips=subs.map(function(lb,i){
           var su=i+1; var cnt=rows.filter(function(x){return (x.sub_unit||1)===su;}).length;
           var u=rows.filter(function(x){return (x.sub_unit||1)===su && MYVOTES[x.id];}).length;
-          var done=cnt>0 && u>=VOTE_PER_SUB;
+          var done=cnt>0 && u>=cap;
           return '<div class="chip'+(i===VIDX?' on':'')+'" onclick="navVote('+i+')" style="position:relative;">'+CIRC[i]+(done?' ✓':'')+'</div>';
         }).join('');
-        var head='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;margin-bottom:8px;">👍 소단원마다 중요한 질문 '+VOTE_PER_SUB+'개에 투표!</div>'
+        var head='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;margin-bottom:8px;">👍 소단원마다 중요한 질문 '+cap+'개에 투표!</div>'
           +'<div class="chips" style="display:flex;gap:6px;flex-wrap:wrap;">'+chips+'</div></div>';
         var lb=subs[VIDX]||('소단원 '+(VIDX+1));
         var list=rows.filter(function(x){return (x.sub_unit||1)===VIDX+1;});
         var usedHere=list.filter(function(x){return MYVOTES[x.id];}).length;
         var html=head
-          +'<div style="margin:14px 0 6px;font-size:15px;font-weight:800;color:#6366f1;display:flex;align-items:center;gap:6px;">'+CIRC[VIDX]+' '+esc(lb)+'<span style="margin-left:auto;font-size:13px;color:'+(usedHere>=VOTE_PER_SUB?'#16a34a':'#94a3b8')+';">'+usedHere+'/'+VOTE_PER_SUB+'표</span></div>';
+          +'<div style="margin:14px 0 6px;font-size:15px;font-weight:800;color:#6366f1;display:flex;align-items:center;gap:6px;">'+CIRC[VIDX]+' '+esc(lb)+'<span style="margin-left:auto;font-size:13px;color:'+(usedHere>=cap?'#16a34a':'#94a3b8')+';">'+usedHere+'/'+cap+'표</span></div>';
         html+=list.length? list.map(function(x){
           var voted=!!MYVOTES[x.id];
           return '<div class="q"><span class="txt">'+esc(x.question)+'</span>'
@@ -193,7 +195,8 @@
     if(voted){ sb.from('havruta_votes').delete().eq('question_id',qid).eq('student_id',USER.studentId).then(function(){ delete MYVOTES[qid]; renderVote(); }); return; }
     var su=QSUB[qid]||0;
     var usedHere=Object.keys(MYVOTES).filter(function(id){return QSUB[id]===su;}).length;
-    if(usedHere>=VOTE_PER_SUB){ toast('이 소단원은 표를 다 썼어요 ('+VOTE_PER_SUB+'표)'); return; }
+    var cap=VOTE_PER_SUB();
+    if(usedHere>=cap){ toast('이 소단원은 표를 다 썼어요 ('+cap+'표)'); return; }
     sb.from('havruta_votes').insert({ session_id:SESSION.id, question_id:qid, student_id:USER.studentId })
       .then(function(r){ if(r.error){ toast('오류: '+r.error.message); return; } MYVOTES[qid]=true; renderVote(); });
   }
