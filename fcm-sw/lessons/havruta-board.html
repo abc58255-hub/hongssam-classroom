@@ -159,8 +159,10 @@
   function stageBtns(){
     ['submit','vote','discuss'].forEach(function(s){ var b=document.getElementById('st-'+s); if(b) b.classList.toggle('active', SESSION&&SESSION.stage===s); });
   }
-  var KWVIEW=false;
-  function toggleKw(){ KWVIEW=!KWVIEW; var b=document.getElementById('kwBtn'); if(b) b.classList.toggle('on',KWVIEW); render(); }
+  var KWVIEW=false, REVEAL=false;
+  function toggleKw(){ KWVIEW=!KWVIEW; if(KWVIEW) REVEAL=false; var b=document.getElementById('kwBtn'); if(b) b.classList.toggle('on',KWVIEW); render(); }
+  function reveal(){ REVEAL=true; render(); }
+  function hideKw(){ REVEAL=false; render(); }
   function nameOf(x){ return (SESSION && SESSION.show_names===false) ? '익명' : esc(x.name||''); }
   function toggleNames(){ if(!SESSION){ toast('세션을 먼저 여세요'); return; } var on=!(SESSION.show_names===false); // 현재 true면 끄기
     portalRPC('havrutaNames',[TOK,SESSION.id,!on]).then(function(){ SESSION.show_names=!on; render(); }).catch(function(e){ toast('오류: '+e.message); }); }
@@ -185,6 +187,14 @@
     QS.forEach(function(q){ var w=String(q.word||'').trim(); if(!w) return; var k=w.toLowerCase(); cnt[k]=(cnt[k]||0)+1; if(!disp[k]) disp[k]=w; });
     var arr=Object.keys(cnt).map(function(k){ return {w:disp[k],n:cnt[k]}; }).sort(function(a,b){ return b.n-a.n; });
     if(!arr.length) return '<div class="empty">아직 입력된 키워드가 없어요.<br><span style="font-size:1vw;">학생이 "중요한 단어"를 적으면 모여요.</span></div>';
+    var total=QS.filter(function(q){return String(q.word||'').trim();}).length;
+    if(!REVEAL){
+      return '<div class="empty" style="min-height:60vh;flex-direction:column;gap:3vh;">'
+        +'<div style="font-size:2vw;font-weight:900;color:#a5b4fc;">🤫 키워드 '+arr.length+'종 · '+total+'개 모였어요</div>'
+        +'<div style="font-size:1vw;color:#94a3b8;">버튼을 누르면 공개돼요</div>'
+        +'<button onclick="reveal()" style="font-size:1.6vw;font-weight:900;background:linear-gradient(135deg,#4338ca,#6d28d9);color:#fff;border:none;border-radius:50px;padding:1.4vh 3vw;cursor:pointer;box-shadow:0 8px 24px rgba(67,56,202,.5);">🎉 짜잔! 키워드 공개하기</button>'
+        +'</div>';
+    }
     var max=arr[0].n;
     var cloud=arr.map(function(x){
       var ratio=x.n/max; var fs=(1.2+ratio*3.0).toFixed(2);
@@ -201,7 +211,7 @@
     }).join('');
     return '<div style="display:flex;gap:2vw;align-items:flex-start;">'
       +'<div style="flex:1;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;padding:2vh 1vw;background:#1e293b;border-radius:16px;min-height:50vh;">'+cloud+'</div>'
-      +'<div style="width:24vw;min-width:240px;"><div style="font-size:1.2vw;font-weight:900;color:#a5b4fc;margin-bottom:10px;">🏆 가장 많이 나온 단어</div>'+rank+'</div>'
+      +'<div style="width:24vw;min-width:240px;"><div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;"><div style="font-size:1.2vw;font-weight:900;color:#a5b4fc;">🏆 가장 많이 나온 단어</div><button onclick="hideKw()" style="margin-left:auto;background:#1e293b;border:1px solid #334155;color:#94a3b8;border-radius:16px;padding:4px 12px;font-size:.85vw;cursor:pointer;">🙈 다시 가리기</button></div>'+rank+'</div>'
       +'</div>';
   }
   function subName(i){ var raw=(SESSION.sub_units||'').trim(); var arr=raw?raw.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean):['소단원 1','소단원 2','소단원 3','소단원 4','소단원 5']; return arr[i]||('소단원 '+(i+1)); }
