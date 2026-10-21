@@ -46,7 +46,7 @@
   <div class="toast" id="toast"></div>
 
 <script>
-  var USER=null, sb=null, SESSION=null, SUBIDX=0, MYVOTES={}, QSUB={}, VOTE_PER_SUB=2;
+  var USER=null, sb=null, SESSION=null, SUBIDX=0, VIDX=0, MYVOTES={}, QSUB={}, VOTE_PER_SUB=2;
   var CIRC=['①','②','③','④','⑤','⑥','⑦','⑧'];
 
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1800); }
@@ -151,28 +151,40 @@
   }
   function delQ(id){ sb.from('havruta_questions').delete().eq('id',id).then(function(){ renderMine(); }); }
 
-  // ── 투표 단계 ── 소단원별로 모든 질문 표시, 소단원당 2표
+  // ── 투표 단계 ── 소단원별 페이지(한 소단원씩), 소단원당 2표
+  function navVote(i){ VIDX=i; renderVote(); }
   function renderVote(){
     sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).order('sub_unit',{ascending:true}).order('votes',{ascending:false}).order('created_at',{ascending:true})
       .then(function(r){ var rows=(r.data||[]).filter(function(x){return String(x.question||'').trim();});
         QSUB={}; rows.forEach(function(x){ QSUB[x.id]=(x.sub_unit||1); });
-        var head='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;">👍 소단원마다 가장 중요한 질문 '+VOTE_PER_SUB+'개에 투표!</div></div>';
-        if(!rows.length){ document.getElementById('main').innerHTML=head+'<div class="muted">아직 질문이 없어요… 🤔</div>'; return; }
         var subs=subLabels();
-        var html=head;
-        subs.forEach(function(lb,i){
-          var su=i+1;
-          var list=rows.filter(function(x){return (x.sub_unit||1)===su;});
-          if(!list.length) return;
-          var usedHere=list.filter(function(x){return MYVOTES[x.id];}).length;
-          html+='<div style="margin-top:16px;margin-bottom:6px;font-size:13px;font-weight:800;color:#6366f1;display:flex;align-items:center;gap:6px;">'+CIRC[i]+' '+esc(lb)+'<span style="margin-left:auto;font-size:12px;color:'+(usedHere>=VOTE_PER_SUB?'#16a34a':'#94a3b8')+';">'+usedHere+'/'+VOTE_PER_SUB+'표</span></div>';
-          html+=list.map(function(x){
-            var voted=!!MYVOTES[x.id];
-            return '<div class="q"><span class="txt">'+esc(x.question)+'</span>'
-              +'<div class="meta">'+nameOf(x)+'</div>'
-              +'<button class="vote-btn'+(voted?' voted':'')+'" onclick="toggleVote('+x.id+')">'+(voted?'✓ 투표함':'👍 투표')+' <b>'+(x.votes||0)+'</b></button></div>';
-          }).join('');
-        });
+        if(VIDX<0) VIDX=0; if(VIDX>subs.length-1) VIDX=subs.length-1;
+        if(!rows.length){ document.getElementById('main').innerHTML='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;">👍 투표</div></div><div class="muted">아직 질문이 없어요… 🤔</div>'; return; }
+        // 상단: 소단원 페이지 칩 (완료 소단원 ✓)
+        var chips=subs.map(function(lb,i){
+          var su=i+1; var cnt=rows.filter(function(x){return (x.sub_unit||1)===su;}).length;
+          var u=rows.filter(function(x){return (x.sub_unit||1)===su && MYVOTES[x.id];}).length;
+          var done=cnt>0 && u>=VOTE_PER_SUB;
+          return '<div class="chip'+(i===VIDX?' on':'')+'" onclick="navVote('+i+')" style="position:relative;">'+CIRC[i]+(done?' ✓':'')+'</div>';
+        }).join('');
+        var head='<div class="card"><div style="font-size:14px;font-weight:800;color:#b45309;margin-bottom:8px;">👍 소단원마다 중요한 질문 '+VOTE_PER_SUB+'개에 투표!</div>'
+          +'<div class="chips" style="display:flex;gap:6px;flex-wrap:wrap;">'+chips+'</div></div>';
+        var lb=subs[VIDX]||('소단원 '+(VIDX+1));
+        var list=rows.filter(function(x){return (x.sub_unit||1)===VIDX+1;});
+        var usedHere=list.filter(function(x){return MYVOTES[x.id];}).length;
+        var html=head
+          +'<div style="margin:14px 0 6px;font-size:15px;font-weight:800;color:#6366f1;display:flex;align-items:center;gap:6px;">'+CIRC[VIDX]+' '+esc(lb)+'<span style="margin-left:auto;font-size:13px;color:'+(usedHere>=VOTE_PER_SUB?'#16a34a':'#94a3b8')+';">'+usedHere+'/'+VOTE_PER_SUB+'표</span></div>';
+        html+=list.length? list.map(function(x){
+          var voted=!!MYVOTES[x.id];
+          return '<div class="q"><span class="txt">'+esc(x.question)+'</span>'
+            +'<div class="meta">'+nameOf(x)+'</div>'
+            +'<button class="vote-btn'+(voted?' voted':'')+'" onclick="toggleVote('+x.id+')">'+(voted?'✓ 투표함':'👍 투표')+' <b>'+(x.votes||0)+'</b></button></div>';
+        }).join('') : '<div class="muted">이 소단원엔 아직 질문이 없어요</div>';
+        // 하단: 이전/다음 네비
+        html+='<div style="display:flex;gap:10px;margin-top:18px;">'
+          +'<button onclick="navVote('+(VIDX-1)+')"'+(VIDX<=0?' disabled':'')+' style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;'+(VIDX<=0?'background:#e5e7eb;color:#9ca3af;':'background:#eef2ff;color:#4338ca;')+'">◀ 이전</button>'
+          +'<button onclick="navVote('+(VIDX+1)+')"'+(VIDX>=subs.length-1?' disabled':'')+' style="flex:1;padding:12px;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;'+(VIDX>=subs.length-1?'background:#e5e7eb;color:#9ca3af;':'background:#4338ca;color:#fff;')+'">다음 ▶</button>'
+          +'</div>';
         document.getElementById('main').innerHTML=html;
       });
   }
