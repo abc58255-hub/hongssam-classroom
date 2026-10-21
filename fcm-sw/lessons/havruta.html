@@ -51,6 +51,7 @@
 
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); setTimeout(function(){t.classList.remove('show');},1800); }
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function nameOf(x){ return (SESSION && SESSION.show_names===false) ? '익명' : esc(x.name||''); }
   function subLabels(){
     var raw=(SESSION&&SESSION.sub_units||'').trim();
     if(raw) return raw.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean);
@@ -117,17 +118,15 @@
       +'<label>소단원 선택</label><div class="chips">'+chips+'</div>'
       +'<label>🔑 중요한 단어</label>'+wIn
       +'<label>❓ 가장 중요한 질문</label>'+qIn
-      +'<label style="display:flex;align-items:center;gap:7px;font-weight:600;margin-top:10px;"><input type="checkbox" id="qAnon" style="width:17px;height:17px;"> 익명으로 내기</label>'
       +'<button class="btn" onclick="submitQ()">제출하기</button>'
       +'</div><div id="mine"></div>';
     document.getElementById('main').innerHTML=html;
     renderMine();
   }
   function submitQ(){
-    var anon=document.getElementById('qAnon').checked;
     var rows=[];
-    document.querySelectorAll('.wIn').forEach(function(el){ var w=(el.value||'').trim(); if(w) rows.push({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, anon:anon, word:w, question:'' }); });
-    document.querySelectorAll('.qIn').forEach(function(el){ var q=(el.value||'').trim(); if(q) rows.push({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, anon:anon, word:'', question:q }); });
+    document.querySelectorAll('.wIn').forEach(function(el){ var w=(el.value||'').trim(); if(w) rows.push({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, word:w, question:'' }); });
+    document.querySelectorAll('.qIn').forEach(function(el){ var q=(el.value||'').trim(); if(q) rows.push({ session_id:SESSION.id, sub_unit:SUBIDX+1, student_id:USER.studentId, name:USER.name, word:'', question:q }); });
     if(!rows.length){ toast('단어나 질문을 하나 이상 적어요'); return; }
     sb.from('havruta_questions').insert(rows).then(function(r){ if(r.error){ toast('오류: '+r.error.message); return; } toast(rows.length+'개 제출 완료! ✨'); renderSubmit(); });
   }
@@ -153,7 +152,7 @@
         if(!rows.length){ document.getElementById('main').innerHTML=head+'<div class="muted">선생님이 투표할 질문을 고르는 중이에요… 🤔</div>'; return; }
         var html=head+rows.map(function(x){
           var voted=!!MYVOTES[x.id];
-          var who=x.anon?'익명':esc(x.name);
+          var who=nameOf(x);
           return '<div class="q"><span class="txt">'+CIRC[(x.sub_unit||1)-1]+' '+esc(x.question)+'</span>'
             +'<div class="meta">'+who+'</div>'
             +'<button class="vote-btn'+(voted?' voted':'')+'" onclick="toggleVote('+x.id+')">'+(voted?'✓ 투표함':'👍 투표')+' <b>'+(x.votes||0)+'</b></button></div>';
@@ -179,7 +178,7 @@
           +'<div style="font-size:13px;font-weight:800;color:#15803d;margin-bottom:10px;">🌟 오늘의 질문</div>'
           +'<div style="font-size:20px;font-weight:900;color:#065f46;line-height:1.5;word-break:keep-all;">'+esc(x.question)+'</div>'
           +(x.word?'<div style="margin-top:12px;"><span class="word">'+esc(x.word)+'</span></div>':'')
-          +'<div class="meta" style="margin-top:10px;">'+(x.anon?'익명':esc(x.name))+' · 👍 '+(x.votes||0)+'</div></div>'
+          +'<div class="meta" style="margin-top:10px;">'+nameOf(x)+' · 👍 '+(x.votes||0)+'</div></div>'
           +'<div class="muted">짝과 이 질문으로 하브루타 토론을 해봐요! 💬</div>';
       });
   }

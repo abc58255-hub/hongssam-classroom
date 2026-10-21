@@ -172,7 +172,7 @@ Deno.serve(async (req) => {
       await admin0.from("havruta_sessions").update({ active: false }).eq("class_scope", cls).eq("active", true);
       const row = { class_scope: cls, unit: String(S.unit ?? "").trim(), sub_units: String(S.sub_units ?? "").trim(),
         n_words: Math.max(1, Number(S.n_words) || 2), n_questions: Math.max(1, Number(S.n_questions) || 2),
-        stage: "submit", active: true };
+        show_names: S.show_names !== false, stage: "submit", active: true };
       let ins = await admin0.from("havruta_sessions").insert(row).select("id").single();
       if (ins.error) {
         await admin0.from("havruta_sessions").update({ active: false }).eq("class_scope", cls).eq("active", true);
@@ -192,6 +192,12 @@ Deno.serve(async (req) => {
     if (body.op === "havrutaFocus") {
       const fq = body.focus_q == null ? null : Number(body.focus_q);
       const { error } = await admin0.from("havruta_sessions").update({ focus_q: fq }).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 이름/익명 전체 전환: {op:'havrutaNames', id, on}
+    if (body.op === "havrutaNames") {
+      const { error } = await admin0.from("havruta_sessions").update({ show_names: !!body.on }).eq("id", Number(body.id));
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }

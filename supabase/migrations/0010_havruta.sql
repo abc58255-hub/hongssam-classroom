@@ -10,6 +10,7 @@ create table if not exists public.havruta_sessions (
   sub_units    text not null default '',            -- 소단원 라벨(줄바꿈 구분, 비면 ①~⑤ 번호)
   n_words      int not null default 2,              -- 소단원당 단어 입력칸 수
   n_questions  int not null default 2,              -- 소단원당 질문 입력칸 수
+  show_names   boolean not null default true,       -- 교사가 이름/익명 전체 전환
   stage        text not null default 'submit',      -- 'submit' | 'vote' | 'discuss'
   focus_q      bigint,                              -- 오늘의 질문(havruta_questions.id)
   active       boolean not null default true,

@@ -2,4 +2,5 @@
 -- 소단원당 단어/질문 입력칸 수 + 질문 투표 후보 플래그
 alter table public.havruta_sessions  add column if not exists n_words     int not null default 2;
 alter table public.havruta_sessions  add column if not exists n_questions int not null default 2;
+alter table public.havruta_sessions  add column if not exists show_names  boolean not null default true;  -- 교사가 이름/익명 전체 전환
 alter table public.havruta_questions add column if not exists candidate   boolean not null default false;
