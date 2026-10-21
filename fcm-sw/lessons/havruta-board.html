@@ -142,7 +142,7 @@
   function closeSession(){ if(!SESSION) return;
     portalRPC('havrutaClose',[TOK,SESSION.id]).then(function(){ toast('세션을 닫았어요'); SESSION=null; QS=[]; render(); }).catch(function(e){ toast('오류: '+e.message); }); }
   function delQ(id){ portalRPC('havrutaDeleteQ',[TOK,id]).then(function(){ loadQs(); }).catch(function(e){ toast('오류: '+e.message); }); }
-  function pickFocus(id){ portalRPC('havrutaFocus',[TOK,SESSION.id,id]).then(function(){ SESSION.focus_q=id; toast('오늘의 질문 선정! 토론 단계로 보여줘요'); setStage('discuss'); }).catch(function(e){ toast('오류: '+e.message); }); }
+  function pickFocus(qid,su,on){ portalRPC('havrutaFocus',[TOK,SESSION.id,qid,su,on]).then(function(){ var q=QS.filter(function(z){return z.id===qid;})[0]; if(on){ QS.forEach(function(z){ if((z.sub_unit||1)===su) z.focus=false; }); } if(q) q.focus=on; render(); toast(on?'오늘의 질문 선정! ⭐':'선정 해제'); }).catch(function(e){ toast('오류: '+e.message); }); }
   function togglePresent(){ document.body.classList.toggle('present'); if(document.body.classList.contains('present')){ var h=document.createElement('div'); h.id='exitP'; h.style.cssText='position:fixed;top:8px;right:8px;z-index:900;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:20px;padding:6px 12px;font-size:12px;cursor:pointer;'; h.textContent='✕ 제어 보기'; h.onclick=togglePresent; document.body.appendChild(h); } else { var e=document.getElementById('exitP'); if(e) e.remove(); } }
 
   function subscribe(){
@@ -175,7 +175,7 @@
     var qCount=QS.filter(function(q){return String(q.question||'').trim();}).length;
     var kCount=QS.filter(function(q){return String(q.word||'').trim();}).length;
     var head='<div class="title">💬 '+(SESSION.unit?esc(SESSION.unit):'하브루타 질문')+'</div>'
-      +'<div class="sub">'+esc(SESSION.class_scope)+' · '+(KWVIEW?'키워드 모음':({submit:'질문 제출 단계 — 교과서를 읽고 질문을 만들어요',vote:'투표 단계 — 후보 질문에 투표',discuss:'토론 단계'}[SESSION.stage]||''))+' · 질문 '+qCount+' · 키워드 '+kCount+'</div>';
+      +'<div class="sub">'+esc(SESSION.class_scope)+' · '+(KWVIEW?'키워드 모음':({submit:'질문 제출 단계 — 교과서를 읽고 질문을 만들어요',vote:'투표 단계 — 소단원마다 2표씩',discuss:'토론 단계 — 소단원별 오늘의 질문'}[SESSION.stage]||''))+' · 질문 '+qCount+' · 키워드 '+kCount+'</div>';
     if(KWVIEW){ wrap.innerHTML=head+renderKeywords(); return; }
     if(SESSION.stage==='discuss'){ wrap.innerHTML=head+renderFocus(); return; }
     if(SESSION.stage==='vote'){ wrap.innerHTML=head+renderVote(); return; }
@@ -215,46 +215,46 @@
       +'</div>';
   }
   function subName(i){ var raw=(SESSION.sub_units||'').trim(); var arr=raw?raw.split(/\n|,/).map(function(s){return s.trim();}).filter(Boolean):['소단원 1','소단원 2','소단원 3','소단원 4','소단원 5']; return arr[i]||('소단원 '+(i+1)); }
-  // 패들렛 스타일 질문 카드 — 이름 작게, ⭐후보 토글
+  // 소단원 개수 (라벨 수, 최소 5)
+  function subCount(){ var raw=(SESSION.sub_units||'').trim(); var n=raw?raw.split(/\n|,/).filter(function(s){return s.trim();}).length:5; return Math.max(5,n); }
+  // 패들렛 스타일 질문 카드 — 이름 작게, (토론 단계) ⭐ 오늘의 질문 선정 버튼
   function qCard(x,opts){ opts=opts||{};
-    var cand=!!x.candidate;
-    return '<div class="qc'+(opts.rank1?' rank1':'')+(cand?' cand':'')+'">'
+    var foc=!!x.focus;
+    return '<div class="qc'+(opts.rank1?' rank1':'')+(foc?' cand':'')+'">'
       +'<button class="del" onclick="delQ('+x.id+')" title="삭제">✕</button>'
       +'<span class="t">'+esc(x.question)+'</span>'
       +'<div class="m">'+nameOf(x)+'</div>'
       +(opts.showVotes
-         ? '<div style="margin-top:6px;"><span class="votes">👍 '+(x.votes||0)+'</span><button class="pick" onclick="pickFocus('+x.id+')">⭐ 오늘의 질문</button></div>'
-         : '<button class="candbtn'+(cand?' on':'')+'" onclick="toggleCand('+x.id+','+(!cand)+')">'+(cand?'⭐ 후보':'☆ 후보 지정')+'</button>')
+         ? '<div style="margin-top:6px;display:flex;align-items:center;gap:8px;"><span class="votes">👍 '+(x.votes||0)+'</span>'
+           +(opts.pick?'<button class="candbtn'+(foc?' on':'')+'" onclick="pickFocus('+x.id+','+(x.sub_unit||1)+','+(!foc)+')">'+(foc?'⭐ 선정됨':'☆ 오늘의 질문')+'</button>':'')
+           +'</div>'
+         : '')
       +'</div>';
   }
-  function toggleCand(id,on){ portalRPC('havrutaCandidate',[TOK,id,on]).then(function(){ var q=QS.filter(function(z){return z.id===id;})[0]; if(q) q.candidate=on; render(); }).catch(function(e){ toast('오류: '+e.message); }); }
-  function renderSubmit(){
-    var maxSub=5; (SESSION.sub_units||'').trim() && (maxSub=Math.max(5,(SESSION.sub_units.split(/\n|,/).filter(function(s){return s.trim();})).length));
-    var cols='';
-    for(var i=0;i<maxSub;i++){ (function(i){
+  // 소단원별 열 그리드 (제출·투표·토론 공용)
+  function groupedCols(opts){ opts=opts||{};
+    var n=subCount(), cols='';
+    for(var i=0;i<n;i++){ (function(i){
       var list=QS.filter(function(q){ return (q.sub_unit||1)-1===i && String(q.question||'').trim(); });
-      var candN=list.filter(function(q){return q.candidate;}).length;
-      cols+='<div class="col"><h3>'+CIRC[i]+' '+esc(subName(i))+' <span style="color:#64748b;font-weight:600;">('+list.length+(candN?' · ⭐'+candN:'')+')</span></h3>'
-        +(list.length?list.map(function(x){return qCard(x,{});}).join(''):'<div style="color:#475569;font-size:.9vw;padding:6px;">아직 없어요</div>')+'</div>';
+      if(opts.sortVotes) list.sort(function(a,b){ return (b.votes||0)-(a.votes||0); });
+      cols+='<div class="col"><h3>'+CIRC[i]+' '+esc(subName(i))+' <span style="color:#64748b;font-weight:600;">('+list.length+')</span></h3>'
+        +(list.length?list.map(function(x){return qCard(x,opts);}).join(''):'<div style="color:#475569;font-size:.9vw;padding:6px;">아직 없어요</div>')+'</div>';
     })(i); }
     return '<div class="cols padlet">'+cols+'</div>';
   }
-  function renderVote(){
-    var cands=QS.filter(function(q){ return q.candidate && String(q.question||'').trim(); }).sort(function(a,b){ return (b.votes||0)-(a.votes||0); });
-    if(!cands.length) return '<div class="empty">후보로 지정된 질문이 없어요.<br><span style="font-size:1vw;">제출 단계에서 질문 카드의 <b>☆ 후보 지정</b>을 눌러 투표할 질문을 골라주세요.</span></div>';
-    var top=(cands[0].votes||0)>0?cands[0].votes:-1;
-    return '<div class="cols">'+cands.map(function(x){ return '<div class="col" style="background:transparent;padding:0;">'+qCard(x,{showVotes:true,rank1:(x.votes||0)===top&&top>0})+'</div>'; }).join('')+'</div>';
-  }
+  function renderSubmit(){ return groupedCols({}); }
+  function renderVote(){ return groupedCols({showVotes:true, sortVotes:true}); }
   function renderFocus(){
-    if(!SESSION.focus_q){
-      // 토론 단계인데 아직 선정 안 함 → 투표 상위 보여주고 고르게
-      return '<div class="empty">아래에서 오늘의 질문을 선정하세요 👇</div>'+renderVote();
+    var focs=QS.filter(function(q){ return q.focus && String(q.question||'').trim(); }).sort(function(a,b){ return (a.sub_unit||1)-(b.sub_unit||1); });
+    var banner='';
+    if(focs.length){
+      banner='<div style="display:flex;flex-direction:column;gap:1.5vh;margin-bottom:2.5vh;">'+focs.map(function(x){ var i=(x.sub_unit||1)-1;
+        return '<div class="focus" style="padding:2vh 2vw;"><div class="lab">🌟 '+CIRC[i]+' '+esc(subName(i))+'</div><div class="q" style="font-size:1.9vw;">'+esc(x.question)+'</div>'
+          +(x.word?'<span class="w" style="font-size:1vw;margin-top:1vh;display:inline-block;">'+esc(x.word)+'</span>':'')
+          +'<div class="m">'+nameOf(x)+' · 👍 '+(x.votes||0)+'</div></div>';
+      }).join('')+'</div>';
     }
-    var x=QS.filter(function(q){return q.id===SESSION.focus_q;})[0];
-    if(!x) return '<div class="empty">질문을 불러오는 중…</div>';
-    return '<div class="focus"><div class="lab">🌟 오늘의 질문</div><div class="q">'+esc(x.question)+'</div>'
-      +(x.word?'<div style="margin-top:2.5vh;"><span class="w" style="font-size:1.1vw;">'+esc(x.word)+'</span></div>':'')
-      +'<div class="m">'+nameOf(x)+' · 👍 '+(x.votes||0)+'</div></div>';
+    return banner+'<div class="sub" style="margin:0 0 1vh;">👇 소단원마다 ⭐ 오늘의 질문을 하나씩 골라요 (득표순 정렬)</div>'+groupedCols({showVotes:true, pick:true, sortVotes:true});
   }
 
   // ── 지난 세션 보관함 (학생이 낸 질문·키워드 모아보기) ──

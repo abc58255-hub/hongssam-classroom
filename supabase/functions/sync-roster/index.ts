@@ -188,11 +188,18 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
-    // 오늘의 질문 선정: {op:'havrutaFocus', id, focus_q}
+    // 오늘의 질문 선정(소단원별): {op:'havrutaFocus', id(세션), qid, sub_unit, on}
     if (body.op === "havrutaFocus") {
-      const fq = body.focus_q == null ? null : Number(body.focus_q);
-      const { error } = await admin0.from("havruta_sessions").update({ focus_q: fq }).eq("id", Number(body.id));
-      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      const sid = Number(body.id), qid = Number(body.qid), su = Number(body.sub_unit) || 0, on = body.on !== false;
+      if (on) {
+        // 같은 소단원의 기존 선정 해제 후 이 질문만 선정 (소단원당 1개)
+        await admin0.from("havruta_questions").update({ focus: false }).eq("session_id", sid).eq("sub_unit", su);
+        const { error } = await admin0.from("havruta_questions").update({ focus: true }).eq("id", qid);
+        if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      } else {
+        const { error } = await admin0.from("havruta_questions").update({ focus: false }).eq("id", qid);
+        if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      }
       return Response.json({ success: true });
     }
     // 이름/익명 전체 전환: {op:'havrutaNames', id, on}

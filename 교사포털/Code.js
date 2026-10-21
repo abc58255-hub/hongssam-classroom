@@ -195,9 +195,9 @@ function havrutaStage(token, id, stage) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'havrutaStage', id: id, stage: stage });
 }
-function havrutaFocus(token, id, focus_q) {
+function havrutaFocus(token, id, qid, sub_unit, on) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
-  return _lessonCall_({ op: 'havrutaFocus', id: id, focus_q: focus_q });
+  return _lessonCall_({ op: 'havrutaFocus', id: id, qid: qid, sub_unit: sub_unit, on: on });
 }
 function havrutaDeleteQ(token, qid) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
