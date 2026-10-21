@@ -135,9 +135,17 @@
     sb.from('havruta_questions').select('*').eq('session_id',SESSION.id).eq('student_id',USER.studentId).order('created_at',{ascending:false})
       .then(function(r){ var all=r.data||[]; var qs=all.filter(function(x){return String(x.question||'').trim();}); var ws=all.filter(function(x){return String(x.word||'').trim();});
         if(!all.length){ box.innerHTML=''; return; }
+        var subs=subLabels();
         var h='<div class="card"><div style="font-size:13px;font-weight:800;color:#4338ca;margin-bottom:8px;">내가 낸 것 — 질문 '+qs.length+' · 단어 '+ws.length+'</div>';
-        h+=qs.map(function(x){ return '<div class="q"><span class="txt">'+CIRC[(x.sub_unit||1)-1]+' '+esc(x.question)+'</span><button onclick="delQ('+x.id+')" style="float:right;background:none;border:none;color:#cbd5e1;font-size:16px;cursor:pointer;">🗑</button></div>'; }).join('');
-        if(ws.length) h+='<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;">'+ws.map(function(x){ return '<span class="word" style="cursor:pointer;" onclick="delQ('+x.id+')" title="삭제">'+esc(x.word)+' ✕</span>'; }).join('')+'</div>';
+        subs.forEach(function(lb,i){
+          var su=i+1;
+          var myQ=qs.filter(function(x){return (x.sub_unit||1)===su;});
+          var myW=ws.filter(function(x){return (x.sub_unit||1)===su;});
+          if(!myQ.length && !myW.length) return;
+          h+='<div style="margin-top:12px;font-size:12px;font-weight:800;color:#6366f1;border-bottom:1px solid #e5e7eb;padding-bottom:4px;">'+CIRC[i]+' '+esc(lb)+'</div>';
+          h+=myQ.map(function(x){ return '<div class="q"><span class="txt">'+esc(x.question)+'</span><button onclick="delQ('+x.id+')" style="float:right;background:none;border:none;color:#cbd5e1;font-size:16px;cursor:pointer;">🗑</button></div>'; }).join('');
+          if(myW.length) h+='<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">'+myW.map(function(x){ return '<span class="word" style="cursor:pointer;" onclick="delQ('+x.id+')" title="삭제">'+esc(x.word)+' ✕</span>'; }).join('')+'</div>';
+        });
         box.innerHTML=h+'</div>';
       });
   }
