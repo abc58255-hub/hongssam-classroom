@@ -81,12 +81,16 @@
       .then(function(r){ var s=(r.data&&r.data[0])||null;
         if(!s){ SESSION=null; document.getElementById('main').innerHTML='<div class="muted">하브루타가 종료됐어요. 수고했어요! 👏</div>'; document.getElementById('stageBadge').textContent='종료'; return; }
         var newSess=!SESSION||SESSION.id!==s.id; SESSION=s;
-        loadMyVotes().then(render);
+        // 같은 세션이 제출 단계로 유지 중이면(예: 교사 이름/익명 토글) 입력칸 보존 — '내가 낸 것'만 갱신
+        loadMyVotes().then(function(){ if(SESSION.stage==='submit' && !newSess) renderMine(); else render(); });
       });
   }
   function subscribeQuestions(){
     sb.channel('hv-q-'+SESSION.id)
-      .on('postgres_changes',{event:'*',schema:'public',table:'havruta_questions',filter:'session_id=eq.'+SESSION.id}, function(){ render(); })
+      .on('postgres_changes',{event:'*',schema:'public',table:'havruta_questions',filter:'session_id=eq.'+SESSION.id}, function(){
+        // 제출 단계에선 입력칸(#main)을 다시 그리지 않음 — 타이핑 중 날아감 방지. '내가 낸 것'만 갱신
+        if(SESSION && SESSION.stage==='submit') renderMine(); else render();
+      })
       .subscribe();
   }
   function loadMyVotes(){
