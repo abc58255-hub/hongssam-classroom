@@ -262,7 +262,9 @@
     return banner+'<div class="sub" style="margin:0 0 1vh;">👇 소단원마다 ⭐ 오늘의 질문을 하나씩 골라요 (득표순 정렬)</div>'+groupedCols({showVotes:true, pick:true, sortVotes:true});
   }
 
-  // ── 지난 세션 보관함 (학생이 낸 질문·키워드 모아보기) ──
+  // ── 지난 세션 보관함 (득표 순위·소단원별 질문·키워드 순위) ──
+  var ARC_SESS=[];
+  function arcLabels(s){ var raw=(s&&s.sub_units||'').trim(); var a=raw?raw.split(/\n|,/).map(function(x){return x.trim();}).filter(Boolean):[]; while(a.length<5)a.push('소단원 '+(a.length+1)); return a; }
   function showArchive(){
     var cls=document.getElementById('clsSel').value||'';
     var ov=document.getElementById('arcOv');
@@ -275,9 +277,9 @@
       +'<div id="arcBody" style="color:#94a3b8;">불러오는 중…</div>';
     sb.from('havruta_sessions').select('*').eq('class_scope',cls).eq('active',false).order('created_at',{ascending:false})
       .then(function(r){
-        var sess=(r.data)||[];
+        var sess=(r.data)||[]; ARC_SESS=sess;
         if(!sess.length){ document.getElementById('arcBody').innerHTML='<p>보관된 지난 세션이 없어요. (세션을 새로 열면 이전 세션이 여기에 쌓여요)</p>'; return; }
-        var btns=sess.map(function(s,i){ var d=new Date(s.created_at); var lab=(d.getMonth()+1)+'/'+d.getDate()+' '+(s.unit||'하브루타');
+        var btns=sess.map(function(s){ var d=new Date(s.created_at); var lab=(d.getMonth()+1)+'/'+d.getDate()+' '+(s.unit||'하브루타');
           return '<button class="arcS" data-id="'+s.id+'" onclick="loadArcSession('+s.id+',this)" style="background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:8px 14px;margin:0 8px 8px 0;cursor:pointer;">'+esc(lab)+'</button>'; }).join('');
         document.getElementById('arcBody').innerHTML='<div style="margin-bottom:16px;">'+btns+'</div><div id="arcDetail"></div>';
         loadArcSession(sess[0].id, document.querySelector('.arcS'));
@@ -286,16 +288,37 @@
   function loadArcSession(sid, btn){
     if(btn){ Array.prototype.forEach.call(document.querySelectorAll('.arcS'),function(b){ b.style.background='#1e293b'; b.style.borderColor='#334155'; }); btn.style.background='#2563eb'; btn.style.borderColor='#2563eb'; }
     var det=document.getElementById('arcDetail'); if(det) det.innerHTML='<span style="color:#94a3b8;">불러오는 중…</span>';
-    sb.from('havruta_questions').select('*').eq('session_id',sid).order('created_at',{ascending:true})
+    var s=ARC_SESS.filter(function(z){return z.id===sid;})[0]||{};
+    var labels=arcLabels(s);
+    sb.from('havruta_questions').select('*').eq('session_id',sid)
       .then(function(r){
         var rows=(r.data)||[];
+        var qs=rows.filter(function(x){return String(x.question||'').trim();});
+        // 키워드 순위 (세션 전체)
         var words={}; rows.forEach(function(x){ var w=String(x.word||'').trim(); if(w) words[w]=(words[w]||0)+1; });
         var wArr=Object.keys(words).map(function(k){return {w:k,n:words[k]};}).sort(function(a,b){return b.n-a.n;});
-        var qs=rows.filter(function(x){return String(x.question||'').trim();});
-        var kwHtml=wArr.length? wArr.map(function(o){return '<span style="display:inline-block;background:#1e293b;border:1px solid #334155;border-radius:16px;padding:4px 12px;margin:0 6px 6px 0;">'+esc(o.w)+' <b style="color:#60a5fa;">'+o.n+'</b></span>';}).join('') : '<span style="color:#64748b;">키워드 없음</span>';
-        var qHtml=qs.length? qs.map(function(x){return '<div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:10px 14px;margin-bottom:8px;"><div>'+esc(x.question)+'</div><div style="color:#64748b;font-size:13px;margin-top:4px;">'+esc(x.name||'')+(x.word?' · 🔑 '+esc(x.word):'')+'</div></div>';}).join('') : '<span style="color:#64748b;">질문 없음</span>';
-        det.innerHTML='<h3 style="margin:8px 0;">🔑 키워드 ('+wArr.length+')</h3><div style="margin-bottom:20px;">'+kwHtml+'</div>'
-          +'<h3 style="margin:8px 0;">💬 질문 ('+qs.length+')</h3><div>'+qHtml+'</div>';
+        var medal=['🥇','🥈','🥉'];
+        var kwHtml=wArr.length? wArr.slice(0,15).map(function(o,i){return '<span style="display:inline-flex;align-items:center;gap:5px;background:#1e293b;border:1px solid #334155;border-radius:16px;padding:4px 12px;margin:0 6px 6px 0;">'+(medal[i]||(i+1)+'위')+' '+esc(o.w)+' <b style="color:#60a5fa;">'+o.n+'</b></span>';}).join('') : '<span style="color:#64748b;">키워드 없음</span>';
+        // 소단원별 질문 — 득표순 + 순위 + 오늘의 질문 표시
+        var nSub=Math.max(labels.length, rows.reduce(function(m,x){return Math.max(m,x.sub_unit||1);},0));
+        var secs='';
+        for(var i=0;i<nSub;i++){ (function(i){
+          var list=qs.filter(function(x){return (x.sub_unit||1)===i+1;}).sort(function(a,b){return (b.votes||0)-(a.votes||0);});
+          if(!list.length) return;
+          secs+='<div style="margin:10px 0 6px;font-size:15px;font-weight:800;color:#a5b4fc;">'+CIRC[i]+' '+esc(labels[i]||('소단원 '+(i+1)))+' <span style="color:#64748b;font-weight:600;font-size:13px;">('+list.length+')</span></div>';
+          secs+=list.map(function(x,idx){
+            var rank=(x.votes||0)>0?(medal[idx]||(idx+1)+'위'):'';
+            return '<div style="background:#1e293b;border:1px solid '+((x.focus)?'#22c55e':'#334155')+';border-radius:10px;padding:9px 13px;margin-bottom:7px;">'
+              +'<div style="display:flex;align-items:center;gap:8px;"><span style="background:#f59e0b;color:#06281a;font-weight:900;font-size:13px;padding:1px 9px;border-radius:12px;">👍 '+(x.votes||0)+'</span>'
+              +(rank?'<span style="font-weight:900;color:#fbbf24;font-size:14px;">'+rank+'</span>':'')
+              +(x.focus?'<span style="color:#86efac;font-size:12px;font-weight:800;">⭐ 오늘의 질문</span>':'')+'</div>'
+              +'<div style="margin-top:5px;">'+esc(x.question)+'</div>'
+              +'<div style="color:#64748b;font-size:12px;margin-top:3px;">'+esc(x.name||'')+(x.word?' · 🔑 '+esc(x.word):'')+'</div></div>';
+          }).join('');
+        })(i); }
+        if(!secs) secs='<span style="color:#64748b;">질문 없음</span>';
+        det.innerHTML='<h3 style="margin:8px 0;">🔑 키워드 순위 ('+wArr.length+'종)</h3><div style="margin-bottom:22px;">'+kwHtml+'</div>'
+          +'<h3 style="margin:8px 0;">💬 소단원별 질문 · 득표순 ('+qs.length+')</h3><div>'+secs+'</div>';
       });
   }
 </script>
