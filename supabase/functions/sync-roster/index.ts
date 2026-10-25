@@ -227,6 +227,12 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
+    // 세션 영구 삭제(질문·투표 cascade): {op:'havrutaDeleteSession', id}
+    if (body.op === "havrutaDeleteSession") {
+      const { error } = await admin0.from("havruta_sessions").delete().eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
 
     // 게임 등록/수정 모드: {games:[{unit,game,title,url,scope,status}]}
     if (Array.isArray(body.games)) {

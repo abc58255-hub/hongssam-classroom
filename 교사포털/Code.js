@@ -38,7 +38,7 @@ var RPC_WHITELIST = [
   'getLinks', 'saveLink', 'deleteLink',
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
   'graphPresetSave', 'graphPresetDelete', 'syncRoster',
-  'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames'
+  'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames', 'havrutaDeleteSession'
 ];
 
 function doPost(e) {
@@ -210,6 +210,10 @@ function havrutaCandidate(token, qid, on) {
 function havrutaNames(token, id, on) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'havrutaNames', id: id, on: on });
+}
+function havrutaDeleteSession(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'havrutaDeleteSession', id: id });
 }
 function havrutaClose(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
