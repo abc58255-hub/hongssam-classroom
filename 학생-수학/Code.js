@@ -141,7 +141,15 @@ function getHash(text) {
 // ✅ 로그인 성공 시 실패 횟수 초기화 + 빈 비밀번호 즉시 반환
 // 로그인 — 인증 라이브러리(인증 시트)로 위임. 5회 잠금·해시검증은 라이브러리가 처리.
 function verifyLogin(studentId, studentName, password) {
-  return StudentAuth.login(studentId, studentName, password);
+  var res = StudentAuth.login(studentId, studentName, password);
+  // 비번을 어떤 경로로 바꿨든(재설정·재가입·교사초기화) 수업활동 로그인도 되도록,
+  // 로그인 성공 시 현재 해시를 Supabase로 즉시 동기화 (업서트라 중복돼도 무해)
+  try {
+    if (res && res.success && password) {
+      _pushStudentToLessons_(studentId, (res.name || studentName), getHash(password));
+    }
+  } catch (_) {}
+  return res;
 }
 
 // AI 응답 JSON 느슨하게 파싱 — 토큰 한도로 잘린 응답도 닫는 괄호({,[) 보정해서 복구
