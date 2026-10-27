@@ -76,9 +76,22 @@
       <label class="muted">기회<input id="maxTries" type="number" value="3" min="1" max="9" style="width:52px;"></label>
       <label class="muted">기본점<input id="basePts" type="number" value="100" style="width:64px;"></label>
       <span style="flex:1"></span>
+      <button class="btn ghost" onclick="toggleBulk()">⚡ 빠른 입력</button>
       <button class="btn ghost" onclick="resetDraft()">🆕 새로</button>
       <button class="btn ghost" onclick="window.open('./sim-board.html','_blank')">🏆 순위판</button>
       <button class="btn" onclick="openSet()">💾 세트 열기 & QR 생성</button>
+    </div>
+
+    <div class="sec" id="bulkPanel" style="display:none;">
+      <h3>⚡ 빠른 입력 (JSON 붙여넣기)</h3>
+      <div class="muted" style="margin-bottom:8px;">AI로 만든 JSON을 붙여넣고 <b>불러오기</b>를 누르면 삼각형·스테이션이 한 번에 채워져요. 닮음비·조건은 자동 계산돼요.</div>
+      <textarea id="bulkText" style="width:100%;min-height:170px;border:1px solid #cbd5e1;border-radius:10px;padding:10px;font-family:monospace;font-size:12px;" placeholder='{ "triangles":[...], "stations":[...] }'></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn" onclick="loadBulk()">📥 불러오기</button>
+        <button class="btn ghost" onclick="document.getElementById('bulkText').value=SAMPLE_JSON">예시 채우기</button>
+        <button class="btn ghost" onclick="copyFormat()">📋 AI용 형식 설명 복사</button>
+        <button class="btn ghost" onclick="toggleBulk()">닫기</button>
+      </div>
     </div>
 
     <div class="sec">
@@ -156,6 +169,51 @@
     return null;
   }
   function resetDraft(){ if(!confirm('편집 중인 내용을 모두 지우고 새로 시작할까요?')) return; localStorage.removeItem('sim_draft'); TRIS=[]; STATIONS=[]; addTri(); addTri(); addTri(); addStation(); }
+
+  // ── 빠른 입력 (JSON 붙여넣기) ──
+  function toggleBulk(){ var p=document.getElementById('bulkPanel'); p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none'; if(p.style.display==='block') p.scrollIntoView({behavior:'smooth'}); }
+  function parseShow(sh){ var o={sa:false,sb:false,sc:false,Aa:false,Ab:false,Ac:false};
+    if(!sh) return o;
+    if(Array.isArray(sh)){ sh.forEach(function(k){ if(o.hasOwnProperty(k)) o[k]=true; }); return o; }
+    String(sh).split('').forEach(function(ch){ if(ch==='a')o.sa=true; else if(ch==='b')o.sb=true; else if(ch==='c')o.sc=true; else if(ch==='A')o.Aa=true; else if(ch==='B')o.Ab=true; else if(ch==='C')o.Ac=true; });
+    return o; }
+  function vArr(o){ if(Array.isArray(o.v)) return o.v; if(o.a!=null) return [o.a,o.b,o.c]; return [o.v1,o.v2,o.v3]; }
+  function loadBulk(){
+    var txt=(document.getElementById('bulkText').value||'').trim(); if(!txt){ toast('붙여넣은 내용이 없어요'); return; }
+    var data; try{ data=JSON.parse(txt); }catch(e){ toast('JSON 형식 오류: '+e.message); return; }
+    var tris=data.triangles||data.tris||[], stns=data.stations||data.sts||[];
+    if(!tris.length){ toast('triangles가 비어있어요'); return; }
+    TRIS=tris.map(function(t){ var v=vArr(t); return {mode:(t.mode||'sss'), v1:+v[0]||0, v2:+v[1]||0, v3:+v[2]||0, show:parseShow(t.show)}; });
+    STATIONS=stns.map(function(s){ var v=vArr(s); return {label:s.label||'', mode:(s.mode||'sss'), v1:+v[0]||0, v2:+v[1]||0, v3:+v[2]||0, show:parseShow(s.show), rotate:+s.rotate||0, flip:!!s.flip, ans_idx:+(s.ans||s.ans_idx)||1, ans_cond:String(s.cond||s.ans_cond||'').toUpperCase(), ratio_a:1, ratio_b:1}; });
+    STATIONS.forEach(function(s){ if(!s.ans_cond){ var g=SimDraw.guessCond(s.show); if(g)s.ans_cond=g; } });
+    if(data.title) document.getElementById('title').value=data.title;
+    if(!TRIS.length){ addTri(); } if(!STATIONS.length){ addStation(); }
+    renderTris(); renderStations(); saveDraft();
+    document.getElementById('bulkPanel').style.display='none';
+    toast('불러왔어요! 삼각형 '+TRIS.length+'개 · 스테이션 '+STATIONS.length+'개');
+  }
+  var SAMPLE_JSON=JSON.stringify({
+    title:'닮음 보물찾기',
+    triangles:[
+      {mode:'sss',v:[6,8,10],show:'abc'},
+      {mode:'sas',v:[6,33,10],show:'abA'},
+      {mode:'sss',v:[6,9,10],show:'abc'}
+    ],
+    stations:[
+      {label:'운동장 골대',mode:'sss',v:[9,12,15],show:'abc',rotate:120,flip:false,ans:1},
+      {label:'농구장',mode:'sas',v:[12,33,20],show:'abA',rotate:40,flip:true,ans:2}
+    ]
+  },null,2);
+  var FORMAT_DOC='닮음 보물찾기 세트를 아래 JSON 형식으로 만들어줘.\n'
+    +'- triangles: 학습지에 줄 삼각형들 (1번부터 순서대로)\n'
+    +'- stations: 야외에 숨길 삼각형들. ans = 닮은 삼각형 번호(1부터)\n'
+    +'- mode: "sss"(세 변) | "sas"(두 변+낀각) | "asa"(한 변+두 각)\n'
+    +'- v: mode에 맞는 값 3개. sss=[a,b,c] / sas=[변,낀각°,변] / asa=[밑변,각°,각°]\n'
+    +'- show: 학생에게 보여줄 정보 문자열. 변=a,b,c / 각=A,B,C (예 "abc"=세 변, "abA"=두 변+낀각A → 조건은 이 정보로 결정)\n'
+    +'- rotate(0~330,선택), flip(true/false,선택)\n'
+    +'규칙: 각 station은 학습지의 "딱 한 번호"와만 닮게. 닮음비·조건은 프로그램이 자동 계산하니 ans와 show만 정확히.\n'
+    +'출력은 JSON만. 예시:\n'+SAMPLE_JSON;
+  function copyFormat(){ (navigator.clipboard?navigator.clipboard.writeText(FORMAT_DOC):Promise.reject()).then(function(){ toast('AI용 형식 설명을 복사했어요'); }).catch(function(){ document.getElementById('bulkText').value=FORMAT_DOC; toast('복사 불가 → 입력칸에 넣었어요'); }); }
   function relock(m){ TOK=''; localStorage.removeItem('sim_ptok'); document.getElementById('app').style.display='none'; document.getElementById('lock').style.display='flex'; if(m)document.getElementById('lerr').textContent=m; }
 
   // 입력 방식 공통
