@@ -303,6 +303,7 @@
       <div style="margin-top:12px;">
         <button class="btn sm" style="width:100%;" onclick="musicSaveAuto()">💾 자동 재생 설정 저장</button>
       </div>
+      <div id="musicAutoStatus" style="margin-top:12px; padding:12px 14px; border-radius:12px; background:#f1f5f9; border:1px solid #e2e8f0; font-size:13px; color:#475569;">현재 설정을 불러오는 중…</div>
       <div style="margin-top:10px; font-size:12px; color:#94a3b8;">설정한 시간대에 TV가 자동으로 재생/정지해요. 자동재생 중 <b>정지</b>를 누르면 그 시간대 동안만 꺼져요.</div>
     </div>
 
@@ -428,14 +429,33 @@
           el.innerHTML = '🟢 지금 재생 중: <b style="color:#0f172a;">' + (pn ? esc(pn) : esc(m.mUrl.split('\n')[0]) + ((m.mUrl.split('\n').length>1)?(' 외 '+(m.mUrl.split('\n').length-1)+'곡'):'')) + '</b>';
         } else el.textContent = '⚫ 지금 수동 재생 중인 음악이 없어요. (자동 시간대면 TV가 알아서 틀어요)';
       }
-      // 자동 설정 채우기
-      var a = document.getElementById('musicAutoOn'); if (a) a.checked = !!m.aOn;
-      if (m.aStart) document.getElementById('musicAutoStart').value = m.aStart;
-      if (m.aEnd) document.getElementById('musicAutoEnd').value = m.aEnd;
-      if (m.aUrl) document.getElementById('musicAutoUrl').value = m.aUrl;
+      // 자동 설정 채우기 (입력 중 덮어쓰기 방지: 최초 1회만)
+      if (!window._musicFormLoaded) {
+        var a = document.getElementById('musicAutoOn'); if (a) a.checked = !!m.aOn;
+        if (m.aStart) document.getElementById('musicAutoStart').value = m.aStart;
+        if (m.aEnd) document.getElementById('musicAutoEnd').value = m.aEnd;
+        if (m.aUrl) document.getElementById('musicAutoUrl').value = m.aUrl;
+        window._musicFormLoaded = true;
+      }
+      renderAutoStatus(m);
     }).withFailureHandler(function(){}).getTvMusic();
     musicLoadPresets();
   }
+  function _hhmmNow(){ var n=new Date(); return (n.getHours()<10?'0':'')+n.getHours()+':'+(n.getMinutes()<10?'0':'')+n.getMinutes(); }
+  function renderAutoStatus(m){
+    var el=document.getElementById('musicAutoStatus'); if(!el||!m) return;
+    if(!m.aOn){ el.innerHTML='⚪ <b>자동 재생 꺼짐</b> — 체크 후 저장하면 설정한 시간대에 TV가 자동으로 틀어요.'; return; }
+    var now=_hhmmNow();
+    var inWin = m.aStart && m.aEnd && now>=m.aStart && now<m.aEnd;
+    var first=(m.aUrl||'').split('\n')[0]||''; var more=(m.aUrl||'').split('\n').filter(Boolean).length;
+    el.innerHTML='🟢 <b>자동 재생 켜짐</b><br>'
+      +'⏰ 시간대: <b>'+esc(m.aStart||'?')+' ~ '+esc(m.aEnd||'?')+'</b> &nbsp; (지금 '+now+')<br>'
+      +'🎵 링크: '+esc(first)+(more>1?(' 외 '+(more-1)+'곡'):'')+'<br>'
+      +(inWin?'<span style="color:#15803d;font-weight:800;">▶ 지금 재생 시간대예요 — TV에서 나오고 있어야 해요</span>'
+             :'<span style="color:#64748b;">⏸ 지금은 재생 시간대가 아니에요 (시간대가 되면 자동 재생)</span>');
+  }
+  function musicStatusPoll(){ var t=document.querySelector('.tab-content#tab-music'); var vis=document.getElementById('musicAutoStatus'); if(!vis||vis.offsetParent===null) return; google.script.run.withSuccessHandler(function(m){ if(m) renderAutoStatus(m); }).withFailureHandler(function(){}).getTvMusic(); }
+  setInterval(musicStatusPoll, 15000);
   function musicLoadPresets() {
     google.script.run.withSuccessHandler(function(res){
       gMusicPresets = (res && res.presets) || [];
