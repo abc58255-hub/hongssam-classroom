@@ -29,9 +29,10 @@ Deno.serve(async (req) => {
     // ── 학생 신원 확인 ──
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const { data: u } = await admin.auth.getUser(token);
-    const sid = String(u?.user?.user_metadata?.student_id || "").trim();
+    const emailSid = String(u?.user?.email || "").split("@")[0];
+    const sid = String(u?.user?.user_metadata?.student_id || emailSid || "").trim();
     const sname = String(u?.user?.user_metadata?.name || "").trim();
-    if (!sid) return json({ success: false, message: "로그인이 필요해요." }, 401);
+    if (!sid) return json({ success: false, message: "로그인이 필요해요. 수학교실에 다시 로그인해 주세요." }, 401);
 
     const body = await req.json();
     const op = body.op;

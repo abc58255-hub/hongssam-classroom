@@ -101,7 +101,8 @@
     el('main').innerHTML='<div class="muted">확인 중…</div>';
     sb.functions.invoke('similarity',{body:{op:'scan',token:token}}).then(function(res){
       var d=res.data||{};
-      if(!d.success){ el('main').innerHTML='<div class="card"><div class="muted">'+esc(d.message||'QR을 읽을 수 없어요')+'</div><button class="btn" onclick="startScan()">📷 다시 스캔</button><button class="btn ghost" onclick="renderHome()">홈</button></div>'; return; }
+      if(res.error && !d.message){ d.message = (res.error.message||'서버 오류')+' — 다시 로그인하거나 잠시 후 재시도'; }
+      if(!d.success){ el('main').innerHTML='<div class="card"><div class="muted">'+esc(d.message||'QR을 읽을 수 없어요')+'</div><div style="font-size:11px;color:#cbd5e1;margin-top:6px;word-break:break-all;">코드: '+esc(token)+'</div><button class="btn" onclick="startScan()">📷 다시 스캔</button><button class="btn ghost" onclick="renderHome()">홈</button></div>'; return; }
       CUR={ token:token, st:d.station, triCount:d.triCount||9, triesLeft:d.triesLeft, cleared:d.cleared };
       ANS={ idx:null, cond:null };
       if(d.cleared){ renderResult({cleared:true, already:true, points:d.points, order:d.order}); return; }
