@@ -38,7 +38,8 @@ var RPC_WHITELIST = [
   'getLinks', 'saveLink', 'deleteLink',
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
   'graphPresetSave', 'graphPresetDelete', 'syncRoster',
-  'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames', 'havrutaDeleteSession'
+  'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames', 'havrutaDeleteSession',
+  'simOpenSet', 'simCloseSet', 'simDeleteSet'
 ];
 
 function doPost(e) {
@@ -214,6 +215,19 @@ function havrutaNames(token, id, on) {
 function havrutaDeleteSession(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'havrutaDeleteSession', id: id });
+}
+// ── 닮음 보물찾기 ──
+function simOpenSet(token, payload) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'simOpenSet', set: payload.set, triangles: payload.triangles, stations: payload.stations });
+}
+function simCloseSet(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'simCloseSet', id: id });
+}
+function simDeleteSet(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'simDeleteSet', id: id });
 }
 function havrutaClose(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };

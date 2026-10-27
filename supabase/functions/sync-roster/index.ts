@@ -234,6 +234,67 @@ Deno.serve(async (req) => {
       return Response.json({ success: true });
     }
 
+    // ── 닮음 보물찾기: 세트 열기(기존 활성 닫고 새로) ──
+    // {op:'simOpenSet', set:{class_scope,title,base_pts,try_bonus,first_bonus,max_tries},
+    //  triangles:[{idx,side_a,side_b,side_c,show}],
+    //  stations:[{label,side_a,side_b,side_c,show,rotate,flip,ans_idx,ans_cond,ratio_a,ratio_b}]}
+    if (body.op === "simOpenSet") {
+      const S = body.set ?? {};
+      const cls = String(S.class_scope ?? "").trim();
+      if (!cls) return Response.json({ success: false, message: "반이 없습니다." }, { status: 400 });
+      await admin0.from("sim_sets").update({ active: false }).eq("class_scope", cls).eq("active", true);
+      const setRow = {
+        class_scope: cls, title: String(S.title ?? "닮음 보물찾기").trim(),
+        base_pts: Number(S.base_pts) || 100,
+        try_bonus: Array.isArray(S.try_bonus) ? S.try_bonus.map(Number) : [50, 20, 0],
+        first_bonus: Array.isArray(S.first_bonus) ? S.first_bonus.map(Number) : [30, 20, 10],
+        max_tries: Math.max(1, Number(S.max_tries) || 3), active: true,
+      };
+      let ins = await admin0.from("sim_sets").insert(setRow).select("id").single();
+      if (ins.error) { // 활성 유니크 경합 대비 1회 재시도
+        await admin0.from("sim_sets").update({ active: false }).eq("class_scope", cls).eq("active", true);
+        ins = await admin0.from("sim_sets").insert(setRow).select("id").single();
+      }
+      if (ins.error) return Response.json({ success: false, message: ins.error.message }, { status: 500 });
+      const setId = ins.data.id;
+
+      const tris = (body.triangles ?? []).map((t: Record<string, unknown>) => ({
+        set_id: setId, idx: Number(t.idx),
+        side_a: Number(t.side_a), side_b: Number(t.side_b), side_c: Number(t.side_c), show: t.show ?? {},
+      }));
+      if (tris.length) {
+        const te = await admin0.from("sim_triangles").insert(tris);
+        if (te.error) return Response.json({ success: false, message: "삼각형 저장 오류: " + te.error.message }, { status: 500 });
+      }
+      const stns = (body.stations ?? []).map((st: Record<string, unknown>) => ({
+        set_id: setId, token: crypto.randomUUID().replace(/-/g, "").slice(0, 8),
+        label: String(st.label ?? "").trim(),
+        side_a: Number(st.side_a), side_b: Number(st.side_b), side_c: Number(st.side_c),
+        show: st.show ?? {}, rotate: Number(st.rotate) || 0, flip: !!st.flip,
+        ans_idx: Number(st.ans_idx), ans_cond: String(st.ans_cond ?? "SSS").toUpperCase(),
+        ratio_a: Number(st.ratio_a) || 1, ratio_b: Number(st.ratio_b) || 1,
+      }));
+      let outStations: unknown[] = [];
+      if (stns.length) {
+        const se = await admin0.from("sim_stations").insert(stns).select("id,token,label");
+        if (se.error) return Response.json({ success: false, message: "스테이션 저장 오류: " + se.error.message }, { status: 500 });
+        outStations = se.data ?? [];
+      }
+      return Response.json({ success: true, id: setId, stations: outStations });
+    }
+    // 세트 닫기: {op:'simCloseSet', id}
+    if (body.op === "simCloseSet") {
+      const { error } = await admin0.from("sim_sets").update({ active: false }).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 세트 삭제(cascade): {op:'simDeleteSet', id}
+    if (body.op === "simDeleteSet") {
+      const { error } = await admin0.from("sim_sets").delete().eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
     // 게임 등록/수정 모드: {games:[{unit,game,title,url,scope,status}]}
     if (Array.isArray(body.games)) {
       const okStatus = ["hidden", "open", "free"];
