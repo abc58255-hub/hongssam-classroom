@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>닮음 보물찾기 — 실시간 현황</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box;margin:0;}
+  body{font-family:Pretendard,sans-serif;background:#f1f5f9;color:#1f2937;padding:16px;}
+  h2{color:#0f766e;margin:0 0 4px;}
+  .muted{color:#94a3b8;font-size:13px;}
+  #lock{position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:999;}
+  #lock .box{background:#1e293b;padding:28px;border-radius:18px;width:300px;text-align:center;color:#e2e8f0;}
+  #lock input{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;margin:10px 0;}
+  button{font-family:inherit;cursor:pointer;}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;padding:12px;border-radius:14px;margin-bottom:14px;}
+  .bar select{padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
+  .scard{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;text-align:center;}
+  .scard .v{font-size:28px;font-weight:900;color:#0f766e;}
+  .scard .l{font-size:12px;color:#64748b;font-weight:700;margin-top:2px;}
+  .sec{background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;}
+  .sec h3{margin:0 0 10px;color:#0f766e;font-size:16px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #f1f5f9;}
+  th{color:#94a3b8;font-size:12px;font-weight:700;}
+  .bar2{height:8px;background:#e5e7eb;border-radius:5px;overflow:hidden;min-width:80px;}
+  .bar2 i{display:block;height:100%;background:linear-gradient(90deg,#34d399,#0f766e);}
+  .tag{font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;}
+  .t-done{background:#dcfce7;color:#15803d;} .t-go{background:#dbeafe;color:#1d4ed8;} .t-stuck{background:#fee2e2;color:#b91c1c;}
+  .hard{color:#b91c1c;font-weight:800;} .easy{color:#16a34a;font-weight:800;}
+  .empty{color:#94a3b8;text-align:center;padding:30px;}
+</style>
+</head>
+<body>
+  <div id="lock"><div class="box"><h2 style="color:#fff;">📊 닮음 현황</h2><p class="muted">교사 비밀번호</p>
+    <input id="lpw" type="password" onkeypress="if(event.keyCode==13)doUnlock()"><button onclick="doUnlock()" id="lbtn" style="width:100%;background:#0f766e;color:#fff;border:none;border-radius:10px;padding:11px;font-weight:800;">확인</button>
+    <div id="lerr" style="color:#f87171;font-size:13px;margin-top:8px;"></div></div></div>
+
+  <div id="app" style="display:none;">
+    <h2>📊 닮음 보물찾기 — 실시간 현황</h2>
+    <div class="bar">
+      <select id="clsSel"></select>
+      <span id="setName" class="muted"></span>
+      <span style="flex:1"></span>
+      <span class="muted">🔄 실시간 자동 갱신</span>
+    </div>
+    <div id="body"><div class="empty">반을 선택하세요.</div></div>
+  </div>
+
+<script>
+  var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
+  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
+  var sb=supabase.createClient(SB_URL,SB_KEY);
+  var TOK=localStorage.getItem('sim_ptok')||'';
+  var SET=null, BCLS='', STMAP={}, STORDER=[], CH=null;
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function portalRPC(fn,args){ return fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args})}).then(function(r){return r.json();}).then(function(d){ if(d&&d.ok) return d.result; throw new Error((d&&d.error)||'서버 오류'); }); }
+
+  function doUnlock(){
+    var pw=document.getElementById('lpw').value,b=document.getElementById('lbtn'); if(!pw)return; b.disabled=true;b.textContent='확인 중…';
+    portalRPC('teacherLogin',[pw]).then(function(res){ b.disabled=false;b.textContent='확인';
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('sim_ptok',TOK); document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block'; initCtl(); }
+      else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
+    }).catch(function(e){ b.disabled=false;b.textContent='확인'; document.getElementById('lerr').textContent='오류: '+e.message; });
+  }
+  if(TOK){ document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block'; initCtl(); }
+
+  function initCtl(){
+    var sel=document.getElementById('clsSel');
+    portalRPC('graphClasses',[TOK]).then(function(res){
+      if(res&&res.success===false){ TOK=''; localStorage.removeItem('sim_ptok'); location.reload(); return; }
+      var cls=(res&&res.classes)||[];
+      sel.innerHTML=cls.map(function(c){return '<option>'+esc(c)+'</option>';}).join('');
+      if(cls.length) loadSet(cls[0]);
+    });
+    sel.addEventListener('change',function(){ loadSet(this.value); });
+  }
+  function loadSet(cls){
+    BCLS=cls;
+    sb.from('sim_sets').select('*').eq('active',true).in('class_scope',[cls,'*']).order('created_at',{ascending:false})
+      .then(function(r){ var rows=r.data||[]; SET=rows.filter(function(x){return x.class_scope===cls;})[0]||rows.filter(function(x){return x.class_scope==='*';})[0]||null;
+        if(!SET){ document.getElementById('body').innerHTML='<div class="empty">이 반에 열린 닮음 활동이 없어요.</div>'; document.getElementById('setName').textContent=''; return; }
+        document.getElementById('setName').textContent=(SET.title||'')+' · '+(SET.class_scope==='*'?'모든 반':SET.class_scope);
+        portalRPC('simGetSet',[TOK,SET.id]).then(function(res){ STMAP={}; STORDER=[]; (res&&res.stations||[]).forEach(function(s,i){ STMAP[s.id]={label:s.label||('스테이션 '+(i+1)),idx:i+1}; STORDER.push(s.id); }); subscribe(); render(); }).catch(function(){ subscribe(); render(); });
+      });
+  }
+  function subscribe(){ if(CH){ sb.removeChannel(CH); CH=null; } if(!SET) return; CH=sb.channel('simm-'+SET.id).on('postgres_changes',{event:'*',schema:'public',table:'sim_attempts',filter:'set_id=eq.'+SET.id}, function(){ render(); }).subscribe(); }
+
+  function render(){
+    if(!SET) return;
+    sb.from('sim_attempts').select('student_id,name,tries,cleared,points,station_id,class_scope').eq('set_id',SET.id)
+      .then(function(r){ if(r.error){ return sb.from('sim_attempts').select('student_id,name,tries,cleared,points,station_id').eq('set_id',SET.id); } return r; })
+      .then(function(r){
+        var all=(r.data||[]).filter(function(a){ return a.class_scope===undefined || a.class_scope===BCLS; });
+        var totalSt=SET.station_count||STORDER.length||0, maxTries=SET.max_tries||3;
+        // 학생별
+        var byStu={}; all.forEach(function(a){ var k=a.student_id; if(!byStu[k])byStu[k]={name:a.name||k,clr:0,pts:0,stuck:0,tries:0}; if(a.cleared)byStu[k].clr++; byStu[k].pts+=a.points||0; byStu[k].tries+=a.tries||0; if(!a.cleared&&a.tries>=maxTries)byStu[k].stuck++; });
+        var stus=Object.keys(byStu).map(function(k){return byStu[k];}).sort(function(x,y){return y.clr-x.clr||y.pts-x.pts;});
+        var done=stus.filter(function(s){return totalSt&&s.clr>=totalSt;}).length;
+        var totalClears=all.filter(function(a){return a.cleared;}).length;
+        // 스테이션별
+        var byStn={}; all.forEach(function(a){ var k=a.station_id; if(!byStn[k])byStn[k]={att:0,clr:0,tries:0}; byStn[k].att++; if(a.cleared)byStn[k].clr++; byStn[k].tries+=a.tries||0; });
+
+        var html='<div class="cards">'
+          +'<div class="scard"><div class="v">'+stus.length+'</div><div class="l">참여 학생</div></div>'
+          +'<div class="scard"><div class="v">'+done+'</div><div class="l">전체 완료</div></div>'
+          +'<div class="scard"><div class="v">'+totalClears+'</div><div class="l">총 클리어</div></div>'
+          +'<div class="scard"><div class="v">'+totalSt+'</div><div class="l">스테이션 수</div></div>'
+          +'</div>';
+
+        // 스테이션별 현황
+        html+='<div class="sec"><h3>📍 스테이션별 현황 <span class="muted">(클리어율 낮으면 어려운 문제)</span></h3><table><tr><th>스테이션</th><th>클리어</th><th>시도자</th><th>평균 시도</th><th>클리어율</th></tr>';
+        var order=STORDER.length?STORDER:Object.keys(byStn);
+        order.forEach(function(sid){ var st=byStn[sid]||{att:0,clr:0,tries:0}; var lab=(STMAP[sid]&&STMAP[sid].label)||('#'+sid); var rate=st.att?Math.round(st.clr/st.att*100):0; var avg=st.att?(st.tries/st.att).toFixed(1):'0';
+          html+='<tr><td><b>'+((STMAP[sid]&&STMAP[sid].idx)?(STMAP[sid].idx+'. '):'')+esc(lab)+'</b></td><td>'+st.clr+'</td><td>'+st.att+'</td><td>'+avg+'</td><td class="'+(rate<40?'hard':(rate>=80?'easy':''))+'">'+rate+'%</td></tr>';
+        });
+        html+='</table></div>';
+
+        // 학생별 현황
+        html+='<div class="sec"><h3>🧑‍🎓 학생별 진행도</h3>';
+        if(!stus.length){ html+='<div class="empty">아직 참여한 학생이 없어요.</div>'; }
+        else { html+='<table><tr><th>이름</th><th>진행</th><th>점수</th><th>상태</th></tr>';
+          stus.forEach(function(s){ var pct=totalSt?Math.round(s.clr/totalSt*100):0;
+            var tag=(totalSt&&s.clr>=totalSt)?'<span class="tag t-done">완료</span>':(s.stuck>0?'<span class="tag t-stuck">막힘 '+s.stuck+'</span>':'<span class="tag t-go">진행중</span>');
+            html+='<tr><td><b>'+esc(s.name)+'</b></td><td><div style="display:flex;align-items:center;gap:8px;"><div class="bar2"><i style="width:'+pct+'%"></i></div><span class="muted">'+s.clr+'/'+totalSt+'</span></div></td><td>'+s.pts+'</td><td>'+tag+'</td></tr>';
+          });
+          html+='</table>'; }
+        html+='</div>';
+
+        document.getElementById('body').innerHTML=html;
+      });
+  }
+</script>
+</body>
+</html>
