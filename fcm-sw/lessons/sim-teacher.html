@@ -125,6 +125,7 @@
         <h3 style="margin:0;color:var(--na);">📷 스테이션 QR (야외에 숨기기)</h3>
         <button class="btn ghost" onclick="printMode('qr')">🖨 QR 인쇄</button>
       </div>
+      <div class="muted no-print" style="margin-bottom:8px;">이 QR 코드(#뒤 코드)는 <b>고정</b>이에요. 수정해도 그대로 유지되고, 📂 세트 관리 → 📷 QR 로 언제든 똑같이 다시 인쇄할 수 있어요.</div>
       <div id="qrList"></div>
     </div>
 
@@ -243,6 +244,7 @@
           return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:6px;background:#fff;">'
             +(s.active?'<span style="background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;">🟢 활성</span>':'<span style="background:#f1f5f9;color:#94a3b8;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">종료됨</span>')
             +'<span style="flex:1;font-size:13px;font-weight:700;color:#334155;">'+esc(s.title||'세트')+' <span style="color:#94a3b8;font-weight:500;">· '+scope+' · '+(s.station_count||0)+'문제 · '+dt+'</span></span>'
+            +'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="showSetQR('+s.id+')">📷 QR</button>'
             +'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="editSet('+s.id+')">✏️ 수정</button>'
             +(s.active?'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="closeSet('+s.id+')">⏹ 종료</button>':'')
             +'<button class="btn warn" style="padding:5px 10px;font-size:12px;" onclick="delSet('+s.id+',\''+esc(s.title||'')+'\')">🗑 삭제</button>'
@@ -385,11 +387,21 @@
       var wrap=document.createElement('div'); wrap.className='qr-item';
       var box=document.createElement('div'); box.style.cssText='width:150px;height:150px;margin:0 auto;'; wrap.appendChild(box);
       var lab=document.createElement('div'); lab.className='lab'; lab.textContent=(s.label||('스테이션 '+(i+1))); wrap.appendChild(lab);
+      var tk=document.createElement('div'); tk.style.cssText='font-size:10px;color:#94a3b8;font-family:monospace;margin-top:2px;'; tk.textContent='#'+String(s.token); wrap.appendChild(tk);
       list.appendChild(wrap);
       try{ new QRCode(box, { text:String(s.token), width:150, height:150, correctLevel:QRCode.CorrectLevel.M }); }
       catch(e){ lab.textContent='QR오류: '+e.message; }
     });
     panel.scrollIntoView({behavior:'smooth'});
+  }
+  // 저장된 세트의 QR을 "그대로" 다시 불러와 인쇄 (토큰 변경 없음)
+  function showSetQR(id){
+    portalRPC('simGetSet',[TOK,id]).then(function(res){
+      if(!res||!res.success){ toast('불러오기 실패: '+((res&&res.message)||'')); return; }
+      document.getElementById('mgmtPanel').style.display='none';
+      renderQR((res.stations||[]).map(function(s){return {token:s.token,label:s.label};}));
+      toast('저장된 QR을 그대로 불러왔어요 (동일 코드)');
+    }).catch(function(e){ toast('오류: '+e.message); });
   }
   function renderSheet(){
     var panel=document.getElementById('sheetPanel'), list=document.getElementById('sheetList');
