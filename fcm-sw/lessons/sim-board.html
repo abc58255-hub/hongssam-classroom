@@ -49,7 +49,7 @@
   var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
   var sb=supabase.createClient(SB_URL,SB_KEY);
   var TOK=localStorage.getItem('sim_ptok')||'';
-  var SET=null, CH=null;
+  var SET=null, CH=null, BCLS='';
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1800); }
@@ -78,8 +78,9 @@
     sel.addEventListener('change',function(){ loadSet(this.value); });
   }
   function loadSet(cls){
-    sb.from('sim_sets').select('*').eq('class_scope',cls).eq('active',true).order('created_at',{ascending:false}).limit(1)
-      .then(function(r){ SET=(r.data&&r.data[0])||null; subscribe(); render(); });
+    BCLS=cls;
+    sb.from('sim_sets').select('*').eq('active',true).in('class_scope',[cls,'*']).order('created_at',{ascending:false})
+      .then(function(r){ var rows=r.data||[]; SET=rows.filter(function(x){return x.class_scope===cls;})[0]||rows.filter(function(x){return x.class_scope==='*';})[0]||null; subscribe(); render(); });
   }
   function subscribe(){
     if(CH){ sb.removeChannel(CH); CH=null; }
@@ -89,7 +90,7 @@
   function render(){
     var wrap=document.getElementById('wrap');
     if(!SET){ wrap.innerHTML='<div class="empty">이 반에 열린 닮음 활동이 없어요.</div>'; return; }
-    sb.from('sim_attempts').select('student_id,name,points,cleared').eq('set_id',SET.id)
+    sb.from('sim_attempts').select('student_id,name,points,cleared').eq('set_id',SET.id).eq('class_scope',BCLS)
       .then(function(r){
         var rows=r.data||[];
         var by={};

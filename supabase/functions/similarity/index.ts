@@ -17,6 +17,7 @@ const CORS = {
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 }
+function classOf(sid: string): string { const s = String(sid || ""); return s.length >= 2 ? s[0] + "학년 " + s[1] + "반" : ""; }
 function gcd(a: number, b: number): number { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a || 1; }
 function reduce(a: number, b: number): [number, number] { const g = gcd(a, b); return g ? [a / g, b / g] : [a, b]; }
 
@@ -64,9 +65,10 @@ Deno.serve(async (req) => {
       if (!set.data || !set.data.active) return json({ success: false, message: "활동이 종료됐어요." });
       const SET = set.data;
 
+      const cls = classOf(sid);
       let row = (await admin.from("sim_attempts").select("*").eq("station_id", S.id).eq("student_id", sid).maybeSingle()).data;
       if (!row) {
-        const ins = await admin.from("sim_attempts").insert({ set_id: S.set_id, station_id: S.id, student_id: sid, name: sname, tries: 0 }).select("*").single();
+        const ins = await admin.from("sim_attempts").insert({ set_id: S.set_id, station_id: S.id, student_id: sid, name: sname, class_scope: cls, tries: 0 }).select("*").single();
         if (ins.error) return json({ success: false, message: ins.error.message }, 500);
         row = ins.data;
       }
@@ -87,11 +89,11 @@ Deno.serve(async (req) => {
         const tb = (SET.try_bonus || [])[tries - 1] || 0;
         const fb = (SET.first_bonus || [])[order - 1] || 0;
         const pts = (SET.base_pts || 0) + tb + fb;
-        await admin.from("sim_attempts").update({ tries, cleared: true, clear_order: order, points: pts, name: sname, updated_at: new Date().toISOString() }).eq("id", row.id);
+        await admin.from("sim_attempts").update({ tries, cleared: true, clear_order: order, points: pts, name: sname, class_scope: cls, updated_at: new Date().toISOString() }).eq("id", row.id);
         return json({ success: true, correct: true, cleared: true, order, points: pts, tries });
       } else {
         const triesLeft = Math.max(0, SET.max_tries - tries);
-        await admin.from("sim_attempts").update({ tries, name: sname, updated_at: new Date().toISOString() }).eq("id", row.id);
+        await admin.from("sim_attempts").update({ tries, name: sname, class_scope: cls, updated_at: new Date().toISOString() }).eq("id", row.id);
         // 부분 피드백(어느 항목이 맞았는지) — 3번 제한이라 정답 노출 위험 낮고 형성평가에 도움
         return json({ success: true, correct: false, triesLeft, feedback: { idx: idxOk, cond: condOk, ratio: ratioOk } });
       }

@@ -125,7 +125,7 @@
     portalRPC('graphClasses',[TOK]).then(function(res){
       if(res&&res.success===false){ relock(res.message); return; }
       var cls=(res&&res.classes)||[];
-      document.getElementById('clsSel').innerHTML=cls.length?cls.map(function(c){return '<option>'+esc(c)+'</option>';}).join(''):'<option value="">반 없음</option>';
+      document.getElementById('clsSel').innerHTML='<option value="*">🏫 모든 반 (공용 · 순위만 반별)</option>'+cls.map(function(c){return '<option>'+esc(c)+'</option>';}).join('');
     }).catch(function(e){ toast('반 불러오기 오류: '+e.message); });
     if(!TRIS.length){ addTri(); addTri(); addTri(); }
     if(!STATIONS.length){ addStation(); }

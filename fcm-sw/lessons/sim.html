@@ -54,6 +54,7 @@
 <script>
   var USER=null, sb=null, SET=null, SCANNER=null, CUR=null;
   var ANS={ idx:null, cond:null };
+  var PROG={ pts:0, clr:0 };
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2200); }
@@ -62,21 +63,27 @@
   LessonHub.init({ onReady: function(user){ USER=user; sb=LessonHub.client; loadSet(); } });
 
   function loadSet(){
-    sb.from('sim_sets').select('*').eq('class_scope',USER.className).eq('active',true).order('created_at',{ascending:false}).limit(1)
-      .then(function(r){ SET=(r.data&&r.data[0])||null; refreshProgress().then(renderHome); });
+    sb.from('sim_sets').select('*').eq('active',true).in('class_scope',[USER.className,'*']).order('created_at',{ascending:false})
+      .then(function(r){ var rows=r.data||[]; SET=rows.filter(function(x){return x.class_scope===USER.className;})[0]||rows.filter(function(x){return x.class_scope==='*';})[0]||null; refreshProgress().then(renderHome); });
   }
   function refreshProgress(){
     if(!SET) return Promise.resolve();
     return sb.from('sim_attempts').select('points,cleared').eq('set_id',SET.id).eq('student_id',USER.studentId)
-      .then(function(r){ var rows=r.data||[]; var pts=0,clr=0; rows.forEach(function(a){ pts+=a.points||0; if(a.cleared)clr++; }); el('pPts').textContent=pts+'점'; el('pClr').textContent=clr+'/'+(SET.station_count||0)+'개'; });
+      .then(function(r){ var rows=r.data||[]; var pts=0,clr=0; rows.forEach(function(a){ pts+=a.points||0; if(a.cleared)clr++; }); PROG={pts:pts,clr:clr}; el('pPts').textContent=pts+'점'; el('pClr').textContent=clr+'/'+(SET.station_count||0)+'개'; });
   }
 
   function renderHome(){
     if(!SET){ el('main').innerHTML='<div class="muted">아직 열린 활동이 없어요.<br>선생님이 시작하면 나타나요! 🙂</div>'; return; }
+    var total=SET.station_count||0;
     el('main').innerHTML='<div class="card" style="text-align:center;">'
-      +'<div style="font-size:15px;font-weight:800;color:#0f766e;margin-bottom:4px;">'+esc(SET.title||'닮음 보물찾기')+'</div>'
-      +'<div class="muted" style="padding:10px 0;">야외에 숨겨진 QR을 찾아 스캔하고,<br>화면의 삼각형과 <b>닮은 번호·조건·닮음비</b>를 맞혀요!</div>'
+      +'<div style="font-size:15px;font-weight:800;color:#0f766e;margin-bottom:10px;">'+esc(SET.title||'닮음 보물찾기')+'</div>'
+      +'<div style="display:flex;gap:10px;margin-bottom:10px;">'
+        +'<div style="flex:1;background:#f0fdfa;border:1px solid #99f6e4;border-radius:12px;padding:12px;"><div style="font-size:26px;font-weight:900;color:#0f766e;">'+PROG.clr+'<span style="font-size:15px;color:#5eead4;">/'+total+'</span></div><div style="font-size:12px;color:#64748b;font-weight:700;">해결한 문제</div></div>'
+        +'<div style="flex:1;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:12px;"><div style="font-size:26px;font-weight:900;color:#b45309;">'+PROG.pts+'</div><div style="font-size:12px;color:#64748b;font-weight:700;">점수</div></div>'
+      +'</div>'
+      +'<div class="muted" style="padding:6px 0 12px;">야외에 숨겨진 QR을 찾아 스캔하고,<br>화면의 삼각형과 <b>닮은 번호·조건·닮음비</b>를 맞혀요!</div>'
       +'<button class="big-btn" onclick="startScan()">📷 QR 스캔하기</button>'
+      +(PROG.clr>=total&&total>0?'<div style="margin-top:12px;font-weight:900;color:#15803d;font-size:16px;">🎉 모든 문제 해결 완료!</div>':'')
       +'</div>';
   }
 
@@ -152,7 +159,7 @@
   }
 
   // 세트 열림/닫힘 실시간 반영
-  setTimeout(function(){ if(sb) sb.channel('sim-set-'+USER.className).on('postgres_changes',{event:'*',schema:'public',table:'sim_sets',filter:'class_scope=eq.'+USER.className}, function(){ loadSet(); }).subscribe(); }, 1500);
+  setTimeout(function(){ if(sb) sb.channel('sim-set-'+USER.studentId).on('postgres_changes',{event:'*',schema:'public',table:'sim_sets'}, function(){ loadSet(); }).subscribe(); }, 1500);
 </script>
 </body>
 </html>
