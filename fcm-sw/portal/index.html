@@ -330,7 +330,13 @@
       + '<p style="font-size:11px;margin-bottom:8px;">짝 질문 만들기·투표·토론 (칠판 화면)</p>'
       + '<button style="width:100%;border:none;background:#4338ca;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">💬 칠판 열기 →</button>'
       + '</div>';
-    cards = havrutaCard + graphCard + cards;
+    var simCard = '<div class="card" style="cursor:pointer;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/sim-teacher.html\',\'_blank\')">'
+      + '<span class="icon" style="font-size:22px;">🔺</span>'
+      + '<h3 style="font-size:15px;margin-bottom:2px;">닮음 보물찾기</h3>'
+      + '<p style="font-size:11px;margin-bottom:8px;">야외 QR 닮음 찾기 — 세트 만들기·QR 인쇄</p>'
+      + '<button style="width:100%;border:none;background:#0f766e;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">🔺 세트 만들기 →</button>'
+      + '</div>';
+    cards = havrutaCard + simCard + graphCard + cards;
     main.innerHTML = '<div class="group">'
       + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;">'
       + '<button class="small" onclick="loadPortal()">← 포털</button><span>🎮 수업활동 관리</span></h2>'

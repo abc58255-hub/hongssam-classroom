@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>닮음 보물찾기 — 세트 만들기</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="./sim-draw.js"></script>
+<style>
+  :root{--bg:#f1f5f9;--ac:#2563eb;--na:#1e3a8a;}
+  *{box-sizing:border-box;}
+  body{font-family:'Pretendard',sans-serif;background:var(--bg);margin:0;color:#1f2937;padding:16px;}
+  h2{color:var(--na);margin:0 0 4px;}
+  .muted{color:#94a3b8;font-size:13px;}
+  #lock{position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:999;}
+  #lock .box{background:#1e293b;padding:28px;border-radius:18px;width:300px;text-align:center;color:#e2e8f0;}
+  #lock input{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;margin:10px 0;}
+  button{font-family:inherit;cursor:pointer;}
+  .btn{background:var(--ac);color:#fff;border:none;border-radius:10px;padding:11px 16px;font-weight:800;font-size:14px;}
+  .btn.ghost{background:#fff;color:var(--na);border:1px solid #cbd5e1;}
+  .btn.warn{background:#ef4444;}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;background:#fff;padding:12px;border-radius:14px;margin-bottom:14px;}
+  .bar input,.bar select{padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;}
+  .sec{background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;}
+  .sec h3{margin:0 0 10px;color:var(--na);font-size:16px;}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+  .edit{border:1px solid #e5e7eb;border-radius:12px;padding:12px;background:#f8fafc;position:relative;}
+  .edit h4{margin:0 0 8px;color:#334155;font-size:14px;}
+  .edit .rm{position:absolute;top:8px;right:8px;background:#fee2e2;color:#b91c1c;border:none;border-radius:8px;padding:3px 9px;font-size:12px;font-weight:800;}
+  .row{display:flex;gap:6px;margin-bottom:7px;flex-wrap:wrap;align-items:center;}
+  .row label{font-size:12px;color:#64748b;font-weight:700;}
+  .row input[type=number],.row input[type=text],.row select{width:62px;padding:6px;border:1px solid #cbd5e1;border-radius:7px;font-size:13px;}
+  .row input[type=text]{width:120px;}
+  .chks{display:flex;gap:9px;flex-wrap:wrap;font-size:12px;margin:4px 0;}
+  .chks label{display:inline-flex;align-items:center;gap:3px;color:#475569;font-weight:600;}
+  .prev{background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-top:6px;min-height:150px;display:flex;align-items:center;justify-content:center;}
+  .hint{font-size:12px;margin-top:6px;}
+  .ok{color:#16a34a;} .bad{color:#ef4444;}
+  #qrPanel,#sheetPanel{background:#fff;border-radius:16px;padding:16px;margin-bottom:16px;}
+  .qr-item{display:inline-block;text-align:center;margin:10px;padding:10px;border:1px dashed #cbd5e1;border-radius:10px;vertical-align:top;}
+  .qr-item .lab{font-size:13px;font-weight:800;margin-top:6px;color:#334155;}
+  .sheet-item{display:inline-block;width:30%;min-width:200px;text-align:center;margin:1%;vertical-align:top;border:1px solid #e5e7eb;border-radius:10px;padding:8px;}
+  .sheet-item .no{font-size:20px;font-weight:900;color:var(--na);}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:11px 18px;border-radius:20px;opacity:0;transition:.3s;z-index:800;}
+  .toast.show{opacity:1;}
+  @media print{
+    body{background:#fff;padding:0;} .bar,.sec,#lock,.no-print{display:none !important;}
+    body.print-qr #sheetPanel{display:none;} body.print-sheet #qrPanel{display:none;}
+    #qrPanel,#sheetPanel{box-shadow:none;margin:0;}
+  }
+</style>
+</head>
+<body>
+  <div id="lock"><div class="box"><h2 style="color:#fff;">🔺 닮음 보물찾기</h2><p class="muted">교사 비밀번호</p>
+    <input id="lpw" type="password" onkeypress="if(event.keyCode==13)doUnlock()"><button class="btn" style="width:100%" id="lbtn" onclick="doUnlock()">확인</button>
+    <div id="lerr" style="color:#f87171;font-size:13px;margin-top:8px;"></div></div></div>
+
+  <div id="app" style="display:none;">
+    <h2>🔺 닮음 보물찾기 — 세트 만들기</h2>
+    <p class="muted">주어진 삼각형(학습지)과 숨길 삼각형(스테이션)을 만들고 QR을 인쇄하세요.</p>
+
+    <div class="bar">
+      <select id="clsSel"></select>
+      <input id="title" type="text" value="닮음 보물찾기" style="width:180px;">
+      <label class="muted">기회<input id="maxTries" type="number" value="3" min="1" max="9" style="width:52px;"></label>
+      <label class="muted">기본점<input id="basePts" type="number" value="100" style="width:64px;"></label>
+      <span style="flex:1"></span>
+      <button class="btn" onclick="openSet()">💾 세트 열기 & QR 생성</button>
+    </div>
+
+    <div class="sec">
+      <h3>① 주어진 삼각형 (학습지 1~N)</h3>
+      <div class="muted" style="margin-bottom:8px;">세 변을 넣으면 모양이 정해져요. 체크한 변/각만 학생에게 보여줍니다 (= 닮음조건 결정).</div>
+      <div class="grid" id="triGrid"></div>
+      <button class="btn ghost" style="margin-top:10px;" onclick="addTri()">+ 삼각형 추가</button>
+    </div>
+
+    <div class="sec">
+      <h3>② 숨긴 삼각형 (스테이션 = QR)</h3>
+      <div class="muted" style="margin-bottom:8px;">스캔하면 학생 화면에 이 삼각형이 떠요. 회전/반전으로 눈대중 매칭을 막아요. 정답(번호·조건·닮음비)은 자동 제안됩니다.</div>
+      <div class="grid" id="stGrid"></div>
+      <button class="btn ghost" style="margin-top:10px;" onclick="addStation()">+ 스테이션 추가</button>
+    </div>
+
+    <div id="qrPanel" style="display:none;">
+      <div class="no-print" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <h3 style="margin:0;color:var(--na);">📷 스테이션 QR (야외에 숨기기)</h3>
+        <button class="btn ghost" onclick="printMode('qr')">🖨 QR 인쇄</button>
+      </div>
+      <div id="qrList"></div>
+    </div>
+
+    <div id="sheetPanel" style="display:none;">
+      <div class="no-print" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <h3 style="margin:0;color:var(--na);">📄 학습지 미리보기 (학생 배부용)</h3>
+        <button class="btn ghost" onclick="printMode('sheet')">🖨 학습지 인쇄</button>
+      </div>
+      <div id="sheetList"></div>
+    </div>
+  </div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  var TOK=localStorage.getItem('sim_ptok')||'';
+  var TRIS=[], STATIONS=[];
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2000); }
+  function portalRPC(fn,args){ return fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args})}).then(function(r){return r.json();}).then(function(d){ if(d&&d.ok) return d.result; throw new Error((d&&d.error)||'서버 오류'); }); }
+
+  function doUnlock(){
+    var pw=document.getElementById('lpw').value, b=document.getElementById('lbtn');
+    if(!pw) return; b.disabled=true; b.textContent='확인 중…';
+    portalRPC('teacherLogin',[pw]).then(function(res){
+      b.disabled=false; b.textContent='확인';
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('sim_ptok',TOK); initApp(); }
+      else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
+    }).catch(function(e){ b.disabled=false; b.textContent='확인'; document.getElementById('lerr').textContent='오류: '+e.message; });
+  }
+  if(TOK) initApp();
+  function initApp(){
+    document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block';
+    portalRPC('graphClasses',[TOK]).then(function(res){
+      if(res&&res.success===false){ relock(res.message); return; }
+      var cls=(res&&res.classes)||[];
+      document.getElementById('clsSel').innerHTML=cls.length?cls.map(function(c){return '<option>'+esc(c)+'</option>';}).join(''):'<option value="">반 없음</option>';
+    }).catch(function(e){ toast('반 불러오기 오류: '+e.message); });
+    if(!TRIS.length){ addTri(); addTri(); addTri(); }
+    if(!STATIONS.length){ addStation(); }
+  }
+  function relock(m){ TOK=''; localStorage.removeItem('sim_ptok'); document.getElementById('app').style.display='none'; document.getElementById('lock').style.display='flex'; if(m)document.getElementById('lerr').textContent=m; }
+
+  // ── 주어진 삼각형 ──
+  function addTri(){ TRIS.push({a:6,b:8,c:10,show:{sa:true,sb:true,sc:true,Aa:false,Ab:false,Ac:false}}); renderTris(); }
+  function rmTri(i){ TRIS.splice(i,1); renderTris(); renderStations(); }
+  function chk(obj,key,i,kind){ return '<label><input type="checkbox" '+(obj[key]?'checked':'')+' onchange="upd'+kind+'('+i+',\''+key+'\',this.checked)"> '+({sa:'변a',sb:'변b',sc:'변c',Aa:'∠A',Ab:'∠B',Ac:'∠C'}[key])+'</label>'; }
+  function triEditor(t,i){
+    var s=t.show;
+    return '<div class="edit"><button class="rm" onclick="rmTri('+i+')">삭제</button><h4>삼각형 '+(i+1)+'번</h4>'
+      +'<div class="row"><label>변 a</label><input type="number" value="'+t.a+'" oninput="updT('+i+',\'a\',this.value)">'
+      +'<label>b</label><input type="number" value="'+t.b+'" oninput="updT('+i+',\'b\',this.value)">'
+      +'<label>c</label><input type="number" value="'+t.c+'" oninput="updT('+i+',\'c\',this.value)"></div>'
+      +'<div class="chks">보여줄 정보: '+chk(s,'sa',i,'TShow')+chk(s,'sb',i,'TShow')+chk(s,'sc',i,'TShow')+chk(s,'Aa',i,'TShow')+chk(s,'Ab',i,'TShow')+chk(s,'Ac',i,'TShow')+'</div>'
+      +'<div class="prev" id="triPrev'+i+'"></div></div>';
+  }
+  function renderTris(){ document.getElementById('triGrid').innerHTML=TRIS.map(triEditor).join(''); TRIS.forEach(function(_,i){drawTri(i);}); refreshStationAnsOptions(); }
+  function updT(i,f,v){ TRIS[i][f]=parseFloat(v)||0; drawTri(i); recompAllRatios(); }
+  function updTShow(i,k,v){ TRIS[i].show[k]=v; drawTri(i); }
+  function drawTri(i){ var el=document.getElementById('triPrev'+i); if(el) el.innerHTML=SimDraw.draw({a:TRIS[i].a,b:TRIS[i].b,c:TRIS[i].c,show:TRIS[i].show,size:180,labelLetters:true}); }
+
+  // ── 스테이션 ──
+  function addStation(){ STATIONS.push({label:'',a:3,b:4,c:5,show:{sa:true,sb:true,sc:true,Aa:false,Ab:false,Ac:false},rotate:0,flip:false,ans_idx:1,ans_cond:'SSS',ratio_a:1,ratio_b:1}); renderStations(); }
+  function rmStation(i){ STATIONS.splice(i,1); renderStations(); }
+  function stEditor(st,i){
+    var s=st.show;
+    var opts=TRIS.map(function(_,k){return '<option value="'+(k+1)+'" '+(st.ans_idx===k+1?'selected':'')+'>'+(k+1)+'번</option>';}).join('');
+    return '<div class="edit"><button class="rm" onclick="rmStation('+i+')">삭제</button><h4>스테이션 '+(i+1)+'</h4>'
+      +'<div class="row"><label>지점명</label><input type="text" value="'+esc(st.label)+'" placeholder="예: 운동장 골대" oninput="updS('+i+',\'label\',this.value)"></div>'
+      +'<div class="row"><label>변 a</label><input type="number" value="'+st.a+'" oninput="updSN('+i+',\'a\',this.value)">'
+      +'<label>b</label><input type="number" value="'+st.b+'" oninput="updSN('+i+',\'b\',this.value)">'
+      +'<label>c</label><input type="number" value="'+st.c+'" oninput="updSN('+i+',\'c\',this.value)"></div>'
+      +'<div class="chks">보여줄 정보: '+chk(s,'sa',i,'SShow')+chk(s,'sb',i,'SShow')+chk(s,'sc',i,'SShow')+chk(s,'Aa',i,'SShow')+chk(s,'Ab',i,'SShow')+chk(s,'Ac',i,'SShow')+'</div>'
+      +'<div class="row"><label>회전</label><select onchange="updSN('+i+',\'rotate\',this.value)">'+[0,30,60,90,120,150,180,210,240,270,300,330].map(function(d){return '<option value="'+d+'" '+(st.rotate===d?'selected':'')+'>'+d+'°</option>';}).join('')+'</select>'
+      +'<label><input type="checkbox" '+(st.flip?'checked':'')+' onchange="updS('+i+',\'flip\',this.checked)"> 좌우반전</label></div>'
+      +'<div class="row" style="background:#eff6ff;padding:7px;border-radius:8px;"><label style="color:var(--na);">정답 →</label>'
+      +'<select onchange="updSN('+i+',\'ans_idx\',this.value)">'+opts+'</select>'
+      +'<select onchange="updS('+i+',\'ans_cond\',this.value)">'+['SSS','SAS','AA'].map(function(c){return '<option '+(st.ans_cond===c?'selected':'')+'>'+c+'</option>';}).join('')+'</select>'
+      +'<span class="muted">닮음비 <b id="ratio'+i+'" style="color:var(--na)">'+st.ratio_a+':'+st.ratio_b+'</b></span></div>'
+      +'<div class="hint" id="stHint'+i+'"></div>'
+      +'<div class="prev" id="stPrev'+i+'"></div></div>';
+  }
+  function renderStations(){ document.getElementById('stGrid').innerHTML=STATIONS.map(stEditor).join(''); STATIONS.forEach(function(_,i){ recompRatio(i); drawSt(i); }); }
+  function refreshStationAnsOptions(){ if(STATIONS.length) renderStations(); }
+  function updS(i,f,v){ STATIONS[i][f]=v; if(f==='ans_cond') checkHint(i); if(f==='flip') drawSt(i); }
+  function updSN(i,f,v){ STATIONS[i][f]=parseFloat(v)||0; if(f==='ans_idx'){ STATIONS[i].ans_idx=parseInt(v)||1; recompRatio(i); } if(f==='rotate') drawSt(i); if(f==='a'||f==='b'||f==='c'){ drawSt(i); recompRatio(i); } }
+  function updSShow(i,k,v){ STATIONS[i].show[k]=v; var g=SimDraw.guessCond(STATIONS[i].show); if(g) STATIONS[i].ans_cond=g; rerenderStation(i); }
+  function rerenderStation(i){ var cards=document.querySelectorAll('#stGrid .edit'); if(cards[i]) cards[i].outerHTML=stEditor(STATIONS[i],i); drawSt(i); recompRatio(i); }
+  function drawSt(i){ var el=document.getElementById('stPrev'+i); if(el) el.innerHTML=SimDraw.draw({a:STATIONS[i].a,b:STATIONS[i].b,c:STATIONS[i].c,show:STATIONS[i].show,rotate:STATIONS[i].rotate,flip:STATIONS[i].flip,size:180}); }
+  function recompRatio(i){ var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1]; if(!t){return;} var r=SimDraw.ratio({a:st.a,b:st.b,c:st.c},{a:t.a,b:t.b,c:t.c}); st.ratio_a=r.p; st.ratio_b=r.q; var el=document.getElementById('ratio'+i); if(el) el.textContent=r.p+':'+r.q; checkHint(i); }
+  function recompAllRatios(){ STATIONS.forEach(function(_,i){recompRatio(i);}); }
+  function checkHint(i){
+    var el=document.getElementById('stHint'+i); if(!el) return; var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1];
+    var msgs=[];
+    if(t){ var r=SimDraw.ratio({a:st.a,b:st.b,c:st.c},{a:t.a,b:t.b,c:t.c}); if(!r.consistent) msgs.push('<span class="bad">⚠ '+st.ans_idx+'번과 닮음이 아니에요(변 비율 불일치)</span>'); }
+    // 유일성: 다른 번호와도 닮은지
+    var dup=[]; TRIS.forEach(function(tt,k){ if(k+1===st.ans_idx) return; if(SimDraw.similar({a:st.a,b:st.b,c:st.c},{a:tt.a,b:tt.b,c:tt.c})) dup.push(k+1); });
+    if(dup.length) msgs.push('<span class="bad">⚠ '+dup.join(',')+'번과도 닮음 → 정답이 유일하지 않아요</span>');
+    var g=SimDraw.guessCond(st.show); if(g&&g!==st.ans_cond) msgs.push('<span class="muted">표시정보상 조건은 '+g+' 로 보여요</span>');
+    el.innerHTML=msgs.join('<br>');
+  }
+
+  // ── 세트 열기 & QR ──
+  function openSet(){
+    var cls=document.getElementById('clsSel').value;
+    if(!cls){ toast('반을 선택하세요'); return; }
+    for(var i=0;i<TRIS.length;i++){ if(!SimDraw.valid(TRIS[i].a,TRIS[i].b,TRIS[i].c)){ toast((i+1)+'번 삼각형 변 길이 오류'); return; } }
+    for(var j=0;j<STATIONS.length;j++){ if(!SimDraw.valid(STATIONS[j].a,STATIONS[j].b,STATIONS[j].c)){ toast('스테이션 '+(j+1)+' 변 길이 오류'); return; } }
+    if(!STATIONS.length){ toast('스테이션을 1개 이상 추가하세요'); return; }
+    var payload={
+      set:{ class_scope:cls, title:document.getElementById('title').value.trim(), base_pts:parseInt(document.getElementById('basePts').value)||100, max_tries:parseInt(document.getElementById('maxTries').value)||3 },
+      triangles:TRIS.map(function(t,i){return {idx:i+1, side_a:t.a, side_b:t.b, side_c:t.c, show:t.show};}),
+      stations:STATIONS.map(function(s){return {label:s.label, side_a:s.a, side_b:s.b, side_c:s.c, show:s.show, rotate:s.rotate, flip:s.flip, ans_idx:s.ans_idx, ans_cond:s.ans_cond, ratio_a:s.ratio_a, ratio_b:s.ratio_b};})
+    };
+    toast('세트 저장 중…');
+    portalRPC('simOpenSet',[TOK,payload]).then(function(res){
+      if(!res||!res.success){ toast('실패: '+((res&&res.message)||'')); return; }
+      toast('세트를 열었어요! QR을 인쇄하세요');
+      renderQR(res.stations||[]); renderSheet();
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+  function renderQR(stations){
+    var panel=document.getElementById('qrPanel'), list=document.getElementById('qrList');
+    panel.style.display='block'; list.innerHTML='';
+    stations.forEach(function(s,i){
+      var wrap=document.createElement('div'); wrap.className='qr-item';
+      var cv=document.createElement('canvas'); wrap.appendChild(cv);
+      var lab=document.createElement('div'); lab.className='lab'; lab.textContent=(s.label||('스테이션 '+(i+1))); wrap.appendChild(lab);
+      list.appendChild(wrap);
+      QRCode.toCanvas(cv, String(s.token), { width:150, margin:1 }, function(err){ if(err) lab.textContent='QR오류'; });
+    });
+    panel.scrollIntoView({behavior:'smooth'});
+  }
+  function renderSheet(){
+    var panel=document.getElementById('sheetPanel'), list=document.getElementById('sheetList');
+    panel.style.display='block';
+    list.innerHTML=TRIS.map(function(t,i){ return '<div class="sheet-item"><div class="no">'+(i+1)+'번</div>'+SimDraw.draw({a:t.a,b:t.b,c:t.c,show:t.show,size:200})+'</div>'; }).join('');
+  }
+  function printMode(which){
+    document.body.classList.remove('print-qr','print-sheet');
+    document.body.classList.add(which==='qr'?'print-qr':'print-sheet');
+    setTimeout(function(){ window.print(); },100);
+  }
+  window.addEventListener('afterprint',function(){ document.body.classList.remove('print-qr','print-sheet'); });
+</script>
+</body>
+</html>
