@@ -137,6 +137,7 @@
     var b=el('subBtn'); b.disabled=true; b.textContent='채점 중…';
     sb.functions.invoke('similarity',{body:{op:'submit',token:CUR.token,answer:{idx:ANS.idx,cond:ANS.cond,ratioA:rA,ratioB:rB}}}).then(function(res){
       var d=res.data||{};
+      if(res.error && !d.message){ d.message=(res.error.message||'서버 오류'); }
       if(!d.success){ toast(d.message||'오류'); b.disabled=false; b.textContent='제출하기'; return; }
       if(d.correct){ refreshProgress(); renderResult({correct:true, points:d.points, order:d.order}); }
       else if(d.locked){ renderResult({locked:true}); }

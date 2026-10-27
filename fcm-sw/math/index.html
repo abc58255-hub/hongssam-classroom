@@ -1101,7 +1101,7 @@
         var actCutoff = new Date(Date.now() - 4 * 3600 * 1000).toISOString();
         var qGraph = fetch(LESSON_SB_URL + '/rest/v1/graph_rooms?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&created_at=gte.' + encodeURIComponent(actCutoff) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } }).then(function (r) { return r.json(); }).then(function (gr) { return Array.isArray(gr) && gr.length > 0; }).catch(function () { return false; });
         var qHv = fetch(LESSON_SB_URL + '/rest/v1/havruta_sessions?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&created_at=gte.' + encodeURIComponent(actCutoff) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } }).then(function (r) { return r.json(); }).then(function (hr) { return Array.isArray(hr) && hr.length > 0; }).catch(function () { return false; });
-        var qSim = fetch(LESSON_SB_URL + '/rest/v1/sim_sets?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } }).then(function (r) { return r.json(); }).then(function (sr) { return Array.isArray(sr) && sr.length > 0; }).catch(function () { return false; });
+        var qSim = fetch(LESSON_SB_URL + '/rest/v1/sim_sets?select=class_scope&active=eq.true', { headers: { apikey: LESSON_SB_KEY } }).then(function (r) { return r.json(); }).then(function (sr) { return Array.isArray(sr) && sr.some(function (s) { return s.class_scope === myClass || s.class_scope === '*'; }); }).catch(function () { return false; });
         Promise.all([qGraph, qHv, qSim]).then(function (a) { done(a[0], a[1], a[2]); });
       } else done(false, false, false);
     }).catch(function () { box.innerHTML = ''; });

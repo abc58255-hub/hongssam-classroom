@@ -242,7 +242,9 @@ Deno.serve(async (req) => {
       const S = body.set ?? {};
       const cls = String(S.class_scope ?? "").trim();
       if (!cls) return Response.json({ success: false, message: "반이 없습니다." }, { status: 400 });
-      await admin0.from("sim_sets").update({ active: false }).eq("class_scope", cls).eq("active", true);
+      // '모든 반(*)'을 열면 기존 활성 세트를 전부 닫아 전 학급에 확실히 적용. 특정 반이면 그 반 것만.
+      if (cls === "*") await admin0.from("sim_sets").update({ active: false }).eq("active", true);
+      else await admin0.from("sim_sets").update({ active: false }).eq("class_scope", cls).eq("active", true);
       const setRow = {
         class_scope: cls, title: String(S.title ?? "닮음 보물찾기").trim(),
         base_pts: Number(S.base_pts) || 100,
