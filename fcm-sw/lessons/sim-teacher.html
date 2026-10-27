@@ -65,6 +65,7 @@
       <label class="muted">기회<input id="maxTries" type="number" value="3" min="1" max="9" style="width:52px;"></label>
       <label class="muted">기본점<input id="basePts" type="number" value="100" style="width:64px;"></label>
       <span style="flex:1"></span>
+      <button class="btn ghost" onclick="resetDraft()">🆕 새로</button>
       <button class="btn ghost" onclick="window.open('./sim-board.html','_blank')">🏆 순위판</button>
       <button class="btn" onclick="openSet()">💾 세트 열기 & QR 생성</button>
     </div>
@@ -122,45 +123,68 @@
   if(TOK) initApp();
   function initApp(){
     document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block';
+    var restored=loadDraft();
     portalRPC('graphClasses',[TOK]).then(function(res){
       if(res&&res.success===false){ relock(res.message); return; }
       var cls=(res&&res.classes)||[];
       document.getElementById('clsSel').innerHTML='<option value="*">🏫 모든 반 (공용 · 순위만 반별)</option>'+cls.map(function(c){return '<option>'+esc(c)+'</option>';}).join('');
+      if(restored&&restored.cls){ document.getElementById('clsSel').value=restored.cls; }
     }).catch(function(e){ toast('반 불러오기 오류: '+e.message); });
+    if(restored){ if(restored.title)document.getElementById('title').value=restored.title; if(restored.basePts)document.getElementById('basePts').value=restored.basePts; if(restored.maxTries)document.getElementById('maxTries').value=restored.maxTries; }
     if(!TRIS.length){ addTri(); addTri(); addTri(); }
     if(!STATIONS.length){ addStation(); }
+    renderTris(); renderStations();
   }
+  function saveDraft(){
+    try{ localStorage.setItem('sim_draft', JSON.stringify({ TRIS:TRIS, STATIONS:STATIONS,
+      title:(document.getElementById('title')||{}).value, basePts:(document.getElementById('basePts')||{}).value,
+      maxTries:(document.getElementById('maxTries')||{}).value, cls:(document.getElementById('clsSel')||{}).value })); }catch(_){}
+  }
+  function loadDraft(){
+    try{ var d=JSON.parse(localStorage.getItem('sim_draft')||'null'); if(d&&Array.isArray(d.TRIS)){ TRIS=d.TRIS; STATIONS=d.STATIONS||[]; return d; } }catch(_){}
+    return null;
+  }
+  function resetDraft(){ if(!confirm('편집 중인 내용을 모두 지우고 새로 시작할까요?')) return; localStorage.removeItem('sim_draft'); TRIS=[]; STATIONS=[]; addTri(); addTri(); addTri(); addStation(); }
   function relock(m){ TOK=''; localStorage.removeItem('sim_ptok'); document.getElementById('app').style.display='none'; document.getElementById('lock').style.display='flex'; if(m)document.getElementById('lerr').textContent=m; }
 
-  // ── 주어진 삼각형 ──
-  function addTri(){ TRIS.push({a:6,b:8,c:10,show:{sa:true,sb:true,sc:true,Aa:false,Ab:false,Ac:false}}); renderTris(); }
-  function rmTri(i){ TRIS.splice(i,1); renderTris(); renderStations(); }
+  // 입력 방식 공통
+  function abcOf(t){ return SimDraw.computeABC(t.mode||'sss', t.v1, t.v2, t.v3); }
+  function labelSet(mode){ return mode==='sas'?['변 ①','낀각(°)','변 ②'] : mode==='asa'?['밑변','한끝 각(°)','다른끝 각(°)'] : ['변 a','변 b','변 c']; }
+  function modeSel(i,mode,kind){ return '<select onchange="upd'+kind+'Mode('+i+',this.value)">'
+    +[['sss','세 변'],['sas','두 변+낀각'],['asa','한 변+두 각']].map(function(m){return '<option value="'+m[0]+'" '+(mode===m[0]?'selected':'')+'>'+m[1]+'</option>';}).join('')+'</select>'; }
   function chk(obj,key,i,kind){ return '<label><input type="checkbox" '+(obj[key]?'checked':'')+' onchange="upd'+kind+'('+i+',\''+key+'\',this.checked)"> '+({sa:'변a',sb:'변b',sc:'변c',Aa:'∠A',Ab:'∠B',Ac:'∠C'}[key])+'</label>'; }
+
+  // ── 주어진 삼각형 ──
+  function addTri(){ TRIS.push({mode:'sss',v1:6,v2:8,v3:10,show:{sa:true,sb:true,sc:true,Aa:false,Ab:false,Ac:false}}); renderTris(); }
+  function rmTri(i){ TRIS.splice(i,1); renderTris(); renderStations(); }
   function triEditor(t,i){
-    var s=t.show;
+    var s=t.show, L=labelSet(t.mode);
     return '<div class="edit"><button class="rm" onclick="rmTri('+i+')">삭제</button><h4>삼각형 '+(i+1)+'번</h4>'
-      +'<div class="row"><label>변 a</label><input type="number" value="'+t.a+'" oninput="updT('+i+',\'a\',this.value)">'
-      +'<label>b</label><input type="number" value="'+t.b+'" oninput="updT('+i+',\'b\',this.value)">'
-      +'<label>c</label><input type="number" value="'+t.c+'" oninput="updT('+i+',\'c\',this.value)"></div>'
+      +'<div class="row"><label>입력 방식</label>'+modeSel(i,t.mode,'T')+'</div>'
+      +'<div class="row"><label>'+L[0]+'</label><input type="number" value="'+t.v1+'" oninput="updT('+i+',\'v1\',this.value)">'
+      +'<label>'+L[1]+'</label><input type="number" value="'+t.v2+'" oninput="updT('+i+',\'v2\',this.value)">'
+      +'<label>'+L[2]+'</label><input type="number" value="'+t.v3+'" oninput="updT('+i+',\'v3\',this.value)"></div>'
       +'<div class="chks">보여줄 정보: '+chk(s,'sa',i,'TShow')+chk(s,'sb',i,'TShow')+chk(s,'sc',i,'TShow')+chk(s,'Aa',i,'TShow')+chk(s,'Ab',i,'TShow')+chk(s,'Ac',i,'TShow')+'</div>'
       +'<div class="prev" id="triPrev'+i+'"></div></div>';
   }
-  function renderTris(){ document.getElementById('triGrid').innerHTML=TRIS.map(triEditor).join(''); TRIS.forEach(function(_,i){drawTri(i);}); refreshStationAnsOptions(); }
-  function updT(i,f,v){ TRIS[i][f]=parseFloat(v)||0; drawTri(i); recompAllRatios(); }
-  function updTShow(i,k,v){ TRIS[i].show[k]=v; drawTri(i); }
-  function drawTri(i){ var el=document.getElementById('triPrev'+i); if(el) el.innerHTML=SimDraw.draw({a:TRIS[i].a,b:TRIS[i].b,c:TRIS[i].c,show:TRIS[i].show,size:180,labelLetters:true}); }
+  function renderTris(){ document.getElementById('triGrid').innerHTML=TRIS.map(triEditor).join(''); TRIS.forEach(function(_,i){drawTri(i);}); refreshStationAnsOptions(); saveDraft(); }
+  function updT(i,f,v){ TRIS[i][f]=parseFloat(v)||0; drawTri(i); recompAllRatios(); saveDraft(); }
+  function updTMode(i,m){ TRIS[i].mode=m; renderTris(); recompAllRatios(); }
+  function updTShow(i,k,v){ TRIS[i].show[k]=v; drawTri(i); saveDraft(); }
+  function drawTri(i){ var el=document.getElementById('triPrev'+i); if(!el)return; var abc=abcOf(TRIS[i]); el.innerHTML=SimDraw.draw({a:abc.a,b:abc.b,c:abc.c,show:TRIS[i].show,size:180,labelLetters:true}); }
 
   // ── 스테이션 ──
-  function addStation(){ STATIONS.push({label:'',a:3,b:4,c:5,show:{sa:true,sb:true,sc:true,Aa:false,Ab:false,Ac:false},rotate:0,flip:false,ans_idx:1,ans_cond:'SSS',ratio_a:1,ratio_b:1}); renderStations(); }
+  function addStation(){ STATIONS.push({label:'',mode:'sss',v1:3,v2:4,v3:5,show:{sa:true,sb:true,sc:true,Aa:false,Ab:false,Ac:false},rotate:0,flip:false,ans_idx:1,ans_cond:'SSS',ratio_a:1,ratio_b:1}); renderStations(); }
   function rmStation(i){ STATIONS.splice(i,1); renderStations(); }
   function stEditor(st,i){
-    var s=st.show;
+    var s=st.show, L=labelSet(st.mode);
     var opts=TRIS.map(function(_,k){return '<option value="'+(k+1)+'" '+(st.ans_idx===k+1?'selected':'')+'>'+(k+1)+'번</option>';}).join('');
     return '<div class="edit"><button class="rm" onclick="rmStation('+i+')">삭제</button><h4>스테이션 '+(i+1)+'</h4>'
       +'<div class="row"><label>지점명</label><input type="text" value="'+esc(st.label)+'" placeholder="예: 운동장 골대" oninput="updS('+i+',\'label\',this.value)"></div>'
-      +'<div class="row"><label>변 a</label><input type="number" value="'+st.a+'" oninput="updSN('+i+',\'a\',this.value)">'
-      +'<label>b</label><input type="number" value="'+st.b+'" oninput="updSN('+i+',\'b\',this.value)">'
-      +'<label>c</label><input type="number" value="'+st.c+'" oninput="updSN('+i+',\'c\',this.value)"></div>'
+      +'<div class="row"><label>입력 방식</label>'+modeSel(i,st.mode,'S')+'</div>'
+      +'<div class="row"><label>'+L[0]+'</label><input type="number" value="'+st.v1+'" oninput="updSN('+i+',\'v1\',this.value)">'
+      +'<label>'+L[1]+'</label><input type="number" value="'+st.v2+'" oninput="updSN('+i+',\'v2\',this.value)">'
+      +'<label>'+L[2]+'</label><input type="number" value="'+st.v3+'" oninput="updSN('+i+',\'v3\',this.value)"></div>'
       +'<div class="chks">보여줄 정보: '+chk(s,'sa',i,'SShow')+chk(s,'sb',i,'SShow')+chk(s,'sc',i,'SShow')+chk(s,'Aa',i,'SShow')+chk(s,'Ab',i,'SShow')+chk(s,'Ac',i,'SShow')+'</div>'
       +'<div class="row"><label>회전</label><select onchange="updSN('+i+',\'rotate\',this.value)">'+[0,30,60,90,120,150,180,210,240,270,300,330].map(function(d){return '<option value="'+d+'" '+(st.rotate===d?'selected':'')+'>'+d+'°</option>';}).join('')+'</select>'
       +'<label><input type="checkbox" '+(st.flip?'checked':'')+' onchange="updS('+i+',\'flip\',this.checked)"> 좌우반전</label></div>'
@@ -171,21 +195,21 @@
       +'<div class="hint" id="stHint'+i+'"></div>'
       +'<div class="prev" id="stPrev'+i+'"></div></div>';
   }
-  function renderStations(){ document.getElementById('stGrid').innerHTML=STATIONS.map(stEditor).join(''); STATIONS.forEach(function(_,i){ recompRatio(i); drawSt(i); }); }
+  function renderStations(){ document.getElementById('stGrid').innerHTML=STATIONS.map(stEditor).join(''); STATIONS.forEach(function(_,i){ recompRatio(i); drawSt(i); }); saveDraft(); }
   function refreshStationAnsOptions(){ if(STATIONS.length) renderStations(); }
-  function updS(i,f,v){ STATIONS[i][f]=v; if(f==='ans_cond') checkHint(i); if(f==='flip') drawSt(i); }
-  function updSN(i,f,v){ STATIONS[i][f]=parseFloat(v)||0; if(f==='ans_idx'){ STATIONS[i].ans_idx=parseInt(v)||1; recompRatio(i); } if(f==='rotate') drawSt(i); if(f==='a'||f==='b'||f==='c'){ drawSt(i); recompRatio(i); } }
-  function updSShow(i,k,v){ STATIONS[i].show[k]=v; var g=SimDraw.guessCond(STATIONS[i].show); if(g) STATIONS[i].ans_cond=g; rerenderStation(i); }
+  function updS(i,f,v){ STATIONS[i][f]=v; if(f==='ans_cond') checkHint(i); if(f==='flip') drawSt(i); saveDraft(); }
+  function updSN(i,f,v){ STATIONS[i][f]=parseFloat(v)||0; if(f==='ans_idx'){ STATIONS[i].ans_idx=parseInt(v)||1; recompRatio(i); } if(f==='rotate') drawSt(i); if(f==='v1'||f==='v2'||f==='v3'){ drawSt(i); recompRatio(i); } saveDraft(); }
+  function updSMode(i,m){ STATIONS[i].mode=m; renderStations(); }
+  function updSShow(i,k,v){ STATIONS[i].show[k]=v; var g=SimDraw.guessCond(STATIONS[i].show); if(g) STATIONS[i].ans_cond=g; rerenderStation(i); saveDraft(); }
   function rerenderStation(i){ var cards=document.querySelectorAll('#stGrid .edit'); if(cards[i]) cards[i].outerHTML=stEditor(STATIONS[i],i); drawSt(i); recompRatio(i); }
-  function drawSt(i){ var el=document.getElementById('stPrev'+i); if(el) el.innerHTML=SimDraw.draw({a:STATIONS[i].a,b:STATIONS[i].b,c:STATIONS[i].c,show:STATIONS[i].show,rotate:STATIONS[i].rotate,flip:STATIONS[i].flip,size:180}); }
-  function recompRatio(i){ var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1]; if(!t){return;} var r=SimDraw.ratio({a:st.a,b:st.b,c:st.c},{a:t.a,b:t.b,c:t.c}); st.ratio_a=r.p; st.ratio_b=r.q; var el=document.getElementById('ratio'+i); if(el) el.textContent=r.p+':'+r.q; checkHint(i); }
+  function drawSt(i){ var el=document.getElementById('stPrev'+i); if(!el)return; var abc=abcOf(STATIONS[i]); el.innerHTML=SimDraw.draw({a:abc.a,b:abc.b,c:abc.c,show:STATIONS[i].show,rotate:STATIONS[i].rotate,flip:STATIONS[i].flip,size:180}); }
+  function recompRatio(i){ var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1]; if(!t){return;} var r=SimDraw.ratio(abcOf(st),abcOf(t)); st.ratio_a=r.p; st.ratio_b=r.q; var el=document.getElementById('ratio'+i); if(el) el.textContent=r.p+':'+r.q; checkHint(i); }
   function recompAllRatios(){ STATIONS.forEach(function(_,i){recompRatio(i);}); }
   function checkHint(i){
     var el=document.getElementById('stHint'+i); if(!el) return; var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1];
-    var msgs=[];
-    if(t){ var r=SimDraw.ratio({a:st.a,b:st.b,c:st.c},{a:t.a,b:t.b,c:t.c}); if(!r.consistent) msgs.push('<span class="bad">⚠ '+st.ans_idx+'번과 닮음이 아니에요(변 비율 불일치)</span>'); }
-    // 유일성: 다른 번호와도 닮은지
-    var dup=[]; TRIS.forEach(function(tt,k){ if(k+1===st.ans_idx) return; if(SimDraw.similar({a:st.a,b:st.b,c:st.c},{a:tt.a,b:tt.b,c:tt.c})) dup.push(k+1); });
+    var msgs=[], sabc=abcOf(st);
+    if(t){ var r=SimDraw.ratio(sabc,abcOf(t)); if(!r.consistent) msgs.push('<span class="bad">⚠ '+st.ans_idx+'번과 닮음이 아니에요(변 비율 불일치)</span>'); }
+    var dup=[]; TRIS.forEach(function(tt,k){ if(k+1===st.ans_idx) return; if(SimDraw.similar(sabc,abcOf(tt))) dup.push(k+1); });
     if(dup.length) msgs.push('<span class="bad">⚠ '+dup.join(',')+'번과도 닮음 → 정답이 유일하지 않아요</span>');
     var g=SimDraw.guessCond(st.show); if(g&&g!==st.ans_cond) msgs.push('<span class="muted">표시정보상 조건은 '+g+' 로 보여요</span>');
     el.innerHTML=msgs.join('<br>');
@@ -195,13 +219,13 @@
   function openSet(){
     var cls=document.getElementById('clsSel').value;
     if(!cls){ toast('반을 선택하세요'); return; }
-    for(var i=0;i<TRIS.length;i++){ if(!SimDraw.valid(TRIS[i].a,TRIS[i].b,TRIS[i].c)){ toast((i+1)+'번 삼각형 변 길이 오류'); return; } }
-    for(var j=0;j<STATIONS.length;j++){ if(!SimDraw.valid(STATIONS[j].a,STATIONS[j].b,STATIONS[j].c)){ toast('스테이션 '+(j+1)+' 변 길이 오류'); return; } }
+    for(var i=0;i<TRIS.length;i++){ var ta=abcOf(TRIS[i]); if(!SimDraw.valid(ta.a,ta.b,ta.c)){ toast((i+1)+'번 삼각형 입력값 오류 (삼각형이 안 돼요)'); return; } }
+    for(var j=0;j<STATIONS.length;j++){ var sa=abcOf(STATIONS[j]); if(!SimDraw.valid(sa.a,sa.b,sa.c)){ toast('스테이션 '+(j+1)+' 입력값 오류'); return; } }
     if(!STATIONS.length){ toast('스테이션을 1개 이상 추가하세요'); return; }
     var payload={
       set:{ class_scope:cls, title:document.getElementById('title').value.trim(), base_pts:parseInt(document.getElementById('basePts').value)||100, max_tries:parseInt(document.getElementById('maxTries').value)||3 },
-      triangles:TRIS.map(function(t,i){return {idx:i+1, side_a:t.a, side_b:t.b, side_c:t.c, show:t.show};}),
-      stations:STATIONS.map(function(s){return {label:s.label, side_a:s.a, side_b:s.b, side_c:s.c, show:s.show, rotate:s.rotate, flip:s.flip, ans_idx:s.ans_idx, ans_cond:s.ans_cond, ratio_a:s.ratio_a, ratio_b:s.ratio_b};})
+      triangles:TRIS.map(function(t,i){var abc=abcOf(t); return {idx:i+1, side_a:abc.a, side_b:abc.b, side_c:abc.c, show:t.show};}),
+      stations:STATIONS.map(function(s){var abc=abcOf(s); return {label:s.label, side_a:abc.a, side_b:abc.b, side_c:abc.c, show:s.show, rotate:s.rotate, flip:s.flip, ans_idx:s.ans_idx, ans_cond:s.ans_cond, ratio_a:s.ratio_a, ratio_b:s.ratio_b};})
     };
     toast('세트 저장 중…');
     portalRPC('simOpenSet',[TOK,payload]).then(function(res){
@@ -227,7 +251,7 @@
   function renderSheet(){
     var panel=document.getElementById('sheetPanel'), list=document.getElementById('sheetList');
     panel.style.display='block';
-    list.innerHTML=TRIS.map(function(t,i){ return '<div class="sheet-item"><div class="no">'+(i+1)+'번</div>'+SimDraw.draw({a:t.a,b:t.b,c:t.c,show:t.show,size:200})+'</div>'; }).join('');
+    list.innerHTML=TRIS.map(function(t,i){ var abc=abcOf(t); return '<div class="sheet-item"><div class="no">'+(i+1)+'번</div>'+SimDraw.draw({a:abc.a,b:abc.b,c:abc.c,show:t.show,size:200})+'</div>'; }).join('');
   }
   function printMode(which){
     document.body.classList.remove('print-qr','print-sheet');

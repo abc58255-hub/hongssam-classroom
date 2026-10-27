@@ -85,21 +85,32 @@
     return '';
   }
 
-  // 닮음비(정수비, 약분): 두 삼각형의 정렬된 변 기준. 반환 [p,q] = t1 : t2
-  function gcd(x, y) { x = Math.abs(x); y = Math.abs(y); while (y) { var t = y; y = x % y; x = t; } return x || 1; }
+  // 입력 방식 → 세 변 {a,b,c}
+  //  sss: v1=a, v2=b, v3=c
+  //  sas: v1=변b, v2=낀각A(°), v3=변c  → a=√(b²+c²-2bc·cosA)
+  //  asa: v1=변a, v2=각B(°), v3=각C(°) → A=180-B-C, b=a·sinB/sinA, c=a·sinC/sinA
+  function round1(n) { return Math.round(n * 100) / 100; }
+  function computeABC(mode, v1, v2, v3) {
+    v1 = +v1 || 0; v2 = +v2 || 0; v3 = +v3 || 0;
+    if (mode === 'sas') { var A = v2 * Math.PI / 180; var a = Math.sqrt(Math.max(0, v1 * v1 + v3 * v3 - 2 * v1 * v3 * Math.cos(A))); return { a: round1(a), b: v1, c: v3 }; }
+    if (mode === 'asa') { var B = v2 * Math.PI / 180, C = v3 * Math.PI / 180, Aa = Math.PI - B - C; if (Aa <= 0.0001) return { a: v1, b: 0, c: 0 }; return { a: v1, b: round1(v1 * Math.sin(B) / Math.sin(Aa)), c: round1(v1 * Math.sin(C) / Math.sin(Aa)) }; }
+    return { a: v1, b: v2, c: v3 };
+  }
+
+  // 닮음비(정수비, 약분): 작은변 기준 배율 k를 간단한 분수로. 반환 {p,q} = t1 : t2
+  function gcd(x, y) { x = Math.abs(Math.round(x)); y = Math.abs(Math.round(y)); while (y) { var t = y; y = x % y; x = t; } return x || 1; }
   function ratio(t1, t2) {
     var s1 = [t1.a, t1.b, t1.c].sort(function (m, n) { return m - n; });
     var s2 = [t2.a, t2.b, t2.c].sort(function (m, n) { return m - n; });
-    // 정수화: 각 변 비가 일정한지 확인하고 최소 정수비로
-    var r = s1[0] / s2[0];
-    var consistent = Math.abs(s1[1] / s2[1] - r) < 0.02 && Math.abs(s1[2] / s2[2] - r) < 0.02;
-    // 정수비 추출: s1,s2를 정수로 가정하고 최대공약수
-    var p = Math.round(s1[0]), q = Math.round(s2[0]);
-    for (var k = 0; k < 3; k++) { /* 대표 변으로 약분 */ }
-    var g = gcd(p, q);
-    return { p: p / g, q: q / g, consistent: consistent };
+    if (!s2[0]) return { p: 1, q: 1, consistent: false };
+    var k = s1[0] / s2[0];
+    var consistent = Math.abs(s1[1] / s2[1] - k) < 0.03 && Math.abs(s1[2] / s2[2] - k) < 0.03;
+    var best = { p: Math.max(1, Math.round(k)), q: 1, err: Math.abs(k - Math.round(k)) };
+    for (var q = 1; q <= 12; q++) { var p = Math.round(k * q); if (p < 1) continue; var err = Math.abs(p / q - k); if (err < best.err) best = { p: p, q: q, err: err }; }
+    var g = gcd(best.p, best.q);
+    return { p: best.p / g, q: best.q / g, consistent: consistent };
   }
   function similar(t1, t2) { return ratio(t1, t2).consistent; }
 
-  global.SimDraw = { draw: draw, valid: valid, angles: angles, guessCond: guessCond, ratio: ratio, similar: similar };
+  global.SimDraw = { draw: draw, valid: valid, angles: angles, guessCond: guessCond, ratio: ratio, similar: similar, computeABC: computeABC };
 })(window);
