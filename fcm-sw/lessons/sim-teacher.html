@@ -33,6 +33,17 @@
   .row input[type=text]{width:120px;}
   .chks{display:flex;gap:9px;flex-wrap:wrap;font-size:12px;margin:4px 0;}
   .chks label{display:inline-flex;align-items:center;gap:3px;color:#475569;font-weight:600;}
+  .mrow{display:flex;align-items:center;gap:8px;margin-bottom:9px;}
+  .mlbl{font-size:12px;color:#64748b;font-weight:700;}
+  .mrow select{padding:7px 9px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;flex:1;}
+  .vals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+  .vals .v label{display:block;font-size:11px;color:#64748b;font-weight:700;margin-bottom:3px;}
+  .vals .v input{width:100%;padding:8px 4px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;text-align:center;font-weight:700;}
+  .showrow{display:flex;align-items:center;gap:11px;margin-bottom:5px;font-size:12px;}
+  .showrow .srl{font-size:11px;font-weight:800;color:#94a3b8;width:16px;}
+  .showrow label{display:inline-flex;align-items:center;gap:3px;color:#475569;font-weight:600;}
+  .ansrow{display:flex;align-items:center;gap:7px;background:#eff6ff;padding:9px;border-radius:9px;margin-top:4px;flex-wrap:wrap;}
+  .ansrow select{padding:7px;border:1px solid #bfdbfe;border-radius:7px;font-size:13px;font-weight:700;}
   .prev{background:#fff;border:1px solid #e5e7eb;border-radius:10px;margin-top:6px;min-height:150px;display:flex;align-items:center;justify-content:center;}
   .hint{font-size:12px;margin-top:6px;}
   .ok{color:#16a34a;} .bad{color:#ef4444;}
@@ -152,7 +163,7 @@
   function labelSet(mode){ return mode==='sas'?['변 ①','낀각(°)','변 ②'] : mode==='asa'?['밑변','한끝 각(°)','다른끝 각(°)'] : ['변 a','변 b','변 c']; }
   function modeSel(i,mode,kind){ return '<select onchange="upd'+kind+'Mode('+i+',this.value)">'
     +[['sss','세 변'],['sas','두 변+낀각'],['asa','한 변+두 각']].map(function(m){return '<option value="'+m[0]+'" '+(mode===m[0]?'selected':'')+'>'+m[1]+'</option>';}).join('')+'</select>'; }
-  function chk(obj,key,i,kind){ return '<label><input type="checkbox" '+(obj[key]?'checked':'')+' onchange="upd'+kind+'('+i+',\''+key+'\',this.checked)"> '+({sa:'변a',sb:'변b',sc:'변c',Aa:'∠A',Ab:'∠B',Ac:'∠C'}[key])+'</label>'; }
+  function chk(obj,key,i,kind){ return '<label><input type="checkbox" '+(obj[key]?'checked':'')+' onchange="upd'+kind+'('+i+',\''+key+'\',this.checked)"> '+({sa:'a',sb:'b',sc:'c',Aa:'A',Ab:'B',Ac:'C'}[key])+'</label>'; }
 
   // ── 주어진 삼각형 ──
   function addTri(){ TRIS.push({mode:'sss',v1:6,v2:8,v3:10,show:{sa:true,sb:true,sc:true,Aa:false,Ab:false,Ac:false}}); renderTris(); }
@@ -160,11 +171,13 @@
   function triEditor(t,i){
     var s=t.show, L=labelSet(t.mode);
     return '<div class="edit"><button class="rm" onclick="rmTri('+i+')">삭제</button><h4>삼각형 '+(i+1)+'번</h4>'
-      +'<div class="row"><label>입력 방식</label>'+modeSel(i,t.mode,'T')+'</div>'
-      +'<div class="row"><label>'+L[0]+'</label><input type="number" value="'+t.v1+'" oninput="updT('+i+',\'v1\',this.value)">'
-      +'<label>'+L[1]+'</label><input type="number" value="'+t.v2+'" oninput="updT('+i+',\'v2\',this.value)">'
-      +'<label>'+L[2]+'</label><input type="number" value="'+t.v3+'" oninput="updT('+i+',\'v3\',this.value)"></div>'
-      +'<div class="chks">보여줄 정보: '+chk(s,'sa',i,'TShow')+chk(s,'sb',i,'TShow')+chk(s,'sc',i,'TShow')+chk(s,'Aa',i,'TShow')+chk(s,'Ab',i,'TShow')+chk(s,'Ac',i,'TShow')+'</div>'
+      +'<div class="mrow"><span class="mlbl">입력</span>'+modeSel(i,t.mode,'T')+'</div>'
+      +'<div class="vals">'
+        +'<div class="v"><label>'+L[0]+'</label><input type="number" value="'+t.v1+'" oninput="updT('+i+',\'v1\',this.value)"></div>'
+        +'<div class="v"><label>'+L[1]+'</label><input type="number" value="'+t.v2+'" oninput="updT('+i+',\'v2\',this.value)"></div>'
+        +'<div class="v"><label>'+L[2]+'</label><input type="number" value="'+t.v3+'" oninput="updT('+i+',\'v3\',this.value)"></div>'
+      +'</div>'
+      +'<div class="showrow"><span class="srl">변</span>'+chk(s,'sa',i,'TShow')+chk(s,'sb',i,'TShow')+chk(s,'sc',i,'TShow')+'<span class="srl" style="margin-left:6px;">각</span>'+chk(s,'Aa',i,'TShow')+chk(s,'Ab',i,'TShow')+chk(s,'Ac',i,'TShow')+'</div>'
       +'<div class="prev" id="triPrev'+i+'"></div></div>';
   }
   function renderTris(){ document.getElementById('triGrid').innerHTML=TRIS.map(triEditor).join(''); TRIS.forEach(function(_,i){drawTri(i);}); refreshStationAnsOptions(); saveDraft(); }
@@ -180,15 +193,17 @@
     var s=st.show, L=labelSet(st.mode);
     var opts=TRIS.map(function(_,k){return '<option value="'+(k+1)+'" '+(st.ans_idx===k+1?'selected':'')+'>'+(k+1)+'번</option>';}).join('');
     return '<div class="edit"><button class="rm" onclick="rmStation('+i+')">삭제</button><h4>스테이션 '+(i+1)+'</h4>'
-      +'<div class="row"><label>지점명</label><input type="text" value="'+esc(st.label)+'" placeholder="예: 운동장 골대" oninput="updS('+i+',\'label\',this.value)"></div>'
-      +'<div class="row"><label>입력 방식</label>'+modeSel(i,st.mode,'S')+'</div>'
-      +'<div class="row"><label>'+L[0]+'</label><input type="number" value="'+st.v1+'" oninput="updSN('+i+',\'v1\',this.value)">'
-      +'<label>'+L[1]+'</label><input type="number" value="'+st.v2+'" oninput="updSN('+i+',\'v2\',this.value)">'
-      +'<label>'+L[2]+'</label><input type="number" value="'+st.v3+'" oninput="updSN('+i+',\'v3\',this.value)"></div>'
-      +'<div class="chks">보여줄 정보: '+chk(s,'sa',i,'SShow')+chk(s,'sb',i,'SShow')+chk(s,'sc',i,'SShow')+chk(s,'Aa',i,'SShow')+chk(s,'Ab',i,'SShow')+chk(s,'Ac',i,'SShow')+'</div>'
-      +'<div class="row"><label>회전</label><select onchange="updSN('+i+',\'rotate\',this.value)">'+[0,30,60,90,120,150,180,210,240,270,300,330].map(function(d){return '<option value="'+d+'" '+(st.rotate===d?'selected':'')+'>'+d+'°</option>';}).join('')+'</select>'
-      +'<label><input type="checkbox" '+(st.flip?'checked':'')+' onchange="updS('+i+',\'flip\',this.checked)"> 좌우반전</label></div>'
-      +'<div class="row" style="background:#eff6ff;padding:7px;border-radius:8px;"><label style="color:var(--na);">정답 →</label>'
+      +'<div class="mrow"><span class="mlbl">지점</span><input type="text" value="'+esc(st.label)+'" placeholder="예: 운동장 골대" style="flex:1;padding:7px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px;" oninput="updS('+i+',\'label\',this.value)"></div>'
+      +'<div class="mrow"><span class="mlbl">입력</span>'+modeSel(i,st.mode,'S')+'</div>'
+      +'<div class="vals">'
+        +'<div class="v"><label>'+L[0]+'</label><input type="number" value="'+st.v1+'" oninput="updSN('+i+',\'v1\',this.value)"></div>'
+        +'<div class="v"><label>'+L[1]+'</label><input type="number" value="'+st.v2+'" oninput="updSN('+i+',\'v2\',this.value)"></div>'
+        +'<div class="v"><label>'+L[2]+'</label><input type="number" value="'+st.v3+'" oninput="updSN('+i+',\'v3\',this.value)"></div>'
+      +'</div>'
+      +'<div class="showrow"><span class="srl">변</span>'+chk(s,'sa',i,'SShow')+chk(s,'sb',i,'SShow')+chk(s,'sc',i,'SShow')+'<span class="srl" style="margin-left:6px;">각</span>'+chk(s,'Aa',i,'SShow')+chk(s,'Ab',i,'SShow')+chk(s,'Ac',i,'SShow')+'</div>'
+      +'<div class="mrow"><span class="mlbl">회전</span><select style="flex:unset;width:auto;padding:6px;border:1px solid #cbd5e1;border-radius:7px;" onchange="updSN('+i+',\'rotate\',this.value)">'+[0,30,60,90,120,150,180,210,240,270,300,330].map(function(d){return '<option value="'+d+'" '+(st.rotate===d?'selected':'')+'>'+d+'°</option>';}).join('')+'</select>'
+      +'<label style="font-size:12px;color:#475569;font-weight:600;"><input type="checkbox" '+(st.flip?'checked':'')+' onchange="updS('+i+',\'flip\',this.checked)"> 좌우반전</label></div>'
+      +'<div class="ansrow"><span style="font-size:12px;color:var(--na);font-weight:800;">정답</span>'
       +'<select onchange="updSN('+i+',\'ans_idx\',this.value)">'+opts+'</select>'
       +'<select onchange="updS('+i+',\'ans_cond\',this.value)">'+['SSS','SAS','AA'].map(function(c){return '<option '+(st.ans_cond===c?'selected':'')+'>'+c+'</option>';}).join('')+'</select>'
       +'<span class="muted">닮음비 <b id="ratio'+i+'" style="color:var(--na)">'+st.ratio_a+':'+st.ratio_b+'</b></span></div>'
