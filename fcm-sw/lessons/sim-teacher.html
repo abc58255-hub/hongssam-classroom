@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>닮음 보물찾기 — 세트 만들기</title>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./sim-draw.js"></script>
 <style>
   :root{--bg:#f1f5f9;--ac:#2563eb;--na:#1e3a8a;}
@@ -78,8 +79,15 @@
       <span style="flex:1"></span>
       <button class="btn ghost" onclick="toggleBulk()">⚡ 빠른 입력</button>
       <button class="btn ghost" onclick="resetDraft()">🆕 새로</button>
+      <button class="btn ghost" onclick="toggleMgmt()">📂 세트 관리</button>
       <button class="btn ghost" onclick="window.open('./sim-board.html','_blank')">🏆 순위판</button>
       <button class="btn" onclick="openSet()">💾 세트 열기 & QR 생성</button>
+    </div>
+
+    <div class="sec" id="mgmtPanel" style="display:none;">
+      <h3>📂 세트 관리</h3>
+      <div class="muted" style="margin-bottom:8px;">열어둔 세트를 종료하거나 삭제해요. 🟢활성 = 지금 학생에게 보이는 세트.</div>
+      <div id="setList" class="muted">불러오는 중…</div>
     </div>
 
     <div class="sec" id="bulkPanel" style="display:none;">
@@ -128,6 +136,9 @@
 
 <script>
   var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
+  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
+  var sb=supabase.createClient(SB_URL,SB_KEY);
   var TOK=localStorage.getItem('sim_ptok')||'';
   var TRIS=[], STATIONS=[];
 
@@ -214,6 +225,28 @@
     +'규칙: 각 station은 학습지의 "딱 한 번호"와만 닮게. 닮음비·조건은 프로그램이 자동 계산하니 ans와 show만 정확히.\n'
     +'출력은 JSON만. 예시:\n'+SAMPLE_JSON;
   function copyFormat(){ (navigator.clipboard?navigator.clipboard.writeText(FORMAT_DOC):Promise.reject()).then(function(){ toast('AI용 형식 설명을 복사했어요'); }).catch(function(){ document.getElementById('bulkText').value=FORMAT_DOC; toast('복사 불가 → 입력칸에 넣었어요'); }); }
+
+  // ── 세트 관리 (종료·삭제) ──
+  function toggleMgmt(){ var p=document.getElementById('mgmtPanel'); var on=(p.style.display==='none'||!p.style.display); p.style.display=on?'block':'none'; if(on){ loadSets(); p.scrollIntoView({behavior:'smooth'}); } }
+  function loadSets(){
+    sb.from('sim_sets').select('id,title,class_scope,active,station_count,created_at').order('created_at',{ascending:false}).limit(40)
+      .then(function(r){
+        var rows=r.data||[], list=document.getElementById('setList');
+        if(r.error){ list.textContent='오류: '+r.error.message; return; }
+        if(!rows.length){ list.textContent='저장된 세트가 없어요.'; return; }
+        list.innerHTML=rows.map(function(s){ var d=new Date(s.created_at); var dt=(d.getMonth()+1)+'/'+d.getDate()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+          var scope=s.class_scope==='*'?'모든 반':esc(s.class_scope);
+          return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:6px;background:#fff;">'
+            +(s.active?'<span style="background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;">🟢 활성</span>':'<span style="background:#f1f5f9;color:#94a3b8;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">종료됨</span>')
+            +'<span style="flex:1;font-size:13px;font-weight:700;color:#334155;">'+esc(s.title||'세트')+' <span style="color:#94a3b8;font-weight:500;">· '+scope+' · '+(s.station_count||0)+'문제 · '+dt+'</span></span>'
+            +(s.active?'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="closeSet('+s.id+')">⏹ 종료</button>':'')
+            +'<button class="btn warn" style="padding:5px 10px;font-size:12px;" onclick="delSet('+s.id+',\''+esc(s.title||'')+'\')">🗑 삭제</button>'
+            +'</div>';
+        }).join('');
+      });
+  }
+  function closeSet(id){ portalRPC('simCloseSet',[TOK,id]).then(function(res){ if(res&&res.success){ toast('활동을 종료했어요'); loadSets(); } else toast('실패: '+((res&&res.message)||'')); }).catch(function(e){ toast('오류: '+e.message); }); }
+  function delSet(id,title){ if(!confirm('"'+(title||'세트')+'"를 삭제할까요?\n문제·학생 기록·순위까지 모두 지워지고 되돌릴 수 없어요.')) return; portalRPC('simDeleteSet',[TOK,id]).then(function(res){ if(res&&res.success){ toast('세트를 삭제했어요'); loadSets(); } else toast('실패: '+((res&&res.message)||'')); }).catch(function(e){ toast('오류: '+e.message); }); }
   function relock(m){ TOK=''; localStorage.removeItem('sim_ptok'); document.getElementById('app').style.display='none'; document.getElementById('lock').style.display='flex'; if(m)document.getElementById('lerr').textContent=m; }
 
   // 입력 방식 공통
