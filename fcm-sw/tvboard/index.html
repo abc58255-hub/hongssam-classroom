@@ -423,7 +423,9 @@
       if(!d)return; var now=_hhmmNow();
       var inWin=!!(d.aOn&&d.aStart&&d.aEnd&&now>=d.aStart&&now<d.aEnd);
       var autoKey=inWin?('play:'+d.aUrl):'stop';
-      if(d.mId&&d.mId!==_tvMusicLastMId){_tvMusicLastMId=d.mId;_tvMusicOverride={key:autoKey,mode:d.mMode,url:d.mUrl};applyMusic(d.mMode==='play',d.mUrl);return;}
+      // 첫 폴링(새로고침·재접속)에선 과거 수동기록을 '새 동작'으로 착각하지 않도록 기준만 잡고 자동 스케줄을 따름
+      if(_tvMusicLastMId===null){ _tvMusicLastMId=d.mId||0; }
+      else if(d.mId&&d.mId!==_tvMusicLastMId){_tvMusicLastMId=d.mId;_tvMusicOverride={key:autoKey,mode:d.mMode,url:d.mUrl};applyMusic(d.mMode==='play',d.mUrl);return;}
       if(_tvMusicOverride&&_tvMusicOverride.key!==autoKey)_tvMusicOverride=null;
       if(_tvMusicOverride){applyMusic(_tvMusicOverride.mode==='play',_tvMusicOverride.url);return;}
       applyMusic(inWin,d.aUrl);
