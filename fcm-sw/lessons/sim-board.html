@@ -90,9 +90,15 @@
   function render(){
     var wrap=document.getElementById('wrap');
     if(!SET){ wrap.innerHTML='<div class="empty">이 반에 열린 닮음 활동이 없어요.</div>'; return; }
-    sb.from('sim_attempts').select('student_id,name,points,cleared').eq('set_id',SET.id).eq('class_scope',BCLS)
+    sb.from('sim_attempts').select('student_id,name,points,cleared,class_scope').eq('set_id',SET.id)
       .then(function(r){
-        var rows=r.data||[];
+        if(r.error){ return sb.from('sim_attempts').select('student_id,name,points,cleared').eq('set_id',SET.id); }
+        return r;
+      })
+      .then(function(r){
+        var all=r.data||[];
+        // class_scope 컬럼 있으면 선택 반만, 없으면 전체
+        var rows=all.filter(function(a){ return a.class_scope===undefined || a.class_scope===BCLS; });
         var by={};
         rows.forEach(function(a){ var k=a.student_id; if(!by[k]) by[k]={name:a.name||k,pts:0,clr:0}; by[k].pts+=a.points||0; if(a.cleared)by[k].clr++; if(a.name)by[k].name=a.name; });
         var list=Object.keys(by).map(function(k){return by[k];}).sort(function(x,y){ return y.pts-x.pts || y.clr-x.clr; });

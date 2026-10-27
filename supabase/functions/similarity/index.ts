@@ -26,6 +26,18 @@ Deno.serve(async (req) => {
   try {
     const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
+    // class_scope 컬럼(0016)이 아직 없어도 동작하도록: 오류 시 해당 필드 빼고 재시도
+    async function attInsert(fields: Record<string, unknown>) {
+      let r = await admin.from("sim_attempts").insert(fields).select("*").single();
+      if (r.error && /class_scope/.test(r.error.message || "")) { const f = { ...fields }; delete f.class_scope; r = await admin.from("sim_attempts").insert(f).select("*").single(); }
+      return r;
+    }
+    async function attUpdate(id: number, fields: Record<string, unknown>) {
+      let r = await admin.from("sim_attempts").update(fields).eq("id", id);
+      if (r.error && /class_scope/.test(r.error.message || "")) { const f = { ...fields }; delete f.class_scope; r = await admin.from("sim_attempts").update(f).eq("id", id); }
+      return r;
+    }
+
     // ── 학생 신원 확인 ──
     const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
     const { data: u } = await admin.auth.getUser(token);
@@ -69,7 +81,7 @@ Deno.serve(async (req) => {
       const cls = classOf(sid);
       let row = (await admin.from("sim_attempts").select("*").eq("station_id", S.id).eq("student_id", sid).maybeSingle()).data;
       if (!row) {
-        const ins = await admin.from("sim_attempts").insert({ set_id: S.set_id, station_id: S.id, student_id: sid, name: sname, class_scope: cls, tries: 0 }).select("*").single();
+        const ins = await attInsert({ set_id: S.set_id, station_id: S.id, student_id: sid, name: sname, class_scope: cls, tries: 0 });
         if (ins.error) return json({ success: false, message: ins.error.message }, 500);
         row = ins.data;
       }
@@ -90,11 +102,11 @@ Deno.serve(async (req) => {
         const tb = (SET.try_bonus || [])[tries - 1] || 0;
         const fb = (SET.first_bonus || [])[order - 1] || 0;
         const pts = (SET.base_pts || 0) + tb + fb;
-        await admin.from("sim_attempts").update({ tries, cleared: true, clear_order: order, points: pts, name: sname, class_scope: cls, updated_at: new Date().toISOString() }).eq("id", row.id);
+        await attUpdate(row.id, { tries, cleared: true, clear_order: order, points: pts, name: sname, class_scope: cls, updated_at: new Date().toISOString() });
         return json({ success: true, correct: true, cleared: true, order, points: pts, tries });
       } else {
         const triesLeft = Math.max(0, SET.max_tries - tries);
-        await admin.from("sim_attempts").update({ tries, name: sname, class_scope: cls, updated_at: new Date().toISOString() }).eq("id", row.id);
+        await attUpdate(row.id, { tries, name: sname, class_scope: cls, updated_at: new Date().toISOString() });
         // 부분 피드백(어느 항목이 맞았는지) — 3번 제한이라 정답 노출 위험 낮고 형성평가에 도움
         return json({ success: true, correct: false, triesLeft, feedback: { idx: idxOk, cond: condOk, ratio: ratioOk } });
       }
