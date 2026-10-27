@@ -110,7 +110,11 @@
       <h3>① 주어진 삼각형 (학습지 1~N)</h3>
       <div class="muted" style="margin-bottom:8px;">세 변을 넣으면 모양이 정해져요. 체크한 변/각만 학생에게 보여줍니다 (= 닮음조건 결정).</div>
       <div class="grid" id="triGrid"></div>
-      <button class="btn ghost" style="margin-top:10px;" onclick="addTri()">+ 삼각형 추가</button>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost" onclick="addTri()">+ 삼각형 추가</button>
+        <button class="btn ghost" onclick="shuffleNumbers()">🎲 번호 섞기</button>
+        <span class="muted" style="align-self:center;">스테이션 순서대로 못 찍게 번호를 무작위 재배정 (정답은 자동으로 따라감)</span>
+      </div>
     </div>
 
     <div class="sec">
@@ -302,6 +306,18 @@
       +'<div class="prev" id="triPrev'+i+'"></div></div>';
   }
   function renderTris(){ document.getElementById('triGrid').innerHTML=TRIS.map(triEditor).join(''); TRIS.forEach(function(_,i){drawTri(i);}); refreshStationAnsOptions(); saveDraft(); }
+  // 삼각형 번호 무작위 재배정 — 도형·정답은 유지, 번호만 섞어 '순서대로 찍기' 방지
+  function shuffleNumbers(){
+    if(TRIS.length<2){ toast('삼각형이 2개 이상일 때 섞을 수 있어요'); return; }
+    var perm=TRIS.map(function(_,i){return i;});
+    for(var tries=0;tries<20;tries++){ for(var i=perm.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=perm[i];perm[i]=perm[j];perm[j]=t; } if(perm.some(function(v,idx){return v!==idx;})) break; }
+    var oldToNew={}; perm.forEach(function(oldPos,newPos){ oldToNew[oldPos+1]=newPos+1; });
+    var newTRIS=perm.map(function(oldPos){ return TRIS[oldPos]; });
+    STATIONS.forEach(function(s){ s.ans_idx=oldToNew[s.ans_idx]||s.ans_idx; });
+    TRIS=newTRIS;
+    renderTris(); renderStations(); saveDraft();
+    toast('번호를 섞었어요! 학습지를 새로 인쇄하세요');
+  }
   function updT(i,f,v){ TRIS[i][f]=parseFloat(v)||0; drawTri(i); recompAllRatios(); saveDraft(); }
   function updTMode(i,m){ TRIS[i].mode=m; renderTris(); recompAllRatios(); }
   function updTShow(i,k,v){ TRIS[i].show[k]=v; drawTri(i); saveDraft(); }
