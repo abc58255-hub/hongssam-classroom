@@ -81,7 +81,11 @@
       <button class="btn ghost" onclick="resetDraft()">🆕 새로</button>
       <button class="btn ghost" onclick="toggleMgmt()">📂 세트 관리</button>
       <button class="btn ghost" onclick="window.open('./sim-board.html','_blank')">🏆 순위판</button>
-      <button class="btn" onclick="openSet()">💾 세트 열기 & QR 생성</button>
+      <button class="btn" id="saveBtn" onclick="openSet()">💾 세트 열기 & QR 생성</button>
+    </div>
+    <div id="editBanner" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400e;">
+      ✏️ <b id="editTitle"></b> 수정 중 — 저장하면 <b>같은 QR이 그대로 유지</b>돼요.
+      <button class="btn ghost" style="padding:4px 10px;font-size:12px;margin-left:8px;" onclick="cancelEdit()">새 세트로 전환</button>
     </div>
 
     <div class="sec" id="mgmtPanel" style="display:none;">
@@ -140,7 +144,7 @@
   var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
   var sb=supabase.createClient(SB_URL,SB_KEY);
   var TOK=localStorage.getItem('sim_ptok')||'';
-  var TRIS=[], STATIONS=[];
+  var TRIS=[], STATIONS=[], EDIT_ID=null;
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2000); }
@@ -179,7 +183,7 @@
     try{ var d=JSON.parse(localStorage.getItem('sim_draft')||'null'); if(d&&Array.isArray(d.TRIS)){ TRIS=d.TRIS; STATIONS=d.STATIONS||[]; return d; } }catch(_){}
     return null;
   }
-  function resetDraft(){ if(!confirm('편집 중인 내용을 모두 지우고 새로 시작할까요?')) return; localStorage.removeItem('sim_draft'); TRIS=[]; STATIONS=[]; addTri(); addTri(); addTri(); addStation(); }
+  function resetDraft(){ if(!confirm('편집 중인 내용을 모두 지우고 새로 시작할까요?')) return; localStorage.removeItem('sim_draft'); TRIS=[]; STATIONS=[]; EDIT_ID=null; setEditUI(); addTri(); addTri(); addTri(); addStation(); }
 
   // ── 빠른 입력 (JSON 붙여넣기) ──
   function toggleBulk(){ var p=document.getElementById('bulkPanel'); p.style.display=(p.style.display==='none'||!p.style.display)?'block':'none'; if(p.style.display==='block') p.scrollIntoView({behavior:'smooth'}); }
@@ -239,6 +243,7 @@
           return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:6px;background:#fff;">'
             +(s.active?'<span style="background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;">🟢 활성</span>':'<span style="background:#f1f5f9;color:#94a3b8;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">종료됨</span>')
             +'<span style="flex:1;font-size:13px;font-weight:700;color:#334155;">'+esc(s.title||'세트')+' <span style="color:#94a3b8;font-weight:500;">· '+scope+' · '+(s.station_count||0)+'문제 · '+dt+'</span></span>'
+            +'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="editSet('+s.id+')">✏️ 수정</button>'
             +(s.active?'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="closeSet('+s.id+')">⏹ 종료</button>':'')
             +'<button class="btn warn" style="padding:5px 10px;font-size:12px;" onclick="delSet('+s.id+',\''+esc(s.title||'')+'\')">🗑 삭제</button>'
             +'</div>';
@@ -246,6 +251,29 @@
       });
   }
   function closeSet(id){ portalRPC('simCloseSet',[TOK,id]).then(function(res){ if(res&&res.success){ toast('활동을 종료했어요'); loadSets(); } else toast('실패: '+((res&&res.message)||'')); }).catch(function(e){ toast('오류: '+e.message); }); }
+
+  // ── 세트 수정 ──
+  function normShow(sh){ var o={sa:false,sb:false,sc:false,Aa:false,Ab:false,Ac:false}; if(!sh)return o; if(typeof sh==='string'){ try{sh=JSON.parse(sh);}catch(_){return o;} } Object.keys(o).forEach(function(k){ if(sh[k])o[k]=true; }); return o; }
+  function setEditUI(){ var on=!!EDIT_ID; var b=document.getElementById('editBanner'); b.style.display=on?'block':'none'; document.getElementById('saveBtn').textContent=on?'💾 수정 저장':'💾 세트 열기 & QR 생성'; if(on) document.getElementById('editTitle').textContent='"'+(document.getElementById('title').value||'세트')+'"'; }
+  function cancelEdit(){ EDIT_ID=null; setEditUI(); toast('새 세트 모드로 전환'); }
+  function editSet(id){
+    portalRPC('simGetSet',[TOK,id]).then(function(res){
+      if(!res||!res.success){ toast('불러오기 실패: '+((res&&res.message)||'')); return; }
+      var set=res.set||{};
+      TRIS=(res.triangles||[]).map(function(t){ return {mode:'sss',v1:+t.side_a,v2:+t.side_b,v3:+t.side_c,show:normShow(t.show)}; });
+      STATIONS=(res.stations||[]).map(function(s){ return {label:s.label||'',mode:'sss',v1:+s.side_a,v2:+s.side_b,v3:+s.side_c,show:normShow(s.show),rotate:+s.rotate||0,flip:!!s.flip,ans_idx:+s.ans_idx||1,ans_cond:String(s.ans_cond||'').toUpperCase(),ratio_a:+s.ratio_a||1,ratio_b:+s.ratio_b||1}; });
+      EDIT_ID=id;
+      document.getElementById('title').value=set.title||'닮음 보물찾기';
+      document.getElementById('basePts').value=set.base_pts||100;
+      document.getElementById('maxTries').value=set.max_tries||3;
+      if(set.class_scope){ var cs=document.getElementById('clsSel'); cs.value=set.class_scope; }
+      if(!TRIS.length) addTri(); if(!STATIONS.length) addStation();
+      renderTris(); renderStations(); saveDraft(); setEditUI();
+      document.getElementById('mgmtPanel').style.display='none';
+      window.scrollTo({top:0,behavior:'smooth'});
+      toast('수정 모드로 불러왔어요 (입력값은 세 변 형태로 표시돼요)');
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
   function delSet(id,title){ if(!confirm('"'+(title||'세트')+'"를 삭제할까요?\n문제·학생 기록·순위까지 모두 지워지고 되돌릴 수 없어요.')) return; portalRPC('simDeleteSet',[TOK,id]).then(function(res){ if(res&&res.success){ toast('세트를 삭제했어요'); loadSets(); } else toast('실패: '+((res&&res.message)||'')); }).catch(function(e){ toast('오류: '+e.message); }); }
   function relock(m){ TOK=''; localStorage.removeItem('sim_ptok'); document.getElementById('app').style.display='none'; document.getElementById('lock').style.display='flex'; if(m)document.getElementById('lerr').textContent=m; }
 
@@ -333,12 +361,21 @@
       triangles:TRIS.map(function(t,i){var abc=abcOf(t); return {idx:i+1, side_a:abc.a, side_b:abc.b, side_c:abc.c, show:t.show};}),
       stations:STATIONS.map(function(s){var abc=abcOf(s); return {label:s.label, side_a:abc.a, side_b:abc.b, side_c:abc.c, show:s.show, rotate:s.rotate, flip:s.flip, ans_idx:s.ans_idx, ans_cond:s.ans_cond, ratio_a:s.ratio_a, ratio_b:s.ratio_b};})
     };
-    toast('세트 저장 중…');
-    portalRPC('simOpenSet',[TOK,payload]).then(function(res){
-      if(!res||!res.success){ toast('실패: '+((res&&res.message)||'')); return; }
-      toast('세트를 열었어요! QR을 인쇄하세요');
-      renderQR(res.stations||[]); renderSheet();
-    }).catch(function(e){ toast('오류: '+e.message); });
+    toast(EDIT_ID?'수정 저장 중…':'세트 저장 중…');
+    if(EDIT_ID){
+      payload.id=EDIT_ID;
+      portalRPC('simUpdateSet',[TOK,payload]).then(function(res){
+        if(!res||!res.success){ toast('실패: '+((res&&res.message)||'')); return; }
+        toast('수정 저장 완료! 같은 QR이 유지돼요');
+        renderQR(res.stations||[]); renderSheet();
+      }).catch(function(e){ toast('오류: '+e.message); });
+    } else {
+      portalRPC('simOpenSet',[TOK,payload]).then(function(res){
+        if(!res||!res.success){ toast('실패: '+((res&&res.message)||'')); return; }
+        toast('세트를 열었어요! QR을 인쇄하세요');
+        renderQR(res.stations||[]); renderSheet();
+      }).catch(function(e){ toast('오류: '+e.message); });
+    }
   }
   function renderQR(stations){
     var panel=document.getElementById('qrPanel'), list=document.getElementById('qrList');

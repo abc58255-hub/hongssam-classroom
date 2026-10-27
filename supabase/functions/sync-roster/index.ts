@@ -296,6 +296,47 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
+    // 세트 불러오기(수정용, 정답 포함 — 교사 전용): {op:'simGetSet', id}
+    if (body.op === "simGetSet") {
+      const id = Number(body.id);
+      const set = await admin0.from("sim_sets").select("*").eq("id", id).maybeSingle();
+      if (!set.data) return Response.json({ success: false, message: "세트를 찾을 수 없어요." });
+      const tris = await admin0.from("sim_triangles").select("*").eq("set_id", id).order("idx");
+      const stns = await admin0.from("sim_stations").select("*").eq("set_id", id).order("id");
+      return Response.json({ success: true, set: set.data, triangles: tris.data || [], stations: stns.data || [] });
+    }
+    // 세트 제자리 수정(QR 토큰 유지): {op:'simUpdateSet', id, set, triangles, stations}
+    if (body.op === "simUpdateSet") {
+      const id = Number(body.id); const S = body.set ?? {};
+      const su = await admin0.from("sim_sets").update({
+        title: String(S.title ?? "닮음 보물찾기").trim(),
+        base_pts: Number(S.base_pts) || 100, max_tries: Math.max(1, Number(S.max_tries) || 3),
+        tri_count: (body.triangles ?? []).length, station_count: (body.stations ?? []).length,
+      }).eq("id", id);
+      if (su.error) return Response.json({ success: false, message: su.error.message }, { status: 500 });
+      // 삼각형: 전체 교체(참조 FK 없음)
+      await admin0.from("sim_triangles").delete().eq("set_id", id);
+      const tris = (body.triangles ?? []).map((t: Record<string, unknown>) => ({ set_id: id, idx: Number(t.idx), side_a: Number(t.side_a), side_b: Number(t.side_b), side_c: Number(t.side_c), show: t.show ?? {} }));
+      if (tris.length) { const te = await admin0.from("sim_triangles").insert(tris); if (te.error) return Response.json({ success: false, message: "삼각형 저장 오류: " + te.error.message }, { status: 500 }); }
+      // 스테이션: 기존 토큰 유지하며 제자리 업데이트 (순서 매칭)
+      const existing = (await admin0.from("sim_stations").select("id,token").eq("set_id", id).order("id")).data ?? [];
+      const ns = body.stations ?? [];
+      const out: unknown[] = [];
+      for (let i = 0; i < ns.length; i++) {
+        const st = ns[i] as Record<string, unknown>;
+        const fields = { label: String(st.label ?? "").trim(), side_a: Number(st.side_a), side_b: Number(st.side_b), side_c: Number(st.side_c), show: st.show ?? {}, rotate: Number(st.rotate) || 0, flip: !!st.flip, ans_idx: Number(st.ans_idx), ans_cond: String(st.ans_cond ?? "SSS").toUpperCase(), ratio_a: Number(st.ratio_a) || 1, ratio_b: Number(st.ratio_b) || 1 };
+        if (i < existing.length) {
+          await admin0.from("sim_stations").update(fields).eq("id", existing[i].id);
+          out.push({ id: existing[i].id, token: existing[i].token, label: fields.label });
+        } else {
+          const ins = await admin0.from("sim_stations").insert({ set_id: id, token: crypto.randomUUID().replace(/-/g, "").slice(0, 8), ...fields }).select("id,token,label").single();
+          if (ins.error) return Response.json({ success: false, message: "스테이션 저장 오류: " + ins.error.message }, { status: 500 });
+          out.push(ins.data);
+        }
+      }
+      if (existing.length > ns.length) { const extra = existing.slice(ns.length).map((e: Record<string, unknown>) => e.id); await admin0.from("sim_stations").delete().in("id", extra); }
+      return Response.json({ success: true, id, stations: out });
+    }
 
     // 게임 등록/수정 모드: {games:[{unit,game,title,url,scope,status}]}
     if (Array.isArray(body.games)) {
