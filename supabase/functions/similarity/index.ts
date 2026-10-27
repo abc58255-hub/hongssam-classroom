@@ -41,7 +41,7 @@ Deno.serve(async (req) => {
       const st = await admin.from("sim_stations")
         .select("id,set_id,label,side_a,side_b,side_c,show,rotate,flip").eq("token", qr).maybeSingle();
       if (st.error || !st.data) return json({ success: false, message: "QR을 찾을 수 없어요." });
-      const set = await admin.from("sim_sets").select("id,active,max_tries").eq("id", st.data.set_id).maybeSingle();
+      const set = await admin.from("sim_sets").select("id,active,max_tries,tri_count,title").eq("id", st.data.set_id).maybeSingle();
       if (!set.data || !set.data.active) return json({ success: false, message: "활동이 종료됐어요." });
       const at = await admin.from("sim_attempts").select("tries,cleared,points,clear_order")
         .eq("station_id", st.data.id).eq("student_id", sid).maybeSingle();
@@ -49,6 +49,7 @@ Deno.serve(async (req) => {
       return json({
         success: true,
         station: { id: st.data.id, label: st.data.label, side_a: st.data.side_a, side_b: st.data.side_b, side_c: st.data.side_c, show: st.data.show, rotate: st.data.rotate, flip: st.data.flip },
+        triCount: set.data.tri_count, title: set.data.title,
         maxTries: set.data.max_tries, tries, cleared: !!at.data?.cleared,
         triesLeft: Math.max(0, set.data.max_tries - tries), points: at.data?.points || 0, order: at.data?.clear_order || null,
       });

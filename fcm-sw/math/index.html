@@ -1072,7 +1072,13 @@
             + '<span style="color:#94a3b8;font-weight:800;">›</span></a>'
           : '';
       }
-      function done(graphActive, hvActive) {
+      function done(graphActive, hvActive, simActive) {
+        var simRow = simActive
+          ? '<a href="../lessons/sim.html" style="display:flex;align-items:center;gap:8px;background:#f0fdfa;border:1.5px solid #99f6e4;border-radius:10px;padding:11px 12px;margin-bottom:6px;text-decoration:none;">'
+            + '<span style="flex:1;min-width:0;font-size:14px;font-weight:800;color:#0f766e;">🔺 닮음 보물찾기</span>'
+            + '<span style="background:#ccfbf1;color:#0f766e;font-size:10px;font-weight:800;padding:3px 8px;border-radius:10px;white-space:nowrap;">🔴 진행 중</span>'
+            + '<span style="color:#2dd4bf;font-weight:800;">›</span></a>'
+          : '';
         var graphRow = graphActive
           ? '<a href="../lessons/graph.html" style="display:flex;align-items:center;gap:8px;background:#fff7ed;border:1.5px solid #fdba74;border-radius:10px;padding:11px 12px;margin-bottom:6px;text-decoration:none;">'
             + '<span style="flex:1;min-width:0;font-size:14px;font-weight:800;color:#9a3412;">📐 그래프 탐구</span>'
@@ -1085,18 +1091,19 @@
             + '<span style="background:#e0e7ff;color:#4338ca;font-size:10px;font-weight:800;padding:3px 8px;border-radius:10px;white-space:nowrap;">🔴 진행 중</span>'
             + '<span style="color:#818cf8;font-weight:800;">›</span></a>'
           : '';
-        if (!graphRow && !hvRow && !cards && !centerLink) { box.innerHTML = ''; return; }
+        if (!graphRow && !hvRow && !simRow && !cards && !centerLink) { box.innerHTML = ''; return; }
         box.innerHTML = '<div class="sec-card" style="padding:12px 14px;">'
           + '<div style="font-size:13px;font-weight:800;color:#1e3a8a;margin-bottom:8px;">🎮 수업 활동</div>'
-          + hvRow + graphRow + cards + centerLink + '</div>';
+          + simRow + hvRow + graphRow + cards + centerLink + '</div>';
       }
       if (myClass) {
         // 만든 지 4시간 지난 방은 '깜빡하고 안 닫은 방'으로 보고 학생 화면에서 숨김
         var actCutoff = new Date(Date.now() - 4 * 3600 * 1000).toISOString();
         var qGraph = fetch(LESSON_SB_URL + '/rest/v1/graph_rooms?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&created_at=gte.' + encodeURIComponent(actCutoff) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } }).then(function (r) { return r.json(); }).then(function (gr) { return Array.isArray(gr) && gr.length > 0; }).catch(function () { return false; });
         var qHv = fetch(LESSON_SB_URL + '/rest/v1/havruta_sessions?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&created_at=gte.' + encodeURIComponent(actCutoff) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } }).then(function (r) { return r.json(); }).then(function (hr) { return Array.isArray(hr) && hr.length > 0; }).catch(function () { return false; });
-        Promise.all([qGraph, qHv]).then(function (a) { done(a[0], a[1]); });
-      } else done(false, false);
+        var qSim = fetch(LESSON_SB_URL + '/rest/v1/sim_sets?select=id&active=eq.true&class_scope=eq.' + encodeURIComponent(myClass) + '&limit=1', { headers: { apikey: LESSON_SB_KEY } }).then(function (r) { return r.json(); }).then(function (sr) { return Array.isArray(sr) && sr.length > 0; }).catch(function () { return false; });
+        Promise.all([qGraph, qHv, qSim]).then(function (a) { done(a[0], a[1], a[2]); });
+      } else done(false, false, false);
     }).catch(function () { box.innerHTML = ''; });
   }
 

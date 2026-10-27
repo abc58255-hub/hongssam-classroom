@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>닮음 보물찾기</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="./supabase-config.js"></script>
+<script src="./lessons-common.js"></script>
+<script src="./sim-draw.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Pretendard,-apple-system,sans-serif;background:#f1f5f9;color:#1e293b;padding:14px;max-width:520px;margin:0 auto;-webkit-tap-highlight-color:transparent;}
+  .hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+  .hd h1{font-size:18px;font-weight:900;color:#0f766e;}
+  .stat{display:flex;gap:8px;}
+  .pill{background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:5px 12px;font-size:12px;font-weight:800;color:#0f766e;}
+  .card{background:#fff;border-radius:16px;box-shadow:0 2px 10px rgba(0,0,0,.05);padding:18px;margin-bottom:12px;}
+  .big-btn{width:100%;padding:18px;background:linear-gradient(135deg,#0f766e,#115e59);color:#fff;border:none;border-radius:14px;font-size:17px;font-weight:900;cursor:pointer;box-shadow:0 4px 14px rgba(15,118,110,.3);}
+  .btn{width:100%;padding:14px;background:#0f766e;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;margin-top:12px;}
+  .btn.ghost{background:#fff;color:#475569;border:1.5px solid #cbd5e1;box-shadow:none;}
+  .btn:disabled{background:#cbd5e1;}
+  label{font-size:13px;font-weight:800;color:#475569;display:block;margin:14px 0 6px;}
+  .chips{display:flex;gap:7px;flex-wrap:wrap;}
+  .chip{padding:10px 15px;border:2px solid #e5e7eb;border-radius:12px;font-size:15px;font-weight:800;background:#fff;color:#475569;cursor:pointer;}
+  .chip.on{background:#0f766e;border-color:#0f766e;color:#fff;}
+  .ratio{display:flex;align-items:center;gap:10px;}
+  .ratio input{width:80px;padding:12px;border:1.5px solid #cbd5e1;border-radius:10px;font-size:18px;text-align:center;font-weight:800;}
+  .ratio b{font-size:22px;color:#64748b;}
+  #reader{width:100%;border-radius:14px;overflow:hidden;}
+  .muted{color:#94a3b8;font-size:14px;text-align:center;padding:24px 10px;line-height:1.7;}
+  .fig{display:flex;justify-content:center;padding:6px;background:#f8fafc;border-radius:12px;}
+  .res{text-align:center;padding:10px;}
+  .res .big{font-size:40px;}
+  .res h2{font-size:22px;margin:6px 0;}
+  .fb{display:flex;gap:8px;justify-content:center;margin-top:10px;font-size:13px;font-weight:800;}
+  .fb span{padding:5px 10px;border-radius:10px;}
+  .fb .o{background:#dcfce7;color:#15803d;} .fb .x{background:#fee2e2;color:#b91c1c;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 18px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:.3s;pointer-events:none;z-index:999;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+  <div class="hd">
+    <h1>🔺 닮음 보물찾기</h1>
+    <div class="stat"><span class="pill" id="pPts">0점</span><span class="pill" id="pClr">0개</span></div>
+  </div>
+  <div id="main"><div class="muted">불러오는 중…</div></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  var USER=null, sb=null, SET=null, SCANNER=null, CUR=null;
+  var ANS={ idx:null, cond:null };
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2200); }
+  function el(id){ return document.getElementById(id); }
+
+  LessonHub.init({ onReady: function(user){ USER=user; sb=LessonHub.client; loadSet(); } });
+
+  function loadSet(){
+    sb.from('sim_sets').select('*').eq('class_scope',USER.className).eq('active',true).order('created_at',{ascending:false}).limit(1)
+      .then(function(r){ SET=(r.data&&r.data[0])||null; refreshProgress().then(renderHome); });
+  }
+  function refreshProgress(){
+    if(!SET) return Promise.resolve();
+    return sb.from('sim_attempts').select('points,cleared').eq('set_id',SET.id).eq('student_id',USER.studentId)
+      .then(function(r){ var rows=r.data||[]; var pts=0,clr=0; rows.forEach(function(a){ pts+=a.points||0; if(a.cleared)clr++; }); el('pPts').textContent=pts+'점'; el('pClr').textContent=clr+'/'+(SET.station_count||0)+'개'; });
+  }
+
+  function renderHome(){
+    if(!SET){ el('main').innerHTML='<div class="muted">아직 열린 활동이 없어요.<br>선생님이 시작하면 나타나요! 🙂</div>'; return; }
+    el('main').innerHTML='<div class="card" style="text-align:center;">'
+      +'<div style="font-size:15px;font-weight:800;color:#0f766e;margin-bottom:4px;">'+esc(SET.title||'닮음 보물찾기')+'</div>'
+      +'<div class="muted" style="padding:10px 0;">야외에 숨겨진 QR을 찾아 스캔하고,<br>화면의 삼각형과 <b>닮은 번호·조건·닮음비</b>를 맞혀요!</div>'
+      +'<button class="big-btn" onclick="startScan()">📷 QR 스캔하기</button>'
+      +'</div>';
+  }
+
+  // ── QR 스캔 ──
+  function startScan(){
+    el('main').innerHTML='<div class="card"><div id="reader"></div><button class="btn ghost" onclick="stopScan(renderHome)">취소</button></div>';
+    SCANNER=new Html5Qrcode("reader");
+    SCANNER.start({facingMode:"environment"},{fps:10,qrbox:{width:230,height:230}}, onScan, function(){})
+      .catch(function(e){ el('main').innerHTML='<div class="card"><div class="muted">카메라를 열 수 없어요 😢<br>카메라 권한을 허용했는지 확인해줘.<br><span style="font-size:12px;">'+esc(e.message||e)+'</span></div><button class="btn ghost" onclick="renderHome()">돌아가기</button></div>'; });
+  }
+  function stopScan(cb){ if(SCANNER){ SCANNER.stop().then(function(){ try{SCANNER.clear();}catch(_){} SCANNER=null; if(cb)cb(); }).catch(function(){ SCANNER=null; if(cb)cb(); }); } else if(cb) cb(); }
+  function onScan(text){ stopScan(function(){ handleToken(String(text).trim()); }); }
+
+  function handleToken(token){
+    el('main').innerHTML='<div class="muted">확인 중…</div>';
+    sb.functions.invoke('similarity',{body:{op:'scan',token:token}}).then(function(res){
+      var d=res.data||{};
+      if(!d.success){ el('main').innerHTML='<div class="card"><div class="muted">'+esc(d.message||'QR을 읽을 수 없어요')+'</div><button class="btn" onclick="startScan()">📷 다시 스캔</button><button class="btn ghost" onclick="renderHome()">홈</button></div>'; return; }
+      CUR={ token:token, st:d.station, triCount:d.triCount||9, triesLeft:d.triesLeft, cleared:d.cleared };
+      ANS={ idx:null, cond:null };
+      if(d.cleared){ renderResult({cleared:true, already:true, points:d.points, order:d.order}); return; }
+      if(d.triesLeft<=0){ renderResult({locked:true}); return; }
+      renderQuestion();
+    }).catch(function(e){ el('main').innerHTML='<div class="card"><div class="muted">오류: '+esc(e.message)+'</div><button class="btn ghost" onclick="renderHome()">홈</button></div>'; });
+  }
+
+  function renderQuestion(){
+    var st=CUR.st;
+    var nums=''; for(var k=1;k<=CUR.triCount;k++){ nums+='<div class="chip" data-n="'+k+'" onclick="pickIdx('+k+')">'+k+'</div>'; }
+    var conds=['SSS','SAS','AA'].map(function(c){ return '<div class="chip" data-c="'+c+'" onclick="pickCond(\''+c+'\')">'+c+'</div>'; }).join('');
+    el('main').innerHTML='<div class="card">'
+      +'<div style="font-size:13px;font-weight:800;color:#0f766e;margin-bottom:8px;">'+esc(st.label||'숨겨진 삼각형')+' · 남은 기회 '+CUR.triesLeft+'번</div>'
+      +'<div class="fig">'+SimDraw.draw({a:st.side_a,b:st.side_b,c:st.side_c,show:st.show,rotate:st.rotate,flip:st.flip,size:240})+'</div>'
+      +'<label>① 학습지에서 닮은 삼각형 번호</label><div class="chips" id="numChips">'+nums+'</div>'
+      +'<label>② 닮음 조건</label><div class="chips" id="condChips">'+conds+'</div>'
+      +'<label>③ 닮음비 (화면 삼각형 : 고른 번호)</label>'
+      +'<div class="ratio"><input type="number" id="rA" placeholder="?"><b>:</b><input type="number" id="rB" placeholder="?"></div>'
+      +'<button class="btn" id="subBtn" onclick="submitAns()">제출하기</button>'
+      +'<button class="btn ghost" onclick="renderHome()">그만두기</button>'
+      +'</div>';
+  }
+  function pickIdx(n){ ANS.idx=n; Array.prototype.forEach.call(document.querySelectorAll('#numChips .chip'),function(c){ c.classList.toggle('on', +c.dataset.n===n); }); }
+  function pickCond(c){ ANS.cond=c; Array.prototype.forEach.call(document.querySelectorAll('#condChips .chip'),function(x){ x.classList.toggle('on', x.dataset.c===c); }); }
+
+  function submitAns(){
+    var rA=parseInt(el('rA').value), rB=parseInt(el('rB').value);
+    if(!ANS.idx){ toast('닮은 번호를 고르세요'); return; }
+    if(!ANS.cond){ toast('닮음 조건을 고르세요'); return; }
+    if(!rA||!rB){ toast('닮음비를 입력하세요'); return; }
+    var b=el('subBtn'); b.disabled=true; b.textContent='채점 중…';
+    sb.functions.invoke('similarity',{body:{op:'submit',token:CUR.token,answer:{idx:ANS.idx,cond:ANS.cond,ratioA:rA,ratioB:rB}}}).then(function(res){
+      var d=res.data||{};
+      if(!d.success){ toast(d.message||'오류'); b.disabled=false; b.textContent='제출하기'; return; }
+      if(d.correct){ refreshProgress(); renderResult({correct:true, points:d.points, order:d.order}); }
+      else if(d.locked){ renderResult({locked:true}); }
+      else { CUR.triesLeft=d.triesLeft; renderResult({wrong:true, triesLeft:d.triesLeft, fb:d.feedback}); }
+    }).catch(function(e){ toast('오류: '+e.message); b.disabled=false; b.textContent='제출하기'; });
+  }
+
+  function renderResult(r){
+    var h='<div class="card res">';
+    if(r.correct){ h+='<div class="big">🎉</div><h2 style="color:#15803d;">정답!</h2><div style="font-size:16px;font-weight:800;color:#0f766e;">+'+r.points+'점'+(r.order?' · 이 스테이션 '+r.order+'등':'')+'</div>'; }
+    else if(r.already){ h+='<div class="big">✅</div><h2 style="color:#0f766e;">이미 해결했어요</h2><div class="muted">+'+(r.points||0)+'점'+(r.order?' · '+r.order+'등':'')+'</div>'; }
+    else if(r.locked){ h+='<div class="big">🔒</div><h2 style="color:#64748b;">기회를 모두 썼어요</h2>'; }
+    else if(r.wrong){ h+='<div class="big">❌</div><h2 style="color:#b91c1c;">오답</h2><div class="muted" style="padding:6px;">남은 기회 '+r.triesLeft+'번</div>';
+      if(r.fb){ h+='<div class="fb"><span class="'+(r.fb.idx?'o':'x')+'">번호 '+(r.fb.idx?'✓':'✗')+'</span><span class="'+(r.fb.cond?'o':'x')+'">조건 '+(r.fb.cond?'✓':'✗')+'</span><span class="'+(r.fb.ratio?'o':'x')+'">닮음비 '+(r.fb.ratio?'✓':'✗')+'</span></div>'; }
+    }
+    h+='<div style="margin-top:16px;">';
+    if(r.wrong && r.triesLeft>0) h+='<button class="btn" onclick="renderQuestion()">다시 풀기</button>';
+    h+='<button class="btn'+((r.wrong&&r.triesLeft>0)?' ghost':'')+'" onclick="startScan()">📷 다음 QR 스캔</button>';
+    h+='<button class="btn ghost" onclick="renderHome()">홈으로</button></div></div>';
+    el('main').innerHTML=h;
+  }
+
+  // 세트 열림/닫힘 실시간 반영
+  setTimeout(function(){ if(sb) sb.channel('sim-set-'+USER.className).on('postgres_changes',{event:'*',schema:'public',table:'sim_sets',filter:'class_scope=eq.'+USER.className}, function(){ loadSet(); }).subscribe(); }, 1500);
+</script>
+</body>
+</html>

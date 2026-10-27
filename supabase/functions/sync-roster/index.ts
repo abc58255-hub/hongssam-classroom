@@ -248,7 +248,9 @@ Deno.serve(async (req) => {
         base_pts: Number(S.base_pts) || 100,
         try_bonus: Array.isArray(S.try_bonus) ? S.try_bonus.map(Number) : [50, 20, 0],
         first_bonus: Array.isArray(S.first_bonus) ? S.first_bonus.map(Number) : [30, 20, 10],
-        max_tries: Math.max(1, Number(S.max_tries) || 3), active: true,
+        max_tries: Math.max(1, Number(S.max_tries) || 3),
+        tri_count: (body.triangles ?? []).length, station_count: (body.stations ?? []).length,
+        active: true,
       };
       let ins = await admin0.from("sim_sets").insert(setRow).select("id").single();
       if (ins.error) { // 활성 유니크 경합 대비 1회 재시도

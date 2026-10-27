@@ -11,6 +11,8 @@ create table if not exists public.sim_sets (
   try_bonus    int[] not null default '{50,20,0}',        -- 1·2·3번째 정답 보너스
   first_bonus  int[] not null default '{30,20,10}',       -- 스테이션별 선착 1·2·3등 보너스(이후 0)
   max_tries    int  not null default 3,
+  tri_count    int  not null default 0,                   -- 주어진 삼각형 수(학생 1~N 선택지·RLS로 원표 숨김)
+  station_count int not null default 0,                   -- 스테이션 수(순위판 진행도 N/total)
   active       boolean not null default true,
   created_at   timestamptz not null default now()
 );
