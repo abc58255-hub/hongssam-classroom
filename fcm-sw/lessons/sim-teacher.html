@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>닮음 보물찾기 — 세트 만들기</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="./sim-draw.js"></script>
 <style>
   :root{--bg:#f1f5f9;--ac:#2563eb;--na:#1e3a8a;}
@@ -213,12 +213,14 @@
   function renderQR(stations){
     var panel=document.getElementById('qrPanel'), list=document.getElementById('qrList');
     panel.style.display='block'; list.innerHTML='';
+    if(typeof QRCode==='undefined'){ list.innerHTML='<div style="color:#ef4444;font-weight:800;">QR 라이브러리 로드 실패 — 인터넷 연결 확인 후 새로고침</div>'; return; }
     stations.forEach(function(s,i){
       var wrap=document.createElement('div'); wrap.className='qr-item';
-      var cv=document.createElement('canvas'); wrap.appendChild(cv);
+      var box=document.createElement('div'); box.style.cssText='width:150px;height:150px;margin:0 auto;'; wrap.appendChild(box);
       var lab=document.createElement('div'); lab.className='lab'; lab.textContent=(s.label||('스테이션 '+(i+1))); wrap.appendChild(lab);
       list.appendChild(wrap);
-      QRCode.toCanvas(cv, String(s.token), { width:150, margin:1 }, function(err){ if(err) lab.textContent='QR오류'; });
+      try{ new QRCode(box, { text:String(s.token), width:150, height:150, correctLevel:QRCode.CorrectLevel.M }); }
+      catch(e){ lab.textContent='QR오류: '+e.message; }
     });
     panel.scrollIntoView({behavior:'smooth'});
   }
