@@ -39,7 +39,7 @@ var RPC_WHITELIST = [
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
   'graphPresetSave', 'graphPresetDelete', 'syncRoster',
   'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames', 'havrutaDeleteSession',
-  'simOpenSet', 'simCloseSet', 'simDeleteSet', 'simGetSet', 'simUpdateSet'
+  'simOpenSet', 'simCloseSet', 'simDeleteSet', 'simGetSet', 'simUpdateSet', 'simShowSet'
 ];
 
 function doPost(e) {
@@ -232,6 +232,10 @@ function simDeleteSet(token, id) {
 function simGetSet(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'simGetSet', id: id });
+}
+function simShowSet(token, id, on) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'simShowSet', id: id, on: on });
 }
 function simUpdateSet(token, payload) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };

@@ -247,17 +247,20 @@
         list.innerHTML=rows.map(function(s){ var d=new Date(s.created_at); var dt=(d.getMonth()+1)+'/'+d.getDate()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
           var scope=s.class_scope==='*'?'모든 반':esc(s.class_scope);
           return '<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;border:1px solid #e5e7eb;border-radius:10px;margin-bottom:6px;background:#fff;">'
-            +(s.active?'<span style="background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;">🟢 활성</span>':'<span style="background:#f1f5f9;color:#94a3b8;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">종료됨</span>')
+            +(s.active?'<span style="background:#dcfce7;color:#15803d;font-size:11px;font-weight:800;padding:2px 8px;border-radius:10px;">🟢 학생에게 보임</span>':'<span style="background:#f1f5f9;color:#94a3b8;font-size:11px;font-weight:700;padding:2px 8px;border-radius:10px;">⚪ 숨김</span>')
             +'<span style="flex:1;font-size:13px;font-weight:700;color:#334155;">'+esc(s.title||'세트')+' <span style="color:#94a3b8;font-weight:500;">· '+scope+' · '+(s.station_count||0)+'문제 · '+dt+'</span></span>'
+            +(s.active
+               ? '<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="showSet('+s.id+',false)">🙈 숨기기</button>'
+               : '<button class="btn" style="padding:5px 10px;font-size:12px;" onclick="showSet('+s.id+',true)">👁 학생에게 보이기</button>')
             +'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="showSetQR('+s.id+')">📷 QR</button>'
             +'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="editSet('+s.id+')">✏️ 수정</button>'
-            +(s.active?'<button class="btn ghost" style="padding:5px 10px;font-size:12px;" onclick="closeSet('+s.id+')">⏹ 종료</button>':'')
             +'<button class="btn warn" style="padding:5px 10px;font-size:12px;" onclick="delSet('+s.id+',\''+esc(s.title||'')+'\')">🗑 삭제</button>'
             +'</div>';
         }).join('');
       });
   }
   function closeSet(id){ portalRPC('simCloseSet',[TOK,id]).then(function(res){ if(res&&res.success){ toast('활동을 종료했어요'); loadSets(); } else toast('실패: '+((res&&res.message)||'')); }).catch(function(e){ toast('오류: '+e.message); }); }
+  function showSet(id,on){ portalRPC('simShowSet',[TOK,id,on]).then(function(res){ if(res&&res.success){ toast(on?'학생에게 보이기로 전환했어요':'학생 화면에서 숨겼어요'); loadSets(); } else toast('실패: '+((res&&res.message)||'')); }).catch(function(e){ toast('오류: '+e.message); }); }
 
   // ── 세트 수정 ──
   function normShow(sh){ var o={sa:false,sb:false,sc:false,Aa:false,Ab:false,Ac:false}; if(!sh)return o; if(typeof sh==='string'){ try{sh=JSON.parse(sh);}catch(_){return o;} } Object.keys(o).forEach(function(k){ if(sh[k])o[k]=true; }); return o; }

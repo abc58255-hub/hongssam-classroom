@@ -292,6 +292,20 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
+    // 세트 보이기 토글: {op:'simShowSet', id, on} — on=true면 학생에게 노출(활성), false면 숨김
+    // 켤 때 같은 반(또는 *) 다른 활성 세트는 닫아 하나만 보이게.
+    if (body.op === "simShowSet") {
+      const id = Number(body.id), on = body.on !== false;
+      if (on) {
+        const cur = await admin0.from("sim_sets").select("class_scope").eq("id", id).maybeSingle();
+        const cls = cur.data?.class_scope ?? "";
+        if (cls === "*") await admin0.from("sim_sets").update({ active: false }).eq("active", true).neq("id", id);
+        else await admin0.from("sim_sets").update({ active: false }).eq("class_scope", cls).eq("active", true).neq("id", id);
+      }
+      const { error } = await admin0.from("sim_sets").update({ active: on }).eq("id", id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
     // 세트 삭제(cascade): {op:'simDeleteSet', id}
     if (body.op === "simDeleteSet") {
       const { error } = await admin0.from("sim_sets").delete().eq("id", Number(body.id));
