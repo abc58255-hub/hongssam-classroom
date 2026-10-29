@@ -23,6 +23,7 @@
   <script src="../config.js"></script>
   <!-- 수업활동(그래프·게임) Supabase 세션을 수학앱 로그인 때 함께 수립 → 두 번째 로그인 제거 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="../lessons/supabase-config.js"></script>
   <script src="../lessons/lessons-common.js"></script>
   <script>
@@ -423,6 +424,7 @@
     <div class="field"><label>비밀번호</label><input type="password" id="loginPw" onkeypress="if(event.keyCode==13) doLogin()"></div>
     <button id="loginBtn" class="primary-btn" onclick="doLogin()">접속하기</button>
     <div class="status-msg" id="loginStatus"></div>
+    <button onclick="openAppQR()" style="width:100%;margin-top:12px;background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;border-radius:12px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;">📲 바로가기 QR 코드</button>
     <div style="margin-top:20px; padding-top:14px; border-top:1px solid #e5e7eb; text-align:center; color:#9ca3af; font-size:11px; line-height:1.8;">
       📐 수학 과제 제출 시스템<br>
       <span>Made with ❤️ by 홍쌤</span> &nbsp;·&nbsp; <span class="app-ver" style="color:#d1d5db;">v1.09.00</span>
@@ -3159,6 +3161,28 @@
 <div style="text-align:center; padding:14px; color:#9ca3af; font-size:11px; margin-top:8px;">
   📐 수학 과제 제출 시스템 &nbsp;|&nbsp; Made with ❤️ by 홍쌤
 </div>
+
+<!-- 📲 바로가기 QR 모달 -->
+<div id="appQrModal" style="display:none; position:fixed; inset:0; background:rgba(15,23,42,.7); z-index:9000; align-items:center; justify-content:center; padding:20px;" onclick="if(event.target===this)closeAppQR()">
+  <div style="background:#fff; border-radius:20px; padding:26px 22px; max-width:320px; width:100%; text-align:center; box-sizing:border-box;">
+    <div style="font-size:18px; font-weight:800; color:#1e3a8a; margin-bottom:4px;">📲 수학 교실 바로가기</div>
+    <div style="font-size:13px; color:#64748b; margin-bottom:16px;">폰 카메라로 스캔하면 바로 접속돼요</div>
+    <div id="appQrBox" style="display:inline-block; background:#fff; padding:12px; border:1px solid #e5e7eb; border-radius:14px;"></div>
+    <div style="font-size:11px; color:#94a3b8; margin-top:12px; word-break:break-all;" id="appQrUrl"></div>
+    <button onclick="closeAppQR()" style="width:100%; margin-top:16px; background:#2563eb; color:#fff; border:none; border-radius:12px; padding:13px; font-size:15px; font-weight:800; cursor:pointer;">닫기</button>
+  </div>
+</div>
+<script>
+  function openAppQR(){
+    var url = location.href.split('#')[0].split('?')[0];
+    var box = document.getElementById('appQrBox'); box.innerHTML='';
+    document.getElementById('appQrUrl').textContent = url;
+    document.getElementById('appQrModal').style.display='flex';
+    if(typeof QRCode==='undefined'){ box.innerHTML='<div style="color:#ef4444;font-size:13px;padding:20px;">QR 생성 실패<br>인터넷 확인 후 다시</div>'; return; }
+    try{ new QRCode(box, { text:url, width:220, height:220, correctLevel:QRCode.CorrectLevel.M }); }catch(e){ box.innerHTML='<div style="color:#ef4444;">오류: '+e.message+'</div>'; }
+  }
+  function closeAppQR(){ document.getElementById('appQrModal').style.display='none'; }
+</script>
 
 </body>
 </html>
