@@ -1082,31 +1082,40 @@ function saveSyllabusCheck(data, groupId) {
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
-// 주간 예상 차시 일괄 입력 — items=[{date,cls,plannedLessonNo}]. 예상차시만(실제=0, 상태='') 저장.
-// 이미 (날짜+반) 기록이 있으면 건너뜀(덮어쓰기 X). 시트 1회 읽기+1회 append로 처리.
-function bulkFillPlanned(items, groupId) {
+// 주간 예상 차시 일괄 입력 — items=[{date,cls,plannedLessonNo}].
+// overwrite=false: 기록 있으면 건너뜀(최초 채움). overwrite=true: 예상차시만 덮어씀(실제수업·취소·이동은 보존).
+function bulkFillPlanned(items, groupId, overwrite) {
   try {
     if (!items || !items.length) return { success: true, count: 0 };
     var gid = groupId || '기본';
     var ss = SpreadsheetApp.openById(SHEET_ID);
     var sh = _ensureSh(ss, _sn('진도체크', gid), ['날짜','반','실제차시','메모','상태','예상차시'], '#10b981');
-    var existing = {};
+    var info = {}; // key → { row, protected }
     if (sh.getLastRow() >= 2) {
-      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 5).getValues();
+      var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
       for (var i = 0; i < rows.length; i++) {
-        if (String(rows[i][4] || '').trim().indexOf('받음:') === 0) continue; // 이동받은 수업 행 제외
+        var st = String(rows[i][4] || '').trim();
+        if (st.indexOf('받음:') === 0) continue; // 이동받은 수업 행 제외
         var rd = rows[i][0] instanceof Date ? Utilities.formatDate(rows[i][0], 'Asia/Seoul', 'yyyy-MM-dd') : String(rows[i][0]).trim();
-        existing[rd + '_' + String(rows[i][1]).trim()] = true;
+        var actual = Number(rows[i][2]) || 0;
+        // 보존 대상: 실제 수업 기록됨(실제>0) 또는 취소/이동 등 상태 있음
+        info[rd + '_' + String(rows[i][1]).trim()] = { row: i + 2, prot: (actual > 0 || st !== '') };
       }
     }
-    var toAppend = [];
+    var toAppend = [], updated = 0;
     items.forEach(function(it) {
       var key = String(it.date).trim() + '_' + String(it.cls).trim();
-      if (existing[key]) return;
-      toAppend.push([String(it.date), String(it.cls), 0, '', '', Number(it.plannedLessonNo) || 0]);
+      var ex = info[key];
+      var pln = Number(it.plannedLessonNo) || 0;
+      if (ex) {
+        if (ex.prot) return;                 // 실제수업·취소·이동 → 보존
+        if (overwrite) { sh.getRange(ex.row, 3, 1, 4).setValues([[0, '', '', pln]]); updated++; } // 예상차시만 갱신
+      } else {
+        toAppend.push([String(it.date), String(it.cls), 0, '', '', pln]);
+      }
     });
     if (toAppend.length) sh.getRange(sh.getLastRow() + 1, 1, toAppend.length, 6).setValues(toAppend);
-    return { success: true, count: toAppend.length };
+    return { success: true, count: toAppend.length + updated };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
