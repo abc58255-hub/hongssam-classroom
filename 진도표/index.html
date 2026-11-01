@@ -121,6 +121,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .actual-btn.active-none { background: #fefce8; border-color: #fde68a; color: #92400e; }
 .actual-btn.active-same { background: #dcfce7; border-color: #86efac; color: #065f46; }
 .actual-btn.active-diff { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
+.actual-btn.active-perf { background: #f5f3ff; border-color: #c4b5fd; color: #7c3aed; }
 
 /* 취소 사유 칩 */
 .cr-btn { padding: 6px 11px; border: 2px solid #fecaca; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; background: #fff1f2; color: #b91c1c; transition: all 0.15s; white-space: nowrap; }
@@ -1844,7 +1845,7 @@ function renderMovedInSection(date, cls) {
           + '<button class="actual-btn ' + (curMode==='none'?'active-none':'') + '" data-mi="' + key + '" data-mode="none" onclick="setMovedInMode(\'' + srcEnc + '\',\'none\')">📌 수업 전</button>'
           + '<button class="actual-btn ' + (curMode==='same'?'active-same':'') + '" data-mi="' + key + '" data-mode="same" onclick="setMovedInMode(\'' + srcEnc + '\',\'same\')">✅ 예상대로</button>'
           + '<button class="actual-btn ' + (curMode==='diff'?'active-diff':'') + '" data-mi="' + key + '" data-mode="diff" onclick="setMovedInMode(\'' + srcEnc + '\',\'diff\')">✏️ 다른 차시</button>'
-          + '<button class="actual-btn ' + (curMode==='perf'?'active-move':'') + '" data-mi="' + key + '" data-mode="perf" onclick="setMovedInMode(\'' + srcEnc + '\',\'perf\')">📋 수행평가</button>'
+          + '<button class="actual-btn ' + (curMode==='perf'?'active-perf':'') + '" data-mi="' + key + '" data-mode="perf" onclick="setMovedInMode(\'' + srcEnc + '\',\'perf\')">📋 수행평가</button>'
           + '<input type="number" min="1" data-mi-input="' + key + '" value="' + (curMode==='diff'?actual:'') + '" placeholder="차시" '
             + 'style="width:70px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;display:' + (curMode==='diff'?'':'none') + ';" '
             + 'oninput="updateMovedInActual(\'' + srcEnc + '\',this.value)">'
