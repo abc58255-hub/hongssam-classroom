@@ -1261,9 +1261,21 @@ function renderSylTable() {
           var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + '(' + DAY_KR[fromD.getDay()] + ')';
           var planned = mi.plannedLessonNo || mi.lessonNo;
           var actual  = mi.lessonNo;
+          var miPerf  = String(mi.memo||'').trim() === '수행평가';
           var displayLn = actual || planned;
           var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === displayLn; });
           var stateLabel, stateBg, stateBorder, stateColor, stateIcon, stateBadge;
+          if (miPerf) {
+            // 수행평가 (이동받은 날에 수행평가 실시 — 진도 진행 없음)
+            html += '<div style="background:#f5f3ff;border:1px solid #c4b5fd;' + CARD + '">'
+              + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
+                + '<span>📋</span><span style="font-weight:800;color:#7c3aed;">수행평가</span>'
+                + '<span style="font-size:8px;background:#ede9fe;color:#7c3aed;padding:0 4px;border-radius:3px;margin-left:1px;">이동</span>'
+              + '</div>'
+              + '<div style="font-size:9px;color:#a78bfa;">📍 ' + fromLabel + ' 수업</div>'
+            + '</div>';
+            return;
+          }
           if (!actual) {
             // 수업 전 (아직 미완료)
             stateBg = '#eef2ff'; stateBorder = '#a5b4fc'; stateColor = '#4338ca';
@@ -1808,8 +1820,9 @@ function renderMovedInSection(date, cls) {
       var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + ' (' + DAY_KR_MI[fromD.getDay()] + ')';
       var planned = mi.plannedLessonNo || mi.lessonNo;
       var actual  = mi.lessonNo;
+      var isPerf  = String(mi.memo||'').trim() === '수행평가';
       var planObj = sylPlanCache.find(function(p){ return p.lessonNo === planned; });
-      var curMode = !actual ? 'none' : (actual === planned ? 'same' : 'diff');
+      var curMode = isPerf ? 'perf' : (!actual ? 'none' : (actual === planned ? 'same' : 'diff'));
       var srcEnc = encodeURIComponent(mi.sourceDate);
       var key = srcEnc;
       return '<div style="background:white;border:1px solid #ddd6fe;border-radius:8px;padding:10px;margin-bottom:6px;">'
@@ -1827,6 +1840,7 @@ function renderMovedInSection(date, cls) {
           + '<button class="actual-btn ' + (curMode==='none'?'active-none':'') + '" data-mi="' + key + '" data-mode="none" onclick="setMovedInMode(\'' + srcEnc + '\',\'none\')">📌 수업 전</button>'
           + '<button class="actual-btn ' + (curMode==='same'?'active-same':'') + '" data-mi="' + key + '" data-mode="same" onclick="setMovedInMode(\'' + srcEnc + '\',\'same\')">✅ 예상대로</button>'
           + '<button class="actual-btn ' + (curMode==='diff'?'active-diff':'') + '" data-mi="' + key + '" data-mode="diff" onclick="setMovedInMode(\'' + srcEnc + '\',\'diff\')">✏️ 다른 차시</button>'
+          + '<button class="actual-btn ' + (curMode==='perf'?'active-move':'') + '" data-mi="' + key + '" data-mode="perf" onclick="setMovedInMode(\'' + srcEnc + '\',\'perf\')">📋 수행평가</button>'
           + '<input type="number" min="1" data-mi-input="' + key + '" value="' + (curMode==='diff'?actual:'') + '" placeholder="차시" '
             + 'style="width:70px;padding:6px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;display:' + (curMode==='diff'?'':'none') + ';" '
             + 'oninput="updateMovedInActual(\'' + srcEnc + '\',this.value)">'
@@ -1848,13 +1862,15 @@ function setMovedInMode(srcEncoded, mode) {
   if (!mi) return;
   var planned = mi.plannedLessonNo || mi.lessonNo;
   if (mode === 'none') {
-    mi.lessonNo = 0;
+    mi.lessonNo = 0; mi.memo = (mi.memo==='수행평가'?'':mi.memo);
   } else if (mode === 'same') {
-    mi.lessonNo = planned;
+    mi.lessonNo = planned; mi.memo = (mi.memo==='수행평가'?'':mi.memo);
+  } else if (mode === 'perf') { // 수행평가 — 진도 차시 진행 없음
+    mi.lessonNo = 0; mi.memo = '수행평가';
   } else { // 'diff'
     var input = document.querySelector('[data-mi-input="' + srcEncoded + '"]');
     var v = input ? parseInt(input.value) : 0;
-    mi.lessonNo = v || 0;
+    mi.lessonNo = v || 0; mi.memo = (mi.memo==='수행평가'?'':mi.memo);
   }
   mi.plannedLessonNo = planned;
   // 원본(이동된) 셀의 lessonNo도 동기화
