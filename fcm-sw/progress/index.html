@@ -170,7 +170,7 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 .actual-btn.active-none { background: #fefce8; border-color: #fde68a; color: #92400e; }
 .actual-btn.active-same { background: #dcfce7; border-color: #86efac; color: #065f46; }
 .actual-btn.active-diff { background: #eff6ff; border-color: #93c5fd; color: #1d4ed8; }
-.actual-btn.active-perf { background: #f5f3ff; border-color: #c4b5fd; color: #7c3aed; }
+.actual-btn.active-perf { background: #f0fdfa; border-color: #99f6e4; color: #0d9488; }
 
 /* 취소 사유 칩 */
 .cr-btn { padding: 6px 11px; border: 2px solid #fecaca; border-radius: 8px; font-size: 12px; font-weight: 700; cursor: pointer; background: #fff1f2; color: #b91c1c; transition: all 0.15s; white-space: nowrap; }
@@ -1318,12 +1318,12 @@ function renderSylTable() {
           var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === displayLn; });
           var stateLabel, stateBg, stateBorder, stateColor, stateIcon, stateBadge;
           if (miPerf) {
-            html += '<div style="background:#f5f3ff;border:1px solid #c4b5fd;' + CARD + '">'
+            html += '<div style="background:#f0fdfa;border:1px solid #99f6e4;' + CARD + '">'
               + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
-                + '<span>📋</span><span style="font-weight:800;color:#7c3aed;">수행평가</span>'
-                + '<span style="font-size:8px;background:#ede9fe;color:#7c3aed;padding:0 4px;border-radius:3px;margin-left:1px;">이동</span>'
+                + '<span>📋</span><span style="font-weight:800;color:#0d9488;">수행평가</span>'
+                + '<span style="font-size:8px;background:#ccfbf1;color:#0d9488;padding:0 4px;border-radius:3px;margin-left:1px;">이동</span>'
               + '</div>'
-              + '<div style="font-size:9px;color:#a78bfa;">📍 ' + fromLabel + ' 수업</div>'
+              + '<div style="font-size:9px;color:#5eead4;">📍 ' + fromLabel + ' 수업</div>'
             + '</div>';
             return;
           }
