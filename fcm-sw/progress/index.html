@@ -1352,8 +1352,8 @@ function renderSylTable() {
           + '</div>';
         });
 
-        // ② 이 날 자체 수업 카드 (구조 동일)
-        if (check && check.lessonNo) {
+        // ② 이 날 자체 수업 카드 — 그 반의 정규 수업일(scheduled)일 때만. 빈 날(이동받은 수업만 있는 날)엔 유령 자체수업 숨김
+        if (scheduled && check && check.lessonNo) {
           var ownPlan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
           html += '<div style="background:#f0fdf4;border:1px solid #86efac;' + CARD + '">'
             + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
@@ -1364,7 +1364,7 @@ function renderSylTable() {
             + '<div style="font-size:9px;color:#86efac;margin-bottom:1px;">📅 이 날 수업</div>'
             + (ownPlan && ownPlan.content ? '<div style="font-size:9px;color:#374151;word-break:keep-all;">' + escapeHtml(ownPlan.content) + '</div>' : '')
           + '</div>';
-        } else if (check && check.plannedLessonNo) {
+        } else if (scheduled && check && check.plannedLessonNo) {
           var pPlan2 = sylPlanCache.find(function(p){ return p.lessonNo === check.plannedLessonNo; });
           html += '<div style="background:#eef2ff;border:1px solid #a5b4fc;' + CARD + '">'
             + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
