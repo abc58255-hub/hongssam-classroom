@@ -808,7 +808,7 @@ function fillWeek(monday){
     if(typeof sylMovedInCache!=='undefined' && sylMovedInCache){
       Object.keys(sylMovedInCache).forEach(function(k){
         if(k.substring(11)!==cls || k.substring(0,10)>=monday) return;
-        (sylMovedInCache[k]||[]).forEach(function(mi){ var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
+        (sylMovedInCache[k]||[]).forEach(function(mi){ if(String(mi.memo||'').trim()==='수행평가') return; var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
       });
     }
     var next=last+1;
@@ -853,7 +853,7 @@ function computeWeekLessons(monday){
     if(typeof sylMovedInCache!=='undefined' && sylMovedInCache){
       Object.keys(sylMovedInCache).forEach(function(k){
         if(k.substring(11)!==cls || k.substring(0,10)>=monday) return;
-        (sylMovedInCache[k]||[]).forEach(function(mi){ var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
+        (sylMovedInCache[k]||[]).forEach(function(mi){ if(String(mi.memo||'').trim()==='수행평가') return; var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
       });
     }
     var next=last+1; map[cls]={};
