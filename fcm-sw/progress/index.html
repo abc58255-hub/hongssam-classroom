@@ -1281,7 +1281,7 @@ function renderSylTable() {
         + '</div>';
       }
 
-      if (status.indexOf('취소') === 0) {
+      if (status.indexOf('취소') === 0 && !_hasMovedIn) {
         var cInfo = _cancelStatusInfo(status);
         html += '<td style="text-align:center;padding:6px 4px;background:' + cInfo.bg + ';cursor:pointer;' + wbStyle + '" ' + cellAttrs + ' title="' + cInfo.label + ' (클릭하여 수정)">'
           + '<div style="display:flex;flex-direction:column;align-items:center;gap:1px;">'
@@ -1290,7 +1290,7 @@ function renderSylTable() {
             + (check.memo ? '<span style="font-size:9px;color:#94a3b8;word-break:keep-all;">' + escapeHtml(check.memo) + '</span>' : '')
           + '</div>' + rateHtml + '</td>';
 
-      } else if (status.indexOf('이동:') === 0 && status.substring(3) !== dateStr) {
+      } else if (status.indexOf('이동:') === 0 && status.substring(3) !== dateStr && !_hasMovedIn) {
         var targetDate = status.substring(3);
         var tD = new Date(targetDate + 'T09:00:00');
         var tLabel = (tD.getMonth()+1) + '/' + tD.getDate() + ' (' + DAY_KR[tD.getDay()] + ')';
@@ -1352,8 +1352,25 @@ function renderSylTable() {
           + '</div>';
         });
 
-        // ② 이 날 자체 수업 카드 — 그 반의 정규 수업일(scheduled)일 때만. 빈 날(이동받은 수업만 있는 날)엔 유령 자체수업 숨김
-        if (scheduled && check && check.lessonNo) {
+        // ② 이 날 자체 수업 카드
+        if (status.indexOf('취소') === 0) {
+          // 이 날 자체 수업이 취소/수행평가 — 이동받은 수업과 함께 표시
+          var cInfo2 = _cancelStatusInfo(status);
+          html += '<div style="background:' + cInfo2.bg + ';border:1px solid ' + cInfo2.color + '33;' + CARD + '">'
+            + '<div style="display:flex;align-items:center;gap:3px;">'
+              + '<span>' + cInfo2.emoji + '</span><span style="font-weight:800;color:' + cInfo2.color + ';">' + escapeHtml(cInfo2.label) + '</span>'
+              + '<span style="font-size:8px;background:rgba(255,255,255,.6);color:' + cInfo2.color + ';padding:0 4px;border-radius:3px;">이 날</span>'
+            + '</div>'
+            + (check.memo ? '<div style="font-size:9px;color:#94a3b8;margin-top:1px;">' + escapeHtml(check.memo) + '</div>' : '')
+          + '</div>';
+        } else if (status.indexOf('이동:') === 0 && status.substring(3) !== dateStr) {
+          // 이 날 자체 수업이 다른 날로 이동나감 — 이동받은 수업과 함께 표시
+          var tD2 = new Date(status.substring(3) + 'T09:00:00');
+          var tLb2 = (tD2.getMonth()+1) + '/' + tD2.getDate() + '(' + DAY_KR[tD2.getDay()] + ')';
+          html += '<div style="background:#f8fafc;border:1px dashed #cbd5e1;' + CARD + 'color:#94a3b8;">'
+            + '<div style="display:flex;align-items:center;gap:3px;"><span style="opacity:.6;">🔄</span><span style="font-weight:600;">이 날 수업 → ' + tLb2 + ' 이동</span></div>'
+          + '</div>';
+        } else if (scheduled && check && check.lessonNo) {
           var ownPlan = sylPlanCache.find(function(p){ return p.lessonNo === check.lessonNo; });
           html += '<div style="background:#f0fdf4;border:1px solid #86efac;' + CARD + '">'
             + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
