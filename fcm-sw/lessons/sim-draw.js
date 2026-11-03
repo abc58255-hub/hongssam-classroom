@@ -89,7 +89,8 @@
   //  sss: v1=a, v2=b, v3=c
   //  sas: v1=변b, v2=낀각A(°), v3=변c  → a=√(b²+c²-2bc·cosA)
   //  asa: v1=변a, v2=각B(°), v3=각C(°) → A=180-B-C, b=a·sinB/sinA, c=a·sinC/sinA
-  function round1(n) { return Math.round(n * 100) / 100; }
+  // 계산변은 4자리까지 보존 — 2자리로 반올림하면 각 재계산 시 ±0.1° 틀어짐(입력 20° → 화면 20.1°).
+  function round1(n) { return Math.round(n * 10000) / 10000; }
   function computeABC(mode, v1, v2, v3) {
     v1 = +v1 || 0; v2 = +v2 || 0; v3 = +v3 || 0;
     if (mode === 'sas') { var A = v2 * Math.PI / 180; var a = Math.sqrt(Math.max(0, v1 * v1 + v3 * v3 - 2 * v1 * v3 * Math.cos(A))); return { a: round1(a), b: v1, c: v3 }; }
