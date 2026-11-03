@@ -217,23 +217,35 @@
     title:'닮음 보물찾기',
     triangles:[
       {mode:'sss',v:[6,8,10],show:'abc'},
-      {mode:'sas',v:[6,33,10],show:'abA'},
-      {mode:'sss',v:[6,9,10],show:'abc'}
+      {mode:'sas',v:[5,70,8],show:'bcA'},
+      {mode:'asa',v:[8,55,65],show:'BC'},
+      {mode:'sss',v:[7,7,4],show:'abc'},
+      {mode:'sas',v:[6,40,9],show:'bcA'},
+      {mode:'asa',v:[10,50,60],show:'BC'}
     ],
     stations:[
-      {label:'운동장 골대',mode:'sss',v:[9,12,15],show:'abc',rotate:120,flip:false,ans:1},
-      {label:'농구장',mode:'sas',v:[12,33,20],show:'abA',rotate:40,flip:true,ans:2}
+      {label:'운동장 골대',mode:'sss',v:[9,12,15],show:'abc',rotate:120,ans:1},
+      {label:'농구장',mode:'sas',v:[7.5,70,12],show:'bcA',rotate:40,flip:true,ans:2},
+      {label:'현관 기둥',mode:'asa',v:[12,55,65],show:'BC',rotate:200,ans:3},
+      {label:'급식실',mode:'sss',v:[10.5,10.5,6],show:'abc',ans:4},
+      {label:'도서관',mode:'sas',v:[9,40,13.5],show:'bcA',rotate:90,ans:5}
     ]
   },null,2);
-  var FORMAT_DOC='닮음 보물찾기 세트를 아래 JSON 형식으로 만들어줘.\n'
-    +'- triangles: 학습지에 줄 삼각형들 (1번부터 순서대로)\n'
-    +'- stations: 야외에 숨길 삼각형들. ans = 닮은 삼각형 번호(1부터)\n'
-    +'- mode: "sss"(세 변) | "sas"(두 변+낀각) | "asa"(한 변+두 각)\n'
-    +'- v: mode에 맞는 값 3개. sss=[a,b,c] / sas=[변,낀각°,변] / asa=[밑변,각°,각°]\n'
-    +'- show: 학생에게 보여줄 정보 문자열. 변=a,b,c / 각=A,B,C (예 "abc"=세 변, "abA"=두 변+낀각A → 조건은 이 정보로 결정)\n'
-    +'- rotate(0~330,선택), flip(true/false,선택)\n'
-    +'규칙: 각 station은 학습지의 "딱 한 번호"와만 닮게. 닮음비·조건은 프로그램이 자동 계산하니 ans와 show만 정확히.\n'
-    +'출력은 JSON만. 예시:\n'+SAMPLE_JSON;
+  var FORMAT_DOC='중2 "삼각형의 닮음" 야외 보물찾기 세트를 아래 JSON으로 만들어줘.\n'
+    +'■ triangles: 학습지에 줄 삼각형들(1번부터). stations: 야외에 숨길 삼각형들(ans=닮은 번호).\n'
+    +'■ mode(입력방식)·v(값3개):\n'
+    +'   sss(세 변)   v=[a,b,c]\n'
+    +'   sas(두 변+낀각) v=[변, 낀각°, 변]\n'
+    +'   asa(한 변+두 각) v=[밑변, 각°, 각°]\n'
+    +'■ show(학생에게 공개할 정보) = 닮음조건을 결정함. 변=a,b,c / 각=A,B,C\n'
+    +'   SSS로 풀 문제 → show "abc" (세 변)\n'
+    +'   SAS로 풀 문제 → show 두 변+낀각 예 "bcA"\n'
+    +'   AA로 풀 문제  → show 두 각 예 "BC"\n'
+    +'★ 중요1: 세 조건(SSS·SAS·AA)을 골고루 섞어줘. SSS만 쓰지 말 것.\n'
+    +'★ 중요2: 각 station과 그 정답 삼각형은 "같은 조건"으로 풀리게 — 둘의 show에 그 조건 정보가 둘 다 들어가야 함 (예 SAS면 둘 다 "bcA").\n'
+    +'★ 중요3: 각 station은 학습지의 딱 한 번호와만 닮게(다른 번호와 비율·각이 겹치지 않게). 닮음비는 1:2, 2:3처럼 깔끔하게.\n'
+    +'■ rotate(0~330,선택)·flip(true/false,선택)으로 보이는 방향만 돌려 눈대중 매칭 방지.\n'
+    +'닮음비·조건명은 프로그램이 자동 계산하니 ans와 show만 정확히. 출력은 JSON만.\n예시:\n'+SAMPLE_JSON;
   function copyFormat(){ (navigator.clipboard?navigator.clipboard.writeText(FORMAT_DOC):Promise.reject()).then(function(){ toast('AI용 형식 설명을 복사했어요'); }).catch(function(){ document.getElementById('bulkText').value=FORMAT_DOC; toast('복사 불가 → 입력칸에 넣었어요'); }); }
 
   // ── 세트 관리 (종료·삭제) ──
