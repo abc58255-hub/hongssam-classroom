@@ -117,9 +117,17 @@
     var s2 = [rDisp(t2.a), rDisp(t2.b), rDisp(t2.c)].sort(asc);
     if (!s2[0]) return { p: 1, q: 1, consistent: false };
     var consistent = similar(t1, t2);
-    var k = s1[0] / s2[0];
-    var best = { p: Math.max(1, Math.round(k)), q: 1, err: Math.abs(k - Math.round(k)) };
-    for (var q = 1; q <= 20; q++) { var p = Math.round(k * q); if (p < 1) continue; var err = Math.abs(p / q - k); if (err < best.err) best = { p: p, q: q, err: err }; }
+    // k = 세 대응 변비의 평균 — 한 변의 반올림 노이즈로 비가 틀어지는 것 방지(예전: 작은변 1쌍만 써 25:18 등 오판)
+    var ks = [], i;
+    for (i = 0; i < 3; i++) { if (s2[i] > 0) ks.push(s1[i] / s2[i]); }
+    var k = ks.reduce(function (a, b) { return a + b; }, 0) / (ks.length || 1);
+    // 간단한 분수 우선: 분모 q=1..12 중 상대오차 2% 이내 "첫" 매칭(= 가장 단순한 비). 예 1.4 → 7:5
+    var best = null;
+    for (var q = 1; q <= 12 && !best; q++) { var p = Math.round(k * q); if (p < 1) continue; if (Math.abs(p / q - k) / k < 0.02) best = { p: p, q: q }; }
+    if (!best) { // 못 찾으면 최소오차로 폴백
+      best = { p: Math.max(1, Math.round(k)), q: 1, err: Math.abs(k - Math.round(k)) };
+      for (var q2 = 1; q2 <= 20; q2++) { var p2 = Math.round(k * q2); if (p2 < 1) continue; var e = Math.abs(p2 / q2 - k); if (e < best.err) best = { p: p2, q: q2, err: e }; }
+    }
     var g = gcd(best.p, best.q);
     return { p: best.p / g, q: best.q / g, consistent: consistent };
   }
