@@ -369,7 +369,7 @@
         var dup=[]; TRIS.forEach(function(tt,k){ if(k+1===st.ans_idx) return; if(SimDraw.similar(sa,abcOf(tt))&&showsCond(st.show,st.ans_cond)&&showsCond(tt.show,st.ans_cond)) dup.push(k+1); });
         if(dup.length){ warns.push(dup.join(',')+'번과도 같은 조건 닮음(유일성 X)'); ok=false; }
       }
-      var ratioTxt = t ? (st.ratio_a+' : '+st.ratio_b) : '-';
+      var ratioTxt = !t ? '-' : ((st.ratio_a===0&&st.ratio_b===0) ? '구할 수 없음' : (st.ratio_a+' : '+st.ratio_b));
       var tb = t ? SimDraw.draw({a:abcOf(t).a,b:abcOf(t).b,c:abcOf(t).c,show:t.show,size:180,labelLetters:true}) : '<div class="muted">없음</div>';
       var sb2 = SimDraw.draw({a:sa.a,b:sa.b,c:sa.c,show:st.show,rotate:st.rotate,flip:st.flip,size:180});
       return '<div style="background:#fff;border:1px solid '+(ok?'#99f6e4':'#fecaca')+';border-radius:14px;padding:14px;margin-bottom:12px;break-inside:avoid;">'
@@ -509,7 +509,13 @@
   function updSShow(i,k,v){ STATIONS[i].show[k]=v; var g=SimDraw.guessCond(STATIONS[i].show); if(g) STATIONS[i].ans_cond=g; rerenderStation(i); saveDraft(); }
   function rerenderStation(i){ var cards=document.querySelectorAll('#stGrid .edit'); if(cards[i]) cards[i].outerHTML=stEditor(STATIONS[i],i); drawSt(i); recompRatio(i); }
   function drawSt(i){ var el=document.getElementById('stPrev'+i); if(!el)return; var abc=abcOf(STATIONS[i]); el.innerHTML=SimDraw.draw({a:abc.a,b:abc.b,c:abc.c,show:STATIONS[i].show,rotate:STATIONS[i].rotate,flip:STATIONS[i].flip,size:180}); }
-  function recompRatio(i){ var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1]; if(!t){return;} var r=SimDraw.ratio(abcOf(st),abcOf(t)); st.ratio_a=r.p; st.ratio_b=r.q; var el=document.getElementById('ratio'+i); if(el) el.textContent=r.p+':'+r.q; checkHint(i); }
+  // 닮음비는 숨긴 삼각형과 정답 삼각형 "둘 다 변을 하나 이상 공개"해야 학생이 구할 수 있음. (AA=두 각만 공개 → 구할 수 없음)
+  function hasSide(show){ show=show||{}; return !!(show.sa||show.sb||show.sc); }
+  function ratioComputable(st,t){ return t && hasSide(st.show) && hasSide(t.show); }
+  function recompRatio(i){ var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1]; if(!t){return;}
+    var el=document.getElementById('ratio'+i);
+    if(!ratioComputable(st,t)){ st.ratio_a=0; st.ratio_b=0; if(el) el.textContent='구할 수 없음'; checkHint(i); return; }
+    var r=SimDraw.ratio(abcOf(st),abcOf(t)); st.ratio_a=r.p; st.ratio_b=r.q; if(el) el.textContent=r.p+':'+r.q; checkHint(i); }
   function recompAllRatios(){ STATIONS.forEach(function(_,i){recompRatio(i);}); }
   // 조건(SSS/SAS/AA)에 필요한 정보가 공개돼 있나 — show 플래그로 판정
   function showsCond(show, cond){

@@ -53,16 +53,18 @@ Deno.serve(async (req) => {
     // ── 스캔: 도형 데이터만 반환 (정답 제외) ──
     if (op === "scan") {
       const st = await admin.from("sim_stations")
-        .select("id,set_id,label,side_a,side_b,side_c,show,rotate,flip").eq("token", qr).maybeSingle();
+        .select("id,set_id,label,side_a,side_b,side_c,show,rotate,flip,ratio_a,ratio_b").eq("token", qr).maybeSingle();
       if (st.error || !st.data) return json({ success: false, message: "QR을 찾을 수 없어요." });
       const set = await admin.from("sim_sets").select("id,active,max_tries,tri_count,title").eq("id", st.data.set_id).maybeSingle();
       if (!set.data || !set.data.active) return json({ success: false, message: "활동이 종료됐어요." });
       const at = await admin.from("sim_attempts").select("tries,cleared,points,clear_order")
         .eq("station_id", st.data.id).eq("student_id", sid).maybeSingle();
       const tries = at.data?.tries || 0;
+      const ratioRequired = !(Number(st.data.ratio_a) === 0 && Number(st.data.ratio_b) === 0); // 0:0 = 닮음비 구할 수 없음(AA 등)
       return json({
         success: true,
         station: { id: st.data.id, label: st.data.label, side_a: st.data.side_a, side_b: st.data.side_b, side_c: st.data.side_c, show: st.data.show, rotate: st.data.rotate, flip: st.data.flip },
+        ratioRequired: ratioRequired,
         triCount: set.data.tri_count, title: set.data.title,
         maxTries: set.data.max_tries, tries, cleared: !!at.data?.cleared,
         triesLeft: Math.max(0, set.data.max_tries - tries), points: at.data?.points || 0, order: at.data?.clear_order || null,
@@ -92,8 +94,9 @@ Deno.serve(async (req) => {
       const ans = body.answer || {};
       const idxOk = Number(ans.idx) === S.ans_idx;
       const condOk = String(ans.cond || "").toUpperCase() === String(S.ans_cond).toUpperCase();
+      const ratioRequired = !(Number(S.ratio_a) === 0 && Number(S.ratio_b) === 0); // 0:0 = 닮음비 구할 수 없음 → 채점 제외
       const [ra, rb] = reduce(Number(ans.ratioA) || 0, Number(ans.ratioB) || 0);
-      const ratioOk = ra === S.ratio_a && rb === S.ratio_b;
+      const ratioOk = !ratioRequired || (ra === S.ratio_a && rb === S.ratio_b);
       const correct = idxOk && condOk && ratioOk;
 
       if (correct) {
