@@ -312,6 +312,12 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
+    // 학생 기록만 초기화(세트·QR·문제 유지): {op:'simResetAttempts', id}
+    if (body.op === "simResetAttempts") {
+      const { error } = await admin0.from("sim_attempts").delete().eq("set_id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
     // 세트 불러오기(수정용, 정답 포함 — 교사 전용): {op:'simGetSet', id}
     if (body.op === "simGetSet") {
       const id = Number(body.id);

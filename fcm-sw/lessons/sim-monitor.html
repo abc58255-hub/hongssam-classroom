@@ -102,8 +102,9 @@
         var stus=Object.keys(byStu).map(function(k){return byStu[k];}).sort(function(x,y){return y.clr-x.clr||y.pts-x.pts;});
         var done=stus.filter(function(s){return totalSt&&s.clr>=totalSt;}).length;
         var totalClears=all.filter(function(a){return a.cleared;}).length;
-        // 스테이션별 (first = 그 반에서 가장 먼저 클리어한 사람 = clear_order 최소)
-        var byStn={}; all.forEach(function(a){ var k=a.station_id; if(!byStn[k])byStn[k]={att:0,clr:0,tries:0,first:null,firstOrd:1e9}; byStn[k].att++; if(a.cleared){ byStn[k].clr++; var o=a.clear_order||1e8; if(o<byStn[k].firstOrd){ byStn[k].firstOrd=o; byStn[k].first=a.name||a.student_id; } } byStn[k].tries+=a.tries||0; });
+        // 스테이션별 (top3 = 먼저 클리어한 3명 = clear_order 작은 순)
+        var byStn={}; all.forEach(function(a){ var k=a.station_id; if(!byStn[k])byStn[k]={att:0,clr:0,tries:0,top:[]}; byStn[k].att++; if(a.cleared){ byStn[k].clr++; byStn[k].top.push({o:a.clear_order||1e8,n:a.name||a.student_id}); } byStn[k].tries+=a.tries||0; });
+        Object.keys(byStn).forEach(function(k){ byStn[k].top.sort(function(a,b){return a.o-b.o;}); byStn[k].top=byStn[k].top.slice(0,3); });
 
         var html='<div class="cards">'
           +'<div class="scard"><div class="v">'+stus.length+'</div><div class="l">참여 학생</div></div>'
@@ -113,11 +114,12 @@
           +'</div>';
 
         // 스테이션별 현황
-        html+='<div class="sec"><h3>📍 스테이션별 현황 <span class="muted">(클리어율 낮으면 어려운 문제)</span></h3><table><tr><th>스테이션</th><th>🥇 1등</th><th>클리어</th><th>시도자</th><th>평균 시도</th><th>클리어율</th></tr>';
+        html+='<div class="sec"><h3>📍 스테이션별 현황 <span class="muted">(클리어율 낮으면 어려운 문제)</span></h3><table><tr><th>스테이션</th><th>🏅 빠른 순 1·2·3등</th><th>클리어</th><th>시도자</th><th>평균 시도</th><th>클리어율</th></tr>';
         var order=STORDER.length?STORDER:Object.keys(byStn);
-        order.forEach(function(sid){ var st=byStn[sid]||{att:0,clr:0,tries:0}; var lab=(STMAP[sid]&&STMAP[sid].label)||('#'+sid); var rate=st.att?Math.round(st.clr/st.att*100):0; var avg=st.att?(st.tries/st.att).toFixed(1):'0';
-          var first=st.first?('<b style="color:#b45309;">'+esc(st.first)+'</b>'):'<span class="muted">-</span>';
-          html+='<tr><td><b>'+((STMAP[sid]&&STMAP[sid].idx)?(STMAP[sid].idx+'. '):'')+esc(lab)+'</b></td><td>'+first+'</td><td>'+st.clr+'</td><td>'+st.att+'</td><td>'+avg+'</td><td class="'+(rate<40?'hard':(rate>=80?'easy':''))+'">'+rate+'%</td></tr>';
+        var medal=['🥇','🥈','🥉'];
+        order.forEach(function(sid){ var st=byStn[sid]||{att:0,clr:0,tries:0,top:[]}; var lab=(STMAP[sid]&&STMAP[sid].label)||('#'+sid); var rate=st.att?Math.round(st.clr/st.att*100):0; var avg=st.att?(st.tries/st.att).toFixed(1):'0';
+          var top=(st.top&&st.top.length)?st.top.map(function(x,i){return medal[i]+' '+esc(x.n);}).join('&nbsp; '):'<span class="muted">-</span>';
+          html+='<tr><td><b>'+((STMAP[sid]&&STMAP[sid].idx)?(STMAP[sid].idx+'. '):'')+esc(lab)+'</b></td><td style="font-weight:700;color:#b45309;">'+top+'</td><td>'+st.clr+'</td><td>'+st.att+'</td><td>'+avg+'</td><td class="'+(rate<40?'hard':(rate>=80?'easy':''))+'">'+rate+'%</td></tr>';
         });
         html+='</table></div>';
 
