@@ -97,20 +97,32 @@
     return { a: v1, b: v2, c: v3 };
   }
 
-  // 닮음비(정수비, 약분): 작은변 기준 배율 k를 간단한 분수로. 반환 {p,q} = t1 : t2
+  // ── 판정은 "화면에 표시되는 반올림값(소수 1자리)" 기준 ──
+  function rDisp(n) { return Math.round(n * 10) / 10; } // 소수 둘째 자리에서 반올림 → 1자리
+  function asc(a, b) { return a - b; }
+  // 표시되는 반올림 변으로 계산한 세 각(정렬, 1자리 반올림)
+  function angleSetR(t) {
+    var a = rDisp(t.a), b = rDisp(t.b), c = rDisp(t.c);
+    return angles(a, b, c).map(rDisp).sort(asc);
+  }
+  // 닮음 판정: 표시되는 각이 (반올림 후) 모두 같으면 닮음. 변 비율의 미세 오차로 인한 오판 방지.
+  function similar(t1, t2) {
+    var A = angleSetR(t1), B = angleSetR(t2);
+    return Math.abs(A[0] - B[0]) <= 0.15 && Math.abs(A[1] - B[1]) <= 0.15 && Math.abs(A[2] - B[2]) <= 0.15;
+  }
+  // 닮음비(정수비, 약분): 표시되는 반올림 변 기준. 반환 {p,q} = t1 : t2 (닮음일 때만 consistent)
   function gcd(x, y) { x = Math.abs(Math.round(x)); y = Math.abs(Math.round(y)); while (y) { var t = y; y = x % y; x = t; } return x || 1; }
   function ratio(t1, t2) {
-    var s1 = [t1.a, t1.b, t1.c].sort(function (m, n) { return m - n; });
-    var s2 = [t2.a, t2.b, t2.c].sort(function (m, n) { return m - n; });
+    var s1 = [rDisp(t1.a), rDisp(t1.b), rDisp(t1.c)].sort(asc);
+    var s2 = [rDisp(t2.a), rDisp(t2.b), rDisp(t2.c)].sort(asc);
     if (!s2[0]) return { p: 1, q: 1, consistent: false };
+    var consistent = similar(t1, t2);
     var k = s1[0] / s2[0];
-    var consistent = Math.abs(s1[1] / s2[1] - k) < 0.03 && Math.abs(s1[2] / s2[2] - k) < 0.03;
     var best = { p: Math.max(1, Math.round(k)), q: 1, err: Math.abs(k - Math.round(k)) };
-    for (var q = 1; q <= 12; q++) { var p = Math.round(k * q); if (p < 1) continue; var err = Math.abs(p / q - k); if (err < best.err) best = { p: p, q: q, err: err }; }
+    for (var q = 1; q <= 20; q++) { var p = Math.round(k * q); if (p < 1) continue; var err = Math.abs(p / q - k); if (err < best.err) best = { p: p, q: q, err: err }; }
     var g = gcd(best.p, best.q);
     return { p: best.p / g, q: best.q / g, consistent: consistent };
   }
-  function similar(t1, t2) { return ratio(t1, t2).consistent; }
 
   global.SimDraw = { draw: draw, valid: valid, angles: angles, guessCond: guessCond, ratio: ratio, similar: similar, computeABC: computeABC };
 })(window);
