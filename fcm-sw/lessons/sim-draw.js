@@ -107,9 +107,10 @@
     return angles(t.a, t.b, t.c).map(rDisp).sort(asc);
   }
   // 닮음 판정: 표시되는 각이 (반올림 후) 모두 같으면 닮음. 변 비율의 미세 오차로 인한 오판 방지.
+  // 허용오차 0.4°: 저장된 변의 반올림(2자리) 노이즈(~0.3°)는 흡수, 실제 다른 삼각형(≥0.47° 차)은 거름.
   function similar(t1, t2) {
     var A = angleSetR(t1), B = angleSetR(t2);
-    return Math.abs(A[0] - B[0]) <= 0.15 && Math.abs(A[1] - B[1]) <= 0.15 && Math.abs(A[2] - B[2]) <= 0.15;
+    return Math.abs(A[0] - B[0]) <= 0.4 && Math.abs(A[1] - B[1]) <= 0.4 && Math.abs(A[2] - B[2]) <= 0.4;
   }
   // 닮음비(정수비, 약분): 표시되는 반올림 변 기준. 반환 {p,q} = t1 : t2 (닮음일 때만 consistent)
   function gcd(x, y) { x = Math.abs(Math.round(x)); y = Math.abs(Math.round(y)); while (y) { var t = y; y = x % y; x = t; } return x || 1; }
