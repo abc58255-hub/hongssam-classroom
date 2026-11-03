@@ -361,13 +361,32 @@
   function drawSt(i){ var el=document.getElementById('stPrev'+i); if(!el)return; var abc=abcOf(STATIONS[i]); el.innerHTML=SimDraw.draw({a:abc.a,b:abc.b,c:abc.c,show:STATIONS[i].show,rotate:STATIONS[i].rotate,flip:STATIONS[i].flip,size:180}); }
   function recompRatio(i){ var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1]; if(!t){return;} var r=SimDraw.ratio(abcOf(st),abcOf(t)); st.ratio_a=r.p; st.ratio_b=r.q; var el=document.getElementById('ratio'+i); if(el) el.textContent=r.p+':'+r.q; checkHint(i); }
   function recompAllRatios(){ STATIONS.forEach(function(_,i){recompRatio(i);}); }
+  // 조건(SSS/SAS/AA)에 필요한 정보가 공개돼 있나 — show 플래그로 판정
+  function showsCond(show, cond){
+    show=show||{};
+    var sN=(show.sa?1:0)+(show.sb?1:0)+(show.sc?1:0);
+    var aN=(show.Aa?1:0)+(show.Ab?1:0)+(show.Ac?1:0);
+    if(cond==='SSS') return sN>=3;
+    if(cond==='SAS') return sN>=2 && aN>=1;
+    if(cond==='AA')  return aN>=2;
+    return false;
+  }
   function checkHint(i){
     var el=document.getElementById('stHint'+i); if(!el) return; var st=STATIONS[i], t=TRIS[(st.ans_idx||1)-1];
-    var msgs=[], sabc=abcOf(st);
+    var msgs=[], sabc=abcOf(st), cond=st.ans_cond;
     if(t){ var r=SimDraw.ratio(sabc,abcOf(t)); if(!r.consistent) msgs.push('<span class="bad">⚠ '+st.ans_idx+'번과 닮음이 아니에요(변 비율 불일치)</span>'); }
-    var dup=[]; TRIS.forEach(function(tt,k){ if(k+1===st.ans_idx) return; if(SimDraw.similar(sabc,abcOf(tt))) dup.push(k+1); });
-    if(dup.length) msgs.push('<span class="bad">⚠ '+dup.join(',')+'번과도 닮음 → 정답이 유일하지 않아요</span>');
-    var g=SimDraw.guessCond(st.show); if(g&&g!==st.ans_cond) msgs.push('<span class="muted">표시정보상 조건은 '+g+' 로 보여요</span>');
+    // 정답을 그 조건으로 풀 수 있나 — 숨긴 삼각형·정답 삼각형 둘 다 조건 정보 공개 필요
+    if(t){
+      if(!showsCond(st.show, cond)) msgs.push('<span class="bad">⚠ 숨긴 삼각형에 '+cond+' 판정에 필요한 정보가 공개 안 됨</span>');
+      if(!showsCond(t.show, cond)) msgs.push('<span class="bad">⚠ 정답 '+st.ans_idx+'번에 '+cond+' 판정에 필요한 정보가 공개 안 됨</span>');
+    }
+    // 유일성: "공개된 정보로" 같은 조건으로 헷갈릴 수 있는 후보만 경고 (실제 닮음 + 양쪽 조건정보 공개)
+    var dup=[]; TRIS.forEach(function(tt,k){
+      if(k+1===st.ans_idx) return;
+      if(SimDraw.similar(sabc,abcOf(tt)) && showsCond(st.show,cond) && showsCond(tt.show,cond)) dup.push(k+1);
+    });
+    if(dup.length) msgs.push('<span class="bad">⚠ '+dup.join(',')+'번과도 '+cond+'로 닮음(공개 정보 기준) → 정답이 유일하지 않아요</span>');
+    var g=SimDraw.guessCond(st.show); if(g&&g!==cond) msgs.push('<span class="muted">공개 정보상 조건은 '+g+' 로 보여요</span>');
     el.innerHTML=msgs.join('<br>');
   }
 
