@@ -53,7 +53,7 @@
 
 <script>
   var USER=null, sb=null, SET=null, SCANNER=null, CUR=null;
-  var ANS={ idx:null, cond:null };
+  var ANS={ idx:null, cond:null, ratioNone:false };
   var PROG={ pts:0, clr:0 };
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -104,7 +104,7 @@
       if(res.error && !d.message){ d.message = (res.error.message||'서버 오류')+' — 다시 로그인하거나 잠시 후 재시도'; }
       if(!d.success){ el('main').innerHTML='<div class="card"><div class="muted">'+esc(d.message||'QR을 읽을 수 없어요')+'</div><div style="font-size:11px;color:#cbd5e1;margin-top:6px;word-break:break-all;">코드: '+esc(token)+'</div><button class="btn" onclick="startScan()">📷 다시 스캔</button><button class="btn ghost" onclick="renderHome()">홈</button></div>'; return; }
       CUR={ token:token, st:d.station, triCount:d.triCount||9, triesLeft:d.triesLeft, cleared:d.cleared, ratioReq:(d.ratioRequired!==false) };
-      ANS={ idx:null, cond:null };
+      ANS={ idx:null, cond:null, ratioNone:false };
       if(d.cleared){ renderResult({cleared:true, already:true, points:d.points, order:d.order}); return; }
       if(d.triesLeft<=0){ renderResult({locked:true}); return; }
       renderQuestion();
@@ -120,23 +120,25 @@
       +'<div class="fig">'+SimDraw.draw({a:st.side_a,b:st.side_b,c:st.side_c,show:st.show,rotate:st.rotate,flip:st.flip,size:240})+'</div>'
       +'<label>① 학습지에서 닮은 삼각형 번호</label><div class="chips" id="numChips">'+nums+'</div>'
       +'<label>② 닮음 조건</label><div class="chips" id="condChips">'+conds+'</div>'
-      +(CUR.ratioReq
-         ? '<label>③ 닮음비 (화면 삼각형 : 고른 번호)</label><div class="ratio"><input type="number" id="rA" placeholder="?"><b>:</b><input type="number" id="rB" placeholder="?"></div>'
-         : '<div style="margin-top:14px;background:#f1f5f9;border-radius:10px;padding:10px 12px;font-size:13px;color:#64748b;">③ 닮음비 — 각만 주어져 <b>구할 수 없음</b> (입력 안 해도 돼요)</div>')
-      +'<button class="btn" id="subBtn" onclick="submitAns()">제출하기</button>'
+      +'<label>③ 닮음비 (화면 삼각형 : 고른 번호)</label>'
+      +'<div class="ratio" id="ratioRow"><input type="number" id="rA" placeholder="?"><b>:</b><input type="number" id="rB" placeholder="?"></div>'
+      +'<div class="chip" id="ratioNoneChip" onclick="toggleRatioNone()" style="margin-top:8px;display:inline-block;">🚫 구할 수 없음</div>'
+      +'<button class="btn" id="subBtn" onclick="submitAns()" style="margin-top:12px;">제출하기</button>'
       +'<button class="btn ghost" onclick="renderHome()">그만두기</button>'
       +'</div>';
   }
   function pickIdx(n){ ANS.idx=n; Array.prototype.forEach.call(document.querySelectorAll('#numChips .chip'),function(c){ c.classList.toggle('on', +c.dataset.n===n); }); }
   function pickCond(c){ ANS.cond=c; Array.prototype.forEach.call(document.querySelectorAll('#condChips .chip'),function(x){ x.classList.toggle('on', x.dataset.c===c); }); }
+  function toggleRatioNone(){ ANS.ratioNone=!ANS.ratioNone; var chip=el('ratioNoneChip'), row=el('ratioRow'); if(chip)chip.classList.toggle('on',ANS.ratioNone); if(row){ row.style.opacity=ANS.ratioNone?'0.4':'1'; row.style.pointerEvents=ANS.ratioNone?'none':'auto'; if(ANS.ratioNone){ if(el('rA'))el('rA').value=''; if(el('rB'))el('rB').value=''; } } }
 
   function submitAns(){
-    var rA=CUR.ratioReq?parseInt(el('rA').value):0, rB=CUR.ratioReq?parseInt(el('rB').value):0;
+    var none=!!ANS.ratioNone;
+    var rA=none?0:parseInt(el('rA').value), rB=none?0:parseInt(el('rB').value);
     if(!ANS.idx){ toast('닮은 번호를 고르세요'); return; }
     if(!ANS.cond){ toast('닮음 조건을 고르세요'); return; }
-    if(CUR.ratioReq && (!rA||!rB)){ toast('닮음비를 입력하세요'); return; }
+    if(!none && (!rA||!rB)){ toast('닮음비를 입력하거나 "구할 수 없음"을 고르세요'); return; }
     var b=el('subBtn'); b.disabled=true; b.textContent='채점 중…';
-    sb.functions.invoke('similarity',{body:{op:'submit',token:CUR.token,answer:{idx:ANS.idx,cond:ANS.cond,ratioA:rA,ratioB:rB}}}).then(function(res){
+    sb.functions.invoke('similarity',{body:{op:'submit',token:CUR.token,answer:{idx:ANS.idx,cond:ANS.cond,ratioA:rA,ratioB:rB,ratioNone:none}}}).then(function(res){
       var d=res.data||{};
       if(res.error && !d.message){ d.message=(res.error.message||'서버 오류'); }
       if(!d.success){ toast(d.message||'오류'); b.disabled=false; b.textContent='제출하기'; return; }
@@ -152,7 +154,7 @@
     else if(r.already){ h+='<div class="big">✅</div><h2 style="color:#0f766e;">이미 해결했어요</h2><div class="muted">+'+(r.points||0)+'점'+(r.order?' · '+r.order+'등':'')+'</div>'; }
     else if(r.locked){ h+='<div class="big">🔒</div><h2 style="color:#64748b;">기회를 모두 썼어요</h2>'; }
     else if(r.wrong){ h+='<div class="big">❌</div><h2 style="color:#b91c1c;">오답</h2><div class="muted" style="padding:6px;">남은 기회 '+r.triesLeft+'번</div>';
-      if(r.fb){ h+='<div class="fb"><span class="'+(r.fb.idx?'o':'x')+'">번호 '+(r.fb.idx?'✓':'✗')+'</span><span class="'+(r.fb.cond?'o':'x')+'">조건 '+(r.fb.cond?'✓':'✗')+'</span>'+(CUR&&CUR.ratioReq?'<span class="'+(r.fb.ratio?'o':'x')+'">닮음비 '+(r.fb.ratio?'✓':'✗')+'</span>':'')+'</div>'; }
+      if(r.fb){ h+='<div class="fb"><span class="'+(r.fb.idx?'o':'x')+'">번호 '+(r.fb.idx?'✓':'✗')+'</span><span class="'+(r.fb.cond?'o':'x')+'">조건 '+(r.fb.cond?'✓':'✗')+'</span><span class="'+(r.fb.ratio?'o':'x')+'">닮음비 '+(r.fb.ratio?'✓':'✗')+'</span></div>'; }
     }
     h+='<div style="margin-top:16px;">';
     if(r.wrong && r.triesLeft>0) h+='<button class="btn" onclick="renderQuestion()">다시 풀기</button>';

@@ -94,9 +94,11 @@ Deno.serve(async (req) => {
       const ans = body.answer || {};
       const idxOk = Number(ans.idx) === S.ans_idx;
       const condOk = String(ans.cond || "").toUpperCase() === String(S.ans_cond).toUpperCase();
-      const ratioRequired = !(Number(S.ratio_a) === 0 && Number(S.ratio_b) === 0); // 0:0 = 닮음비 구할 수 없음 → 채점 제외
+      const ratioRequired = !(Number(S.ratio_a) === 0 && Number(S.ratio_b) === 0); // 0:0 = 닮음비 구할 수 없음(AA 등)
+      const ansNone = !!ans.ratioNone; // 학생이 '구할 수 없음' 선택
       const [ra, rb] = reduce(Number(ans.ratioA) || 0, Number(ans.ratioB) || 0);
-      const ratioOk = !ratioRequired || (ra === S.ratio_a && rb === S.ratio_b);
+      // 구할 수 있는 문제: 비를 맞혀야 정답('구할 수 없음' 고르면 오답). 못 구하는 문제(AA): '구할 수 없음'을 골라야 정답.
+      const ratioOk = ratioRequired ? (!ansNone && ra === S.ratio_a && rb === S.ratio_b) : ansNone;
       const correct = idxOk && condOk && ratioOk;
 
       if (correct) {
