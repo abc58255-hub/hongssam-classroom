@@ -61,7 +61,8 @@
       if (!show[vt.k]) return;
       var p = Q[vt.i], dx = G.x - p.x, dy = G.y - p.y, d = Math.hypot(dx, dy) || 1;
       var lx = p.x + dx / d * 22, ly = p.y + dy / d * 22;
-      svg += '<text x="' + num(lx) + '" y="' + num(ly) + '" font-size="13" font-weight="800" fill="#b45309" text-anchor="middle" dominant-baseline="middle">' + num(vt.v) + '°</text>';
+      // 각은 정수(도)로 표시 — 반올림 변에서 재계산해도 닮은 삼각형끼리 같은 숫자가 나오게(105.1/104.9 → 105)
+      svg += '<text x="' + num(lx) + '" y="' + num(ly) + '" font-size="13" font-weight="800" fill="#b45309" text-anchor="middle" dominant-baseline="middle">' + Math.round(vt.v) + '°</text>';
     });
     // 꼭짓점 글자(선택)
     if (spec.labelLetters) {
