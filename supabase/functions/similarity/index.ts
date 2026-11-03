@@ -102,8 +102,11 @@ Deno.serve(async (req) => {
       if (correct) {
         const { data: ord } = await admin.rpc("sim_award_clear", { p_station: S.id });
         const order = Number(ord) || 1;
-        const tb = (SET.try_bonus || [])[tries - 1] || 0;
-        const fb = (SET.first_bonus || [])[order - 1] || 0;
+        // 시도 보너스: 1번째 +20, 2번째 +10, 3번째 +0 (조금씩 감점). 3번 다 틀리면 애초에 여기 못 옴(0점).
+        const tryBonus = [20, 10, 0];
+        const tb = tryBonus[tries - 1] ?? 0;
+        // 선착 보너스: 그 스테이션 1등 +30 → 1등씩 1점 감소 → 30등 +1, 31등부터 +0 (순위 차등)
+        const fb = Math.max(0, 31 - order);
         const pts = (SET.base_pts || 0) + tb + fb;
         await attUpdate(row.id, { tries, cleared: true, clear_order: order, points: pts, name: sname, class_scope: cls, updated_at: new Date().toISOString() });
         return json({ success: true, correct: true, cleared: true, order, points: pts, tries });
