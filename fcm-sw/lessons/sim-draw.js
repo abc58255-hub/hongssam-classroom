@@ -100,10 +100,10 @@
   // ── 판정은 "화면에 표시되는 반올림값(소수 1자리)" 기준 ──
   function rDisp(n) { return Math.round(n * 10) / 10; } // 소수 둘째 자리에서 반올림 → 1자리
   function asc(a, b) { return a - b; }
-  // 표시되는 반올림 변으로 계산한 세 각(정렬, 1자리 반올림)
+  // 세 각(정렬) — 실제 변에서 계산 후 각만 1자리 반올림(화면 각 표시값).
+  // 변을 먼저 반올림하면 SAS/ASA 계산변의 반올림 노이즈가 비율을 깨 진짜 닮음을 놓침.
   function angleSetR(t) {
-    var a = rDisp(t.a), b = rDisp(t.b), c = rDisp(t.c);
-    return angles(a, b, c).map(rDisp).sort(asc);
+    return angles(t.a, t.b, t.c).map(rDisp).sort(asc);
   }
   // 닮음 판정: 표시되는 각이 (반올림 후) 모두 같으면 닮음. 변 비율의 미세 오차로 인한 오판 방지.
   function similar(t1, t2) {
