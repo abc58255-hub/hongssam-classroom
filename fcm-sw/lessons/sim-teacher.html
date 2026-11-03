@@ -59,6 +59,7 @@
     body{background:#fff;padding:0;} .bar,.sec,#lock,.no-print{display:none !important;}
     body.print-qr #sheetPanel{display:none !important;} body.print-sheet #qrPanel{display:none !important;}
     #qrPanel,#sheetPanel{box-shadow:none;margin:0;}
+    #verifyList > div{break-inside:avoid;}
   }
 </style>
 </head>
@@ -68,31 +69,65 @@
     <div id="lerr" style="color:#f87171;font-size:13px;margin-top:8px;"></div></div></div>
 
   <div id="app" style="display:none;">
-    <h2>🔺 닮음 보물찾기 — 세트 만들기</h2>
-    <p class="muted">주어진 삼각형(학습지)과 숨길 삼각형(스테이션)을 만들고 QR을 인쇄하세요.</p>
+    <!-- ══════ 홈 ══════ -->
+    <div id="homeView">
+      <h2>🔺 닮음 보물찾기</h2>
+      <p class="muted" style="margin-bottom:18px;">무엇을 할까요?</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:660px;">
+        <div onclick="newSet()" style="cursor:pointer;background:#fff;border:2px solid #99f6e4;border-radius:16px;padding:26px 20px;text-align:center;transition:.15s;">
+          <div style="font-size:40px;">➕</div>
+          <div style="font-size:18px;font-weight:900;color:var(--na);margin:8px 0 4px;">세트 새로 만들기</div>
+          <div class="muted">삼각형·스테이션을 만들고 QR·학습지 인쇄</div>
+        </div>
+        <div onclick="goManage()" style="cursor:pointer;background:#fff;border:2px solid #cbd5e1;border-radius:16px;padding:26px 20px;text-align:center;transition:.15s;">
+          <div style="font-size:40px;">📂</div>
+          <div style="font-size:18px;font-weight:900;color:var(--na);margin:8px 0 4px;">세트 관리하기</div>
+          <div class="muted">만든 세트 목록 · 보이기/숨기기 · 수정 · QR · 삭제</div>
+        </div>
+      </div>
+      <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn ghost" onclick="window.open('./sim-monitor.html','_blank')">📊 실시간 현황</button>
+        <button class="btn ghost" onclick="window.open('./sim-board.html','_blank')">🏆 순위판</button>
+      </div>
+    </div>
 
+    <!-- ══════ 세트 관리 ══════ -->
+    <div id="manageView" style="display:none;">
+      <div class="bar">
+        <button class="btn ghost" onclick="goHome()">← 홈</button>
+        <b style="color:var(--na);font-size:16px;">📂 세트 관리</b>
+        <span style="flex:1"></span>
+        <span class="muted">🟢 = 지금 학생에게 보이는 세트</span>
+      </div>
+      <div class="sec"><div id="setList" class="muted">불러오는 중…</div></div>
+    </div>
+
+    <!-- ══════ 검증 모드 ══════ -->
+    <div id="verifyView" style="display:none;">
+      <div class="bar no-print">
+        <button class="btn ghost" onclick="goBuild()">← 편집으로</button>
+        <b style="color:var(--na);font-size:16px;">🔍 검증 — 스테이션 ↔ 정답 비교</b>
+        <span style="flex:1"></span>
+        <button class="btn ghost" onclick="window.print()">🖨 인쇄</button>
+      </div>
+      <div class="muted no-print" style="margin-bottom:10px;">각 스테이션(숨긴 삼각형)과 정답 삼각형을 양옆으로 놓고 닮음조건·닮음비를 확인하세요. 경고(❌)가 있으면 편집으로 돌아가 고치세요.</div>
+      <div id="verifyList"></div>
+    </div>
+
+    <!-- ══════ 세트 만들기(편집) ══════ -->
+    <div id="buildView" style="display:none;">
     <div class="bar">
-      <select id="clsSel"></select>
-      <input id="title" type="text" value="닮음 보물찾기" style="width:180px;">
-      <label class="muted">기회<input id="maxTries" type="number" value="3" min="1" max="9" style="width:52px;"></label>
-      <label class="muted">기본점<input id="basePts" type="number" value="100" style="width:64px;"></label>
+      <button class="btn ghost no-print" onclick="goHome()">← 홈</button>
+      <b id="buildTitle" style="color:var(--na);font-size:16px;">새 세트 만들기</b>
       <span style="flex:1"></span>
       <button class="btn ghost" onclick="toggleBulk()">⚡ 빠른 입력</button>
-      <button class="btn ghost" onclick="resetDraft()">🆕 새로</button>
-      <button class="btn ghost" onclick="toggleMgmt()">📂 세트 관리</button>
-      <button class="btn ghost" onclick="window.open('./sim-monitor.html','_blank')">📊 현황</button>
-      <button class="btn ghost" onclick="window.open('./sim-board.html','_blank')">🏆 순위판</button>
-      <button class="btn" id="saveBtn" onclick="openSet()">💾 세트 열기 & QR 생성</button>
+      <button class="btn ghost" onclick="resetDraft()">🆕 비우기</button>
+      <button class="btn ghost" onclick="goVerify()">🔍 검증하기</button>
+      <button class="btn" id="saveBtn" onclick="openSaveDialog()">💾 저장하기</button>
     </div>
     <div id="editBanner" style="display:none;background:#fef3c7;border:1px solid #fde68a;border-radius:10px;padding:10px 14px;margin-bottom:14px;font-size:13px;font-weight:700;color:#92400e;">
       ✏️ <b id="editTitle"></b> 수정 중 — 저장하면 <b>같은 QR이 그대로 유지</b>돼요.
       <button class="btn ghost" style="padding:4px 10px;font-size:12px;margin-left:8px;" onclick="cancelEdit()">새 세트로 전환</button>
-    </div>
-
-    <div class="sec" id="mgmtPanel" style="display:none;">
-      <h3>📂 세트 관리</h3>
-      <div class="muted" style="margin-bottom:8px;">열어둔 세트를 종료하거나 삭제해요. 🟢활성 = 지금 학생에게 보이는 세트.</div>
-      <div id="setList" class="muted">불러오는 중…</div>
     </div>
 
     <div class="sec" id="bulkPanel" style="display:none;">
@@ -141,6 +176,30 @@
       </div>
       <div id="sheetList"></div>
     </div>
+    </div><!-- /buildView -->
+
+    <!-- ══════ 저장 모달 (이름·대상반) ══════ -->
+    <div id="saveModal" style="display:none;position:fixed;inset:0;background:rgba(15,23,42,.6);z-index:900;align-items:center;justify-content:center;padding:20px;">
+      <div style="background:#fff;border-radius:18px;padding:24px;width:360px;max-width:100%;box-sizing:border-box;">
+        <h3 style="margin:0 0 4px;color:var(--na);">💾 세트 저장</h3>
+        <div class="muted" style="margin-bottom:14px;">이름과 대상 반을 정하세요. 저장하면 QR·학습지가 만들어져요.</div>
+        <label style="font-size:13px;font-weight:700;color:#475569;">세트 이름</label>
+        <input id="title" type="text" value="닮음 보물찾기" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:9px;margin:5px 0 12px;font-size:14px;">
+        <label style="font-size:13px;font-weight:700;color:#475569;">대상 반</label>
+        <select id="clsSel" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:9px;margin:5px 0 12px;font-size:14px;"></select>
+        <div style="display:flex;gap:10px;">
+          <div style="flex:1;"><label style="font-size:13px;font-weight:700;color:#475569;">기회(회)</label><input id="maxTries" type="number" value="3" min="1" max="9" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:9px;margin-top:5px;font-size:14px;"></div>
+          <div style="flex:1;"><label style="font-size:13px;font-weight:700;color:#475569;">기본점</label><input id="basePts" type="number" value="100" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #cbd5e1;border-radius:9px;margin-top:5px;font-size:14px;"></div>
+        </div>
+        <label style="display:flex;align-items:center;gap:7px;margin-top:12px;font-size:13px;font-weight:700;color:#475569;cursor:pointer;">
+          <input type="checkbox" id="saveShow" checked style="width:16px;height:16px;"> 저장 후 바로 학생에게 보이기(ON)
+        </label>
+        <div style="display:flex;gap:8px;margin-top:18px;">
+          <button class="btn ghost" style="flex:1;" onclick="document.getElementById('saveModal').style.display='none'">취소</button>
+          <button class="btn" style="flex:1;" onclick="openSet()">💾 저장</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="toast" id="toast"></div>
 
@@ -179,6 +238,23 @@
     if(!TRIS.length){ addTri(); addTri(); addTri(); }
     if(!STATIONS.length){ addStation(); }
     renderTris(); renderStations();
+    goHome();
+  }
+  // ── 화면 전환 ──
+  function showView(v){
+    ['homeView','buildView','manageView','verifyView'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display = (id===v) ? 'block':'none'; });
+    document.body.classList.remove('print-qr','print-sheet');
+  }
+  function goHome(){ showView('homeView'); }
+  function goBuild(){ showView('buildView'); }
+  function goManage(){ showView('manageView'); loadSets(); }
+  function goVerify(){ STATIONS.forEach(function(_,i){ try{recompRatio(i);}catch(e){} }); showView('verifyView'); renderVerify(); }
+  function newSet(){ EDIT_ID=null; localStorage.removeItem('sim_draft'); TRIS=[]; STATIONS=[]; addTri(); addTri(); addTri(); addStation(); document.getElementById('title').value='닮음 보물찾기'; document.getElementById('maxTries').value=3; document.getElementById('basePts').value=100; document.getElementById('buildTitle').textContent='새 세트 만들기'; setEditUI(); var q=document.getElementById('qrPanel'),s=document.getElementById('sheetPanel'); if(q)q.style.display='none'; if(s)s.style.display='none'; goBuild(); }
+  function openSaveDialog(){
+    // 저장 전 변 유효성 빠른 체크
+    for(var i=0;i<TRIS.length;i++){ var ta=abcOf(TRIS[i]); if(!SimDraw.valid(ta.a,ta.b,ta.c)){ toast((i+1)+'번 삼각형 입력값 오류'); return; } }
+    if(!STATIONS.length){ toast('스테이션을 1개 이상 추가하세요'); return; }
+    document.getElementById('saveModal').style.display='flex';
   }
   function saveDraft(){
     try{ localStorage.setItem('sim_draft', JSON.stringify({ TRIS:TRIS, STATIONS:STATIONS,
@@ -276,7 +352,40 @@
   function copyFormat(){ (navigator.clipboard?navigator.clipboard.writeText(FORMAT_DOC):Promise.reject()).then(function(){ toast('AI용 형식 설명을 복사했어요'); }).catch(function(){ document.getElementById('bulkText').value=FORMAT_DOC; toast('복사 불가 → 입력칸에 넣었어요'); }); }
 
   // ── 세트 관리 (종료·삭제) ──
-  function toggleMgmt(){ var p=document.getElementById('mgmtPanel'); var on=(p.style.display==='none'||!p.style.display); p.style.display=on?'block':'none'; if(on){ loadSets(); p.scrollIntoView({behavior:'smooth'}); } }
+  // ── 🔍 검증 모드: 스테이션 ↔ 정답 삼각형 양옆 비교 ──
+  function renderVerify(){
+    var box=document.getElementById('verifyList');
+    if(!STATIONS.length){ box.innerHTML='<div class="muted" style="padding:20px;">스테이션이 없어요.</div>'; return; }
+    box.innerHTML=STATIONS.map(function(st,i){
+      var t=TRIS[(st.ans_idx||1)-1];
+      var sa=abcOf(st), ok=true, warns=[];
+      if(!t){ warns.push('정답 삼각형 없음'); ok=false; }
+      else {
+        var r=SimDraw.ratio(sa,abcOf(t));
+        if(!r.consistent){ warns.push('정답 '+st.ans_idx+'번과 닮음 아님'); ok=false; }
+        if(!showsCond(st.show,st.ans_cond)){ warns.push('숨긴 삼각형에 '+st.ans_cond+' 정보 미공개'); ok=false; }
+        if(t&&!showsCond(t.show,st.ans_cond)){ warns.push('정답 '+st.ans_idx+'번에 '+st.ans_cond+' 정보 미공개'); ok=false; }
+        var dup=[]; TRIS.forEach(function(tt,k){ if(k+1===st.ans_idx) return; if(SimDraw.similar(sa,abcOf(tt))&&showsCond(st.show,st.ans_cond)&&showsCond(tt.show,st.ans_cond)) dup.push(k+1); });
+        if(dup.length){ warns.push(dup.join(',')+'번과도 같은 조건 닮음(유일성 X)'); ok=false; }
+      }
+      var ratioTxt = t ? (st.ratio_a+' : '+st.ratio_b) : '-';
+      var tb = t ? SimDraw.draw({a:abcOf(t).a,b:abcOf(t).b,c:abcOf(t).c,show:t.show,size:180,labelLetters:true}) : '<div class="muted">없음</div>';
+      var sb2 = SimDraw.draw({a:sa.a,b:sa.b,c:sa.c,show:st.show,rotate:st.rotate,flip:st.flip,size:180});
+      return '<div style="background:#fff;border:1px solid '+(ok?'#99f6e4':'#fecaca')+';border-radius:14px;padding:14px;margin-bottom:12px;break-inside:avoid;">'
+        +'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+          +'<span style="font-size:16px;font-weight:900;color:var(--na);">'+(i+1)+'. '+esc(st.label||'스테이션')+'</span>'
+          +'<span style="background:#ccfbf1;color:#0d9488;font-weight:800;font-size:13px;padding:3px 10px;border-radius:10px;">조건 '+esc(st.ans_cond)+'</span>'
+          +'<span style="background:#fef3c7;color:#b45309;font-weight:800;font-size:13px;padding:3px 10px;border-radius:10px;">닮음비 '+ratioTxt+'</span>'
+          +(ok?'<span style="color:#16a34a;font-weight:800;">✅ 정상</span>':'<span style="color:#dc2626;font-weight:800;">❌ '+warns.join(' · ')+'</span>')
+        +'</div>'
+        +'<div style="display:flex;gap:14px;flex-wrap:wrap;">'
+          +'<div style="flex:1;min-width:200px;text-align:center;"><div style="font-size:13px;font-weight:800;color:#0f766e;margin-bottom:4px;">🔺 숨긴 삼각형(QR)</div>'+sb2+'</div>'
+          +'<div style="align-self:center;font-size:24px;color:#94a3b8;">≈</div>'
+          +'<div style="flex:1;min-width:200px;text-align:center;"><div style="font-size:13px;font-weight:800;color:var(--na);margin-bottom:4px;">📄 정답 '+(st.ans_idx)+'번</div>'+tb+'</div>'
+        +'</div>'
+      +'</div>';
+    }).join('');
+  }
   function loadSets(){
     sb.from('sim_sets').select('id,title,class_scope,active,station_count,created_at').order('created_at',{ascending:false}).limit(40)
       .then(function(r){
@@ -303,7 +412,7 @@
 
   // ── 세트 수정 ──
   function normShow(sh){ var o={sa:false,sb:false,sc:false,Aa:false,Ab:false,Ac:false}; if(!sh)return o; if(typeof sh==='string'){ try{sh=JSON.parse(sh);}catch(_){return o;} } Object.keys(o).forEach(function(k){ if(sh[k])o[k]=true; }); return o; }
-  function setEditUI(){ var on=!!EDIT_ID; var b=document.getElementById('editBanner'); b.style.display=on?'block':'none'; document.getElementById('saveBtn').textContent=on?'💾 수정 저장':'💾 세트 열기 & QR 생성'; if(on) document.getElementById('editTitle').textContent='"'+(document.getElementById('title').value||'세트')+'"'; }
+  function setEditUI(){ var on=!!EDIT_ID; var b=document.getElementById('editBanner'); if(b) b.style.display=on?'block':'none'; var sb=document.getElementById('saveBtn'); if(sb) sb.textContent=on?'💾 수정 저장':'💾 저장하기'; var bt=document.getElementById('buildTitle'); if(bt&&on) bt.textContent='세트 수정'; if(on){ var et=document.getElementById('editTitle'); if(et) et.textContent='"'+(document.getElementById('title').value||'세트')+'"'; } }
   function cancelEdit(){ EDIT_ID=null; setEditUI(); toast('새 세트 모드로 전환'); }
   function editSet(id){
     portalRPC('simGetSet',[TOK,id]).then(function(res){
@@ -317,8 +426,9 @@
       document.getElementById('maxTries').value=set.max_tries||3;
       if(set.class_scope){ var cs=document.getElementById('clsSel'); cs.value=set.class_scope; }
       if(!TRIS.length) addTri(); if(!STATIONS.length) addStation();
+      document.getElementById('buildTitle').textContent='세트 수정';
       renderTris(); renderStations(); saveDraft(); setEditUI();
-      document.getElementById('mgmtPanel').style.display='none';
+      goBuild();
       window.scrollTo({top:0,behavior:'smooth'});
       toast('수정 모드로 불러왔어요 (입력값은 세 변 형태로 표시돼요)');
     }).catch(function(e){ toast('오류: '+e.message); });
@@ -441,19 +551,25 @@
       triangles:TRIS.map(function(t,i){var abc=abcOf(t); return {idx:i+1, side_a:abc.a, side_b:abc.b, side_c:abc.c, show:t.show};}),
       stations:STATIONS.map(function(s){var abc=abcOf(s); return {label:s.label, side_a:abc.a, side_b:abc.b, side_c:abc.c, show:s.show, rotate:s.rotate, flip:s.flip, ans_idx:s.ans_idx, ans_cond:s.ans_cond, ratio_a:s.ratio_a, ratio_b:s.ratio_b};})
     };
+    var wantShow = document.getElementById('saveShow') ? document.getElementById('saveShow').checked : true;
+    document.getElementById('saveModal').style.display='none';
     toast(EDIT_ID?'수정 저장 중…':'세트 저장 중…');
     if(EDIT_ID){
       payload.id=EDIT_ID;
       portalRPC('simUpdateSet',[TOK,payload]).then(function(res){
         if(!res||!res.success){ toast('실패: '+((res&&res.message)||'')); return; }
         toast('수정 저장 완료! 같은 QR이 유지돼요');
-        renderQR(res.stations||[]); renderSheet();
+        goBuild(); renderQR(res.stations||[]); renderSheet();
+        if(document.getElementById('qrPanel')) document.getElementById('qrPanel').scrollIntoView({behavior:'smooth'});
       }).catch(function(e){ toast('오류: '+e.message); });
     } else {
       portalRPC('simOpenSet',[TOK,payload]).then(function(res){
         if(!res||!res.success){ toast('실패: '+((res&&res.message)||'')); return; }
-        toast('세트를 열었어요! QR을 인쇄하세요');
-        renderQR(res.stations||[]); renderSheet();
+        EDIT_ID=res.id||null; setEditUI(); // 저장 후엔 '수정' 상태로 전환(같은 세트 계속 편집 가능)
+        if(!wantShow && res.id){ portalRPC('simShowSet',[TOK,res.id,false]).catch(function(){}); toast('세트 저장 완료 (숨김 상태로 저장)'); }
+        else toast('세트 저장 완료! 학생에게 공개됐어요');
+        goBuild(); renderQR(res.stations||[]); renderSheet();
+        if(document.getElementById('qrPanel')) document.getElementById('qrPanel').scrollIntoView({behavior:'smooth'});
       }).catch(function(e){ toast('오류: '+e.message); });
     }
   }
@@ -472,13 +588,30 @@
     });
     panel.scrollIntoView({behavior:'smooth'});
   }
-  // 저장된 세트의 QR을 "그대로" 다시 불러와 인쇄 (토큰 변경 없음)
+  // 저장된 세트의 QR을 오버레이로 띄워 바로 인쇄 (토큰 변경 없음)
   function showSetQR(id){
     portalRPC('simGetSet',[TOK,id]).then(function(res){
       if(!res||!res.success){ toast('불러오기 실패: '+((res&&res.message)||'')); return; }
-      document.getElementById('mgmtPanel').style.display='none';
-      renderQR((res.stations||[]).map(function(s){return {token:s.token,label:s.label};}));
-      toast('저장된 QR을 그대로 불러왔어요 (동일 코드)');
+      var ov=document.getElementById('qrOverlay');
+      if(!ov){ ov=document.createElement('div'); ov.id='qrOverlay'; document.body.appendChild(ov); }
+      ov.style.cssText='position:fixed;inset:0;background:#fff;z-index:950;overflow:auto;padding:20px;box-sizing:border-box;';
+      ov.innerHTML='<div class="no-print" style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">'
+        +'<h3 style="margin:0;color:var(--na);">📷 스테이션 QR (야외에 숨기기)</h3>'
+        +'<button class="btn ghost" onclick="window.print()">🖨 인쇄</button>'
+        +'<button class="btn ghost" onclick="document.getElementById(\'qrOverlay\').remove()">✕ 닫기</button></div>'
+        +'<div class="muted no-print" style="margin-bottom:8px;">이 QR(#뒤 코드)은 고정이에요. 언제 다시 인쇄해도 같은 코드예요.</div>'
+        +'<div id="qrOvList"></div>';
+      var list=ov.querySelector('#qrOvList');
+      if(typeof QRCode==='undefined'){ list.innerHTML='QR 라이브러리 로드 실패'; return; }
+      (res.stations||[]).forEach(function(s,i){
+        var wrap=document.createElement('div'); wrap.className='qr-item';
+        var box=document.createElement('div'); box.style.cssText='width:150px;height:150px;margin:0 auto;'; wrap.appendChild(box);
+        var lab=document.createElement('div'); lab.className='lab'; lab.textContent=(s.label||('스테이션 '+(i+1))); wrap.appendChild(lab);
+        var tk=document.createElement('div'); tk.style.cssText='font-size:10px;color:#94a3b8;font-family:monospace;'; tk.textContent='#'+String(s.token); wrap.appendChild(tk);
+        list.appendChild(wrap);
+        try{ new QRCode(box,{text:String(s.token),width:150,height:150,correctLevel:QRCode.CorrectLevel.M}); }catch(e){ lab.textContent='QR오류'; }
+      });
+      toast('저장된 QR을 그대로 불러왔어요');
     }).catch(function(e){ toast('오류: '+e.message); });
   }
   function renderSheet(){
