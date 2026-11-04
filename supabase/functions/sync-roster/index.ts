@@ -276,7 +276,7 @@ Deno.serve(async (req) => {
         side_a: Number(st.side_a), side_b: Number(st.side_b), side_c: Number(st.side_c),
         show: st.show ?? {}, rotate: Number(st.rotate) || 0, flip: !!st.flip,
         ans_idx: Number(st.ans_idx), ans_cond: String(st.ans_cond ?? "SSS").toUpperCase(),
-        ratio_a: Number(st.ratio_a) || 1, ratio_b: Number(st.ratio_b) || 1,
+        ratio_a: Number(st.ratio_a) || 0, ratio_b: Number(st.ratio_b) || 0,
       }));
       let outStations: unknown[] = [];
       if (stns.length) {
@@ -346,7 +346,7 @@ Deno.serve(async (req) => {
       const out: unknown[] = [];
       for (let i = 0; i < ns.length; i++) {
         const st = ns[i] as Record<string, unknown>;
-        const fields = { label: String(st.label ?? "").trim(), side_a: Number(st.side_a), side_b: Number(st.side_b), side_c: Number(st.side_c), show: st.show ?? {}, rotate: Number(st.rotate) || 0, flip: !!st.flip, ans_idx: Number(st.ans_idx), ans_cond: String(st.ans_cond ?? "SSS").toUpperCase(), ratio_a: Number(st.ratio_a) || 1, ratio_b: Number(st.ratio_b) || 1 };
+        const fields = { label: String(st.label ?? "").trim(), side_a: Number(st.side_a), side_b: Number(st.side_b), side_c: Number(st.side_c), show: st.show ?? {}, rotate: Number(st.rotate) || 0, flip: !!st.flip, ans_idx: Number(st.ans_idx), ans_cond: String(st.ans_cond ?? "SSS").toUpperCase(), ratio_a: Number(st.ratio_a) || 0, ratio_b: Number(st.ratio_b) || 0 };
         if (i < existing.length) {
           await admin0.from("sim_stations").update(fields).eq("id", existing[i].id);
           out.push({ id: existing[i].id, token: existing[i].token, label: fields.label });
