@@ -812,19 +812,28 @@
         html += '</ul>';
       }
       else if (q.type === 'dynamic') {
-        let targetMap = {}, voterMap = {};
-        resList.forEach(function(r) { let ans = JSON.parse(r.answers); let dData = ans[idx]; if (dData && typeof dData === 'object') { for (let target in dData) { if (dData[target].trim() === "") continue; if (!targetMap[target]) targetMap[target] = []; targetMap[target].push(dData[target]); if (!voterMap[target]) voterMap[target] = []; voterMap[target].push(r.stuName||r.stuId||''); } } });
+        let targetMap = {};
+        resList.forEach(function(r) { let ans = JSON.parse(r.answers); let dData = ans[idx]; if (dData && typeof dData === 'object') { for (let target in dData) { if (String(dData[target]).trim() === "") continue; if (!targetMap[target]) targetMap[target] = []; targetMap[target].push({ reason: String(dData[target]), voter: String(r.stuName||r.stuId||'') }); } } });
         let sortedTargets = Object.keys(targetMap).sort(function(a, b) { return targetMap[b].length - targetMap[a].length; });
+        html += '<div style="margin-bottom:8px;"><label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="svShowName-'+idx+'" onchange="toggleSurveyNames('+idx+')"> 작성자 이름 표시</label></div>';
+        html += '<div id="svdyn-'+idx+'">';
         if (sortedTargets.length === 0) { html += "<div style='color:#94a3b8; font-size:13px;'>언급된 학생이 없습니다.</div>"; }
         else { sortedTargets.forEach(function(target) {
-          var voters = voterMap[target]||[]; var tip = '<b>투표한 학생 ('+voters.length+'명):</b><br>'+(voters.length>0?voters.join(', '):'없음');
+          var items = targetMap[target]||[];
+          var voters = items.map(function(x){return x.voter;});
+          var tip = '<b>투표한 학생 ('+voters.length+'명):</b><br>'+(voters.length>0?voters.join(', '):'없음');
           html += '<div class="sv-bar-wrap" style="margin-bottom:10px;">'
             + '<div class="sv-bar-tip">'+tip+'</div>'
-            + '<div style="font-weight:bold; color:#b91c1c; display:inline-block; margin-right:10px; white-space:nowrap;">'+target+' <span style="background:#fee2e2; padding:2px 6px; border-radius:4px; font-size:11px;">'+targetMap[target].length+'표</span></div>'
+            + '<div style="font-weight:bold; color:#b91c1c; display:inline-block; margin-right:10px; white-space:nowrap;">'+target+' <span style="background:#fee2e2; padding:2px 6px; border-radius:4px; font-size:11px;">'+items.length+'표</span></div>'
             + '<div style="background:white; padding:8px; border-radius:6px; border:1px dashed #cbd5e1; margin-top:5px; font-size:13px; color:#334155;">';
-          targetMap[target].forEach(function(reason) { html += '• '+reason+'<br>'; });
+          items.forEach(function(it) {
+            var vn = it.voter.replace(/</g,'&lt;').replace(/>/g,'&gt;');
+            html += '<div style="margin-bottom:3px;">• '+it.reason.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')
+              + '<span class="sv-author" style="display:none;font-size:11px;color:#7c3aed;font-weight:700;margin-left:6px;background:#f3e8ff;padding:1px 6px;border-radius:10px;">'+vn+'</span></div>';
+          });
           html += '</div></div>';
         }); }
+        html += '</div>';
       }
       else if (q.type === 'choice') {
         var choiceCount = {};
@@ -1140,6 +1149,7 @@
     var checked = document.getElementById('svShowName-'+idx).checked;
     document.querySelectorAll('#svtxt-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'inline' : 'none'; });
     document.querySelectorAll('#svchoice-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'block' : 'none'; });
+    document.querySelectorAll('#svdyn-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'inline' : 'none'; });
   }
   // 👤 모든 주관식 작성자 이름을 한 번에 표시/숨김
   function toggleAllSurveyNames() {
