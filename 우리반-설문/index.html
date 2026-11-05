@@ -848,7 +848,8 @@
         });
         var allKeys = Object.keys(choiceCount);
         var maxVal = allKeys.length > 0 ? Math.max.apply(null, allKeys.map(function(k){ return choiceCount[k]; }).concat([1])) : 1;
-        html += '<div style="margin-top:5px;">';
+        html += '<div style="margin-bottom:8px;"><label style="font-size:12px;color:#64748b;cursor:pointer;display:inline-flex;align-items:center;gap:4px;"><input type="checkbox" id="svShowName-'+idx+'" onchange="toggleSurveyNames('+idx+')"> 응답자 이름 표시</label></div>';
+        html += '<div id="svchoice-'+idx+'" style="margin-top:5px;">';
         if (allKeys.length === 0) {
           html += '<div style="color:#94a3b8; font-size:13px;">선택지가 없습니다.</div>';
         } else {
@@ -869,6 +870,7 @@
               + '<div style="width:' + barW + '%; background:#0284c7; height:100%; border-radius:8px;"></div>'
               + '</div>'
               + '</div>'
+              + (names.length > 0 ? '<div class="sv-author" style="display:none; margin-top:4px; font-size:12px; color:#7c3aed; background:#f3e8ff; border-radius:6px; padding:4px 9px; line-height:1.6;">'+names.join(', ')+'</div>' : '')
               + '</div>';
           });
         }
@@ -1137,11 +1139,12 @@
   function toggleSurveyNames(idx) {
     var checked = document.getElementById('svShowName-'+idx).checked;
     document.querySelectorAll('#svtxt-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'inline' : 'none'; });
+    document.querySelectorAll('#svchoice-'+idx+' .sv-author').forEach(function(el){ el.style.display = checked ? 'block' : 'none'; });
   }
   // 👤 모든 주관식 작성자 이름을 한 번에 표시/숨김
   function toggleAllSurveyNames() {
     var on = document.getElementById('svShowAllNames').checked;
-    document.querySelectorAll('#surveyStatsList .sv-author').forEach(function(el){ el.style.display = on ? 'inline' : 'none'; });
+    document.querySelectorAll('#surveyStatsList .sv-author').forEach(function(el){ el.style.display = on ? (el.closest('[id^="svchoice-"]') ? 'block' : 'inline') : 'none'; });
     document.querySelectorAll('#surveyStatsList input[id^="svShowName-"]').forEach(function(cb){ cb.checked = on; });
   }
   function navSurveyViewer(dir) { currentViewerIdx += dir; renderSurveyViewer(); }
