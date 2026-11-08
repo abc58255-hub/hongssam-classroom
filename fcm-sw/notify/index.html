@@ -389,6 +389,7 @@
     document.getElementById('tab-flash').classList.toggle('hidden', name !== 'flash');
     document.getElementById('tab-music').classList.toggle('hidden', name !== 'music');
     document.getElementById('tab-cheer').classList.toggle('hidden', name !== 'cheer');
+    document.getElementById('tab-dday').classList.toggle('hidden', name !== 'dday');
     if (name === 'board' && !BOARD_LOADED) loadBoard();
     if (name === 'flash') tvFlashRefresh();
     if (name === 'music') musicRefresh();
