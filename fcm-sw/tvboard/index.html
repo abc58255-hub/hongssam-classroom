@@ -10,7 +10,7 @@
   <script>
     var GAS_EXEC_URL = 'https://script.google.com/macros/s/AKfycbyl9-rX1YY4hrkEMdGT5uasMF1c38R7qu5I7YpN9vlPl95CYJpXG0ptkNDz0Wlj73jK/exec';
     (function () {
-      var FNS = ["getTodayData", "getTvFlash", "getTvMusic", "getCheers"];
+      var FNS = ["getTodayData", "getTvFlash", "getTvMusic", "getCheers", "getDdays"];
       var TOKKEY = '';
       function makeRunner() {
         var ok = function () {}, fail = function (e) { console.error('[RPC]', e); };
@@ -493,7 +493,23 @@
     }
     function pollCheers(){ google.script.run.withSuccessHandler(applyCheers).withFailureHandler(function(){}).getCheers(); }
 
-    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); pollCheers(); setInterval(pollCheers, 4000); _updTtsBadge(); };
+    // ── 📅 디데이 카운트다운 (좌상단 띠) ──
+    function _ddayBox(){ var b=document.getElementById('ddayBox'); if(!b){ b=document.createElement('div'); b.id='ddayBox'; b.style.cssText='position:fixed;top:1.2vw;left:1.2vw;z-index:400;display:flex;gap:.7vw;flex-wrap:wrap;'; document.body.appendChild(b); } return b; }
+    function applyDdays(d){
+      var list=((d&&d.ddays)||[]).filter(function(x){ return x.active && x.days>=0; }).slice(0,4);
+      var box=_ddayBox();
+      if(!list.length){ box.innerHTML=''; return; }
+      box.innerHTML=list.map(function(x){
+        var dd=x.days===0?'D-DAY':'D-'+x.days;
+        var urgent=x.days<=7;
+        return '<div style="background:'+(urgent?'rgba(220,38,38,.92)':'rgba(37,99,235,.9)')+';color:#fff;border-radius:.8vw;padding:.5vw 1vw;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;align-items:center;gap:.6vw;">'
+          +'<span style="font-size:1.8vw;font-weight:900;">'+dd+'</span>'
+          +'<span style="font-size:1vw;font-weight:700;opacity:.95;">'+String(x.title).replace(/</g,'&lt;')+'</span></div>';
+      }).join('');
+    }
+    function pollDdays(){ google.script.run.withSuccessHandler(applyDdays).withFailureHandler(function(){}).getDdays(); }
+
+    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); pollCheers(); setInterval(pollCheers, 4000); pollDdays(); setInterval(pollDdays, 60000); _updTtsBadge(); };
     document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; _ttsUnlock(); });
     document.body.addEventListener('touchstart', function() { _ttsUnlock(); }, { passive: true });
   </script>

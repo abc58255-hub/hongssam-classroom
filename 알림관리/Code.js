@@ -160,8 +160,8 @@ function deleteBoardData(rowIdx) {
 
 
 // ── PWA(Pages) 프론트 → GAS 백엔드 (google.script.run 어댑터) + 토큰 게이트 ──
-var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTtsOn", "ttsTest", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getMusicPresets", "saveMusicPreset", "deleteMusicPreset", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "teacherLogin", "teacherLogout", "validateTeacherSession"];
-var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash','getTvMusic']; // getTvFlash/getTvMusic=TV 화면 폴링(공개)
+var RPC_WHITELIST = ["deleteBoardData", "deleteNotice", "getBoardNotices", "getClassInfo", "getNotices", "saveBoardData", "saveNotice", "sendPush", "setBoardSheetId", "setDefaultSlide", "sendTvFlash", "clearTvFlash", "getTvFlash", "setTtsOn", "ttsTest", "setTvMusic", "setTvMusicAuto", "getTvMusic", "getMusicPresets", "saveMusicPreset", "deleteMusicPreset", "getCheerConfig", "setCheerConfig", "getCheerAdmin", "deleteCheer", "clearCheers", "getDdays", "saveDday", "setDdayActive", "deleteDday", "teacherLogin", "teacherLogout", "validateTeacherSession"];
+var RPC_NOAUTH = ['teacherLogin','teacherLogout','getTvFlash','getTvMusic','getDdays']; // getTvFlash/getTvMusic/getDdays=TV 화면 폴링(공개)
 function _atOk_(token) { try { var v = ClassCore.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; } }
 function doPost(e) {
   var out;
@@ -269,6 +269,63 @@ function getTvMusic() {
       aOn: !!String(v[3] || ''), aStart: String(v[4] || ''), aEnd: String(v[5] || ''), aUrl: String(v[6] || '')
     };
   } catch (_) { return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' }; }
+}
+
+// ── 📅 디데이(D-day) ── 보드 시트 '_DDAY' 탭 (A=id, B=제목, C=날짜 yyyy-MM-dd, D=표시on(1/''))
+// 교사 쓰기=setDday/deleteDday(게이트), 읽기=getDdays(RPC_NOAUTH, TV 폴링 공개).
+var DDAY_TAB = '_DDAY';
+function _ddaySheet_() {
+  var id = _boardSheetId(); if (!id) return null;
+  var ss = SpreadsheetApp.openById(id);
+  var sh = ss.getSheetByName(DDAY_TAB);
+  if (!sh) { sh = ss.insertSheet(DDAY_TAB); sh.getRange('A1:D1').setValues([['id','제목','날짜','표시']]); }
+  return sh;
+}
+function _ddayStr_(d) { // Date/문자 → yyyy-MM-dd
+  if (d instanceof Date) return Utilities.formatDate(d, 'Asia/Seoul', 'yyyy-MM-dd');
+  return String(d || '').trim();
+}
+function getDdays() {
+  try {
+    var sh = _ddaySheet_(); if (!sh || sh.getLastRow() < 2) return { ddays: [] };
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var out = [];
+    rows.forEach(function (r) {
+      var id = String(r[0] || '').trim(); if (!id) return;
+      var dateStr = _ddayStr_(r[2]); if (!dateStr) return;
+      var dt = new Date(dateStr + 'T00:00:00'); dt.setHours(0, 0, 0, 0);
+      var days = Math.round((dt - today) / 86400000);
+      out.push({ id: id, title: String(r[1] || '').trim(), date: dateStr, active: !!String(r[3] || ''), days: days });
+    });
+    out.sort(function (a, b) { return a.days - b.days; });
+    return { ddays: out };
+  } catch (_) { return { ddays: [] }; }
+}
+function saveDday(id, title, date) {
+  var sh = _ddaySheet_(); if (!sh) return { success: false, message: '알림판 시트가 연결되지 않았어요. (칠판공지 설정을 먼저 해주세요)' };
+  var t = String(title || '').trim(), d = _ddayStr_(date);
+  if (!t) return { success: false, message: '제목을 입력하세요.' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return { success: false, message: '날짜를 선택하세요.' };
+  if (id) {
+    var rows = sh.getLastRow() >= 2 ? sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues() : [];
+    for (var i = 0; i < rows.length; i++) { if (String(rows[i][0]).trim() === String(id)) { sh.getRange(i + 2, 2, 1, 2).setValues([[t, d]]); return { success: true, id: id }; } }
+  }
+  var newId = String(Date.now());
+  sh.appendRow([newId, t, d, '1']);
+  return { success: true, id: newId };
+}
+function setDdayActive(id, on) {
+  var sh = _ddaySheet_(); if (!sh || sh.getLastRow() < 2) return { success: true };
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = 0; i < rows.length; i++) { if (String(rows[i][0]).trim() === String(id)) { sh.getRange(i + 2, 4).setValue(on ? '1' : ''); return { success: true }; } }
+  return { success: true };
+}
+function deleteDday(id) {
+  var sh = _ddaySheet_(); if (!sh || sh.getLastRow() < 2) return { success: true };
+  var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues();
+  for (var i = rows.length - 1; i >= 0; i--) { if (String(rows[i][0]).trim() === String(id)) sh.deleteRow(i + 2); }
+  return { success: true };
 }
 
 // ── 🎵 저장된 재생목록(프리셋) ── 보드 시트 '_MUSIC_LIST' 탭 (A=이름, B=링크들)
