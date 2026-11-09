@@ -94,15 +94,16 @@
   function render(){
     var wrap=document.getElementById('wrap');
     if(!SET){ wrap.innerHTML='<div class="empty">이 반에 열린 닮음 활동이 없어요.</div>'; return; }
-    sb.from('sim_attempts').select('student_id,name,points,cleared,class_scope').eq('set_id',SET.id)
+    // 선택한 반만 서버에서 필터(전체 1000건 한도에 다른 반이 밀어내는 것 방지) — 컬럼 없으면 폴백
+    sb.from('sim_attempts').select('student_id,name,points,cleared,class_scope').eq('set_id',SET.id).eq('class_scope',BCLS).limit(3000)
       .then(function(r){
-        if(r.error){ return sb.from('sim_attempts').select('student_id,name,points,cleared').eq('set_id',SET.id); }
+        if(r.error){ return sb.from('sim_attempts').select('student_id,name,points,cleared').eq('set_id',SET.id).limit(5000); }
         return r;
       })
       .then(function(r){
         if(r.error || !r.data){ return; } // 일시적 에러/빈응답 땐 화면 유지(안 비움)
         var all=r.data||[];
-        // class_scope 컬럼 있으면 선택 반만, 없으면 전체
+        // 폴백(컬럼 없음) 시엔 전체가 오므로 클라에서 한번 더 거름
         var rows=all.filter(function(a){ return a.class_scope===undefined || a.class_scope===BCLS; });
         var by={};
         rows.forEach(function(a){ var k=a.student_id; if(!by[k]) by[k]={name:a.name||k,pts:0,clr:0}; by[k].pts+=a.points||0; if(a.cleared)by[k].clr++; if(a.name)by[k].name=a.name; });
