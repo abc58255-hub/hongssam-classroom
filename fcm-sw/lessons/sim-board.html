@@ -82,10 +82,14 @@
     sb.from('sim_sets').select('*').eq('active',true).in('class_scope',[cls,'*']).order('created_at',{ascending:false})
       .then(function(r){ var rows=r.data||[]; SET=rows.filter(function(x){return x.class_scope===cls;})[0]||rows.filter(function(x){return x.class_scope==='*';})[0]||null; subscribe(); render(); });
   }
+  var POLL=null;
   function subscribe(){
     if(CH){ sb.removeChannel(CH); CH=null; }
+    if(POLL){ clearInterval(POLL); POLL=null; }
     if(!SET) return;
     CH=sb.channel('simb-'+SET.id).on('postgres_changes',{event:'*',schema:'public',table:'sim_attempts',filter:'set_id=eq.'+SET.id}, function(){ render(); }).subscribe();
+    // realtime이 안 되는 환경 대비 — 5초 폴링 안전망
+    POLL=setInterval(function(){ if(SET) render(); }, 5000);
   }
   function render(){
     var wrap=document.getElementById('wrap');

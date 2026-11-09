@@ -88,7 +88,8 @@
         portalRPC('simGetSet',[TOK,SET.id]).then(function(res){ STMAP={}; STORDER=[]; (res&&res.stations||[]).forEach(function(s,i){ STMAP[s.id]={label:s.label||('스테이션 '+(i+1)),idx:i+1}; STORDER.push(s.id); }); subscribe(); render(); }).catch(function(){ subscribe(); render(); });
       });
   }
-  function subscribe(){ if(CH){ sb.removeChannel(CH); CH=null; } if(!SET) return; CH=sb.channel('simm-'+SET.id).on('postgres_changes',{event:'*',schema:'public',table:'sim_attempts',filter:'set_id=eq.'+SET.id}, function(){ render(); }).subscribe(); }
+  var POLL=null;
+  function subscribe(){ if(CH){ sb.removeChannel(CH); CH=null; } if(POLL){ clearInterval(POLL); POLL=null; } if(!SET) return; CH=sb.channel('simm-'+SET.id).on('postgres_changes',{event:'*',schema:'public',table:'sim_attempts',filter:'set_id=eq.'+SET.id}, function(){ render(); }).subscribe(); POLL=setInterval(function(){ if(SET) render(); }, 5000); }
 
   function render(){
     if(!SET) return;
