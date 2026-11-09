@@ -494,17 +494,24 @@
     function pollCheers(){ google.script.run.withSuccessHandler(applyCheers).withFailureHandler(function(){}).getCheers(); }
 
     // ── 📅 디데이 카운트다운 (좌상단 띠) ──
-    function _ddayBox(){ var b=document.getElementById('ddayBox'); if(!b){ b=document.createElement('div'); b.id='ddayBox'; b.style.cssText='position:fixed;top:1.2vw;left:1.2vw;z-index:400;display:flex;gap:.7vw;flex-wrap:wrap;'; document.body.appendChild(b); } return b; }
+    function _ddayBox(){ var b=document.getElementById('ddayBox'); if(!b){ b=document.createElement('div'); b.id='ddayBox'; b.style.cssText='position:fixed;top:1.4vw;left:1.4vw;z-index:400;display:flex;gap:.9vw;flex-wrap:wrap;align-items:flex-start;'; document.body.appendChild(b); } return b; }
     function applyDdays(d){
       var list=((d&&d.ddays)||[]).filter(function(x){ return x.active && x.days>=0; }).slice(0,4);
       var box=_ddayBox();
       if(!list.length){ box.innerHTML=''; return; }
       box.innerHTML=list.map(function(x){
-        var dd=x.days===0?'D-DAY':'D-'+x.days;
         var urgent=x.days<=7;
-        return '<div style="background:'+(urgent?'rgba(220,38,38,.92)':'rgba(37,99,235,.9)')+';color:#fff;border-radius:.8vw;padding:.5vw 1vw;box-shadow:0 4px 14px rgba(0,0,0,.3);display:flex;align-items:center;gap:.6vw;">'
-          +'<span style="font-size:1.8vw;font-weight:900;">'+dd+'</span>'
-          +'<span style="font-size:1vw;font-weight:700;opacity:.95;">'+String(x.title).replace(/</g,'&lt;')+'</span></div>';
+        var g=x.days===0?'linear-gradient(135deg,#f59e0b,#d97706)':(urgent?'linear-gradient(135deg,#f43f5e,#be123c)':'linear-gradient(135deg,#3b82f6,#1e3a8a)');
+        var big=x.days===0?'D-DAY':x.days;
+        var ddLabel=x.days===0?'':'<span style="font-size:1vw;font-weight:800;opacity:.85;margin-right:.1vw;">D-</span>';
+        var mo=''; try{var dt=new Date(x.date+'T00:00:00'); mo=(dt.getMonth()+1)+'.'+dt.getDate();}catch(_){}
+        return '<div style="background:'+g+';color:#fff;border-radius:1vw;padding:.7vw 1.2vw .7vw 1vw;box-shadow:0 .4vw 1.4vw rgba(0,0,0,.28);display:flex;align-items:center;gap:.9vw;min-width:9vw;">'
+          +'<div style="font-size:2vw;line-height:1;">📅</div>'
+          +'<div style="display:flex;flex-direction:column;gap:.15vw;">'
+            +'<div style="display:flex;align-items:baseline;gap:.15vw;">'+ddLabel+'<span style="font-size:2.4vw;font-weight:900;line-height:1;letter-spacing:-.02em;">'+big+'</span></div>'
+            +'<div style="font-size:1.05vw;font-weight:800;line-height:1.1;max-width:13vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+String(x.title).replace(/</g,'&lt;')+'</div>'
+            +'<div style="font-size:.8vw;font-weight:600;opacity:.8;">'+mo+'</div>'
+          +'</div></div>';
       }).join('');
     }
     function pollDdays(){ google.script.run.withSuccessHandler(applyDdays).withFailureHandler(function(){}).getDdays(); }
