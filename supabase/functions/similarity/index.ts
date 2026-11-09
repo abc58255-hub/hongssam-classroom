@@ -102,12 +102,15 @@ Deno.serve(async (req) => {
       const correct = idxOk && condOk && ratioOk;
 
       if (correct) {
-        const { data: ord } = await admin.rpc("sim_award_clear", { p_station: S.id });
-        const order = Number(ord) || 1;
+        // 선착 순위 = "같은 반"에서 이 스테이션을 이미 클리어한 수 + 1 (반별 선착순). 순위판이 반별이므로 보너스도 반별.
+        const { count: clearedInClass } = await admin.from("sim_attempts")
+          .select("id", { count: "exact", head: true })
+          .eq("station_id", S.id).eq("cleared", true).eq("class_scope", cls);
+        const order = (Number(clearedInClass) || 0) + 1;
         // 시도 보너스: 1번째 +20, 2번째 +10, 3번째 +0 (조금씩 감점). 3번 다 틀리면 애초에 여기 못 옴(0점).
         const tryBonus = [20, 10, 0];
         const tb = tryBonus[tries - 1] ?? 0;
-        // 선착 보너스: 그 스테이션 1등 +30 → 1등씩 1점 감소 → 30등 +1, 31등부터 +0 (순위 차등)
+        // 선착 보너스: 반에서 그 스테이션 1등 +30 → 1등씩 1점 감소 → 30등 +1, 31등부터 +0
         const fb = Math.max(0, 31 - order);
         const pts = (SET.base_pts || 0) + tb + fb;
         await attUpdate(row.id, { tries, cleared: true, clear_order: order, points: pts, name: sname, class_scope: cls, updated_at: new Date().toISOString() });

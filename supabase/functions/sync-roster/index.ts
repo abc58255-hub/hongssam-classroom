@@ -318,6 +318,32 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
+    // 점수·순위 재계산(반별 선착순으로): {op:'simRecomputeScores', id}
+    if (body.op === "simRecomputeScores") {
+      const setId = Number(body.id);
+      const set = await admin0.from("sim_sets").select("base_pts").eq("id", setId).maybeSingle();
+      if (!set.data) return Response.json({ success: false, message: "세트를 찾을 수 없어요." });
+      const base = Number(set.data.base_pts) || 100;
+      const tryBonus = [20, 10, 0];
+      const att = await admin0.from("sim_attempts").select("id,station_id,class_scope,cleared,tries,updated_at").eq("set_id", setId);
+      if (att.error) return Response.json({ success: false, message: att.error.message }, { status: 500 });
+      const groups: Record<string, Record<string, unknown>[]> = {};
+      (att.data || []).filter((a) => a.cleared).forEach((a) => { const k = a.station_id + "|" + (a.class_scope || ""); (groups[k] = groups[k] || []).push(a); });
+      let updated = 0;
+      for (const k in groups) {
+        groups[k].sort((x, y) => new Date(String(x.updated_at)).getTime() - new Date(String(y.updated_at)).getTime());
+        for (let i = 0; i < groups[k].length; i++) {
+          const a = groups[k][i]; const order = i + 1;
+          const tb = tryBonus[(Number(a.tries) || 1) - 1] ?? 0;
+          const pts = base + tb + Math.max(0, 31 - order);
+          await admin0.from("sim_attempts").update({ clear_order: order, points: pts }).eq("id", a.id);
+          updated++;
+        }
+      }
+      // 미클리어(0점) 행도 points 0 보장
+      await admin0.from("sim_attempts").update({ points: 0, clear_order: null }).eq("set_id", setId).eq("cleared", false);
+      return Response.json({ success: true, updated });
+    }
     // 세트 불러오기(수정용, 정답 포함 — 교사 전용): {op:'simGetSet', id}
     if (body.op === "simGetSet") {
       const id = Number(body.id);
