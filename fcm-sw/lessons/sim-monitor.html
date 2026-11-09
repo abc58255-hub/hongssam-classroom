@@ -96,6 +96,7 @@
     sb.from('sim_attempts').select('student_id,name,tries,cleared,points,station_id,clear_order,class_scope').eq('set_id',SET.id)
       .then(function(r){ if(r.error){ return sb.from('sim_attempts').select('student_id,name,tries,cleared,points,station_id,clear_order').eq('set_id',SET.id); } return r; })
       .then(function(r){
+        if(r.error || !r.data){ return; } // 일시적 에러/빈응답 땐 화면 유지
         var all=(r.data||[]).filter(function(a){ return a.class_scope===undefined || a.class_scope===BCLS; });
         var totalSt=SET.station_count||STORDER.length||0, maxTries=SET.max_tries||3;
         // 학생별

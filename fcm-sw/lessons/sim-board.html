@@ -100,6 +100,7 @@
         return r;
       })
       .then(function(r){
+        if(r.error || !r.data){ return; } // 일시적 에러/빈응답 땐 화면 유지(안 비움)
         var all=r.data||[];
         // class_scope 컬럼 있으면 선택 반만, 없으면 전체
         var rows=all.filter(function(a){ return a.class_scope===undefined || a.class_scope===BCLS; });
