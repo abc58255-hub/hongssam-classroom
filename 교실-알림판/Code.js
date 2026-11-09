@@ -88,6 +88,26 @@ function getTvMusic() {
   } catch (_) { return { mId: 0, mMode: 'stop', mUrl: '', aOn: false, aStart: '', aEnd: '', aUrl: '' }; }
 }
 
+// ── 📅 디데이 — 같은 스프레드시트 '_DDAY' 탭에서 읽음 (알림관리가 씀) ──
+function getDdays() {
+  try {
+    var sh = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('_DDAY');
+    if (!sh || sh.getLastRow() < 2) return { ddays: [] };
+    var rows = sh.getRange(2, 1, sh.getLastRow() - 1, 4).getValues();
+    var today = new Date(); today.setHours(0, 0, 0, 0);
+    var out = [];
+    rows.forEach(function (r) {
+      var id = String(r[0] || '').trim(); if (!id) return;
+      var dateStr = (r[2] instanceof Date) ? Utilities.formatDate(r[2], 'Asia/Seoul', 'yyyy-MM-dd') : String(r[2] || '').trim();
+      if (!dateStr) return;
+      var dt = new Date(dateStr + 'T00:00:00'); dt.setHours(0, 0, 0, 0);
+      out.push({ id: id, title: String(r[1] || '').trim(), date: dateStr, active: !!String(r[3] || ''), days: Math.round((dt - today) / 86400000) });
+    });
+    out.sort(function (a, b) { return a.days - b.days; });
+    return { ddays: out };
+  } catch (_) { return { ddays: [] }; }
+}
+
 // ── 💬 우리반 응원문구 — 같은 스프레드시트 '_CHEER' 탭에서 읽음 (학생-담임이 씀, 알림관리가 관리) ──
 function getCheers() {
   try {
@@ -118,7 +138,7 @@ function getCheers() {
 }
 
 // ── PWA(Pages) 프론트 → GAS 백엔드 호출 (google.script.run 어댑터) ──
-var RPC_WHITELIST = ["getTodayData", "getTvFlash", "getTvMusic", "getCheers"];
+var RPC_WHITELIST = ["getTodayData", "getTvFlash", "getTvMusic", "getCheers", "getDdays"];
 function doPost(e) {
   var out;
   try {

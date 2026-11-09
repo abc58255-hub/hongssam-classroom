@@ -325,10 +325,16 @@ Deno.serve(async (req) => {
       if (!set.data) return Response.json({ success: false, message: "세트를 찾을 수 없어요." });
       const base = Number(set.data.base_pts) || 100;
       const tryBonus = [20, 10, 0];
-      const att = await admin0.from("sim_attempts").select("id,station_id,class_scope,cleared,tries,updated_at").eq("set_id", setId);
-      if (att.error) return Response.json({ success: false, message: att.error.message }, { status: 500 });
+      // 전체 읽기 — PostgREST 1000행 한도 → range로 페이지네이션
+      const allAtt: Record<string, unknown>[] = [];
+      for (let off = 0; off < 100000; off += 1000) {
+        const page = await admin0.from("sim_attempts").select("id,station_id,class_scope,cleared,tries,updated_at").eq("set_id", setId).order("id", { ascending: true }).range(off, off + 999);
+        if (page.error) return Response.json({ success: false, message: page.error.message }, { status: 500 });
+        allAtt.push(...(page.data || []));
+        if (!page.data || page.data.length < 1000) break;
+      }
       const groups: Record<string, Record<string, unknown>[]> = {};
-      (att.data || []).filter((a) => a.cleared).forEach((a) => { const k = a.station_id + "|" + (a.class_scope || ""); (groups[k] = groups[k] || []).push(a); });
+      allAtt.filter((a) => a.cleared).forEach((a) => { const k = a.station_id + "|" + (a.class_scope || ""); (groups[k] = groups[k] || []).push(a); });
       let updated = 0;
       for (const k in groups) {
         groups[k].sort((x, y) => new Date(String(x.updated_at)).getTime() - new Date(String(y.updated_at)).getTime());
