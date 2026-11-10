@@ -66,7 +66,10 @@
 
   <div class="header-container">
     <h1 class="header-title">우리반 알림판</h1>
-    <div class="header-date" id="dateHeader"></div>
+    <div style="display:flex;align-items:center;gap:1vw;flex-wrap:wrap;justify-content:flex-end;">
+      <div id="ddayBox" style="display:flex;gap:.7vw;flex-wrap:wrap;"></div>
+      <div class="header-date" id="dateHeader"></div>
+    </div>
   </div>
 
   <div class="content-container">
@@ -445,7 +448,23 @@
     }
     function pollCheers(){ google.script.run.withSuccessHandler(applyCheers).withFailureHandler(function(){}).getCheers(); }
 
-    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); pollCheers(); setInterval(pollCheers, 4000); _updTtsBadge(); };
+    // ── 📅 디데이 (날짜 헤더 옆) ──
+    function applyDdays(d){
+      var list=((d&&d.ddays)||[]).filter(function(x){ return x.active && x.days>=0; }).slice(0,3);
+      var box=document.getElementById('ddayBox'); if(!box) return;
+      if(!list.length){ box.innerHTML=''; return; }
+      box.innerHTML=list.map(function(x){
+        var urgent=x.days<=7;
+        var g=x.days===0?'linear-gradient(135deg,#f59e0b,#d97706)':(urgent?'linear-gradient(135deg,#f43f5e,#be123c)':'linear-gradient(135deg,#3b82f6,#1e3a8a)');
+        var dd=x.days===0?'D-DAY':'D-'+x.days;
+        return '<div style="background:'+g+';color:#fff;border-radius:50px;padding:.6vw 1.3vw;box-shadow:0 .3vw 1vw rgba(0,0,0,.22);display:flex;align-items:center;gap:.6vw;">'
+          +'<span style="font-size:1.6vw;font-weight:900;letter-spacing:-.02em;">'+dd+'</span>'
+          +'<span style="font-size:1.15vw;font-weight:800;max-width:11vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+String(x.title).replace(/</g,'&lt;')+'</span></div>';
+      }).join('');
+    }
+    function pollDdays(){ google.script.run.withSuccessHandler(applyDdays).withFailureHandler(function(){}).getDdays(); }
+
+    window.onload = function() { loadData(); setInterval(loadData, 60000); pollTvFlash(); setInterval(pollTvFlash, 3000); _loadYT(); pollTvMusic(); setInterval(pollTvMusic, 3000); pollCheers(); setInterval(pollCheers, 4000); pollDdays(); setInterval(pollDdays, 60000); _updTtsBadge(); };
     document.body.addEventListener('click', function() { document.getElementById('audioNotice').style.display = 'none'; _ttsUnlock(); });
     document.body.addEventListener('touchstart', function() { _ttsUnlock(); }, { passive: true });
   </script>
