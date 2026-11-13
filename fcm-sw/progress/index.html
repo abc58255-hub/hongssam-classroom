@@ -1114,7 +1114,7 @@ function renderLessonMatrix() {
     var cls=k.substring(11), date=k.substring(0,10), c=sylCheckCache[k];
     if(done[cls]===undefined) return;
     if(Number(c.lessonNo)>0) markDone(cls, Number(c.lessonNo), date);
-    else if(Number(c.plannedLessonNo)>0 && String(c.status||'')==='') planned[cls][Number(c.plannedLessonNo)]=true; // 정상 예정만(취소·이동 제외)
+    else if(Number(c.plannedLessonNo)>0 && String(c.status||'')==='') { var pln=Number(c.plannedLessonNo); if(!planned[cls][pln] || date<planned[cls][pln]) planned[cls][pln]=date; } // 정상 예정만(취소·이동 제외)
   });
   Object.keys(sylMovedInCache||{}).forEach(function(k){
     var cls=k.substring(11);
@@ -1127,7 +1127,7 @@ function renderLessonMatrix() {
     var tds=cols.map(function(c){
       var dn=done[c][ln], pl=planned[c][ln];
       if(dn) return '<td style="text-align:center;background:#f0fdf4;padding:6px 4px;"><div style="font-weight:800;color:#15803d;font-size:13px;">✅</div><div style="font-size:10px;color:#16a34a;">'+_mdOf(dn)+'</div></td>';
-      if(pl) return '<td style="text-align:center;background:#eff6ff;padding:6px 4px;"><span style="font-size:11px;font-weight:700;color:#4338ca;">📋 예정</span></td>';
+      if(pl) return '<td style="text-align:center;background:#eff6ff;padding:6px 4px;"><div style="font-size:11px;font-weight:700;color:#4338ca;">📋 예정</div><div style="font-size:10px;color:#818cf8;">'+_mdOf(pl)+'</div></td>';
       return '<td style="text-align:center;background:#fff;padding:6px 4px;color:#cbd5e1;">⬜</td>';
     }).join('');
     return '<tr><td style="position:sticky;left:0;background:#f8fafc;z-index:1;padding:7px 10px;border-right:2px solid #e2e8f0;"><b style="color:#1e3a8a;">'+ln+'차시</b>'+(p.content?' <span style="font-size:12px;color:#475569;">'+escapeHtml(p.content)+'</span>':'')+'</td>'+tds+'</tr>';
