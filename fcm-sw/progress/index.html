@@ -219,13 +219,20 @@ body { font-family: 'Noto Sans KR', -apple-system, sans-serif; background: #f8fa
 
     <!-- 탭1: 진도표 -->
     <div id="tab-content-1" style="display:none;">
-      <div style="display:flex;justify-content:flex-end;gap:6px;margin-bottom:8px;flex-wrap:wrap;">
-        <button onclick="openBulkModal()" style="background:#fff7ed;color:#b45309;border:1px solid #fed7aa;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📅 기간 일괄 변동</button>
-        <button onclick="expandAllSylMonths()" style="background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▼ 모두 펼치기</button>
-        <button onclick="collapseAllSylMonths()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▶ 모두 접기</button>
+      <div style="display:flex;justify-content:space-between;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center;">
+        <div style="display:flex;gap:4px;background:#f1f5f9;border-radius:9px;padding:3px;">
+          <button id="sylViewDate" onclick="setSylView('date')" style="border:none;background:#2563eb;color:#fff;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:800;cursor:pointer;">📅 날짜별</button>
+          <button id="sylViewLesson" onclick="setSylView('lesson')" style="border:none;background:transparent;color:#64748b;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:800;cursor:pointer;">📚 차시별</button>
+        </div>
+        <div id="sylDateTools" style="display:flex;gap:6px;flex-wrap:wrap;">
+          <button onclick="openBulkModal()" style="background:#fff7ed;color:#b45309;border:1px solid #fed7aa;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">📅 기간 일괄 변동</button>
+          <button onclick="expandAllSylMonths()" style="background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▼ 모두 펼치기</button>
+          <button onclick="collapseAllSylMonths()" style="background:#f1f5f9;color:#475569;border:1px solid #cbd5e1;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;">▶ 모두 접기</button>
+        </div>
       </div>
       <div class="syl-table-wrap">
         <div id="sylTableWrap"><div class="loading">불러오는 중...</div></div>
+        <div id="sylLessonWrap" style="display:none;"></div>
       </div>
     </div>
 
@@ -1079,7 +1086,60 @@ function markWeekCell(cid){
     .saveSyllabusCheck({ date:c.date, cls:c.cls, lessonNo:ln, plannedLessonNo:c.no, memo:memo, status:'' }, currentGroupId);
 }
 
+// ── 📚 차시별 완료 매트릭스 (차시 × 반) ──
+var SYL_VIEW = 'date';
+function setSylView(v){
+  SYL_VIEW = v;
+  var dBtn=document.getElementById('sylViewDate'), lBtn=document.getElementById('sylViewLesson');
+  var dWrap=document.getElementById('sylTableWrap'), lWrap=document.getElementById('sylLessonWrap'), tools=document.getElementById('sylDateTools');
+  var on='background:#2563eb;color:#fff;', off='background:transparent;color:#64748b;';
+  if(dBtn) dBtn.style.cssText='border:none;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:800;cursor:pointer;'+(v==='date'?on:off);
+  if(lBtn) lBtn.style.cssText='border:none;padding:6px 14px;border-radius:7px;font-size:12px;font-weight:800;cursor:pointer;'+(v==='lesson'?on:off);
+  if(dWrap) dWrap.style.display = v==='date'?'':'none';
+  if(lWrap) lWrap.style.display = v==='lesson'?'':'none';
+  if(tools) tools.style.visibility = v==='date'?'visible':'hidden';
+  if(v==='lesson') renderLessonMatrix();
+}
+function _mdOf(dateStr){ try{ var d=new Date(dateStr+'T00:00:00'); return (d.getMonth()+1)+'/'+d.getDate(); }catch(_){ return ''; } }
+function renderLessonMatrix() {
+  var wrap=document.getElementById('sylLessonWrap'); if(!wrap) return;
+  var cols=getActiveClasses().filter(function(x){ return x && x!=='undefined'; });
+  var plans=(sylPlanCache||[]).slice().sort(function(a,b){ return (a.lessonNo||0)-(b.lessonNo||0); });
+  if(!plans.length){ wrap.innerHTML='<div class="loading">진도 계획(차시)이 없어요. 먼저 계획을 등록하세요.</div>'; return; }
+  // 반별 차시 상태 맵: done[cls][lessonNo]={date}, planned[cls][lessonNo]=true
+  var done={}, planned={};
+  cols.forEach(function(c){ done[c]={}; planned[c]={}; });
+  function markDone(c,ln,date){ if(!ln||!done[c])return; if(!done[c][ln] || date<done[c][ln]) done[c][ln]=date; }
+  Object.keys(sylCheckCache).forEach(function(k){
+    var cls=k.substring(11), date=k.substring(0,10), c=sylCheckCache[k];
+    if(done[cls]===undefined) return;
+    if(Number(c.lessonNo)>0) markDone(cls, Number(c.lessonNo), date);
+    else if(Number(c.plannedLessonNo)>0 && String(c.status||'')==='') planned[cls][Number(c.plannedLessonNo)]=true; // 정상 예정만(취소·이동 제외)
+  });
+  Object.keys(sylMovedInCache||{}).forEach(function(k){
+    var cls=k.substring(11);
+    (sylMovedInCache[k]||[]).forEach(function(mi){ if(String(mi.memo||'').trim()==='수행평가')return; if(Number(mi.lessonNo)>0) markDone(cls, Number(mi.lessonNo), k.substring(0,10)); });
+  });
+  var th='<th style="position:sticky;left:0;background:#1e3a8a;color:#fff;z-index:2;text-align:left;padding:8px 10px;min-width:180px;">차시</th>'
+    + cols.map(function(c){ return '<th style="background:#1e3a8a;color:#fff;padding:8px 6px;white-space:nowrap;">'+escapeHtml(c)+'</th>'; }).join('');
+  var body=plans.map(function(p){
+    var ln=p.lessonNo;
+    var tds=cols.map(function(c){
+      var dn=done[c][ln], pl=planned[c][ln];
+      if(dn) return '<td style="text-align:center;background:#f0fdf4;padding:6px 4px;"><div style="font-weight:800;color:#15803d;font-size:13px;">✅</div><div style="font-size:10px;color:#16a34a;">'+_mdOf(dn)+'</div></td>';
+      if(pl) return '<td style="text-align:center;background:#eff6ff;padding:6px 4px;"><span style="font-size:11px;font-weight:700;color:#4338ca;">📋 예정</span></td>';
+      return '<td style="text-align:center;background:#fff;padding:6px 4px;color:#cbd5e1;">⬜</td>';
+    }).join('');
+    return '<tr><td style="position:sticky;left:0;background:#f8fafc;z-index:1;padding:7px 10px;border-right:2px solid #e2e8f0;"><b style="color:#1e3a8a;">'+ln+'차시</b>'+(p.content?' <span style="font-size:12px;color:#475569;">'+escapeHtml(p.content)+'</span>':'')+'</td>'+tds+'</tr>';
+  }).join('');
+  // 반별 완료 수 요약행
+  var sum='<tr style="background:#f1f5f9;"><td style="position:sticky;left:0;background:#f1f5f9;padding:7px 10px;font-weight:800;color:#334155;">완료 / 전체</td>'
+    + cols.map(function(c){ var d=Object.keys(done[c]).length; return '<td style="text-align:center;font-weight:800;color:#0f766e;">'+d+' / '+plans.length+'</td>'; }).join('')+'</tr>';
+  wrap.innerHTML='<table class="syl-table" style="width:100%;border-collapse:collapse;"><thead><tr>'+th+'</tr></thead><tbody>'+sum+body+'</tbody></table>';
+}
+
 function renderSylTable() {
+  if (SYL_VIEW === 'lesson') { renderLessonMatrix(); }
   var wrap = document.getElementById('sylTableWrap');
   if (!wrap) return;
   var cols = (sylClassList.length > 0 ? sylClassList : allClasses).filter(function(x){ return x && x !== 'undefined'; });
