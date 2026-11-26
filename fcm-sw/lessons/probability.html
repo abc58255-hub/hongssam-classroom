@@ -35,15 +35,19 @@
   .coin{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 30% 25%, #ffffff 0%, #e2e8f0 60%, #cbd5e1 100%);
     box-shadow:inset 0 2px 8px rgba(255,255,255,.9),inset 0 -2px 10px rgba(0,0,0,.18),0 10px 24px rgba(15,23,42,.18);
     display:flex;align-items:center;justify-content:center;padding:22px;}
-  .coin.flipping{animation:flip .6s ease-in-out;}
+  .coin.flipping{animation:flip .55s ease-in-out;}
+  .coin.flipping-fast{animation:flipFast .32s ease-in-out;}
   @keyframes flip{0%{transform:rotateY(0) translateY(0);}40%{transform:rotateY(540deg) translateY(-34px);}100%{transform:rotateY(1080deg) translateY(0);}}
+  @keyframes flipFast{0%{transform:rotateY(0) translateY(0) scale(1);}50%{transform:rotateY(540deg) translateY(-18px) scale(.95);}100%{transform:rotateY(1080deg) translateY(0) scale(1);}}
   .coin-back{background:radial-gradient(circle at 30% 25%, #dbeafe 0%, #93c5fd 60%, #60a5fa 100%);}
   .coin svg{width:100%;height:100%;}
   .dice{position:absolute;inset:0;border-radius:28px;background:#fff;border:3px solid #0f172a;
     box-shadow:0 10px 24px rgba(15,23,42,.2);
     display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:22px;gap:6px;}
   .dice.rolling{animation:roll .5s ease-in-out;}
+  .dice.rolling-fast{animation:rollFast .3s ease-in-out;}
   @keyframes roll{0%{transform:rotate(0) scale(1);}50%{transform:rotate(360deg) scale(.9);}100%{transform:rotate(720deg) scale(1);}}
+  @keyframes rollFast{0%{transform:rotate(0) scale(1);}50%{transform:rotate(180deg) scale(.92);}100%{transform:rotate(360deg) scale(1);}}
   .pip{background:#0f172a;border-radius:50%;}
   .pip.hide{visibility:hidden;}
 
@@ -64,9 +68,13 @@
   .ratio-panel{justify-content:center;align-items:center;text-align:center;padding:30px 24px;}
   .ratio-title{font-size:12px;color:#64748b;font-weight:800;margin-bottom:28px;letter-spacing:.2px;line-height:1.5;}
   .frac{display:inline-block;}
-  .frac .num,.frac .den{font-size:72px;font-weight:900;color:#0f172a;line-height:1;padding:8px 24px;letter-spacing:-2px;}
+  .frac .num,.frac .den{font-size:72px;font-weight:900;color:#0f172a;line-height:1;padding:8px 24px;letter-spacing:-2px;transition:transform .2s;}
   .frac .bar{height:5px;background:linear-gradient(90deg,#06b6d4,#0ea5e9);border-radius:3px;}
-  .frac .decimal{font-size:30px;color:#0891b2;font-weight:900;margin-top:24px;letter-spacing:-.5px;}
+  .frac .decimal{font-size:30px;color:#0891b2;font-weight:900;margin-top:24px;letter-spacing:-.5px;transition:transform .2s;}
+  .frac .num.pulse,.frac .den.pulse,.frac .decimal.pulse{animation:pulseNum .32s ease-out;}
+  @keyframes pulseNum{0%{transform:scale(1);}50%{transform:scale(1.14);}100%{transform:scale(1);}}
+  .log-strip .r{animation:popIn .18s ease-out;}
+  @keyframes popIn{0%{opacity:0;transform:scale(.4);}100%{opacity:1;transform:scale(1);}}
   .theo-chip{display:inline-block;background:linear-gradient(135deg,#fef3c7,#fde68a);color:#92400e;padding:6px 14px;border-radius:999px;font-size:11px;font-weight:800;margin-top:20px;}
 
   /* 우 — 그래프 패널 */
@@ -235,34 +243,52 @@
     console.log('[prob] throwN', n, 'busy=', busy, 'SESSION?', !!SESSION);
     if(busy) { console.warn('[prob] busy 상태라 스킵'); return; }
     if(!SESSION) { console.warn('[prob] SESSION 없음 — 세션이 열려있는지 확인'); return; }
+    disableBtns(true);
     var isCoin = SESSION.tool==='coin';
     var evt = isCoin ? 1 : SESSION.event_value;
-    var results=[]; var lastVal=null;
+    var results = [];
     for(var i=0;i<n;i++){
       var v = isCoin ? (Math.random()<0.5?1:0) : (1 + Math.floor(Math.random()*6));
-      var hit = v===evt;
-      results.push({v:v, hit:hit});
-      trials++; if(hit) successes++;
-      lastVal=v;
+      results.push({v:v, hit: v===evt});
     }
-    rolls = rolls.concat(results);
-    if(rolls.length>1000) rolls = rolls.slice(-1000);
-    disableBtns(true);
-    var actor = document.getElementById('actor');
-    if(actor && n<=5){
-      actor.classList.add(isCoin?'flipping':'rolling');
-      setTimeout(function(){
-        updateStage(isCoin, lastVal);
-        updateStats();
-        disableBtns(false);
-        scheduleUpload();
-      }, 620);
-    } else {
-      updateStage(isCoin, lastVal);
-      updateStats();
-      setTimeout(function(){ disableBtns(false); }, 120);
+    animateBatch(isCoin, results, function(){
+      disableBtns(false);
       scheduleUpload();
+    });
+  }
+
+  // 결과를 리듬감 있게 하나씩 공개: 매 틱마다 coin/dice를 바꾸고 숫자·strip을 갱신
+  function animateBatch(isCoin, results, done){
+    var total = results.length;
+    // n에 따라 틱 간격·총 지속시간 조절
+    var perMs = total<=1 ? 520 : total<=5 ? 160 : total<=10 ? 90 : total<=20 ? 55 : 28;
+    var showAnim = total<=10;  // 10까지는 flip, 20~50은 shake만
+    var i = 0;
+    var actor = document.getElementById('actor');
+
+    function tick(){
+      var r = results[i];
+      rolls.push(r);
+      if(rolls.length>1200) rolls.shift();
+      trials++; if(r.hit) successes++;
+      // stage 바뀌는 애니메이션
+      if(actor){
+        if(showAnim){
+          var cls = isCoin ? (total<=1?'flipping':'flipping-fast') : (total<=1?'rolling':'rolling-fast');
+          actor.classList.remove('flipping','flipping-fast','rolling','rolling-fast');
+          void actor.offsetWidth; // reflow로 애니 재시작
+          actor.classList.add(cls);
+        }
+      }
+      updateStage(isCoin, r.v);
+      actor = document.getElementById('actor'); // 교체된 요소 재획득
+      // 숫자·strip·그래프 실시간 갱신
+      updateStats(true);
+      i++;
+      if(i < total) setTimeout(tick, perMs);
+      else done && done();
     }
+    tick();
   }
 
   function updateStage(isCoin, lastVal){
@@ -270,11 +296,17 @@
     if(stage) stage.innerHTML = stageHtml(isCoin, lastVal);
   }
 
-  function updateStats(){
-    document.getElementById('numN').textContent = successes;
-    document.getElementById('denN').textContent = trials;
-    document.getElementById('decN').textContent = trials? (successes/trials).toFixed(3) : '0.000';
+  function updateStats(pulse){
+    var nEl = document.getElementById('numN'), dEl = document.getElementById('denN'), decEl = document.getElementById('decN');
+    nEl.textContent = successes;
+    dEl.textContent = trials;
+    decEl.textContent = trials? (successes/trials).toFixed(3) : '0.000';
     document.getElementById('totalBadge').textContent = '총 ' + trials + '회';
+    if(pulse){
+      [nEl, dEl, decEl].forEach(function(el){
+        el.classList.remove('pulse'); void el.offsetWidth; el.classList.add('pulse');
+      });
+    }
     renderLog();
     drawChart();
   }
