@@ -321,36 +321,19 @@
         + '<button onclick="openLessonScores(' + i + ')" style="width:100%;margin-top:10px;border:none;background:#0f172a;color:#94a3b8;padding:8px;border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;">📊 기록 관리</button>'
         + '</div>';
     }).join('');
-    var graphCard = '<div class="card" style="cursor:pointer;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/graph-teacher.html\',\'_blank\')">'
-      + '<span class="icon" style="font-size:22px;">📐</span>'
-      + '<h3 style="font-size:15px;margin-bottom:2px;">그래프 탐구</h3>'
-      + '<p style="font-size:11px;margin-bottom:8px;">학생 참여형 협력 좌표평면 (실시간)</p>'
-      + '<button style="width:100%;border:none;background:#7a5230;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">📐 방 만들기 →</button>'
+    // 실시간 활동(확률·하브루타·그래프·닮음)은 '🎮 수업활동 센터'로 이동 — 여기선 게임만 관리
+    var hubLink = '<div class="card" style="cursor:pointer;border:1.5px dashed #334155;background:#0f172a;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/hub.html\',\'_blank\')">'
+      + '<span class="icon" style="font-size:22px;">🎮</span>'
+      + '<h3 style="font-size:15px;margin-bottom:2px;">수업활동 센터로 →</h3>'
+      + '<p style="font-size:11px;margin-bottom:8px;">확률·하브루타·그래프·닮음 실시간 활동은 여기서</p>'
+      + '<button style="width:100%;border:none;background:#1e293b;color:#94a3b8;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">센터 열기 →</button>'
       + '</div>';
-    var havrutaCard = '<div class="card" style="cursor:pointer;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/havruta-board.html\',\'_blank\')">'
-      + '<span class="icon" style="font-size:22px;">💬</span>'
-      + '<h3 style="font-size:15px;margin-bottom:2px;">하브루타 질문</h3>'
-      + '<p style="font-size:11px;margin-bottom:8px;">짝 질문 만들기·투표·토론 (칠판 화면)</p>'
-      + '<button style="width:100%;border:none;background:#4338ca;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">💬 칠판 열기 →</button>'
-      + '</div>';
-    var simCard = '<div class="card" style="cursor:pointer;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/sim-teacher.html\',\'_blank\')">'
-      + '<span class="icon" style="font-size:22px;">🔺</span>'
-      + '<h3 style="font-size:15px;margin-bottom:2px;">닮음 보물찾기</h3>'
-      + '<p style="font-size:11px;margin-bottom:8px;">야외 QR 닮음 찾기 — 세트 만들기·QR 인쇄</p>'
-      + '<button style="width:100%;border:none;background:#0f766e;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">🔺 세트 만들기 →</button>'
-      + '</div>';
-    var probCard = '<div class="card" style="cursor:pointer;" onclick="window.open(\'https://abc58255-hub.github.io/hongssam-classroom/lessons/probability-board.html\',\'_blank\')">'
-      + '<span class="icon" style="font-size:22px;">🐦‍⬛</span>'
-      + '<h3 style="font-size:15px;margin-bottom:2px;">확률 체험 — 큰 수의 법칙</h3>'
-      + '<p style="font-size:11px;margin-bottom:8px;">동전·주사위 던지기 · 상대도수 수렴 그래프</p>'
-      + '<button style="width:100%;border:none;background:#14532d;color:#fff;padding:9px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;">🐦‍⬛ TV 열기 →</button>'
-      + '</div>';
-    cards = havrutaCard + probCard + simCard + graphCard + cards;
+    var listHtml = cards || '<div style="color:#64748b;font-size:13px;padding:20px 4px;">등록된 게임이 없어요.</div>';
     main.innerHTML = '<div class="group">'
       + '<h2 style="display:flex;align-items:center;gap:12px;text-transform:none;letter-spacing:0;">'
-      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🎮 수업활동 관리</span></h2>'
-      + '<div class="grid">' + cards + '</div>'
-      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">⚫ 숨김 = 학생에게 안 보임 · 🔥 진행 중 = 수업 시간 활동 · 🏁 자유 도전 = 종료 후 기록경쟁</p>'
+      + '<button class="small" onclick="loadPortal()">← 포털</button><span>🕹️ 게임·도전 관리</span></h2>'
+      + '<div class="grid">' + hubLink + listHtml + '</div>'
+      + '<p style="font-size:12px;color:#64748b;margin-top:14px;">⚫ 숨김 = 학생에게 안 보임 · 🔥 진행 중 = 수업 시간 게임 · 🏁 자유 도전 = 종료 후 기록경쟁</p>'
       + '</div>';
   }
 
