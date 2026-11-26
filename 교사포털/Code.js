@@ -41,6 +41,7 @@ var RPC_WHITELIST = [
   'graphPresetSave', 'graphPresetDelete', 'syncRoster',
   'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames', 'havrutaDeleteSession',
   'probabilityOpen', 'probabilitySettings', 'probabilityClose', 'probabilityResetContribs',
+  'activityList', 'activityDraft', 'activitySetState', 'activityDelete',
   'simOpenSet', 'simCloseSet', 'simDeleteSet', 'simGetSet', 'simUpdateSet', 'simShowSet', 'simResetAttempts', 'simRecomputeScores'
 ];
 
@@ -560,4 +561,23 @@ function signupStudent(token, sid, name, pw) {
     }
     return { success: true, pwSet: pwSet, synced: _safeSync_() };
   } catch (e) { return { success: false, message: String(e && e.message || e) }; }
+}
+
+// ── 📚 수업활동 공통 상태머신 (준비 draft → 진행 live → 종료 done) ──
+// act = 'prob' | 'havruta' | 'graph' | 'sim'
+function activityList(token, class_scope, states) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'actList', class_scope: class_scope, states: states });
+}
+function activityDraft(token, act, row) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'actDraft', act: act, row: row });
+}
+function activitySetState(token, act, id, state, force) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'actSetState', act: act, id: id, state: state, force: !!force });
+}
+function activityDelete(token, act, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'actDelete', act: act, id: id });
 }

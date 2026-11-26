@@ -234,6 +234,84 @@ Deno.serve(async (req) => {
       return Response.json({ success: true });
     }
 
+    // ── 📚 수업활동 공통 상태머신 (준비 draft → 진행 live → 종료 done) ──
+    // 활동키 → 테이블 매핑 (SSRF/오타 방지용 화이트리스트)
+    const ACT_TABLE: Record<string, string> = {
+      prob: "prob_sessions",
+      havruta: "havruta_sessions",
+      graph: "graph_rooms",
+      sim: "sim_sets",
+    };
+    // 반별 활동 목록: {op:'actList', class_scope, states?:['draft','live']}
+    if (body.op === "actList") {
+      const cls = String(body.class_scope ?? "").trim();
+      const states: string[] = Array.isArray(body.states) && body.states.length
+        ? body.states.map(String) : ["draft", "live"];
+      const out: Record<string, unknown[]> = {};
+      for (const [key, tbl] of Object.entries(ACT_TABLE)) {
+        let q = admin0.from(tbl).select("*").in("state", states).order("created_at", { ascending: false }).limit(50);
+        if (cls) q = q.in("class_scope", cls === "*" ? [cls] : [cls, "*"]);
+        const { data, error } = await q;
+        out[key] = error ? [] : (data ?? []);
+      }
+      return Response.json({ success: true, acts: out });
+    }
+    // 준비(draft) 생성: {op:'actDraft', act:'prob'|'havruta'|'graph'|'sim', row:{...}}
+    //   row에 class_scope 필수. state는 강제로 'draft'.
+    if (body.op === "actDraft") {
+      const tbl = ACT_TABLE[String(body.act ?? "")];
+      if (!tbl) return Response.json({ success: false, message: "알 수 없는 활동" }, { status: 400 });
+      const row = { ...(body.row ?? {}), state: "draft", active: false };
+      if (!String(row.class_scope ?? "").trim()) {
+        return Response.json({ success: false, message: "반이 없습니다." }, { status: 400 });
+      }
+      const { data, error } = await admin0.from(tbl).insert(row).select("id").single();
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true, id: data.id });
+    }
+    // 상태 전환: {op:'actSetState', act, id, state:'draft'|'live'|'done', force?:bool}
+    //   live로 올릴 때 같은 반에 이미 live가 있으면 force 없으면 충돌 알림(교사에게 확인받기).
+    if (body.op === "actSetState") {
+      const tbl = ACT_TABLE[String(body.act ?? "")];
+      const st = String(body.state ?? "");
+      if (!tbl || !["draft", "live", "done"].includes(st)) {
+        return Response.json({ success: false, message: "잘못된 요청" }, { status: 400 });
+      }
+      const id = Number(body.id);
+      const cur = await admin0.from(tbl).select("id, class_scope, state").eq("id", id).single();
+      if (cur.error || !cur.data) return Response.json({ success: false, message: "활동을 찾을 수 없어요." }, { status: 404 });
+      const cls = String(cur.data.class_scope ?? "");
+
+      if (st === "live") {
+        // 같은 반의 다른 live 찾기 (닮음의 '*'는 전체 반 대상이라 같은 class_scope만 본다)
+        const { data: lives } = await admin0.from(tbl).select("id").eq("class_scope", cls).eq("state", "live").neq("id", id);
+        if (lives && lives.length) {
+          if (!body.force) {
+            return Response.json({ success: false, conflict: true, conflictCount: lives.length,
+              message: "이미 진행 중인 활동이 있어요." });
+          }
+          // force: 기존 live들을 종료 처리
+          await admin0.from(tbl).update({ state: "done" }).in("id", lives.map((r: { id: number }) => r.id));
+        }
+      }
+      const { error } = await admin0.from(tbl).update({ state: st }).eq("id", id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 준비/종료 활동 삭제: {op:'actDelete', act, id}  — live는 삭제 불가(먼저 종료)
+    if (body.op === "actDelete") {
+      const tbl = ACT_TABLE[String(body.act ?? "")];
+      if (!tbl) return Response.json({ success: false, message: "알 수 없는 활동" }, { status: 400 });
+      const id = Number(body.id);
+      const cur = await admin0.from(tbl).select("state").eq("id", id).single();
+      if (cur.data && cur.data.state === "live") {
+        return Response.json({ success: false, message: "진행 중인 활동은 먼저 종료해주세요." }, { status: 400 });
+      }
+      const { error } = await admin0.from(tbl).delete().eq("id", id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
     // ── 확률 체험(큰 수의 법칙) 교사 제어 ──
     // 세션 열기: {op:'probOpen', session:{class_scope, tool:'coin'|'dice', event_value}}
     if (body.op === "probOpen") {

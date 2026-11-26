@@ -108,7 +108,14 @@
 
     <!-- 수업 활동 -->
     <div class="pane on" id="pane-act">
-      <div class="subline">교사가 여는 실시간 활동이에요. 카드를 누르면 교사 화면(TV)이 새 창으로 열려요.</div>
+      <div class="subline">미리 <b>준비</b>해두고 수업 때 <b>진행</b>으로 바꾸면 학생 화면에 떠요. 준비 중인 건 학생에게 안 보여요.</div>
+      <div class="bar">
+        <select id="clsSel" onchange="loadPlans()" style="padding:10px 14px;border:none;border-radius:12px;font-size:14px;font-weight:800;background:rgba(255,255,255,.92);color:#0369a1;"></select>
+        <span class="sp"></span>
+        <button class="wbtn" onclick="loadPlans()">🔄 새로고침</button>
+      </div>
+      <div class="wgrid" id="planGrid"><div class="wempty">불러오는 중…</div></div>
+      <div class="subline" style="padding-top:6px;">아래는 각 활동의 교사 화면이에요. 새 활동을 만들거나 세부 설정은 여기서 해요.</div>
       <div class="grid" id="grid"></div>
       <div class="refresh-note">🔄 진행 상태는 30초마다 자동 갱신돼요</div>
     </div>
@@ -216,8 +223,9 @@
   function startHub(){
     renderCards();
     loadLive();
+    loadClasses();
     if(pollTimer) clearInterval(pollTimer);
-    pollTimer=setInterval(loadLive, 30000);
+    pollTimer=setInterval(function(){ loadLive(); if(TAB==='act') loadPlans(); }, 30000);
   }
 
   function renderCards(){
@@ -271,6 +279,80 @@
   function openPage(page){
     // 공용 토큰이 이미 localStorage에 있으므로 각 활동이 자동 인식 (lesson_ptok)
     window.open(BASE+page,'_blank');
+  }
+
+  // ══════════ 📚 반별 준비·진행 (상태머신) ══════════
+  var CLASSES=[], PLANS={};
+  function loadClasses(){
+    portalRPC('graphClasses',[TOK]).then(function(res){
+      CLASSES=(res&&res.classes)||[];
+      var sel=document.getElementById('clsSel');
+      if(!CLASSES.length){ sel.innerHTML='<option value="">반 정보 없음</option>'; document.getElementById('planGrid').innerHTML='<div class="wempty">등록된 학생이 없어요.</div>'; return; }
+      var saved=localStorage.getItem('hub_cls')||'';
+      sel.innerHTML=CLASSES.map(function(c){ return '<option'+(c===saved?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
+      loadPlans();
+    }).catch(function(e){ document.getElementById('planGrid').innerHTML='<div class="wempty">반 불러오기 오류: '+esc(e.message)+'</div>'; });
+  }
+  function curClass(){ var s=document.getElementById('clsSel'); return s?s.value:''; }
+  function loadPlans(){
+    var cls=curClass(); if(!cls) return;
+    localStorage.setItem('hub_cls',cls);
+    document.getElementById('planGrid').innerHTML='<div class="wempty">불러오는 중…</div>';
+    portalRPC('activityList',[TOK,cls,['draft','live']]).then(function(res){
+      if(!res||!res.success){ document.getElementById('planGrid').innerHTML='<div class="wempty">오류: '+esc((res&&res.message)||'')+'</div>'; return; }
+      PLANS=res.acts||{}; renderPlans();
+    }).catch(function(e){ document.getElementById('planGrid').innerHTML='<div class="wempty">오류: '+esc(e.message)+'</div>'; });
+  }
+  function planTitle(key,r){
+    if(key==='prob') return (r.tool==='dice'?'주사위':'동전')+' · '+(r.tool==='coin'?'앞면':(r.event_value+'의 눈'));
+    if(key==='havruta') return (r.unit||'하브루타')+' · '+({submit:'제출',vote:'투표',discuss:'토론'}[r.stage]||r.stage||'');
+    if(key==='graph') return (r.display||(r.a+'x + '+r.b+'y = '+r.c));
+    if(key==='sim') return (r.title||'닮음 세트')+' · '+(r.station_count||0)+'개 스테이션';
+    return '활동';
+  }
+  function renderPlans(){
+    var rows=[];
+    ACTS.forEach(function(a){
+      (PLANS[a.key]||[]).forEach(function(r){ rows.push({a:a, r:r}); });
+    });
+    if(!rows.length){
+      document.getElementById('planGrid').innerHTML='<div class="wempty">이 반에 준비된 활동이 없어요.<br>아래 활동 카드에서 새로 만들면 여기에 나타나요.</div>';
+      return;
+    }
+    // 진행 중 먼저
+    rows.sort(function(x,y){ return (y.r.state==='live'?1:0)-(x.r.state==='live'?1:0); });
+    document.getElementById('planGrid').innerHTML=rows.map(function(o){
+      var live=o.r.state==='live';
+      var badge = live ? '<span class="pill on">▶️ 진행 중</span>' : '<span class="pill off">📝 준비됨</span>';
+      var btns = live
+        ? '<button style="flex:1;background:#fef2f2;color:#b91c1c;" onclick="setPlanState(\''+o.a.key+'\','+o.r.id+',\'done\')">✅ 종료</button>'
+          + '<button style="flex:0 0 auto;padding:8px 14px;background:#eff6ff;color:#1d4ed8;" onclick="openPage(\''+o.a.page+'\')">교사 화면</button>'
+        : '<button style="flex:1;background:#059669;color:#fff;" onclick="setPlanState(\''+o.a.key+'\','+o.r.id+',\'live\')">▶️ 진행</button>'
+          + '<button style="flex:0 0 auto;padding:8px 14px;background:#fef2f2;color:#b91c1c;" onclick="delPlan(\''+o.a.key+'\','+o.r.id+')">삭제</button>';
+      return '<div class="wcard" style="border-top:5px solid '+o.a.c+';">'
+        + '<div class="top"><span class="ic">'+o.a.emoji+'</span>'+badge+'</div>'
+        + '<h3>'+esc(o.a.title)+'</h3>'
+        + '<p>'+esc(planTitle(o.a.key,o.r))+'</p>'
+        + '<div class="segrow" style="margin-top:auto;">'+btns+'</div>'
+        + '</div>';
+    }).join('');
+  }
+  function setPlanState(act,id,state,force){
+    portalRPC('activitySetState',[TOK,act,id,state,!!force]).then(function(res){
+      if(res&&res.success){ toast(state==='live'?'▶️ 진행 시작':'✅ 종료됨'); loadPlans(); loadLive(); return; }
+      if(res&&res.conflict){
+        if(confirm('이 반에 이미 진행 중인 활동이 있어요.\n기존 것을 종료하고 이 활동을 진행할까요?')) setPlanState(act,id,state,true);
+        return;
+      }
+      toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+  function delPlan(act,id){
+    if(!confirm('준비된 활동을 삭제할까요?')) return;
+    portalRPC('activityDelete',[TOK,act,id]).then(function(res){
+      if(res&&res.success){ toast('🗑 삭제됨'); loadPlans(); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
   }
 
   // ══════════ 탭 ══════════

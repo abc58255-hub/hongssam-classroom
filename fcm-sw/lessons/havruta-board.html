@@ -279,7 +279,8 @@
       +'<div id="arcBody" style="color:#94a3b8;">불러오는 중…</div>';
     sb.from('havruta_sessions').select('*').eq('class_scope',cls).eq('active',false).order('created_at',{ascending:false})
       .then(function(r){
-        var sess=(r.data)||[]; ARC_SESS=sess;
+        // 지난 세션 = 종료된 것만. 아직 준비(draft) 중인 건 보관함에 안 보이게 (state 없으면 전부 통과)
+        var sess=((r.data)||[]).filter(function(s){ return !s.state || s.state==='done'; }); ARC_SESS=sess;
         if(!sess.length){ document.getElementById('arcBody').innerHTML='<p>보관된 지난 세션이 없어요. (세션을 새로 열면 이전 세션이 여기에 쌓여요)</p>'; return; }
         var btns=sess.map(function(s){ var d=new Date(s.created_at); var lab=(d.getMonth()+1)+'/'+d.getDate()+' '+(s.unit||'하브루타');
           return '<span class="arcSwrap" style="display:inline-flex;align-items:center;margin:0 8px 8px 0;">'
