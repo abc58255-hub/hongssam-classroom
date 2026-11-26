@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>확률 체험 — 큰 수의 법칙</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./supabase-config.js"></script>
+<script src="./lessons-common.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;background:linear-gradient(140deg,#f0fdfa 0%,#ecfeff 50%,#d1fae5 100%);color:#0f172a;min-height:100%;padding:12px;-webkit-tap-highlight-color:transparent;}
+  .wrap{max-width:1280px;margin:0 auto;}
+  header{display:flex;align-items:center;gap:10px;padding:8px 6px 14px;}
+  header .logo{width:40px;height:40px;background:#0f172a;border-radius:12px;display:flex;align-items:center;justify-content:center;padding:4px;flex-shrink:0;}
+  header .logo svg{width:100%;height:100%;}
+  header h1{font-size:18px;font-weight:900;color:#0f172a;line-height:1.2;}
+  header .sub{font-size:11px;color:#64748b;font-weight:700;margin-top:2px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr 1.4fr;gap:12px;align-items:stretch;}
+  @media (max-width:860px){ .grid{grid-template-columns:1fr;} }
+  .panel{background:rgba(255,255,255,.85);border-radius:20px;box-shadow:0 2px 14px rgba(15,23,42,.06);padding:16px;display:flex;flex-direction:column;}
+
+  /* 좌 — 던지기 */
+  .stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:280px;position:relative;}
+  .stage::after{content:'';position:absolute;bottom:32px;width:120px;height:14px;background:radial-gradient(ellipse,rgba(0,0,0,.15) 0%,transparent 70%);}
+  .coin-wrap{position:relative;width:170px;height:170px;}
+  .coin{position:absolute;inset:0;border-radius:50%;background:linear-gradient(145deg,#f3f4f6,#cbd5e1);box-shadow:inset 0 2px 6px rgba(255,255,255,.7),inset 0 -2px 8px rgba(0,0,0,.2),0 6px 16px rgba(0,0,0,.15);display:flex;align-items:center;justify-content:center;padding:18px;}
+  .coin.flipping{animation:flip .6s ease-in-out;}
+  @keyframes flip{0%{transform:rotateY(0) translateY(0);}40%{transform:rotateY(540deg) translateY(-30px);}100%{transform:rotateY(1080deg) translateY(0);}}
+  .coin-back{background:linear-gradient(145deg,#e0e7ff,#a5b4fc);}
+  .coin svg{width:100%;height:100%;}
+  .dice{position:absolute;inset:0;border-radius:24px;background:#fff;border:2px solid #0f172a;box-shadow:0 6px 16px rgba(0,0,0,.15);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:18px;gap:4px;}
+  .dice.rolling{animation:roll .5s ease-in-out;}
+  @keyframes roll{0%{transform:rotate(0) scale(1);}50%{transform:rotate(360deg) scale(.9);}100%{transform:rotate(720deg) scale(1);}}
+  .pip{background:#111827;border-radius:50%;}
+  .pip.hide{visibility:hidden;}
+
+  .throw-btns{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:14px;}
+  .tbtn{border:none;color:#fff;padding:12px 2px;border-radius:12px;font-size:13px;font-weight:900;cursor:pointer;line-height:1.2;transition:transform .1s;}
+  .tbtn:active{transform:scale(.94);}
+  .tbtn:disabled{opacity:.45;cursor:not-allowed;}
+  .tbtn .n{font-size:16px;font-weight:900;}
+  .tbtn .l{font-size:10px;font-weight:700;opacity:.92;}
+  .tb1{background:#06b6d4;} .tb5{background:#2563eb;} .tb10{background:#059669;} .tb20{background:#7c3aed;} .tb50{background:#c026d3;}
+
+  .log-line{display:flex;justify-content:space-between;align-items:center;margin-top:12px;font-size:11px;color:#64748b;}
+  .log-strip{display:flex;flex-wrap:wrap;gap:3px;padding:8px;background:#f8fafc;border-radius:10px;margin-top:4px;max-height:90px;overflow-y:auto;font-size:11px;}
+  .log-strip .r{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;background:#e2e8f0;font-weight:800;color:#475569;font-size:11px;}
+  .log-strip .r.hit{background:#fbbf24;color:#1e293b;}
+
+  /* 중 — 분수 */
+  .ratio-panel{justify-content:center;align-items:center;text-align:center;}
+  .ratio-title{font-size:13px;color:#64748b;font-weight:800;margin-bottom:22px;}
+  .frac{display:inline-block;}
+  .frac .num,.frac .den{font-size:64px;font-weight:900;color:#0f172a;line-height:1;padding:6px 20px;}
+  .frac .bar{height:4px;background:#06b6d4;border-radius:2px;}
+  .frac .decimal{font-size:28px;color:#06b6d4;font-weight:900;margin-top:20px;}
+  .theo-chip{display:inline-block;background:#fef3c7;color:#b45309;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:800;margin-top:16px;}
+  .evt{font-size:12px;color:#64748b;font-weight:700;margin-top:10px;}
+
+  /* 우 — 그래프 */
+  .chart-wrap{flex:1;display:flex;flex-direction:column;}
+  .chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;gap:10px;flex-wrap:wrap;}
+  .chart-head .legend{font-size:11px;color:#64748b;display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+  .legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#06b6d4;margin-right:4px;vertical-align:middle;}
+  .legend .dash{display:inline-block;width:18px;height:0;border-top:2.5px dashed #ef4444;margin-right:4px;vertical-align:middle;}
+  .reset-btn{background:#fecaca;color:#991b1b;border:none;padding:6px 12px;border-radius:10px;font-size:11px;font-weight:800;cursor:pointer;}
+  canvas{width:100%;height:280px;background:#fff;border-radius:12px;border:1px solid #e5e7eb;}
+
+  .status-line{background:rgba(15,23,42,.05);border-radius:12px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;font-weight:700;}
+  .muted{color:#94a3b8;font-size:14px;text-align:center;padding:40px 10px;line-height:1.7;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:700;opacity:0;transition:.3s;pointer-events:none;z-index:999;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">
+      <!-- 까마귀 로고 (임시 SVG, 나중에 PNG로 교체 가능) -->
+      <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="60" cy="78" rx="34" ry="26" fill="#1f2937"/>
+        <circle cx="60" cy="46" r="26" fill="#111827"/>
+        <path d="M90,84 L108,92 L92,98 Z" fill="#111827"/>
+        <path d="M82,46 L100,50 L82,56 Z" fill="#f59e0b"/>
+        <circle cx="54" cy="44" r="8.5" fill="none" stroke="#f3f4f6" stroke-width="2"/>
+        <circle cx="72" cy="44" r="8.5" fill="none" stroke="#f3f4f6" stroke-width="2"/>
+        <circle cx="54" cy="44" r="6.5" fill="#f9fafb"/>
+        <circle cx="72" cy="44" r="6.5" fill="#f9fafb"/>
+        <circle cx="54" cy="44" r="2.6" fill="#111827"/>
+        <circle cx="72" cy="44" r="2.6" fill="#111827"/>
+      </svg>
+    </div>
+    <div>
+      <h1 id="hdTitle">언제까지 ○○을 던지게 할거야</h1>
+      <div class="sub">까마쌤 · 경우의 수와 확률 · <span id="evtName">—</span></div>
+    </div>
+  </header>
+
+  <div id="main"><div class="panel"><div class="muted">불러오는 중…</div></div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+  var USER=null, sb=null, SESSION=null;
+  var trials=0, successes=0, history=[]; // history: [{v,hit}]
+  var busy=false, uploadTimer=null;
+
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1800); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function toolName(t){ return t==='dice'?'주사위':'동전'; }
+  function evtLabel(s){
+    if(!s) return '—';
+    if(s.tool==='coin') return '앞면(까마귀)';
+    return s.event_value + '의 눈';
+  }
+  function hdTitle(s){ return '언제까지 ' + (s.tool==='dice'?'주사위':'동전') + '을 던지게 할거야'; }
+
+  LessonHub.init({ onReady: function(user){ USER=user; sb=LessonHub.client; findSession(); } });
+
+  function findSession(){
+    sb.from('prob_sessions').select('*').eq('class_scope', USER.className).eq('active', true)
+      .order('created_at',{ascending:false}).limit(1)
+      .then(function(r){
+        var s=(r.data&&r.data[0])||null;
+        if(!s){
+          document.getElementById('main').innerHTML='<div class="panel"><div class="muted">아직 확률 체험이 열리지 않았어요.<br>선생님이 시작하면 바로 나타나요! 🐦‍⬛</div></div>';
+          subscribeSession(); return;
+        }
+        SESSION = s; trials=0; successes=0; history=[];
+        render(); subscribeSession();
+      });
+  }
+
+  function subscribeSession(){
+    sb.channel('prob-sess-'+USER.className)
+      .on('postgres_changes',{event:'*',schema:'public',table:'prob_sessions',filter:'class_scope=eq.'+USER.className},
+        function(){ reloadSession(); }).subscribe();
+  }
+  function reloadSession(){
+    sb.from('prob_sessions').select('*').eq('class_scope',USER.className).eq('active',true)
+      .order('created_at',{ascending:false}).limit(1).then(function(r){
+        var s=(r.data&&r.data[0])||null;
+        if(!s){ SESSION=null; document.getElementById('main').innerHTML='<div class="panel"><div class="muted">확률 체험이 종료됐어요. 수고했어요! 🐦‍⬛</div></div>'; return; }
+        // 도구/사건 바뀌면 로컬 통계 리셋
+        if(!SESSION || SESSION.id!==s.id || SESSION.tool!==s.tool || SESSION.event_value!==s.event_value){
+          SESSION=s; trials=0; successes=0; history=[]; render();
+        } else {
+          SESSION=s; updateHeader();
+        }
+      });
+  }
+
+  function updateHeader(){
+    document.getElementById('hdTitle').textContent = hdTitle(SESSION);
+    document.getElementById('evtName').textContent = toolName(SESSION.tool) + ' · ' + evtLabel(SESSION);
+  }
+
+  function render(){
+    updateHeader();
+    var isCoin = SESSION.tool==='coin';
+    var theoryStr = isCoin ? '½' : '⅙';
+    var main = document.getElementById('main');
+    main.innerHTML =
+      '<div class="grid">'
+      + '<div class="panel">'
+        + '<div class="stage" id="stage">' + stageHtml(isCoin, null) + '</div>'
+        + '<div class="throw-btns">'
+          + '<button class="tbtn tb1" onclick="throwN(1)"><div class="n">1</div><div class="l">번</div></button>'
+          + '<button class="tbtn tb5" onclick="throwN(5)"><div class="n">5</div><div class="l">번</div></button>'
+          + '<button class="tbtn tb10" onclick="throwN(10)"><div class="n">10</div><div class="l">번</div></button>'
+          + '<button class="tbtn tb20" onclick="throwN(20)"><div class="n">20</div><div class="l">번</div></button>'
+          + '<button class="tbtn tb50" onclick="throwN(50)"><div class="n">50</div><div class="l">번</div></button>'
+        + '</div>'
+        + '<div class="log-line"><span>최근 결과</span><span id="totalBadge">총 0회</span></div>'
+        + '<div class="log-strip" id="logStrip"></div>'
+      + '</div>'
+      + '<div class="panel ratio-panel">'
+        + '<div class="ratio-title">' + (isCoin?'앞면':(SESSION.event_value+'의 눈')) + '이 나온 경우의 수 / 던진 횟수</div>'
+        + '<div class="frac"><div class="num" id="numN">0</div><div class="bar"></div><div class="den" id="denN">0</div></div>'
+        + '<div class="decimal" id="decN">0.000</div>'
+        + '<div class="theo-chip">이론 확률 ' + theoryStr + ' = ' + Number(SESSION.theory_p).toFixed(3) + '</div>'
+      + '</div>'
+      + '<div class="panel chart-wrap">'
+        + '<div class="chart-head">'
+          + '<div class="legend"><span><span class="dot"></span>실제 상대도수</span><span><span class="dash"></span>' + theoryStr + '</span></div>'
+          + '<button class="reset-btn" onclick="resetLocal()">처음부터</button>'
+        + '</div>'
+        + '<canvas id="chart"></canvas>'
+      + '</div>'
+      + '</div>';
+    drawChart();
+    renderLog();
+  }
+
+  function stageHtml(isCoin, lastVal){
+    if(isCoin){
+      var isBack = lastVal === 0;
+      return '<div class="coin-wrap"><div class="coin ' + (isBack?'coin-back':'') + '" id="actor">'
+        + (isBack ? '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg"><text x="60" y="78" font-size="60" text-anchor="middle" font-weight="900" fill="#1e3a8a">뒷</text></svg>'
+                 : '<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">'
+                   + '<circle cx="60" cy="46" r="24" fill="#111827"/>'
+                   + '<ellipse cx="60" cy="78" rx="32" ry="22" fill="#1f2937"/>'
+                   + '<path d="M80,46 L96,50 L80,54 Z" fill="#f59e0b"/>'
+                   + '<circle cx="54" cy="44" r="7" fill="none" stroke="#f3f4f6" stroke-width="1.8"/>'
+                   + '<circle cx="70" cy="44" r="7" fill="none" stroke="#f3f4f6" stroke-width="1.8"/>'
+                   + '<circle cx="54" cy="44" r="5.2" fill="#f9fafb"/>'
+                   + '<circle cx="70" cy="44" r="5.2" fill="#f9fafb"/>'
+                   + '<circle cx="54" cy="44" r="2" fill="#111827"/>'
+                   + '<circle cx="70" cy="44" r="2" fill="#111827"/>'
+                   + '</svg>')
+        + '</div></div>';
+    }
+    // 주사위 (lastVal = 1~6)
+    var v = (lastVal && lastVal>=1 && lastVal<=6) ? lastVal : 1;
+    return '<div class="coin-wrap"><div class="dice" id="actor">' + pips(v) + '</div></div>';
+  }
+
+  function pips(v){
+    // 3x3 그리드: [0..8] 위치 중 어디에 pip 표시할지
+    var sets = {
+      1:[4], 2:[0,8], 3:[0,4,8], 4:[0,2,6,8], 5:[0,2,4,6,8], 6:[0,2,3,5,6,8]
+    };
+    var on = sets[v] || [];
+    var html='';
+    for(var i=0;i<9;i++){
+      html += '<div class="pip ' + (on.indexOf(i)<0?'hide':'') + '"></div>';
+    }
+    return html;
+  }
+
+  function throwN(n){
+    if(busy || !SESSION) return;
+    var isCoin = SESSION.tool==='coin';
+    var evt = isCoin ? 1 : SESSION.event_value;
+    var results=[]; var lastVal=null;
+    for(var i=0;i<n;i++){
+      var v = isCoin ? (Math.random()<0.5?1:0) : (1 + Math.floor(Math.random()*6));
+      var hit = v===evt;
+      results.push({v:v, hit:hit});
+      trials++; if(hit) successes++;
+      lastVal=v;
+    }
+    // 애니메이션: 1~5번은 짧게, 10번 이상은 즉시
+    history = history.concat(results);
+    if(history.length>1000) history = history.slice(-1000);
+    disableBtns(true);
+    var actor = document.getElementById('actor');
+    if(actor && n<=5){
+      actor.classList.add(isCoin?'flipping':'rolling');
+      setTimeout(function(){
+        updateStage(isCoin, lastVal);
+        updateStats();
+        disableBtns(false);
+        scheduleUpload();
+      }, 620);
+    } else {
+      updateStage(isCoin, lastVal);
+      updateStats();
+      setTimeout(function(){ disableBtns(false); }, 120);
+      scheduleUpload();
+    }
+  }
+
+  function updateStage(isCoin, lastVal){
+    var stage = document.getElementById('stage');
+    if(stage) stage.innerHTML = stageHtml(isCoin, lastVal);
+  }
+
+  function updateStats(){
+    document.getElementById('numN').textContent = successes;
+    document.getElementById('denN').textContent = trials;
+    document.getElementById('decN').textContent = trials? (successes/trials).toFixed(3) : '0.000';
+    document.getElementById('totalBadge').textContent = '총 ' + trials + '회';
+    renderLog();
+    drawChart();
+  }
+
+  function renderLog(){
+    var strip = document.getElementById('logStrip'); if(!strip) return;
+    // 최근 40개만 표시
+    var recent = history.slice(-40);
+    strip.innerHTML = recent.map(function(r){
+      var txt = SESSION.tool==='coin' ? (r.v===1?'앞':'뒷') : String(r.v);
+      return '<span class="r ' + (r.hit?'hit':'') + '">' + txt + '</span>';
+    }).join('');
+    strip.scrollTop = strip.scrollHeight;
+  }
+
+  function disableBtns(on){
+    busy = !!on;
+    [].forEach.call(document.querySelectorAll('.tbtn'), function(b){ b.disabled = on; });
+  }
+
+  function resetLocal(){
+    if(!SESSION) return;
+    trials=0; successes=0; history=[];
+    updateStats();
+    scheduleUpload();
+  }
+
+  // 서버 업로드: 디바운스 (던진 뒤 1초 후 upsert; 연속 누르면 늦게 한 번만)
+  function scheduleUpload(){
+    if(!SESSION) return;
+    clearTimeout(uploadTimer);
+    uploadTimer = setTimeout(uploadNow, 900);
+  }
+  function uploadNow(){
+    if(!SESSION || !USER || !USER.studentId) return;
+    sb.from('prob_contributions').upsert({
+      session_id: SESSION.id,
+      student_id: USER.studentId,
+      name: USER.name || '',
+      trials: trials,
+      successes: successes,
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'session_id,student_id' }).then(function(r){
+      if(r.error) console.warn('[prob upsert]', r.error.message);
+    });
+  }
+
+  // ── 그래프 (Canvas 2D) ──
+  function drawChart(){
+    var cv = document.getElementById('chart'); if(!cv || !SESSION) return;
+    var dpr = window.devicePixelRatio || 1;
+    var W = cv.clientWidth || 400, H = cv.clientHeight || 280;
+    cv.width = W*dpr; cv.height = H*dpr;
+    var ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+
+    var padL = 38, padR = 14, padT = 14, padB = 26;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    // 배경 격자 + y 라벨
+    ctx.font = '11px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+    for(var y=0;y<=4;y++){
+      var yy = padT + plotH * (y/4);
+      ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL+plotW, yy); ctx.stroke();
+      ctx.fillText((1 - y/4).toFixed(2), 4, yy+4);
+    }
+    // 축
+    ctx.strokeStyle = '#cbd5e1'; ctx.beginPath();
+    ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(padL+plotW, padT+plotH); ctx.stroke();
+
+    // x 범위 — 동적: trials만큼 (최소 10, 20, 50, 100, ...)
+    var maxX = Math.max(10, Math.pow(2, Math.ceil(Math.log2(Math.max(10, trials)))));
+    if(trials > maxX) maxX = trials;
+
+    // x 눈금 (약 5개)
+    ctx.fillStyle = '#94a3b8';
+    for(var i=0;i<=5;i++){
+      var xv = Math.round(maxX * i/5);
+      var xx = padL + plotW * i/5;
+      ctx.fillText(String(xv), xx - 6, padT+plotH+16);
+    }
+
+    // 이론확률 기준선
+    var theoryY = padT + plotH * (1 - Number(SESSION.theory_p));
+    ctx.strokeStyle = '#ef4444'; ctx.setLineDash([6,4]); ctx.lineWidth = 1.8;
+    ctx.beginPath(); ctx.moveTo(padL, theoryY); ctx.lineTo(padL+plotW, theoryY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ef4444'; ctx.font = 'bold 11px sans-serif';
+    ctx.fillText(SESSION.tool==='coin'?'½':'⅙', padL+4, theoryY-4);
+
+    if(trials===0) return;
+
+    // 실제 상대도수 꺾은선
+    ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    var cum = 0;
+    for(var k=0;k<history.length;k++){
+      if(history[k].hit) cum++;
+      var n = k+1;
+      var r = cum/n;
+      var px = padL + plotW * (n/maxX);
+      var py = padT + plotH * (1 - r);
+      if(k===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // 마지막 점 강조
+    var lastN = history.length;
+    if(lastN>0){
+      var lastR = successes/trials;
+      var lx = padL + plotW * (lastN/maxX);
+      var ly = padT + plotH * (1 - lastR);
+      ctx.fillStyle = '#06b6d4';
+      ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI*2); ctx.fill();
+    }
+  }
+
+  // 화면 리사이즈 시 재그리기
+  window.addEventListener('resize', function(){ if(SESSION) drawChart(); });
+</script>
+</body>
+</html>

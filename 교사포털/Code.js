@@ -39,6 +39,7 @@ var RPC_WHITELIST = [
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
   'graphPresetSave', 'graphPresetDelete', 'syncRoster',
   'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames', 'havrutaDeleteSession',
+  'probabilityOpen', 'probabilitySettings', 'probabilityClose', 'probabilityResetContribs',
   'simOpenSet', 'simCloseSet', 'simDeleteSet', 'simGetSet', 'simUpdateSet', 'simShowSet', 'simResetAttempts', 'simRecomputeScores'
 ];
 
@@ -215,6 +216,23 @@ function havrutaNames(token, id, on) {
 function havrutaDeleteSession(token, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'havrutaDeleteSession', id: id });
+}
+// ── 확률 체험(큰 수의 법칙) ──
+function probabilityOpen(token, session) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'probOpen', session: session });
+}
+function probabilitySettings(token, id, tool, event_value, reset) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'probSettings', id: id, tool: tool, event_value: event_value, reset: reset });
+}
+function probabilityClose(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'probClose', id: id });
+}
+function probabilityResetContribs(token, id) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'probResetContribs', id: id });
 }
 // ── 닮음 보물찾기 ──
 function simOpenSet(token, payload) {

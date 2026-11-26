@@ -1,0 +1,32 @@
+<!-- 안경 쓴 까마귀 캐릭터 (임시) — 매일 우상향 수학 로고 톤 참고
+     ※ 사용자가 투명 PNG 업로드하면 crow-coin.png / crow-dice.png로 대체하고
+        probability.html / probability-board.html의 <img src>를 교체하세요. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%" aria-label="까마귀">
+  <!-- 몸통 -->
+  <ellipse cx="60" cy="78" rx="34" ry="26" fill="#1f2937"/>
+  <!-- 머리 -->
+  <circle cx="60" cy="46" r="26" fill="#111827"/>
+  <!-- 꼬리 -->
+  <path d="M90,84 L108,92 L92,98 Z" fill="#111827"/>
+  <!-- 날개 -->
+  <path d="M38,70 Q50,86 72,82 Q58,96 40,90 Z" fill="#0b1220"/>
+  <!-- 부리 -->
+  <path d="M82,46 L100,50 L82,56 Z" fill="#f59e0b"/>
+  <path d="M82,52 L100,50 L82,58 Z" fill="#d97706"/>
+  <!-- 안경테 -->
+  <circle cx="54" cy="44" r="8.5" fill="none" stroke="#f3f4f6" stroke-width="2"/>
+  <circle cx="72" cy="44" r="8.5" fill="none" stroke="#f3f4f6" stroke-width="2"/>
+  <line x1="62.5" y1="44" x2="63.5" y2="44" stroke="#f3f4f6" stroke-width="2"/>
+  <!-- 안경 안쪽(흰 하이라이트) -->
+  <circle cx="54" cy="44" r="6.5" fill="#f9fafb"/>
+  <circle cx="72" cy="44" r="6.5" fill="#f9fafb"/>
+  <!-- 눈동자 -->
+  <circle cx="54" cy="44" r="2.6" fill="#111827"/>
+  <circle cx="72" cy="44" r="2.6" fill="#111827"/>
+  <!-- 눈 하이라이트 -->
+  <circle cx="54.9" cy="43.1" r="0.8" fill="#f9fafb"/>
+  <circle cx="72.9" cy="43.1" r="0.8" fill="#f9fafb"/>
+  <!-- 발 -->
+  <line x1="52" y1="104" x2="52" y2="110" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="68" y1="104" x2="68" y2="110" stroke="#f59e0b" stroke-width="2.5" stroke-linecap="round"/>
+</svg>

@@ -234,6 +234,63 @@ Deno.serve(async (req) => {
       return Response.json({ success: true });
     }
 
+    // ── 확률 체험(큰 수의 법칙) 교사 제어 ──
+    // 세션 열기: {op:'probOpen', session:{class_scope, tool:'coin'|'dice', event_value}}
+    if (body.op === "probOpen") {
+      const S = body.session ?? {};
+      const cls = String(S.class_scope ?? "").trim();
+      if (!cls) return Response.json({ success: false, message: "반이 없습니다." }, { status: 400 });
+      const tool = String(S.tool ?? "coin") === "dice" ? "dice" : "coin";
+      const ev = Number(S.event_value);
+      const eventValue = tool === "coin"
+        ? 1
+        : (Number.isFinite(ev) && ev >= 1 && ev <= 6 ? Math.floor(ev) : 1);
+      const theoryP = tool === "coin" ? 0.5 : (1 / 6);
+      await admin0.from("prob_sessions").update({ active: false }).eq("class_scope", cls).eq("active", true);
+      const row = { class_scope: cls, tool, event_value: eventValue, theory_p: theoryP, active: true };
+      let ins = await admin0.from("prob_sessions").insert(row).select("id").single();
+      if (ins.error) {
+        await admin0.from("prob_sessions").update({ active: false }).eq("class_scope", cls).eq("active", true);
+        ins = await admin0.from("prob_sessions").insert(row).select("id").single();
+      }
+      if (ins.error) return Response.json({ success: false, message: ins.error.message }, { status: 500 });
+      return Response.json({ success: true, id: ins.data.id });
+    }
+    // 사건 변경(진행 중 교체): {op:'probSettings', id, tool?, event_value?}
+    if (body.op === "probSettings") {
+      const patch: Record<string, unknown> = {};
+      if (body.tool) {
+        const tool = String(body.tool) === "dice" ? "dice" : "coin";
+        patch.tool = tool;
+        patch.theory_p = tool === "coin" ? 0.5 : (1 / 6);
+        // 도구 바뀌면 사건 기본값도 재설정
+        if (body.event_value === undefined) patch.event_value = 1;
+      }
+      if (body.event_value !== undefined) {
+        const ev = Number(body.event_value);
+        patch.event_value = Number.isFinite(ev) ? Math.floor(ev) : 1;
+      }
+      // 사건만 바꾸는 경우도 contributions는 리셋해야 통계가 의미있음 → 리셋 플래그가 true면 지움
+      const { error } = await admin0.from("prob_sessions").update(patch).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      if (body.reset) {
+        await admin0.from("prob_contributions").delete().eq("session_id", Number(body.id));
+      }
+      return Response.json({ success: true });
+    }
+    // 세션 닫기: {op:'probClose', id}
+    if (body.op === "probClose") {
+      const { error } = await admin0.from("prob_sessions").update({ active: false }).eq("id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+    // 기록 리셋(진행 중 다시 시작): {op:'probResetContribs', id}
+    if (body.op === "probResetContribs") {
+      const { error } = await admin0.from("prob_contributions").delete().eq("session_id", Number(body.id));
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
+
     // ── 닮음 보물찾기: 세트 열기(기존 활성 닫고 새로) ──
     // {op:'simOpenSet', set:{class_scope,title,base_pts,try_bonus,first_bonus,max_tries},
     //  triangles:[{idx,side_a,side_b,side_c,show}],

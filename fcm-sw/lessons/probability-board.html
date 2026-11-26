@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>확률 체험 — 칠판(교사 TV)</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;background:#0b1220;color:#e2e8f0;min-height:100vh;}
+  /* 잠금 */
+  #lock{position:fixed;inset:0;background:#0b1220;display:flex;align-items:center;justify-content:center;z-index:999;}
+  #lock .box{background:#1e293b;padding:34px;border-radius:20px;width:340px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);}
+  #lock h2{font-size:20px;margin-bottom:16px;color:#bbf7d0;}
+  #lock input{width:100%;padding:13px;border:1.5px solid #334155;border-radius:12px;background:#0b1220;color:#fff;font-size:15px;margin-bottom:12px;}
+  #lock button{width:100%;padding:13px;background:#059669;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;}
+  #lerr{color:#f87171;font-size:13px;margin-top:10px;min-height:18px;}
+
+  /* 제어바 */
+  .ctl{background:#1e293b;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50;}
+  .ctl select,.ctl input{padding:8px 10px;border:1px solid #334155;border-radius:8px;background:#0b1220;color:#fff;font-size:13px;}
+  .ctl button{padding:8px 14px;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;background:#334155;color:#e2e8f0;}
+  .ctl button.on{background:#059669;color:#fff;}
+  .ctl button.warn{background:#7f1d1d;color:#fecaca;}
+  .ctl button.yel{background:#78350f;color:#fde68a;}
+  .ctl .sp{flex:1;}
+  .seg{display:inline-flex;background:#0b1220;border:1px solid #334155;border-radius:10px;overflow:hidden;}
+  .seg button{background:transparent;border:none;color:#94a3b8;padding:7px 14px;font-weight:800;cursor:pointer;}
+  .seg button.on{background:#059669;color:#fff;}
+
+  /* 본문 */
+  .wrap{padding:3vh 3vw;}
+  .top{display:flex;align-items:baseline;gap:20px;margin-bottom:2vh;flex-wrap:wrap;}
+  .title{font-size:3vw;font-weight:900;color:#fff;}
+  .tag{background:#065f46;color:#d1fae5;font-size:1.1vw;font-weight:800;padding:5px 14px;border-radius:14px;}
+
+  .grid{display:grid;grid-template-columns:1.1fr 1.6fr .9fr;gap:1.5vw;align-items:stretch;}
+  @media (max-width:1100px){ .grid{grid-template-columns:1fr;} }
+  .panel{background:#1e293b;border:1px solid #334155;border-radius:16px;padding:2vh 2vw;display:flex;flex-direction:column;}
+
+  /* 중앙 — 큰 분수 */
+  .ratio-panel{justify-content:center;align-items:center;text-align:center;}
+  .ratio-title{font-size:1.1vw;color:#94a3b8;font-weight:800;margin-bottom:2vh;}
+  .frac .num,.frac .den{font-size:7vw;font-weight:900;color:#fff;line-height:1;padding:.5vh 2vw;}
+  .frac .bar{height:6px;background:#10b981;border-radius:3px;}
+  .frac .decimal{font-size:3vw;color:#34d399;font-weight:900;margin-top:2vh;}
+  .theo{display:inline-block;background:#422006;color:#fde68a;padding:5px 16px;border-radius:20px;font-size:1vw;font-weight:800;margin-top:1.5vh;}
+
+  /* 좌 — 그래프 */
+  .chart-box{flex:1;display:flex;flex-direction:column;}
+  .chart-head{font-size:1vw;color:#94a3b8;margin-bottom:8px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;}
+  .chart-head .dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#10b981;margin-right:5px;vertical-align:middle;}
+  .chart-head .dash{display:inline-block;width:20px;height:0;border-top:2.5px dashed #f87171;margin-right:5px;vertical-align:middle;}
+  canvas{width:100%;height:46vh;background:#0b1220;border-radius:12px;border:1px solid #334155;}
+
+  /* 우 — 학생 표 */
+  .list-head{font-size:1vw;font-weight:800;color:#a7f3d0;margin-bottom:8px;display:flex;justify-content:space-between;}
+  .list{flex:1;overflow-y:auto;max-height:52vh;}
+  .srow{display:grid;grid-template-columns:1fr auto auto;gap:6px;align-items:center;padding:8px 10px;border-radius:8px;background:#0b1220;margin-bottom:5px;font-size:.95vw;}
+  .srow.top1{border:2px solid #f59e0b;}
+  .srow .nm{color:#fff;font-weight:800;}
+  .srow .tr{color:#60a5fa;font-weight:800;}
+  .srow .sc{color:#fbbf24;font-weight:800;}
+
+  .empty{color:#475569;font-size:1.3vw;text-align:center;padding:8vh 0;}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;opacity:0;transition:.3s;z-index:800;}
+  .toast.show{opacity:1;}
+  body.present .ctl{display:none !important;}
+</style>
+</head>
+<body>
+  <div id="lock"><div class="box"><h2>🐦‍⬛ 확률 체험 칠판</h2><p style="font-size:13px;color:#94a3b8;margin-bottom:14px;">교사 비밀번호를 입력하세요</p>
+    <input type="password" id="lpw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
+    <button id="lbtn" onclick="doUnlock()">확인</button><div id="lerr"></div></div></div>
+
+  <div class="ctl" id="ctl" style="display:none;">
+    <select id="clsSel"></select>
+    <span style="color:#64748b;font-size:12px;">도구</span>
+    <span class="seg">
+      <button id="toolCoin" class="on" onclick="setTool('coin')">동전</button>
+      <button id="toolDice" onclick="setTool('dice')">주사위</button>
+    </span>
+    <span id="diceEvtWrap" style="display:none;">
+      <span style="color:#64748b;font-size:12px;">사건(눈)</span>
+      <select id="diceEvt"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
+    </span>
+    <button onclick="openSession()">세션 열기</button>
+    <span class="sp"></span>
+    <button class="yel" onclick="applySettings()">사건 변경·적용</button>
+    <button class="yel" onclick="resetContribs()">기록 리셋</button>
+    <button onclick="togglePresent()">🖥️ 전시</button>
+    <button class="warn" onclick="closeSession()">닫기</button>
+  </div>
+
+  <div class="wrap" id="wrap"><div class="empty">반·도구·사건을 고르고 "세션 열기"를 누르세요.</div></div>
+  <div class="toast" id="toast"></div>
+
+<script>
+  var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
+  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
+  var sb=supabase.createClient(SB_URL,SB_KEY);
+  var TOK=localStorage.getItem('prob_ptok')||'';
+  var SESSION=null, CTRIBS=[], TOOL='coin', pollTimer=null, sCh=null, cCh=null;
+  var seriesX=[], seriesY=[]; // 집계 추이(교사 TV용 downsampled)
+
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1800); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function portalRPC(fn,args){ return fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args})}).then(function(r){return r.json();}).then(function(d){ if(d&&d.ok) return d.result; throw new Error((d&&d.error)||'서버 오류'); }); }
+
+  function doUnlock(){
+    var pw=document.getElementById('lpw').value, b=document.getElementById('lbtn');
+    if(!pw) return; b.disabled=true; b.textContent='확인 중…';
+    portalRPC('teacherLogin',[pw]).then(function(res){
+      b.disabled=false; b.textContent='확인';
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('prob_ptok',TOK); document.getElementById('lock').style.display='none'; document.getElementById('ctl').style.display='flex'; initCtl(); }
+      else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
+    }).catch(function(e){ b.disabled=false; b.textContent='확인'; document.getElementById('lerr').textContent='오류: '+e.message; });
+  }
+  if(TOK){ document.getElementById('lock').style.display='none'; document.getElementById('ctl').style.display='flex'; initCtl(); }
+
+  function relock(msg){ TOK=''; localStorage.removeItem('prob_ptok'); document.getElementById('ctl').style.display='none'; document.getElementById('lock').style.display='flex'; if(msg) document.getElementById('lerr').textContent=msg; }
+
+  function setTool(t){
+    TOOL = t;
+    document.getElementById('toolCoin').classList.toggle('on', t==='coin');
+    document.getElementById('toolDice').classList.toggle('on', t==='dice');
+    document.getElementById('diceEvtWrap').style.display = t==='dice' ? 'inline-flex' : 'none';
+  }
+
+  function initCtl(){
+    var sel=document.getElementById('clsSel');
+    portalRPC('graphClasses',[TOK]).then(function(res){
+      if(res&&res.success===false){ relock(res.message||'로그인이 만료됐어요. 다시 로그인해주세요.'); return; }
+      var cls=(res&&res.classes)||[];
+      if(!cls.length){ sel.innerHTML='<option value="">반 정보 없음</option>'; toast('등록된 학생이 없어요.'); return; }
+      sel.innerHTML=cls.map(function(c){return '<option>'+esc(c)+'</option>';}).join('');
+      loadActive(cls[0]);
+    }).catch(function(e){ sel.innerHTML='<option value="">불러오기 실패</option>'; toast('반 불러오기 오류: '+e.message); });
+    document.getElementById('clsSel').addEventListener('change',function(){ loadActive(this.value); });
+  }
+
+  function loadActive(cls){
+    sb.from('prob_sessions').select('*').eq('class_scope',cls).eq('active',true).order('created_at',{ascending:false}).limit(1)
+      .then(function(r){
+        SESSION=(r.data&&r.data[0])||null; CTRIBS=[]; seriesX=[]; seriesY=[];
+        if(SESSION){
+          setTool(SESSION.tool);
+          if(SESSION.tool==='dice') document.getElementById('diceEvt').value = String(SESSION.event_value);
+          subscribe(); loadContribs(); startPoll();
+        } else {
+          stopPoll(); if(sCh){sb.removeChannel(sCh);sCh=null;} if(cCh){sb.removeChannel(cCh);cCh=null;}
+          render();
+        }
+      });
+  }
+
+  function openSession(){
+    var cls=document.getElementById('clsSel').value;
+    var ev = TOOL==='dice' ? parseInt(document.getElementById('diceEvt').value)||1 : 1;
+    portalRPC('probabilityOpen',[TOK,{class_scope:cls, tool:TOOL, event_value:ev}]).then(function(res){
+      if(res&&res.success){ toast('세션을 열었어요'); loadActive(cls); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+  function applySettings(){
+    if(!SESSION){ toast('먼저 세션을 여세요'); return; }
+    var ev = TOOL==='dice' ? parseInt(document.getElementById('diceEvt').value)||1 : 1;
+    if(!confirm('사건을 바꾸면 지금까지의 반 기록이 모두 지워집니다. 계속할까요?')) return;
+    portalRPC('probabilitySettings',[TOK, SESSION.id, TOOL, ev, true]).then(function(res){
+      if(res&&res.success){ toast('사건을 바꿨어요'); loadActive(document.getElementById('clsSel').value); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+  function resetContribs(){
+    if(!SESSION){ toast('먼저 세션을 여세요'); return; }
+    if(!confirm('이번 세션의 반 기록을 모두 지웁니다. 계속할까요?')) return;
+    portalRPC('probabilityResetContribs',[TOK, SESSION.id]).then(function(res){
+      if(res&&res.success){ toast('기록을 리셋했어요'); CTRIBS=[]; seriesX=[]; seriesY=[]; render(); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+  function closeSession(){
+    if(!SESSION){ toast('세션이 없어요'); return; }
+    if(!confirm('세션을 닫을까요?')) return;
+    portalRPC('probabilityClose',[TOK, SESSION.id]).then(function(res){
+      if(res&&res.success){ toast('세션을 닫았어요'); SESSION=null; render(); stopPoll(); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+
+  function subscribe(){
+    if(sCh){sb.removeChannel(sCh);sCh=null;}
+    if(cCh){sb.removeChannel(cCh);cCh=null;}
+    sCh = sb.channel('prob-sess-tv-'+SESSION.class_scope)
+      .on('postgres_changes',{event:'*',schema:'public',table:'prob_sessions',filter:'class_scope=eq.'+SESSION.class_scope},
+        function(){ loadActive(SESSION.class_scope); }).subscribe();
+    cCh = sb.channel('prob-c-'+SESSION.id)
+      .on('postgres_changes',{event:'*',schema:'public',table:'prob_contributions',filter:'session_id=eq.'+SESSION.id},
+        function(){ loadContribs(); }).subscribe();
+  }
+
+  function startPoll(){ stopPoll(); pollTimer = setInterval(loadContribs, 5000); }
+  function stopPoll(){ if(pollTimer){ clearInterval(pollTimer); pollTimer=null; } }
+
+  function loadContribs(){
+    if(!SESSION) return;
+    sb.from('prob_contributions').select('student_id,name,trials,successes,updated_at').eq('session_id', SESSION.id).then(function(r){
+      if(r.error) return;
+      CTRIBS = r.data||[];
+      // 추이(시계열): 반 합계 기준 매 로드 시점마다 1점 (최대 60점 유지)
+      var sum = CTRIBS.reduce(function(a,c){ return {t:a.t+(c.trials||0), s:a.s+(c.successes||0)}; }, {t:0,s:0});
+      if(sum.t>0){
+        seriesX.push(sum.t); seriesY.push(sum.s/sum.t);
+        if(seriesX.length>60){ seriesX.shift(); seriesY.shift(); }
+      }
+      render();
+    });
+  }
+
+  function render(){
+    if(!SESSION){
+      document.getElementById('wrap').innerHTML='<div class="empty">반·도구·사건을 고르고 "세션 열기"를 누르세요.</div>';
+      return;
+    }
+    var isCoin = SESSION.tool==='coin';
+    var theoryStr = isCoin ? '½' : '⅙';
+    var evLabel = isCoin ? '앞면(까마귀)' : (SESSION.event_value + '의 눈');
+    var sum = CTRIBS.reduce(function(a,c){ return {t:a.t+(c.trials||0), s:a.s+(c.successes||0)}; }, {t:0,s:0});
+    var pct = sum.t ? (sum.s/sum.t) : 0;
+
+    // 학생별 정렬 (시행 많은 순)
+    var sorted = CTRIBS.slice().sort(function(a,b){ return (b.trials||0) - (a.trials||0); });
+    var studentsHtml = sorted.map(function(c, i){
+      var p = c.trials ? (c.successes/c.trials) : 0;
+      return '<div class="srow ' + (i===0&&c.trials?'top1':'') + '"><span class="nm">' + esc(c.name||c.student_id) + '</span>'
+        + '<span class="tr">' + c.trials + '회</span>'
+        + '<span class="sc">' + p.toFixed(3) + '</span></div>';
+    }).join('') || '<div style="color:#475569;padding:20px 10px;text-align:center;">학생이 아직 던지지 않았어요</div>';
+
+    document.getElementById('wrap').innerHTML =
+      '<div class="top"><div class="title">🐦‍⬛ 언제까지 ' + (isCoin?'동전':'주사위') + '을 던지게 할거야</div>'
+      + '<span class="tag">' + esc(SESSION.class_scope) + ' · ' + esc(evLabel) + '</span></div>'
+      + '<div class="grid">'
+        + '<div class="panel chart-box">'
+          + '<div class="chart-head"><span><span class="dot"></span>우리 반 합계 상대도수</span><span><span class="dash"></span>이론 ' + theoryStr + '</span></div>'
+          + '<canvas id="tvChart"></canvas>'
+        + '</div>'
+        + '<div class="panel ratio-panel">'
+          + '<div class="ratio-title">반 전체 — ' + esc(evLabel) + '이 나온 경우의 수 / 던진 횟수</div>'
+          + '<div class="frac"><div class="num">' + sum.s + '</div><div class="bar"></div><div class="den">' + sum.t + '</div></div>'
+          + '<div class="decimal">' + pct.toFixed(3) + '</div>'
+          + '<div class="theo">이론 확률 ' + theoryStr + ' = ' + Number(SESSION.theory_p).toFixed(3) + '</div>'
+        + '</div>'
+        + '<div class="panel">'
+          + '<div class="list-head"><span>👥 참여 학생</span><span>' + CTRIBS.length + '명</span></div>'
+          + '<div class="list">' + studentsHtml + '</div>'
+        + '</div>'
+      + '</div>';
+
+    drawTvChart();
+  }
+
+  function drawTvChart(){
+    var cv = document.getElementById('tvChart'); if(!cv || !SESSION) return;
+    var dpr = window.devicePixelRatio || 1;
+    var W = cv.clientWidth || 600, H = cv.clientHeight || 400;
+    cv.width = W*dpr; cv.height = H*dpr;
+    var ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+
+    var padL = 48, padR = 16, padT = 14, padB = 30;
+    var plotW = W - padL - padR, plotH = H - padT - padB;
+
+    // 격자 + y 라벨
+    ctx.font = '13px sans-serif'; ctx.fillStyle = '#64748b'; ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1;
+    for(var y=0;y<=4;y++){
+      var yy = padT + plotH * (y/4);
+      ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL+plotW, yy); ctx.stroke();
+      ctx.fillText((1 - y/4).toFixed(2), 8, yy+5);
+    }
+    ctx.strokeStyle = '#334155'; ctx.beginPath();
+    ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(padL+plotW, padT+plotH); ctx.stroke();
+
+    var lastX = seriesX[seriesX.length-1] || 10;
+    var maxX = Math.max(10, lastX);
+    ctx.fillStyle = '#64748b';
+    for(var i=0;i<=5;i++){
+      var xv = Math.round(maxX * i/5);
+      var xx = padL + plotW * i/5;
+      ctx.fillText(String(xv), xx - 10, padT+plotH+20);
+    }
+
+    // 이론확률 기준선
+    var theoryY = padT + plotH * (1 - Number(SESSION.theory_p));
+    ctx.strokeStyle = '#f87171'; ctx.setLineDash([8,5]); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(padL, theoryY); ctx.lineTo(padL+plotW, theoryY); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f87171'; ctx.font = 'bold 14px sans-serif';
+    ctx.fillText(SESSION.tool==='coin'?'½':'⅙', padL+6, theoryY-6);
+
+    if(seriesX.length===0) return;
+
+    // 실제 추이 꺾은선
+    ctx.strokeStyle = '#10b981'; ctx.lineWidth = 2.6;
+    ctx.beginPath();
+    for(var k=0;k<seriesX.length;k++){
+      var px = padL + plotW * (seriesX[k]/maxX);
+      var py = padT + plotH * (1 - seriesY[k]);
+      if(k===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+
+    // 마지막 점 강조
+    var lx = padL + plotW * (seriesX[seriesX.length-1]/maxX);
+    var ly = padT + plotH * (1 - seriesY[seriesY.length-1]);
+    ctx.fillStyle = '#10b981';
+    ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI*2); ctx.fill();
+  }
+
+  function togglePresent(){
+    document.body.classList.toggle('present');
+    if(document.body.classList.contains('present')){
+      var h=document.createElement('div');
+      h.id='exitP';
+      h.style.cssText='position:fixed;top:8px;right:8px;z-index:900;background:rgba(0,0,0,.5);color:#fff;border:none;border-radius:20px;padding:6px 12px;font-size:12px;cursor:pointer;';
+      h.textContent='✕ 제어 보기'; h.onclick=togglePresent;
+      document.body.appendChild(h);
+    } else {
+      var e=document.getElementById('exitP'); if(e) e.remove();
+    }
+    if(SESSION) drawTvChart();
+  }
+
+  window.addEventListener('resize', function(){ if(SESSION) drawTvChart(); });
+</script>
+</body>
+</html>
