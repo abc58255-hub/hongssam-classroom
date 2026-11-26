@@ -1,0 +1,10 @@
+{
+  "name": "도장 조회",
+  "short_name": "도장조회",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f59e0b",
+  "theme_color": "#f59e0b",
+  "icons": []
+}

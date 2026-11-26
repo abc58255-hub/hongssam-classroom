@@ -1,0 +1,10 @@
+{
+  "name": "교실 칭찬",
+  "short_name": "교실칭찬",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#7c3aed",
+  "theme_color": "#7c3aed",
+  "icons": []
+}

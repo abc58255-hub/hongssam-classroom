@@ -159,3 +159,32 @@ function deleteSurvey(svId) {
     return { success: false, message: '해당 설문을 찾을 수 없습니다.' };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
+
+// ══════════════════════════════════════════════════════════════
+//  PWA 전환 — doPost RPC + 교사 로그인 게이트 (StudentAuth=코어 공용)
+//  프론트(fcm-sw/survey/)가 google.script.run 어댑터로 호출.
+// ══════════════════════════════════════════════════════════════
+function teacherLogin(pw)             { return StudentAuth.teacherLogin(pw); }
+function teacherLogout(token)         { try { return StudentAuth.teacherLogout(token); } catch(_) { return { success: true }; } }
+function validateTeacherSession(token){ return StudentAuth.verifyTeacher(token); }
+
+var RPC_WHITELIST = [
+  'getInitData', 'getSurveyData', 'saveNewSurvey', 'updateSurvey', 'updateSurveyStatus', 'deleteSurvey',
+  'teacherLogin', 'teacherLogout', 'validateTeacherSession'
+];
+var RPC_NOAUTH = ['teacherLogin', 'teacherLogout', 'validateTeacherSession'];
+function _atOk_(token) { try { var v = StudentAuth.verifyTeacher(token); return (v === true) || !!(v && (v.success || v.valid || v.ok)); } catch(_) { return false; } }
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    if (RPC_NOAUTH.indexOf(req.fn) < 0 && !_atOk_(req.token)) {
+      return ContentService.createTextOutput(JSON.stringify({ ok: false, error: '로그인이 필요해요', needAuth: true })).setMimeType(ContentService.MimeType.JSON);
+    }
+    var fn = globalThis[req.fn];
+    if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
+    out = { ok: true, result: fn.apply(null, req.args || []) };
+  } catch (err) { out = { ok: false, error: String(err && err.message || err) }; }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}

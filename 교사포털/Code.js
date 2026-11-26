@@ -112,8 +112,8 @@ function getPortalData() {
     { title: '학급운영', cards: [
       { name: '알림관리',  icon: '🔔', desc: '학급알림 작성·푸시 알림 전송',    keys: ['알림관리'], url: 'https://abc58255-hub.github.io/hongssam-classroom/notify/' },
       { name: '창체관리',  icon: '🎯', desc: '창의적 체험활동 관리',         keys: ['창체관리'], url: 'https://abc58255-hub.github.io/hongssam-classroom/activity/' },
-      { name: '설문관리',  icon: '📊', desc: '우리 반 설문 만들기·결과',      keys: ['설문관리', '설문'] },
-      { name: '칭찬',      icon: '💝', desc: '칭찬 이벤트·배정·기록',        keys: ['칭찬'] },
+      { name: '설문관리',  icon: '📊', desc: '우리 반 설문 만들기·결과',      keys: ['설문관리', '설문'], url: 'https://abc58255-hub.github.io/hongssam-classroom/survey/' },
+      { name: '칭찬',      icon: '💝', desc: '칭찬 이벤트·배정·기록',        keys: ['칭찬'], url: 'https://abc58255-hub.github.io/hongssam-classroom/praise/' },
       { name: '학급비',    icon: '💰', desc: '학급비 영수증·예산',          keys: ['업무도구'], suffix: '?page=budget' },
       { name: 'TV알림판',  icon: '📺', desc: '교실 TV 공지 화면',           keys: ['교실알림판', 'TV알림판', '교실TV알림판'], url: 'https://abc58255-hub.github.io/hongssam-classroom/tvboard/' }
     ]},
@@ -123,7 +123,7 @@ function getPortalData() {
     { title: '도구', cards: [
       { name: 'AI업무분석', icon: '🤖', desc: '공문·메시지 AI 분석 → TickTick', keys: ['AI업무분석'], url: 'https://abc58255-hub.github.io/hongssam-classroom/ai/' },
       { name: '도장입력',  icon: '🏅', desc: '학생 도장 부여',             keys: ['도장입력'], url: 'https://abc58255-hub.github.io/hongssam-classroom/stamp/' },
-      { name: '도장조회',  icon: '🔍', desc: '도장 데이터 조회',            keys: ['도장데이터', '도장조회'] },
+      { name: '도장조회',  icon: '🔍', desc: '도장 데이터 조회',            keys: ['도장데이터', '도장조회'], url: 'https://abc58255-hub.github.io/hongssam-classroom/dojang/' },
       { name: '방탈출',    icon: '🔓', desc: '방탈출 게임 만들기',          keys: ['업무도구'], suffix: '?page=escape' }
     ]},
     { title: '학생용 (학생에게 안내)', student: true, cards: [

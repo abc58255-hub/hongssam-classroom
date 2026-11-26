@@ -1,0 +1,10 @@
+{
+  "name": "우리 반 설문",
+  "short_name": "설문관리",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0ea5e9",
+  "theme_color": "#0ea5e9",
+  "icons": []
+}
