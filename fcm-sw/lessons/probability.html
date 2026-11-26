@@ -174,11 +174,11 @@
       + '<div class="panel">'
         + '<div class="stage" id="stage">' + stageHtml(isCoin, null) + '</div>'
         + '<div class="throw-btns">'
-          + '<button class="tbtn tb1" onclick="throwN(1)"><div class="n">1</div><div class="l">번</div></button>'
-          + '<button class="tbtn tb5" onclick="throwN(5)"><div class="n">5</div><div class="l">번</div></button>'
-          + '<button class="tbtn tb10" onclick="throwN(10)"><div class="n">10</div><div class="l">번</div></button>'
-          + '<button class="tbtn tb20" onclick="throwN(20)"><div class="n">20</div><div class="l">번</div></button>'
-          + '<button class="tbtn tb50" onclick="throwN(50)"><div class="n">50</div><div class="l">번</div></button>'
+          + '<button type="button" class="tbtn tb1" data-n="1"><div class="n">1</div><div class="l">번</div></button>'
+          + '<button type="button" class="tbtn tb5" data-n="5"><div class="n">5</div><div class="l">번</div></button>'
+          + '<button type="button" class="tbtn tb10" data-n="10"><div class="n">10</div><div class="l">번</div></button>'
+          + '<button type="button" class="tbtn tb20" data-n="20"><div class="n">20</div><div class="l">번</div></button>'
+          + '<button type="button" class="tbtn tb50" data-n="50"><div class="n">50</div><div class="l">번</div></button>'
         + '</div>'
         + '<div class="log-line"><span>최근 결과</span><span id="totalBadge">총 0회</span></div>'
         + '<div class="log-strip" id="logStrip"></div>'
@@ -192,7 +192,7 @@
       + '<div class="panel chart-wrap">'
         + '<div class="chart-head">'
           + '<div class="legend"><span><span class="dot"></span>실제 상대도수</span><span><span class="dash"></span>이론 ' + theoryStr + '</span></div>'
-          + '<button class="reset-btn" onclick="resetLocal()">처음부터</button>'
+          + '<button type="button" class="reset-btn">처음부터</button>'
         + '</div>'
         + '<canvas id="chart"></canvas>'
       + '</div>'
@@ -232,7 +232,9 @@
   }
 
   function throwN(n){
-    if(busy || !SESSION) return;
+    console.log('[prob] throwN', n, 'busy=', busy, 'SESSION?', !!SESSION);
+    if(busy) { console.warn('[prob] busy 상태라 스킵'); return; }
+    if(!SESSION) { console.warn('[prob] SESSION 없음 — 세션이 열려있는지 확인'); return; }
     var isCoin = SESSION.tool==='coin';
     var evt = isCoin ? 1 : SESSION.event_value;
     var results=[]; var lastVal=null;
@@ -381,6 +383,16 @@
   }
 
   window.addEventListener('resize', function(){ if(SESSION) drawChart(); });
+
+  // onclick 속성이 혹시 실패해도 작동하도록 명시적으로 window에 바인딩 + 위임 핸들러
+  window.throwN = throwN;
+  window.resetLocal = resetLocal;
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest && ev.target.closest('.tbtn');
+    if(t){ var n = parseInt(t.getAttribute('data-n')||'0', 10); if(n>0) throwN(n); return; }
+    var r = ev.target.closest && ev.target.closest('.reset-btn');
+    if(r){ resetLocal(); }
+  });
 </script>
 </body>
 </html>
