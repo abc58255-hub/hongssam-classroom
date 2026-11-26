@@ -34,6 +34,7 @@ function _serviceUrl_() {
 var RPC_WHITELIST = [
   'teacherLogin', 'teacherLogout', 'validateTeacherSession',
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
+  'getRosterAdmin', 'addStudents', 'updateStudent', 'archiveStudent', 'getArchivedStudents', 'restoreStudent',
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
   'getLinks', 'saveLink', 'deleteLink',
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
@@ -118,7 +119,8 @@ function getPortalData() {
       { name: 'TV알림판',  icon: '📺', desc: '교실 TV 공지 화면',           keys: ['교실알림판', 'TV알림판', '교실TV알림판'], url: 'https://abc58255-hub.github.io/hongssam-classroom/tvboard/' }
     ]},
     { title: '안전·기록', cards: [
-      { name: '관찰·신고', icon: '🚨', desc: '학생 관찰 기록·신고 접수함',    keys: ['관찰신고'], url: 'https://abc58255-hub.github.io/hongssam-classroom/observe/' }
+      { name: '관찰·신고', icon: '🚨', desc: '학생 관찰 기록·신고 접수함',    keys: ['관찰신고'], url: 'https://abc58255-hub.github.io/hongssam-classroom/observe/' },
+      { name: '학생 관리', icon: '👥', desc: '명단 추가·수정·전학·비번 초기화', keys: [], url: 'https://abc58255-hub.github.io/hongssam-classroom/roster/' }
     ]},
     { title: '도구', cards: [
       { name: 'AI업무분석', icon: '🤖', desc: '공문·메시지 AI 분석 → TickTick', keys: ['AI업무분석'], url: 'https://abc58255-hub.github.io/hongssam-classroom/ai/' },
@@ -351,4 +353,191 @@ function getStudentList() {
 function resetStudentPassword(studentId, newPw) {
   try { return ClassCore.resetStudentPw(studentId, newPw || ''); }
   catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  👥 학생 관리 — 명단 시트 직접 CRUD (교사 전용)
+//  명단 시트 = ClassCore.getAuthSheetId()의 스프레드시트 내 '학번/이름' 헤더 탭.
+//  전학·졸업은 '_전학보관' 탭으로 행 이동 → 라이브러리 로그인/명단에서 자동 제외(복구 가능).
+//  구조: B=학번, C=이름, D=비번해시 (A=번호). 반 = 학번 앞 2자리(학년·반).
+// ══════════════════════════════════════════════════════════════
+var ARCHIVE_TAB = '_전학보관';
+
+function _rosterSS_() {
+  var id = ClassCore.getAuthSheetId();
+  if (!id) throw new Error('인증 시트 ID를 찾을 수 없어요 (ClassCore.getAuthSheetId)');
+  return SpreadsheetApp.openById(id);
+}
+// 학번/이름 헤더가 있는 명단 탭 자동 탐지
+function _rosterSheet_() {
+  var ss = _rosterSS_(), shs = ss.getSheets();
+  for (var i = 0; i < shs.length; i++) {
+    var sh = shs[i];
+    if (sh.getName() === ARCHIVE_TAB) continue;
+    if (sh.getLastColumn() < 2) continue;
+    var hdr = sh.getRange(1, 1, 1, Math.min(6, sh.getLastColumn())).getValues()[0].map(function (x) { return String(x).trim(); });
+    if (hdr.indexOf('학번') >= 0 && hdr.indexOf('이름') >= 0) return sh;
+  }
+  // 폴백: 첫 시트 (B=학번,C=이름 가정)
+  return shs[0];
+}
+function _archiveSheet_(create) {
+  var ss = _rosterSS_();
+  var sh = ss.getSheetByName(ARCHIVE_TAB);
+  if (!sh && create) {
+    sh = ss.insertSheet(ARCHIVE_TAB);
+    sh.getRange(1, 1, 1, 6).setValues([['번호', '학번', '이름', '비번해시', '보관일', '사유']]);
+  }
+  return sh;
+}
+function _clsOfSid_(sid) {
+  sid = String(sid || '').trim();
+  return sid.length >= 2 ? (sid.charAt(0) + '학년 ' + sid.charAt(1) + '반') : '';
+}
+
+// 명단 조회 (반별 그룹 + 보관 인원 수)
+function getRosterAdmin(token) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  try {
+    var sh = _rosterSheet_();
+    var last = sh.getLastRow();
+    var vals = last > 1 ? sh.getRange(2, 1, last - 1, Math.max(4, sh.getLastColumn())).getValues() : [];
+    var students = [];
+    vals.forEach(function (r, i) {
+      var sid = String(r[1] || '').trim();
+      if (!sid) return;
+      students.push({ row: i + 2, sid: sid, name: String(r[2] || '').trim(), hasPw: !!String(r[3] || '').trim(), cls: _clsOfSid_(sid) });
+    });
+    students.sort(function (a, b) { return a.sid.localeCompare(b.sid, 'ko', { numeric: true }); });
+    var arch = _archiveSheet_(false);
+    var archCount = arch && arch.getLastRow() > 1 ? arch.getLastRow() - 1 : 0;
+    return { success: true, students: students, archivedCount: archCount };
+  } catch (e) { return { success: false, message: String(e && e.message || e) }; }
+}
+
+// 대량/단일 추가 — text = "학번 이름" 줄 목록(공백/탭/쉼표 구분). 중복 학번은 건너뜀.
+function addStudents(token, text) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  try {
+    var sh = _rosterSheet_();
+    var last = sh.getLastRow();
+    var existing = {};
+    if (last > 1) sh.getRange(2, 2, last - 1, 1).getValues().forEach(function (r) { var s = String(r[0] || '').trim(); if (s) existing[s] = 1; });
+    var lines = String(text || '').split(/\r?\n/);
+    var toAdd = [], skipped = [], bad = [];
+    lines.forEach(function (ln) {
+      ln = ln.trim(); if (!ln) return;
+      var parts = ln.split(/[\s,\t]+/).filter(Boolean);
+      if (parts.length < 2) { bad.push(ln); return; }
+      var sid = parts[0].replace(/[^0-9]/g, '');
+      var name = parts.slice(1).join(' ').trim();
+      if (!/^\d{3,5}$/.test(sid) || !name) { bad.push(ln); return; }
+      if (existing[sid]) { skipped.push(sid); return; }
+      existing[sid] = 1; toAdd.push([ '', sid, name, '' ]);
+    });
+    if (toAdd.length) sh.getRange(sh.getLastRow() + 1, 1, toAdd.length, 4).setValues(toAdd);
+    _autoRenumber_(sh);
+    var sync = _safeSync_();
+    return { success: true, added: toAdd.length, skipped: skipped, bad: bad, synced: sync };
+  } catch (e) { return { success: false, message: String(e && e.message || e) }; }
+}
+
+// 학생 수정 (이름/학번). oldSid로 찾아 newSid·newName으로. 학번 변경 시 중복 체크.
+function updateStudent(token, oldSid, newSid, newName) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  try {
+    oldSid = String(oldSid || '').trim(); newSid = String(newSid || '').trim().replace(/[^0-9]/g, '');
+    newName = String(newName || '').trim();
+    if (!newSid || !newName) return { success: false, message: '학번과 이름을 입력해주세요.' };
+    var sh = _rosterSheet_(), last = sh.getLastRow();
+    var vals = sh.getRange(2, 2, last - 1, 2).getValues(); // B,C
+    var rowIdx = -1, dup = false;
+    for (var i = 0; i < vals.length; i++) {
+      var s = String(vals[i][0] || '').trim();
+      if (s === oldSid) rowIdx = i + 2;
+      else if (s === newSid) dup = true;
+    }
+    if (rowIdx < 0) return { success: false, message: '학생을 찾을 수 없어요: ' + oldSid };
+    if (newSid !== oldSid && dup) return { success: false, message: '이미 있는 학번이에요: ' + newSid };
+    sh.getRange(rowIdx, 2).setValue(newSid);
+    sh.getRange(rowIdx, 3).setValue(newName);
+    var sync = _safeSync_();
+    return { success: true, synced: sync };
+  } catch (e) { return { success: false, message: String(e && e.message || e) }; }
+}
+
+// 전학·졸업 보관 — 명단 행을 _전학보관 탭으로 이동(삭제 아님).
+function archiveStudent(token, sid, reason) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  try {
+    sid = String(sid || '').trim();
+    var sh = _rosterSheet_(), last = sh.getLastRow();
+    var vals = sh.getRange(2, 1, last - 1, 4).getValues();
+    var rowIdx = -1, rowData = null;
+    for (var i = 0; i < vals.length; i++) { if (String(vals[i][1] || '').trim() === sid) { rowIdx = i + 2; rowData = vals[i]; break; } }
+    if (rowIdx < 0) return { success: false, message: '학생을 찾을 수 없어요: ' + sid };
+    var arch = _archiveSheet_(true);
+    arch.appendRow(['', rowData[1], rowData[2], rowData[3], new Date(), String(reason || '전학')]);
+    sh.deleteRow(rowIdx);
+    _autoRenumber_(sh);
+    var sync = _safeSync_();
+    return { success: true, synced: sync };
+  } catch (e) { return { success: false, message: String(e && e.message || e) }; }
+}
+
+// 보관 학생 목록
+function getArchivedStudents(token) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  try {
+    var arch = _archiveSheet_(false);
+    if (!arch || arch.getLastRow() < 2) return { success: true, students: [] };
+    var vals = arch.getRange(2, 1, arch.getLastRow() - 1, 6).getValues();
+    var list = vals.map(function (r, i) {
+      return { row: i + 2, sid: String(r[1] || '').trim(), name: String(r[2] || '').trim(),
+        cls: _clsOfSid_(r[1]), date: r[4] ? Utilities.formatDate(new Date(r[4]), 'Asia/Seoul', 'yyyy-MM-dd') : '', reason: String(r[5] || '') };
+    }).filter(function (x) { return x.sid; });
+    return { success: true, students: list };
+  } catch (e) { return { success: false, message: String(e && e.message || e) }; }
+}
+
+// 보관 학생 복구 — 보관 탭에서 명단으로 되돌림(비번해시 포함).
+function restoreStudent(token, sid) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  try {
+    sid = String(sid || '').trim();
+    var arch = _archiveSheet_(false);
+    if (!arch || arch.getLastRow() < 2) return { success: false, message: '보관 명단이 없어요.' };
+    var vals = arch.getRange(2, 1, arch.getLastRow() - 1, 6).getValues();
+    var rowIdx = -1, rowData = null;
+    for (var i = 0; i < vals.length; i++) { if (String(vals[i][1] || '').trim() === sid) { rowIdx = i + 2; rowData = vals[i]; break; } }
+    if (rowIdx < 0) return { success: false, message: '보관 학생을 찾을 수 없어요: ' + sid };
+    var sh = _rosterSheet_();
+    // 현재 명단에 같은 학번 있으면 복구 차단
+    var cur = sh.getLastRow() > 1 ? sh.getRange(2, 2, sh.getLastRow() - 1, 1).getValues() : [];
+    if (cur.some(function (r) { return String(r[0] || '').trim() === sid; })) return { success: false, message: '이미 명단에 있는 학번이에요: ' + sid };
+    sh.appendRow(['', rowData[1], rowData[2], rowData[3]]);
+    arch.deleteRow(rowIdx);
+    _autoRenumber_(sh);
+    var sync = _safeSync_();
+    return { success: true, synced: sync };
+  } catch (e) { return { success: false, message: String(e && e.message || e) }; }
+}
+
+// A열 번호 자동 매김 (1부터)
+function _autoRenumber_(sh) {
+  try {
+    var last = sh.getLastRow(); if (last < 2) return;
+    var n = last - 1, seq = [];
+    for (var i = 1; i <= n; i++) seq.push([i]);
+    sh.getRange(2, 1, n, 1).setValues(seq);
+  } catch (_) {}
+}
+// 변경 후 Supabase 자동 동기화 (실패해도 CRUD 자체는 성공 처리)
+function _safeSync_() {
+  try {
+    var key = _cfg('수업활동동기화키', '');
+    if (!key) return false;
+    UrlFetchApp.fetch(STUDENT_MATH_URL + '?action=syncRoster&key=' + encodeURIComponent(key), { muteHttpExceptions: true, followRedirects: true });
+    return true;
+  } catch (_) { return false; }
 }

@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="학생 관리">
+<meta name="theme-color" content="#1e3a8a">
+<link rel="manifest" href="./manifest.json">
+<title>학생 관리</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;background:#f1f5f9;color:#0f172a;min-height:100vh;}
+  /* 잠금 */
+  #lock{position:fixed;inset:0;background:linear-gradient(135deg,#3b82f6,#1e3a8a);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;}
+  #lock .box{background:#fff;padding:40px;border-radius:24px;width:360px;max-width:100%;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.25);}
+  #lock .emoji{font-size:48px;margin-bottom:12px;}
+  #lock h2{font-size:22px;font-weight:900;margin-bottom:6px;}
+  #lock .desc{font-size:13px;color:#64748b;margin-bottom:22px;}
+  #lock input{width:100%;padding:14px 16px;border:2px solid #e2e8f0;border-radius:14px;background:#f8fafc;font-size:15px;margin-bottom:12px;}
+  #lock input:focus{outline:none;border-color:#3b82f6;background:#fff;}
+  #lock button{width:100%;padding:14px;background:#2563eb;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:800;cursor:pointer;}
+  #lerr{color:#dc2626;font-size:13px;margin-top:10px;min-height:18px;font-weight:700;}
+
+  header{background:#fff;padding:16px 20px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 6px rgba(0,0,0,.06);position:sticky;top:0;z-index:20;flex-wrap:wrap;}
+  header h1{font-size:19px;font-weight:900;}
+  header .sp{flex:1;}
+  .hbtn{background:#eef2ff;color:#3730a3;border:none;padding:9px 14px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;text-decoration:none;}
+  .hbtn.ghost{background:#f1f5f9;color:#64748b;}
+  main{max-width:860px;margin:0 auto;padding:18px 16px 60px;}
+
+  .btn{padding:10px 16px;border:none;border-radius:10px;font-size:14px;font-weight:800;cursor:pointer;background:#2563eb;color:#fff;}
+  .btn.green{background:#059669;} .btn.gray{background:#e2e8f0;color:#475569;} .btn.amber{background:#f59e0b;}
+  .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px;}
+  .btn.ghost{background:#fff;border:1.5px solid #e2e8f0;color:#475569;}
+  .btn.red{background:#fee2e2;color:#b91c1c;}
+
+  .cls-group{margin-bottom:18px;}
+  .cls-head{font-size:14px;font-weight:900;color:#1e3a8a;margin:0 2px 8px;display:flex;align-items:center;gap:8px;}
+  .cls-head .cnt{font-size:12px;color:#94a3b8;font-weight:700;}
+  .card{background:#fff;border-radius:14px;box-shadow:0 2px 8px rgba(0,0,0,.05);overflow:hidden;}
+  .srow{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid #f1f5f9;}
+  .srow:last-child{border-bottom:none;}
+  .srow .sid{font-weight:900;color:#2563eb;font-size:14px;width:56px;flex-shrink:0;}
+  .srow .nm{flex:1;font-weight:700;font-size:15px;min-width:0;}
+  .srow .pw{font-size:11px;font-weight:800;padding:2px 8px;border-radius:999px;}
+  .pw.set{background:#dcfce7;color:#15803d;} .pw.no{background:#fef3c7;color:#b45309;}
+  .srow .acts{display:flex;gap:5px;flex-shrink:0;}
+
+  .empty{text-align:center;color:#94a3b8;padding:50px 14px;font-weight:700;line-height:1.7;}
+  .loading{text-align:center;color:#94a3b8;padding:60px;font-weight:700;}
+
+  /* 모달 */
+  .modal{position:fixed;inset:0;background:rgba(15,23,42,.55);display:none;align-items:center;justify-content:center;z-index:100;padding:20px;}
+  .modal.show{display:flex;}
+  .modal .box{background:#fff;border-radius:20px;padding:24px;width:440px;max-width:100%;max-height:88vh;overflow-y:auto;box-shadow:0 20px 50px rgba(0,0,0,.3);}
+  .modal h3{font-size:18px;font-weight:900;margin-bottom:4px;}
+  .modal .mdesc{font-size:12.5px;color:#64748b;margin-bottom:16px;line-height:1.5;}
+  .modal label{display:block;font-size:12px;font-weight:800;color:#475569;margin:12px 0 5px;}
+  .modal input,.modal textarea{width:100%;padding:12px 13px;border:2px solid #e2e8f0;border-radius:11px;font-size:15px;font-family:inherit;}
+  .modal input:focus,.modal textarea:focus{outline:none;border-color:#2563eb;}
+  .modal textarea{min-height:140px;resize:vertical;}
+  .modal .mrow{display:flex;gap:10px;margin-top:18px;}
+  .modal .mrow .btn{flex:1;}
+  .warn-box{background:#fffbeb;border:1px solid #fde68a;border-radius:10px;padding:10px 12px;font-size:12px;color:#92400e;margin-top:12px;line-height:1.5;}
+
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:12px 22px;border-radius:999px;font-size:14px;font-weight:700;z-index:800;opacity:0;transition:.3s;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.3);}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+  <div id="lock"><div class="box"><div class="emoji">👥</div><h2>학생 관리</h2><div class="desc">교사 비밀번호를 입력하세요</div>
+    <input type="password" id="lpw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
+    <button id="lbtn" onclick="doUnlock()">입장</button><div id="lerr"></div></div></div>
+
+  <div id="app" style="display:none;">
+    <header>
+      <h1>👥 학생 관리</h1>
+      <span class="sp"></span>
+      <button class="hbtn" onclick="openAdd()">➕ 학생 추가</button>
+      <button class="hbtn ghost" onclick="openArchive()">📦 전학·졸업 보관함 <span id="archBadge"></span></button>
+      <a class="hbtn ghost" href="https://abc58255-hub.github.io/hongssam-classroom/portal/">⚙ 포털</a>
+    </header>
+    <main>
+      <div id="body"><div class="loading">불러오는 중…</div></div>
+    </main>
+  </div>
+
+  <!-- 추가 모달 -->
+  <div class="modal" id="addModal"><div class="box">
+    <h3>➕ 학생 추가</h3>
+    <div class="mdesc">한 줄에 한 명씩 <b>학번 이름</b> 형식으로 붙여넣으세요. (엑셀에서 두 칸 복사해도 됨)<br>이미 있는 학번은 자동으로 건너뜁니다.</div>
+    <label>명단 붙여넣기</label>
+    <textarea id="addText" placeholder="2601 김철수&#10;2602 이영희&#10;2603 박민수"></textarea>
+    <div class="mrow"><button class="btn gray" onclick="closeModal('addModal')">취소</button><button class="btn green" id="addBtn" onclick="doAdd()">추가하기</button></div>
+  </div></div>
+
+  <!-- 수정 모달 -->
+  <div class="modal" id="editModal"><div class="box">
+    <h3>✏️ 학생 수정</h3>
+    <div class="mdesc">이름이나 학번을 바꿀 수 있어요.</div>
+    <label>학번</label>
+    <input type="text" id="editSid" inputmode="numeric">
+    <label>이름</label>
+    <input type="text" id="editName">
+    <div class="warn-box" id="editWarn" style="display:none;">⚠️ 학번을 바꾸면 반이 이동되지만, 그 학생의 <b>과거 성적·도장 기록은 예전 학번에 남아</b> 새 학번과 연결이 끊길 수 있어요. 반 이동이 꼭 필요할 때만 바꿔주세요.</div>
+    <div class="mrow"><button class="btn gray" onclick="closeModal('editModal')">취소</button><button class="btn" id="editBtn" onclick="doEdit()">저장</button></div>
+  </div></div>
+
+  <!-- 비번 초기화 모달 -->
+  <div class="modal" id="pwModal"><div class="box">
+    <h3>🔑 비밀번호 초기화</h3>
+    <div class="mdesc"><b id="pwWho"></b> 학생의 비밀번호를 처리합니다.</div>
+    <label>새 비밀번호 (비우면 삭제 → 학생이 다음 로그인 때 새로 설정)</label>
+    <input type="text" id="pwNew" placeholder="비우면 삭제">
+    <div class="mrow"><button class="btn gray" onclick="closeModal('pwModal')">취소</button><button class="btn amber" id="pwBtn" onclick="doResetPw()">적용</button></div>
+  </div></div>
+
+  <!-- 보관함 모달 -->
+  <div class="modal" id="archModal"><div class="box">
+    <h3>📦 전학·졸업 보관함</h3>
+    <div class="mdesc">보관하면 로그인·명단에서 빠지고, 복구하면 되돌아옵니다(비번 포함).</div>
+    <div id="archList"><div class="loading">불러오는 중…</div></div>
+    <div class="mrow"><button class="btn gray" onclick="closeModal('archModal')">닫기</button></div>
+  </div></div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+  var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  var TOK=localStorage.getItem('lesson_ptok')||localStorage.getItem('roster_ptok')||'';
+  var STUDENTS=[], EDIT_OLD='';
+
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},2000); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function rpc(fn,args){ return fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:fn,args:args})}).then(function(r){return r.json();}).then(function(d){ if(d&&d.ok) return d.result; throw new Error((d&&d.error)||'서버 오류'); }); }
+  function openModal(id){ document.getElementById(id).classList.add('show'); }
+  function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+  function doUnlock(){
+    var pw=document.getElementById('lpw').value, b=document.getElementById('lbtn');
+    if(!pw) return; b.disabled=true; b.textContent='확인 중…';
+    rpc('teacherLogin',[pw]).then(function(res){
+      b.disabled=false; b.textContent='입장';
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('lesson_ptok',TOK); localStorage.setItem('roster_ptok',TOK); document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block'; load(); }
+      else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
+    }).catch(function(e){ b.disabled=false; b.textContent='입장'; document.getElementById('lerr').textContent='오류: '+e.message; });
+  }
+  if(TOK){ document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block'; load(); }
+
+  function relock(msg){ TOK=''; localStorage.removeItem('lesson_ptok'); localStorage.removeItem('roster_ptok'); document.getElementById('app').style.display='none'; document.getElementById('lock').style.display='flex'; if(msg) document.getElementById('lerr').textContent=msg; }
+
+  function load(){
+    document.getElementById('body').innerHTML='<div class="loading">불러오는 중…</div>';
+    rpc('getRosterAdmin',[TOK]).then(function(res){
+      if(res&&res.success===false){ relock(res.message||'다시 로그인해주세요.'); return; }
+      STUDENTS=res.students||[];
+      document.getElementById('archBadge').textContent = res.archivedCount ? '('+res.archivedCount+')' : '';
+      render();
+    }).catch(function(e){ document.getElementById('body').innerHTML='<div class="empty">불러오기 오류: '+esc(e.message)+'</div>'; });
+  }
+
+  function render(){
+    if(!STUDENTS.length){ document.getElementById('body').innerHTML='<div class="empty">명단이 비어있어요.<br>➕ 학생 추가로 시작하세요.</div>'; return; }
+    var groups={}, order=[];
+    STUDENTS.forEach(function(s){ var c=s.cls||'기타'; if(!groups[c]){ groups[c]=[]; order.push(c); } groups[c].push(s); });
+    order.sort(function(a,b){ return a.localeCompare(b,'ko',{numeric:true}); });
+    document.getElementById('body').innerHTML = order.map(function(c){
+      var rows=groups[c].map(function(s){
+        return '<div class="srow">'
+          + '<span class="sid">'+esc(s.sid)+'</span>'
+          + '<span class="nm">'+esc(s.name)+'</span>'
+          + '<span class="pw '+(s.hasPw?'set':'no')+'">'+(s.hasPw?'비번 O':'비번 X')+'</span>'
+          + '<span class="acts">'
+          + '<button class="btn ghost sm" onclick="openEdit(\''+esc(s.sid)+'\')">✏️</button>'
+          + '<button class="btn ghost sm" onclick="openPw(\''+esc(s.sid)+'\')">🔑</button>'
+          + '<button class="btn red sm" onclick="doArchive(\''+esc(s.sid)+'\')">전학</button>'
+          + '</span></div>';
+      }).join('');
+      return '<div class="cls-group"><div class="cls-head">'+esc(c)+' <span class="cnt">'+groups[c].length+'명</span></div><div class="card">'+rows+'</div></div>';
+    }).join('');
+  }
+
+  function openAdd(){ document.getElementById('addText').value=''; openModal('addModal'); }
+  function doAdd(){
+    var text=document.getElementById('addText').value.trim(); if(!text){ toast('명단을 붙여넣어주세요'); return; }
+    var b=document.getElementById('addBtn'); b.disabled=true; b.textContent='추가 중…';
+    rpc('addStudents',[TOK,text]).then(function(res){
+      b.disabled=false; b.textContent='추가하기';
+      if(res&&res.success){ closeModal('addModal'); var m='✅ '+res.added+'명 추가'; if(res.skipped&&res.skipped.length) m+=' · 중복 '+res.skipped.length+'건 건너뜀'; if(res.bad&&res.bad.length) m+=' · 형식오류 '+res.bad.length+'줄'; toast(m); load(); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ b.disabled=false; b.textContent='추가하기'; toast('오류: '+e.message); });
+  }
+
+  function openEdit(sid){
+    var s=STUDENTS.filter(function(x){return x.sid===sid;})[0]; if(!s) return;
+    EDIT_OLD=sid;
+    document.getElementById('editSid').value=sid;
+    document.getElementById('editName').value=s.name;
+    document.getElementById('editWarn').style.display='none';
+    openModal('editModal');
+    document.getElementById('editSid').oninput=function(){ document.getElementById('editWarn').style.display = (this.value.trim()!==EDIT_OLD)?'block':'none'; };
+  }
+  function doEdit(){
+    var sid=document.getElementById('editSid').value.trim(), name=document.getElementById('editName').value.trim();
+    if(!sid||!name){ toast('학번과 이름을 입력해주세요'); return; }
+    var b=document.getElementById('editBtn'); b.disabled=true; b.textContent='저장 중…';
+    rpc('updateStudent',[TOK,EDIT_OLD,sid,name]).then(function(res){
+      b.disabled=false; b.textContent='저장';
+      if(res&&res.success){ closeModal('editModal'); toast('✅ 수정됨'); load(); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ b.disabled=false; b.textContent='저장'; toast('오류: '+e.message); });
+  }
+
+  function openPw(sid){
+    var s=STUDENTS.filter(function(x){return x.sid===sid;})[0]; if(!s) return;
+    document.getElementById('pwWho').textContent=s.name+' ('+sid+')';
+    document.getElementById('pwNew').value=''; document.getElementById('pwBtn').dataset.sid=sid;
+    openModal('pwModal');
+  }
+  function doResetPw(){
+    var sid=document.getElementById('pwBtn').dataset.sid, np=document.getElementById('pwNew').value;
+    var b=document.getElementById('pwBtn'); b.disabled=true; b.textContent='적용 중…';
+    rpc('resetStudentPassword',[sid,np]).then(function(res){
+      b.disabled=false; b.textContent='적용';
+      closeModal('pwModal'); toast('✅ 비밀번호 '+(np?'변경':'삭제')+'됨'); load();
+    }).catch(function(e){ b.disabled=false; b.textContent='적용'; toast('오류: '+e.message); });
+  }
+
+  function doArchive(sid){
+    var s=STUDENTS.filter(function(x){return x.sid===sid;})[0]; if(!s) return;
+    var reason=prompt(s.name+'('+sid+') 보관 사유 (예: 전학/졸업)', '전학');
+    if(reason===null) return;
+    rpc('archiveStudent',[TOK,sid,reason]).then(function(res){
+      if(res&&res.success){ toast('📦 보관됨 — 복구는 보관함에서'); load(); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+
+  function openArchive(){
+    openModal('archModal');
+    document.getElementById('archList').innerHTML='<div class="loading">불러오는 중…</div>';
+    rpc('getArchivedStudents',[TOK]).then(function(res){
+      var list=(res&&res.students)||[];
+      if(!list.length){ document.getElementById('archList').innerHTML='<div class="empty">보관된 학생이 없어요.</div>'; return; }
+      document.getElementById('archList').innerHTML='<div class="card">'+list.map(function(s){
+        return '<div class="srow"><span class="sid">'+esc(s.sid)+'</span><span class="nm">'+esc(s.name)
+          +' <span style="font-size:11px;color:#94a3b8;font-weight:700;">'+esc(s.reason)+' · '+esc(s.date)+'</span></span>'
+          +'<button class="btn green sm" onclick="doRestore(\''+esc(s.sid)+'\')">복구</button></div>';
+      }).join('')+'</div>';
+    }).catch(function(e){ document.getElementById('archList').innerHTML='<div class="empty">오류: '+esc(e.message)+'</div>'; });
+  }
+  function doRestore(sid){
+    rpc('restoreStudent',[TOK,sid]).then(function(res){
+      if(res&&res.success){ toast('✅ 복구됨'); openArchive(); load(); }
+      else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ toast('오류: '+e.message); });
+  }
+</script>
+</body>
+</html>
