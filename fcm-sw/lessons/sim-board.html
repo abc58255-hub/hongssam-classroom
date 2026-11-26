@@ -5,43 +5,41 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>닮음 보물찾기 — 순위판</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>:root{ --accent:#0f766e; --accent-dark:#115e59; }</style>
+<link rel="stylesheet" href="./lessons-ui.css">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:Pretendard,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;}
-  #lock{position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:999;}
-  #lock .box{background:#1e293b;padding:28px;border-radius:18px;width:300px;text-align:center;}
-  #lock input{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;margin:10px 0;}
-  .ctl{background:#1e293b;padding:10px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50;}
-  .ctl select,.ctl button{padding:8px 12px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#fff;font-weight:700;cursor:pointer;font-size:14px;}
   button{font-family:inherit;cursor:pointer;}
-  .wrap{padding:3vh 4vw;}
-  .title{font-size:2.4vw;font-weight:900;color:#5eead4;}
-  .sub{font-size:1.1vw;color:#94a3b8;margin-bottom:2.5vh;}
-  .row{display:flex;align-items:center;gap:2vw;background:#1e293b;border-radius:14px;padding:1.6vh 2vw;margin-bottom:1.2vh;}
-  .row .rk{font-size:2vw;font-weight:900;width:3.5vw;text-align:center;}
-  .row .nm{flex:1;font-size:1.8vw;font-weight:800;color:#f1f5f9;}
-  .row .cl{font-size:1.2vw;color:#5eead4;font-weight:800;}
-  .row .pt{font-size:2vw;font-weight:900;color:#fbbf24;min-width:7vw;text-align:right;}
-  .row.top1{background:linear-gradient(90deg,#78350f,#1e293b);box-shadow:0 0 0 2px #f59e0b;}
-  .empty{color:#64748b;text-align:center;padding:10vh 0;font-size:1.4vw;}
-  body.present .ctl{display:none !important;}
-  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:10px 18px;border-radius:20px;opacity:0;transition:.3s;z-index:800;}
-  .toast.show{opacity:1;}
+  .wrap{padding:3vh 4vw;color:#fff;}
+  .title{font-size:2.6vw;font-weight:900;color:#fff;letter-spacing:-.5px;text-shadow:0 2px 10px rgba(0,0,0,.2);}
+  @media (max-width:860px){ .title{font-size:22px;} }
+  .sub{font-size:1.2vw;color:rgba(255,255,255,.88);margin-bottom:2.5vh;font-weight:700;}
+  @media (max-width:860px){ .sub{font-size:13px;} }
+  .row{display:flex;align-items:center;gap:2vw;background:#fff;border-radius:16px;padding:1.6vh 2vw;margin-bottom:1.2vh;box-shadow:0 10px 26px rgba(15,118,110,.12), 0 2px 6px rgba(15,118,110,.05);}
+  .row .rk{font-size:2vw;font-weight:900;width:3.5vw;text-align:center;color:#0f766e;}
+  @media (max-width:860px){ .row .rk{font-size:18px;width:40px;} }
+  .row .nm{flex:1;font-size:1.8vw;font-weight:800;color:#0f172a;}
+  @media (max-width:860px){ .row .nm{font-size:16px;} }
+  .row .cl{font-size:1.2vw;color:#0d9488;font-weight:800;}
+  @media (max-width:860px){ .row .cl{font-size:12px;} }
+  .row .pt{font-size:2vw;font-weight:900;color:#d97706;min-width:7vw;text-align:right;}
+  @media (max-width:860px){ .row .pt{font-size:18px;} }
+  .row.top1{background:linear-gradient(135deg,#fef3c7,#fde68a);box-shadow:0 0 0 3px #f59e0b, 0 10px 26px rgba(245,158,11,.25);}
 </style>
 </head>
-<body>
-  <div id="lock"><div class="box"><h2>🔺 닮음 순위판</h2><p style="font-size:13px;color:#94a3b8;margin:8px 0;">교사 비밀번호</p>
-    <input id="lpw" type="password" onkeypress="if(event.keyCode==13)doUnlock()"><button id="lbtn" onclick="doUnlock()" style="width:100%;background:#0f766e;border:none;">확인</button>
-    <div id="lerr" style="color:#f87171;font-size:13px;margin-top:8px;"></div></div></div>
+<body class="l-body">
+  <div class="l-lock" id="lock"><div class="box"><div class="emoji">🔺</div><h2>닮음 순위판</h2><div class="desc">교사 비밀번호를 입력하세요</div>
+    <input id="lpw" type="password" placeholder="비밀번호" onkeypress="if(event.keyCode==13)doUnlock()"><button id="lbtn" onclick="doUnlock()">확인</button>
+    <div class="err" id="lerr"></div></div></div>
 
-  <div class="ctl" id="ctl" style="display:none;">
+  <div class="l-ctl" id="ctl" style="display:none;">
     <select id="clsSel"></select>
-    <button onclick="togglePresent()">🖥️ 전시</button>
-    <span style="flex:1"></span>
-    <span style="font-size:12px;color:#64748b;">실시간 자동 갱신</span>
+    <button class="l-btn" onclick="togglePresent()">🖥️ 전시</button>
+    <span class="sp"></span>
+    <span style="font-size:12px;color:var(--text-muted);font-weight:700;">실시간 자동 갱신</span>
   </div>
-  <div class="wrap" id="wrap"><div class="empty">반을 선택하세요.</div></div>
-  <div class="toast" id="toast"></div>
+  <div class="wrap" id="wrap"><div class="l-empty">반을 선택하세요.</div></div>
+  <div class="l-toast" id="toast"></div>
 
 <script>
   var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';

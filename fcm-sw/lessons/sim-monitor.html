@@ -5,23 +5,29 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>닮음 보물찾기 — 실시간 현황</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>:root{ --accent:#0f766e; --accent-dark:#115e59; }</style>
+<link rel="stylesheet" href="./lessons-ui.css">
 <style>
   *{box-sizing:border-box;margin:0;}
-  body{font-family:Pretendard,sans-serif;background:#f1f5f9;color:#1f2937;padding:16px;}
-  h2{color:#0f766e;margin:0 0 4px;}
-  .muted{color:#94a3b8;font-size:13px;}
-  #lock{position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:999;}
-  #lock .box{background:#1e293b;padding:28px;border-radius:18px;width:300px;text-align:center;color:#e2e8f0;}
-  #lock input{width:100%;padding:12px;border-radius:10px;border:1px solid #475569;background:#0f172a;color:#fff;margin:10px 0;}
+  body{font-family:Pretendard,sans-serif;background:linear-gradient(135deg,#99f6e4 0%,#2dd4bf 55%,#0d9488 100%);color:#1f2937;padding:16px;min-height:100vh;}
+  h2{color:#fff;margin:0 0 4px;letter-spacing:-.3px;text-shadow:0 2px 10px rgba(0,0,0,.15);}
+  .muted{color:rgba(255,255,255,.88);font-size:13px;font-weight:700;}
+  #lock{position:fixed;inset:0;background:linear-gradient(135deg,#99f6e4 0%,#2dd4bf 55%,#0d9488 100%);display:flex;align-items:center;justify-content:center;z-index:999;padding:20px;}
+  #lock .box{background:#fff;padding:40px;border-radius:28px;width:360px;max-width:100%;text-align:center;color:#0f172a;box-shadow:0 20px 50px rgba(15,118,110,.3);}
+  #lock .box h2{color:#0f172a !important;font-size:22px;font-weight:900;}
+  #lock .box p{color:#64748b !important;font-size:13px;margin-bottom:22px;}
+  #lock input{width:100%;padding:14px 16px;border-radius:14px;border:2px solid #e5e7eb;background:#f8fafc;color:#0f172a;margin:0 0 12px;font-size:15px;}
+  #lock input:focus{outline:none;border-color:#0f766e;background:#fff;}
   button{font-family:inherit;cursor:pointer;}
-  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;padding:12px;border-radius:14px;margin-bottom:14px;}
-  .bar select{padding:9px;border:1px solid #cbd5e1;border-radius:8px;font-size:14px;}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px;}
-  .scard{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:14px;text-align:center;}
-  .scard .v{font-size:28px;font-weight:900;color:#0f766e;}
-  .scard .l{font-size:12px;color:#64748b;font-weight:700;margin-top:2px;}
-  .sec{background:#fff;border-radius:16px;padding:16px;margin-bottom:14px;}
-  .sec h3{margin:0 0 10px;color:#0f766e;font-size:16px;}
+  .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;padding:14px;border-radius:18px;margin-bottom:14px;box-shadow:0 10px 26px rgba(15,118,110,.12), 0 2px 6px rgba(15,118,110,.05);}
+  .bar select{padding:9px 11px;border:1.5px solid #ccfbf1;border-radius:10px;font-size:14px;}
+  .bar .muted{color:#64748b;}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px;margin-bottom:14px;}
+  .scard{background:#fff;border-radius:18px;padding:16px;text-align:center;box-shadow:0 10px 26px rgba(15,118,110,.12), 0 2px 6px rgba(15,118,110,.05);}
+  .scard .v{font-size:30px;font-weight:900;color:#0f766e;letter-spacing:-1px;}
+  .scard .l{font-size:12px;color:#64748b;font-weight:700;margin-top:4px;}
+  .sec{background:#fff;border-radius:20px;padding:20px;margin-bottom:14px;box-shadow:0 10px 26px rgba(15,118,110,.12), 0 2px 6px rgba(15,118,110,.05);}
+  .sec h3{margin:0 0 12px;color:#0f766e;font-size:16px;font-weight:900;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
   th,td{text-align:left;padding:8px 6px;border-bottom:1px solid #f1f5f9;}
   th{color:#94a3b8;font-size:12px;font-weight:700;}

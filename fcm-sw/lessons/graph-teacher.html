@@ -6,21 +6,24 @@
 <title>그래프 탐구 — 교사</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="./graph-plot.js"></script>
+<style>:root{ --accent:#ea580c; --accent-dark:#c2410c; }</style>
+<link rel="stylesheet" href="./lessons-ui.css">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; -webkit-user-select:none; user-select:none; }
-  body { font-family:-apple-system,'Apple SD Gothic Neo',sans-serif; background:#fffdf7; color:#3b2f1e; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
-  .top { display:flex; align-items:center; gap:12px; padding:12px 18px; background:#7a5230; color:#fff8ec; flex-shrink:0; box-shadow:0 2px 10px rgba(0,0,0,.15); }
-  .top h1 { font-size:18px; font-weight:900; }
-  .top .eq { font-size:22px; font-weight:900; color:#ffe6b3; }
+  body { font-family:var(--font); background:linear-gradient(135deg,#fed7aa 0%,#fb923c 55%,#ea580c 100%); color:#3b2f1e; height:100vh; overflow:hidden; display:flex; flex-direction:column; }
+  .top { display:flex; align-items:center; gap:12px; padding:14px 20px; background:rgba(255,255,255,.92); backdrop-filter:blur(10px); color:#9a3412; flex-shrink:0; box-shadow:0 2px 12px rgba(234,88,12,.15); }
+  .top h1 { font-size:18px; font-weight:900; letter-spacing:-.3px; }
+  .top .eq { font-size:22px; font-weight:900; color:var(--accent); }
   .top .sp { margin-left:auto; }
-  .top button { background:#fff3dc; color:#7a5230; border:none; border-radius:9px; padding:8px 13px; font-size:13px; font-weight:800; cursor:pointer; margin-left:6px; }
-  .top button.warn { background:#fecaca; color:#991b1b; }
-  .top button.on { background:#fbbf24; color:#3b2f1e; }
+  .top button { background:#fff7ed; color:#9a3412; border:1px solid #fed7aa; border-radius:10px; padding:8px 13px; font-size:13px; font-weight:800; cursor:pointer; margin-left:6px; transition:.15s; }
+  .top button:hover { background:#ffedd5; }
+  .top button.warn { background:#fef2f2; color:#b91c1c; border-color:#fecaca; }
+  .top button.on { background:linear-gradient(135deg,#f59e0b,#d97706); color:#fff; border-color:transparent; }
 
   /* 설정 화면 */
   #setup { flex:1; overflow-y:auto; padding:24px; display:flex; justify-content:center; }
   .panel { width:100%; max-width:560px; }
-  .card { background:#fff; border:1px solid #f0e6d2; border-radius:16px; padding:20px 22px; margin-bottom:16px; box-shadow:0 4px 14px rgba(122,82,48,.06); }
+  .card { background:#fff; border:1px solid #fde4c4; border-radius:20px; padding:22px 24px; margin-bottom:16px; box-shadow:0 10px 26px rgba(234,88,12,.12), 0 2px 6px rgba(234,88,12,.05); }
   .card h3 { font-size:14px; font-weight:900; color:#7a5230; margin-bottom:12px; }
   .presets { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:14px; }
   .presets button { background:#fff3dc; color:#7a5230; border:1px solid #eaddc2; border-radius:20px; padding:7px 13px; font-size:13px; font-weight:800; cursor:pointer; }
@@ -75,16 +78,17 @@
   @media (max-width:720px){ #live{ flex-direction:column; } #side{ width:auto; max-height:38%; } }
 
   /* 잠금 */
-  #lock { position:fixed; inset:0; background:radial-gradient(circle at 30% 20%,#8a6034,#3b2a17 70%); display:flex; align-items:center; justify-content:center; z-index:100; }
-  .lc { background:#fff; padding:36px 30px; border-radius:22px; width:320px; text-align:center; box-shadow:0 25px 60px rgba(0,0,0,.4); }
-  .lc .ico { font-size:44px; margin-bottom:8px; }
-  .lc h2 { font-size:20px; margin-bottom:6px; font-weight:900; color:#7a5230; }
-  .lc p { color:#a68a63; font-size:13px; margin-bottom:18px; }
-  .lc input { width:100%; padding:13px; border:2px solid #eaddc2; border-radius:12px; font-size:15px; margin-bottom:12px; }
-  .lc button { width:100%; padding:13px; background:#7a5230; color:white; border:none; border-radius:12px; font-size:15px; font-weight:900; cursor:pointer; }
-  .lc .err { color:#dc2626; font-size:13px; margin-top:8px; min-height:18px; font-weight:700; }
-  .toast { position:fixed; left:50%; bottom:90px; transform:translateX(-50%) translateY(20px); background:#3b2f1e; color:#fff; padding:12px 22px; border-radius:30px; font-size:14px; font-weight:800; z-index:200; opacity:0; transition:.3s; pointer-events:none; }
-  .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #lock { position:fixed; inset:0; background:linear-gradient(135deg,#fed7aa 0%,#fb923c 55%,#ea580c 100%); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px; }
+  .lc { background:#fff; padding:40px; border-radius:28px; width:360px; max-width:100%; text-align:center; box-shadow:0 20px 50px rgba(234,88,12,.3); }
+  .lc .ico { font-size:48px; margin-bottom:12px; }
+  .lc h2 { font-size:22px; margin-bottom:6px; font-weight:900; color:#0f172a; }
+  .lc p { color:#64748b; font-size:13px; margin-bottom:22px; }
+  .lc input { width:100%; padding:14px 16px; border:2px solid #e5e7eb; border-radius:14px; background:#f8fafc; font-size:15px; margin-bottom:12px; color:#0f172a; }
+  .lc input:focus { outline:none; border-color:var(--accent); background:#fff; }
+  .lc button { width:100%; padding:14px; background:linear-gradient(135deg,var(--accent),var(--accent-dark)); color:#fff; border:none; border-radius:14px; font-size:15px; font-weight:800; cursor:pointer; box-shadow:0 6px 16px rgba(234,88,12,.3); }
+  .lc .err { color:#dc2626; font-size:13px; margin-top:10px; min-height:18px; font-weight:700; }
+  .toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0f172a; color:#fff; padding:12px 22px; border-radius:999px; font-size:14px; font-weight:700; z-index:200; opacity:0; transition:.3s; pointer-events:none; box-shadow:0 8px 24px rgba(0,0,0,.3); }
+  .toast.show { opacity:1; }
 </style>
 </head>
 <body>

@@ -5,81 +5,83 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>하브루타 — 칠판</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>:root{ --accent:#7c3aed; --accent-dark:#6d28d9; }</style>
+<link rel="stylesheet" href="./lessons-ui.css">
 <style>
   *{box-sizing:border-box;margin:0;padding:0;}
-  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh;}
-  /* 로그인 */
-  #lock{position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:999;}
-  #lock .box{background:#1e293b;padding:34px;border-radius:20px;width:340px;text-align:center;box-shadow:0 20px 50px rgba(0,0,0,.4);}
-  #lock h2{font-size:20px;margin-bottom:16px;color:#c7d2fe;}
-  #lock input{width:100%;padding:13px;border:1.5px solid #334155;border-radius:12px;background:#0f172a;color:#fff;font-size:15px;margin-bottom:12px;}
-  #lock button{width:100%;padding:13px;background:#4f46e5;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;}
-  #lerr{color:#f87171;font-size:13px;margin-top:10px;min-height:18px;}
-  /* 제어바 */
-  .ctl{background:#1e293b;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:1px solid #334155;position:sticky;top:0;z-index:50;}
-  .ctl select,.ctl input{padding:8px 10px;border:1px solid #334155;border-radius:8px;background:#0f172a;color:#fff;font-size:13px;}
-  .ctl button{padding:8px 14px;border:none;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;background:#334155;color:#e2e8f0;}
-  .ctl button.on{background:#4f46e5;color:#fff;}
-  .ctl button.warn{background:#7f1d1d;color:#fecaca;}
-  .ctl .sp{flex:1;}
-  .stagebtn{padding:8px 16px;}
-  .stagebtn.active{background:#22c55e;color:#06281a;}
+  /* 로그인·제어바·토스트는 공용 CSS 사용 (.l-lock, .l-ctl, .l-toast) */
+  .stagebtn{padding:9px 18px;}
+  .stagebtn.active{background:#22c55e !important; color:#06281a !important;}
+
   /* 본문 */
-  .wrap{padding:2vw 2.5vw;}
-  .title{font-size:2.4vw;font-weight:900;color:#fff;margin-bottom:.5vw;}
-  .sub{font-size:1.2vw;color:#94a3b8;margin-bottom:1.5vw;}
-  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;}
-  .col{background:#1e293b;border-radius:12px;padding:9px;}
-  .col h3{font-size:1vw;font-weight:900;color:#a5b4fc;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #334155;}
-  .qc{background:#0f172a;border:1px solid #334155;border-radius:8px;padding:5px 8px;margin-bottom:5px;position:relative;}
-  .qc .w{font-size:.8vw;font-weight:800;color:#c4b5fd;background:#312e81;display:inline-block;padding:1px 6px;border-radius:6px;margin-bottom:2px;}
-  .qc .t{font-size:.92vw;color:#f1f5f9;line-height:1.3;word-break:keep-all;display:block;padding-right:14px;}
-  .qc .m{font-size:.72vw;color:#64748b;margin-top:1px;}
-  .qc .del{position:absolute;top:3px;right:5px;background:none;border:none;color:#475569;font-size:13px;cursor:pointer;line-height:1;}
-  .qc .votes{display:inline-block;background:#f59e0b;color:#06281a;font-weight:900;font-size:.85vw;padding:0 8px;border-radius:12px;}
-  .qc .rankb{font-size:.9vw;font-weight:900;color:#fbbf24;}
-  .qc .pick{background:#22c55e;color:#06281a;border:none;border-radius:8px;padding:2px 9px;font-size:.8vw;font-weight:800;cursor:pointer;}
-  .rank1{border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.3);}
-  .qc.cand{border-color:#f59e0b;background:#2a2410;}
-  .candbtn{margin-top:6px;background:none;border:1px solid #475569;color:#94a3b8;border-radius:8px;padding:3px 10px;font-size:.85vw;font-weight:700;cursor:pointer;}
-  .candbtn.on{background:#f59e0b;border-color:#f59e0b;color:#241a04;}
-  .cols.padlet .qc{box-shadow:0 2px 6px rgba(0,0,0,.25);}
-  .focus{background:linear-gradient(135deg,#064e3b,#065f46);border:3px solid #34d399;border-radius:24px;padding:5vh 4vw;text-align:center;margin-top:3vh;}
-  .focus .lab{font-size:1.4vw;font-weight:800;color:#6ee7b7;margin-bottom:2vh;}
-  .focus .q{font-size:3.4vw;font-weight:900;color:#fff;line-height:1.4;word-break:keep-all;}
+  .wrap{padding:3vh 3vw;}
+  .title{font-size:2.6vw;font-weight:900;color:#fff;margin-bottom:.5vw;letter-spacing:-.5px;text-shadow:0 2px 10px rgba(0,0,0,.15);}
+  @media (max-width:860px){ .title{font-size:22px;} }
+  .sub{font-size:1.2vw;color:rgba(255,255,255,.88);margin-bottom:2vh;font-weight:700;}
+  @media (max-width:860px){ .sub{font-size:13px;} }
+
+  .cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;}
+  .col{background:#fff;border-radius:18px;padding:14px;box-shadow:0 10px 26px rgba(15,23,42,.12), 0 2px 6px rgba(15,23,42,.05);}
+  .col h3{font-size:1vw;font-weight:900;color:var(--accent-dark);margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid #f3e8ff;}
+  @media (max-width:860px){ .col h3{font-size:14px;} }
+
+  .qc{background:#faf5ff;border:1.5px solid #ede9fe;border-radius:12px;padding:10px 12px;margin-bottom:8px;position:relative;transition:.15s;}
+  .qc:hover{border-color:#c4b5fd;}
+  .qc .w{font-size:.82vw;font-weight:800;color:var(--accent-dark);background:#ede9fe;display:inline-block;padding:3px 10px;border-radius:999px;margin-bottom:4px;}
+  @media (max-width:860px){ .qc .w{font-size:11px;} }
+  .qc .t{font-size:.95vw;color:#1e1b4b;line-height:1.45;word-break:keep-all;display:block;padding-right:16px;font-weight:600;}
+  @media (max-width:860px){ .qc .t{font-size:14px;} }
+  .qc .m{font-size:.74vw;color:#94a3b8;margin-top:4px;}
+  @media (max-width:860px){ .qc .m{font-size:11px;} }
+  .qc .del{position:absolute;top:6px;right:8px;background:none;border:none;color:#cbd5e1;font-size:16px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:6px;}
+  .qc .del:hover{background:#fecaca;color:#b91c1c;}
+  .qc .votes{display:inline-block;background:linear-gradient(135deg,#fbbf24,#f59e0b);color:#78350f;font-weight:900;font-size:.88vw;padding:2px 12px;border-radius:999px;box-shadow:0 2px 6px rgba(245,158,11,.3);}
+  @media (max-width:860px){ .qc .votes{font-size:12px;} }
+  .qc .rankb{font-size:1vw;font-weight:900;color:#f59e0b;}
+  .qc .pick{background:linear-gradient(135deg,#34d399,#10b981);color:#fff;border:none;border-radius:999px;padding:4px 12px;font-size:.84vw;font-weight:800;cursor:pointer;box-shadow:0 2px 6px rgba(16,185,129,.3);}
+  @media (max-width:860px){ .qc .pick{font-size:12px;} }
+  .rank1{border-color:#f59e0b;box-shadow:0 0 0 2px rgba(245,158,11,.35);}
+  .qc.cand{border-color:#f59e0b;background:#fffbeb;}
+  .candbtn{margin-top:8px;background:#fff;border:1.5px solid #e5e7eb;color:#64748b;border-radius:999px;padding:4px 12px;font-size:.88vw;font-weight:700;cursor:pointer;}
+  .candbtn.on{background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:#f59e0b;color:#fff;}
+
+  .focus{background:linear-gradient(135deg,#065f46,#059669);border-radius:28px;padding:6vh 4vw;text-align:center;margin-top:3vh;box-shadow:0 20px 50px rgba(5,150,105,.35);}
+  .focus .lab{font-size:1.4vw;font-weight:800;color:#a7f3d0;margin-bottom:2vh;letter-spacing:.3px;}
+  @media (max-width:860px){ .focus .lab{font-size:14px;} }
+  .focus .q{font-size:3.4vw;font-weight:900;color:#fff;line-height:1.4;word-break:keep-all;letter-spacing:-.5px;}
+  @media (max-width:860px){ .focus .q{font-size:24px;} }
   .focus .m{font-size:1.2vw;color:#a7f3d0;margin-top:2.5vh;}
-  .empty{color:#475569;font-size:1.3vw;text-align:center;padding:8vh 0;}
-  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#000;color:#fff;padding:10px 18px;border-radius:20px;font-size:14px;opacity:0;transition:.3s;z-index:800;}
-  .toast.show{opacity:1;}
-  body.present .ctl{display:none !important;}
+
+  .empty{color:rgba(255,255,255,.9);font-size:1.3vw;text-align:center;padding:10vh 0;font-weight:700;text-shadow:0 2px 8px rgba(0,0,0,.15);}
+  @media (max-width:860px){ .empty{font-size:15px;padding:50px 20px;} }
 </style>
 </head>
-<body>
-  <div id="lock"><div class="box"><h2>💬 하브루타 칠판</h2><p style="font-size:13px;color:#94a3b8;margin-bottom:14px;">교사 비밀번호를 입력하세요</p>
+<body class="l-body">
+  <div class="l-lock" id="lock"><div class="box"><div class="emoji">💬</div><h2>하브루타 칠판</h2><div class="desc">교사 비밀번호를 입력하세요</div>
     <input type="password" id="lpw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
-    <button id="lbtn" onclick="doUnlock()">확인</button><div id="lerr"></div></div></div>
+    <button id="lbtn" onclick="doUnlock()">확인</button><div class="err" id="lerr"></div></div></div>
 
-  <div class="ctl" id="ctl" style="display:none;">
+  <div class="l-ctl" id="ctl" style="display:none;">
     <select id="clsSel"></select>
     <input type="text" id="unitInp" placeholder="단원명 (예: 도형의 닮음과 피타고라스)" style="width:240px;">
-    <textarea id="subInp" placeholder="소단원 (한 줄에 하나, 비우면 1~5)" rows="1" style="width:240px;resize:vertical;font-family:inherit;min-height:34px;"></textarea>
-    <label style="font-size:12px;color:#94a3b8;">단어<input type="number" id="nwInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
-    <label style="font-size:12px;color:#94a3b8;">질문<input type="number" id="nqInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
-    <label style="font-size:12px;color:#94a3b8;">투표<input type="number" id="nvInp" value="2" min="1" max="9" style="width:48px;margin-left:4px;"></label>
-    <button onclick="openSession()">세션 열기</button>
+    <textarea id="subInp" placeholder="소단원 (한 줄에 하나, 비우면 1~5)" rows="1" style="width:240px;resize:vertical;min-height:34px;"></textarea>
+    <label>단어<input type="number" id="nwInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
+    <label>질문<input type="number" id="nqInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
+    <label>투표<input type="number" id="nvInp" value="2" min="1" max="9" style="width:48px;margin-left:4px;"></label>
+    <button class="l-btn primary" onclick="openSession()">세션 열기</button>
     <span class="sp"></span>
-    <button class="stagebtn" id="st-submit" onclick="setStage('submit')">① 제출</button>
-    <button class="stagebtn" id="st-vote" onclick="setStage('vote')">② 투표</button>
-    <button class="stagebtn" id="st-discuss" onclick="setStage('discuss')">③ 토론</button>
-    <button id="kwBtn" onclick="toggleKw()">☁️ 키워드</button>
-    <button id="nmBtn" onclick="toggleNames()">👤 이름</button>
-    <button onclick="showArchive()">📚 지난 세션</button>
-    <button onclick="togglePresent()">🖥️ 전시</button>
-    <button class="warn" onclick="closeSession()">닫기</button>
+    <button class="l-btn stagebtn" id="st-submit" onclick="setStage('submit')">① 제출</button>
+    <button class="l-btn stagebtn" id="st-vote" onclick="setStage('vote')">② 투표</button>
+    <button class="l-btn stagebtn" id="st-discuss" onclick="setStage('discuss')">③ 토론</button>
+    <button class="l-btn" id="kwBtn" onclick="toggleKw()">☁️ 키워드</button>
+    <button class="l-btn" id="nmBtn" onclick="toggleNames()">👤 이름</button>
+    <button class="l-btn" onclick="showArchive()">📚 지난 세션</button>
+    <button class="l-btn" onclick="togglePresent()">🖥️ 전시</button>
+    <button class="l-btn warn" onclick="closeSession()">닫기</button>
   </div>
 
   <div class="wrap" id="wrap"><div class="empty">반을 고르고 "세션 열기"를 누르세요.</div></div>
-  <div class="toast" id="toast"></div>
+  <div class="l-toast" id="toast"></div>
 
 <script>
   var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';

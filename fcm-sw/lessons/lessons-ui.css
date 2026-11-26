@@ -1,0 +1,122 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   lessons-ui.css — 수업활동 공용 디자인 토큰 (상어쌤 톤)
+
+   각 활동 페이지에서 사용법:
+     1. <head>에 CSS 변수로 활동 색상 선언:
+          <style>:root{ --accent:#7c3aed; --accent-dark:#6d28d9; }</style>
+     2. 이 파일 link:
+          <link rel="stylesheet" href="./lessons-ui.css">
+
+   기본 --accent 는 바다(청록). 활동별 추천:
+     하브루타=보라(#7c3aed/#6d28d9) · 그래프=주황(#ea580c/#c2410c)
+     닮음=청록(#0f766e/#115e59) · 확률=바다(#0891b2/#0e7490)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root{
+  --accent: #0891b2;
+  --accent-dark: #0e7490;
+  --accent-soft: color-mix(in srgb, var(--accent) 22%, white);
+  --bg-from: color-mix(in srgb, var(--accent) 30%, #a7f3d0);
+  --bg-to: color-mix(in srgb, var(--accent) 65%, #0ea5e9);
+  --card: #ffffff;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --border: #e5e7eb;
+  --border-soft: #eef2f7;
+  --surface-soft: #f8fafc;
+  --radius-xl: 24px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+  --shadow-lg: 0 14px 32px rgba(15,23,42,.14), 0 3px 8px rgba(15,23,42,.06);
+  --shadow-md: 0 10px 26px rgba(15,23,42,.1), 0 2px 6px rgba(15,23,42,.05);
+  --shadow-sm: 0 4px 12px rgba(0,0,0,.08);
+  --font: Pretendard,-apple-system,BlinkMacSystemFont,'Segoe UI','Apple SD Gothic Neo',sans-serif;
+}
+
+/* 리셋 */
+.l-body, body.l-body{
+  margin:0; padding:0;
+  font-family: var(--font);
+  color: var(--text);
+  min-height: 100vh;
+  background: linear-gradient(135deg, var(--bg-from) 0%, var(--accent) 55%, var(--bg-to) 100%);
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ═══ 잠금 화면 ═══ */
+.l-lock{ position:fixed; inset:0; background:linear-gradient(135deg, var(--bg-from) 0%, var(--accent) 55%, var(--bg-to) 100%); display:flex; align-items:center; justify-content:center; z-index:999; padding:20px; }
+.l-lock .box{ background:var(--card); padding:40px; border-radius:28px; width:360px; max-width:100%; text-align:center; box-shadow:0 20px 50px rgba(15,23,42,.3); }
+.l-lock .emoji{ font-size:48px; margin-bottom:12px; }
+.l-lock h2{ font-size:22px; margin-bottom:6px; color:var(--text); font-weight:900; }
+.l-lock .desc{ font-size:13px; color:var(--text-muted); margin-bottom:22px; }
+.l-lock input{ width:100%; padding:14px 16px; border:2px solid var(--border); border-radius:14px; background:var(--surface-soft); color:var(--text); font-size:15px; margin-bottom:12px; }
+.l-lock input:focus{ outline:none; border-color:var(--accent); background:var(--card); }
+.l-lock button{ width:100%; padding:14px; background:linear-gradient(135deg, var(--accent), var(--accent-dark)); color:#fff; border:none; border-radius:14px; font-size:15px; font-weight:800; cursor:pointer; box-shadow:0 6px 16px rgba(15,23,42,.18); }
+.l-lock .err{ color:#dc2626; font-size:13px; margin-top:10px; min-height:18px; font-weight:700; }
+
+/* ═══ 제어바 (교사 TV 상단) ═══ */
+.l-ctl{ background:rgba(255,255,255,.92); backdrop-filter:blur(10px); padding:12px 20px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; border-bottom:1px solid rgba(15,23,42,.08); position:sticky; top:0; z-index:50; box-shadow:0 2px 12px rgba(15,23,42,.08); }
+.l-ctl select, .l-ctl input, .l-ctl textarea{ padding:9px 12px; border:1.5px solid var(--border); border-radius:10px; background:#fff; color:var(--text); font-size:13px; font-weight:700; font-family:inherit; }
+.l-ctl select:focus, .l-ctl input:focus, .l-ctl textarea:focus{ outline:none; border-color:var(--accent); }
+.l-ctl label{ font-size:12px; color:var(--text-muted); font-weight:700; }
+.l-ctl .sp{ flex:1; }
+
+/* ═══ 버튼 ═══ */
+.l-btn{ padding:9px 14px; border:none; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; background:#f1f5f9; color:#475569; transition:.15s; font-family:inherit; }
+.l-btn:hover{ background:#e2e8f0; }
+.l-btn:disabled{ opacity:.5; cursor:not-allowed; }
+.l-btn.primary{ background:linear-gradient(135deg, var(--accent), var(--accent-dark)); color:#fff; box-shadow:0 3px 8px rgba(15,23,42,.18); }
+.l-btn.primary:hover{ box-shadow:0 5px 12px rgba(15,23,42,.24); }
+.l-btn.warn{ background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; }
+.l-btn.warn:hover{ background:#fee2e2; }
+.l-btn.yel{ background:#fef3c7; color:#92400e; border:1px solid #fde68a; }
+.l-btn.yel:hover{ background:#fde68a; }
+.l-btn.ghost{ background:transparent; color:var(--text-muted); border:1.5px solid var(--border); }
+.l-btn.active{ background:#22c55e; color:#06281a; }
+
+/* 세그먼트 (예: 동전/주사위) */
+.l-seg{ display:inline-flex; background:#f1f5f9; border-radius:12px; padding:3px; }
+.l-seg button{ background:transparent; color:var(--text-muted); padding:6px 14px; font-weight:800; border:none; border-radius:9px; cursor:pointer; font-family:inherit; }
+.l-seg button.on{ background:linear-gradient(135deg, var(--accent), var(--accent-dark)); color:#fff; box-shadow:0 2px 6px rgba(15,23,42,.18); }
+
+/* ═══ 본문 wrap ═══ */
+.l-wrap{ padding:3vh 3vw; color:#fff; }
+.l-top{ display:flex; align-items:baseline; gap:20px; margin-bottom:2.5vh; flex-wrap:wrap; }
+.l-title{ font-size:2.6vw; font-weight:900; color:#fff; letter-spacing:-.5px; text-shadow:0 2px 10px rgba(0,0,0,.15); }
+@media (max-width:860px){ .l-title{ font-size:22px; } }
+.l-tag{ background:rgba(255,255,255,.25); backdrop-filter:blur(10px); color:#fff; font-size:1.1vw; font-weight:800; padding:6px 16px; border-radius:var(--radius-pill); border:1px solid rgba(255,255,255,.3); }
+@media (max-width:860px){ .l-tag{ font-size:12px; } }
+
+/* ═══ 카드 (흰 라운드 패널) ═══ */
+.l-panel{ background:var(--card); border-radius:var(--radius-xl); padding:22px; box-shadow:var(--shadow-lg); color:var(--text); display:flex; flex-direction:column; }
+.l-panel.sm{ padding:14px; border-radius:var(--radius-lg); box-shadow:var(--shadow-md); }
+.l-panel h3{ font-size:15px; font-weight:900; color:var(--text); margin-bottom:10px; }
+.l-panel .sub{ font-size:12px; color:var(--text-muted); font-weight:700; }
+
+/* 학생용 bg (더 밝게) */
+body.l-body.student{ padding:16px; }
+body.l-body.student .l-wrap{ padding:0; max-width:1320px; margin:0 auto; color:var(--text); }
+
+/* 그리드 */
+.l-grid{ display:grid; gap:14px; }
+.l-grid.cols3{ grid-template-columns:repeat(3,1fr); }
+.l-grid.cols2{ grid-template-columns:repeat(2,1fr); }
+@media (max-width:900px){ .l-grid.cols3,.l-grid.cols2{ grid-template-columns:1fr; } }
+
+/* 작은 요소 */
+.l-badge{ display:inline-block; background:var(--accent-soft); color:var(--accent-dark); font-size:11px; font-weight:800; padding:4px 10px; border-radius:var(--radius-pill); }
+.l-muted{ color:var(--text-muted); font-size:14px; text-align:center; padding:50px 14px; line-height:1.7; font-weight:700; }
+.l-empty{ color:rgba(255,255,255,.95); font-size:1.4vw; text-align:center; padding:12vh 0; font-weight:700; text-shadow:0 2px 8px rgba(0,0,0,.15); }
+@media (max-width:860px){ .l-empty{ font-size:15px; padding:60px 20px; } }
+
+/* 토스트 */
+.l-toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:#0f172a; color:#fff; padding:12px 22px; border-radius:var(--radius-pill); font-size:14px; font-weight:700; opacity:0; transition:.3s; z-index:800; box-shadow:0 8px 24px rgba(0,0,0,.3); pointer-events:none; }
+.l-toast.show{ opacity:1; }
+
+/* 전시 모드(제어바 숨김) */
+body.present .l-ctl{ display:none !important; }
+
+/* 포커스 접근성 */
+.l-btn:focus-visible, .l-ctl button:focus-visible, .l-seg button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
