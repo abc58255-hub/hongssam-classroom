@@ -1,0 +1,10 @@
+{
+  "name": "홍쌤 교실 스마트포털",
+  "short_name": "스마트포털",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "icons": []
+}

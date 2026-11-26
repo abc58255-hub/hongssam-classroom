@@ -1,0 +1,10 @@
+{
+  "name": "우리 반 교실",
+  "short_name": "우리반교실",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#7c3aed",
+  "theme_color": "#7c3aed",
+  "icons": []
+}

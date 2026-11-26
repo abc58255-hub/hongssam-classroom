@@ -1,0 +1,10 @@
+{
+  "name": "수학 교실 회원가입",
+  "short_name": "회원가입",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#047857",
+  "theme_color": "#047857",
+  "icons": []
+}

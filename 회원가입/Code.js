@@ -96,3 +96,20 @@ function saveSheetId(input) {
     return { success: false, message: '스프레드시트를 열 수 없어요. ID와 접근 권한을 확인해주세요.' };
   }
 }
+
+// ══════════════════════════════════════════════════════════════
+//  PWA 전환 — 공개 doPost RPC (학생 회원가입, 로그인 전 단계라 인증 없음)
+//  프론트(fcm-sw/signup/)가 google.script.run 어댑터로 호출.
+// ══════════════════════════════════════════════════════════════
+var RPC_WHITELIST = ['registerStudent', 'saveSheetId'];
+function doPost(e) {
+  var out;
+  try {
+    var req = JSON.parse(e.postData.contents);
+    if (RPC_WHITELIST.indexOf(req.fn) < 0) throw new Error('허용되지 않은 함수: ' + req.fn);
+    var fn = globalThis[req.fn];
+    if (typeof fn !== 'function') throw new Error('함수를 찾을 수 없음: ' + req.fn);
+    out = { ok: true, result: fn.apply(null, req.args || []) };
+  } catch (err) { out = { ok: false, error: String(err && err.message || err) }; }
+  return ContentService.createTextOutput(JSON.stringify(out)).setMimeType(ContentService.MimeType.JSON);
+}

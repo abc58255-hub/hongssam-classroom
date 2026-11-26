@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="스마트포털">
+<meta name="theme-color" content="#0f172a">
+<link rel="manifest" href="./manifest.json">
+<title>스마트 포털</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;
+    min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;
+    background:linear-gradient(150deg,#1e3a8a 0%,#0f172a 55%,#020617 100%);color:#fff;}
+  .wrap{width:100%;max-width:420px;text-align:center;}
+  .logo{font-size:56px;margin-bottom:10px;}
+  h1{font-size:26px;font-weight:900;letter-spacing:-.5px;margin-bottom:6px;}
+  .sub{font-size:14px;color:#94a3b8;font-weight:700;margin-bottom:34px;}
+  .btn{display:flex;align-items:center;gap:16px;width:100%;padding:22px 24px;border:none;border-radius:22px;
+    font-size:19px;font-weight:900;cursor:pointer;margin-bottom:16px;color:#fff;text-decoration:none;text-align:left;
+    box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .15s, box-shadow .15s;}
+  .btn:active{transform:scale(.97);}
+  .btn .ic{font-size:34px;flex-shrink:0;}
+  .btn .tx{flex:1;}
+  .btn .tx small{display:block;font-size:12px;font-weight:700;opacity:.85;margin-top:3px;}
+  .btn .arr{font-size:22px;opacity:.7;}
+  .math{background:linear-gradient(135deg,#3b82f6,#1d4ed8);}
+  .class{background:linear-gradient(135deg,#f472b6,#db2777);}
+  .signup{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);box-shadow:none;font-size:15px;padding:16px 24px;}
+  .signup .ic{font-size:24px;}
+  .foot{margin-top:24px;font-size:12px;color:#475569;font-weight:700;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">🏫</div>
+    <h1>우리 교실</h1>
+    <div class="sub">들어갈 곳을 선택하세요</div>
+
+    <a class="btn math" href="https://abc58255-hub.github.io/hongssam-classroom/math/">
+      <span class="ic">📐</span>
+      <span class="tx">수학 교실<small>과제·채점·내 성적·도장</small></span>
+      <span class="arr">›</span>
+    </a>
+
+    <a class="btn class" href="https://abc58255-hub.github.io/hongssam-classroom/homeroom/">
+      <span class="ic">🎈</span>
+      <span class="tx">우리 반 교실<small>학급알림·창체·설문·칭찬</small></span>
+      <span class="arr">›</span>
+    </a>
+
+    <a class="btn signup" href="https://abc58255-hub.github.io/hongssam-classroom/signup/">
+      <span class="ic">✏️</span>
+      <span class="tx">처음이에요? 회원가입</span>
+      <span class="arr">›</span>
+    </a>
+
+    <div class="foot">홍쌤 교실 · Smart Portal</div>
+  </div>
+</body>
+</html>

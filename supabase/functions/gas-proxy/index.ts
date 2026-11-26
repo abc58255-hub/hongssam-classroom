@@ -13,12 +13,23 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA/exec";
+// 앱별 GAS 배포 ID 화이트리스트 (SSRF 방지: 아는 앱만 프록시).
+// 쿼리 ?app=<키>로 대상 선택. 기본=math(수학교실, 하위호환).
+const GAS_DEPLOY: Record<string, string> = {
+  math:     "AKfycbyR1whn6f90-kJEAaJg_O34uP8v-KvyEqsRky58idjoxVDS5cWj80p2ScJp6V2dnz_0hA", // 학생-수학
+  homeroom: "AKfycbyur2cLLWQp-kEpgyYhJ0wOSmvVgbuEcFC7btI0DblyyPLsINygtOZvglb1xDFmOeTWmA", // 학생-담임(우리반교실)
+  signup:   "AKfycbzA_D6nyZplLSka3YNoq8ynHBn1NxnHj7FXoFjS6WpqY8e_mZArdFoBq6nSPRr63Gcg",    // 회원가입
+};
+function gasUrlFor(app: string): string {
+  const id = GAS_DEPLOY[app] || GAS_DEPLOY.math;
+  return `https://script.google.com/macros/s/${id}/exec`;
+}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   try {
+    const app = new URL(req.url).searchParams.get("app") || "math";
+    const GAS_URL = gasUrlFor(app);
     const body = await req.text(); // {"fn":..., "args":[...]}
     const r = await fetch(GAS_URL, {
       method: "POST",

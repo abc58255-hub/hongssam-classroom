@@ -127,10 +127,10 @@ function getPortalData() {
       { name: '방탈출',    icon: '🔓', desc: '방탈출 게임 만들기',          keys: ['업무도구'], suffix: '?page=escape' }
     ]},
     { title: '학생용 (학생에게 안내)', student: true, cards: [
-      { name: '스마트포털', icon: '🎓', desc: '학생용 통합 포털(수학 교실 대문)', keys: ['스마트포털', '학생포털', '포털'] },
-      { name: '수학교실',   icon: '➗', desc: '수학 과제 제출·피드백',       keys: ['수학교실'] },
-      { name: '우리반교실', icon: '🏫', desc: '학급알림·창체·설문·내 도장',   keys: ['우리반교실'] },
-      { name: '회원가입',   icon: '✏️', desc: '학생 회원가입',             keys: ['회원가입'] }
+      { name: '스마트포털', icon: '🎓', desc: '학생용 통합 포털(수학·우리반 교실 대문)', keys: ['스마트포털', '학생포털', '포털'], url: 'https://abc58255-hub.github.io/hongssam-classroom/student/' },
+      { name: '수학교실',   icon: '➗', desc: '수학 과제 제출·피드백',       keys: ['수학교실'], url: 'https://abc58255-hub.github.io/hongssam-classroom/math/' },
+      { name: '우리반교실', icon: '🏫', desc: '학급알림·창체·설문·내 도장',   keys: ['우리반교실'], url: 'https://abc58255-hub.github.io/hongssam-classroom/homeroom/' },
+      { name: '회원가입',   icon: '✏️', desc: '학생 회원가입',             keys: ['회원가입'], url: 'https://abc58255-hub.github.io/hongssam-classroom/signup/' }
     ]}
   ];
 
