@@ -34,7 +34,7 @@ function _serviceUrl_() {
 var RPC_WHITELIST = [
   'teacherLogin', 'teacherLogout', 'validateTeacherSession',
   'getPortalData', 'setAppUrl', 'getStudentList', 'resetStudentPassword',
-  'getRosterAdmin', 'addStudents', 'updateStudent', 'archiveStudent', 'getArchivedStudents', 'restoreStudent',
+  'getRosterAdmin', 'addStudents', 'signupStudent', 'updateStudent', 'archiveStudent', 'getArchivedStudents', 'restoreStudent',
   'getLessonGames', 'setLessonGame', 'lessonScores', 'lessonDeleteScore', 'lessonResetGame',
   'getLinks', 'saveLink', 'deleteLink',
   'graphCreate', 'graphUpdate', 'graphClear', 'graphClose', 'graphClasses',
@@ -540,4 +540,25 @@ function _safeSync_() {
     UrlFetchApp.fetch(STUDENT_MATH_URL + '?action=syncRoster&key=' + encodeURIComponent(key), { muteHttpExceptions: true, followRedirects: true });
     return true;
   } catch (_) { return false; }
+}
+
+// 한 명 바로 가입 — 명단 추가 + 비밀번호 설정(있으면)까지 한 번에. 바로 로그인 가능.
+function signupStudent(token, sid, name, pw) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  try {
+    sid = String(sid || '').trim().replace(/[^0-9]/g, '');
+    name = String(name || '').trim();
+    if (!/^\d{3,5}$/.test(sid) || !name) return { success: false, message: '학번(숫자)과 이름을 입력해주세요.' };
+    var sh = _rosterSheet_(), last = sh.getLastRow();
+    var exist = last > 1 ? sh.getRange(2, 2, last - 1, 1).getValues().some(function (r) { return String(r[0] || '').trim() === sid; }) : false;
+    if (exist) return { success: false, message: '이미 있는 학번이에요: ' + sid };
+    sh.appendRow(['', sid, name, '']);
+    _autoRenumber_(sh);
+    var pwSet = false;
+    if (pw) {
+      try { ClassCore.resetStudentPw(sid, String(pw)); pwSet = true; }
+      catch (e) { return { success: true, pwFail: String(e && e.message || e), synced: _safeSync_() }; }
+    }
+    return { success: true, pwSet: pwSet, synced: _safeSync_() };
+  } catch (e) { return { success: false, message: String(e && e.message || e) }; }
 }

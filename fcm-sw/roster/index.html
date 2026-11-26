@@ -99,11 +99,23 @@
 
   <!-- 추가 모달 -->
   <div class="modal" id="addModal"><div class="box">
-    <h3>➕ 학생 추가</h3>
-    <div class="mdesc">한 줄에 한 명씩 <b>학번 이름</b> 형식으로 붙여넣으세요. (엑셀에서 두 칸 복사해도 됨)<br>이미 있는 학번은 자동으로 건너뜁니다.</div>
-    <label>명단 붙여넣기</label>
+    <h3>＋ 학생 추가</h3>
+
+    <div style="background:#eff6ff;border:1.5px solid #bfdbfe;border-radius:14px;padding:16px;margin-bottom:18px;">
+      <div style="font-size:14px;font-weight:900;color:#1d4ed8;margin-bottom:4px;">👤 한 명 바로 가입</div>
+      <div class="mdesc" style="margin-bottom:12px;">학번·이름·비밀번호를 넣으면 <b>바로 로그인 가능한 계정</b>이 돼요. (비밀번호를 비우면 학생이 첫 로그인 때 직접 정함)</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <input type="text" id="suSid" inputmode="numeric" placeholder="학번 (예: 2601)" style="flex:1;min-width:110px;">
+        <input type="text" id="suName" placeholder="이름" style="flex:1;min-width:90px;">
+        <input type="text" id="suPw" placeholder="비밀번호 (선택)" style="flex:1;min-width:110px;">
+      </div>
+      <button class="btn" id="suBtn" onclick="doSignup()" style="width:100%;margin-top:12px;">이 학생 가입시키기</button>
+    </div>
+
+    <div style="font-size:14px;font-weight:900;color:#334155;margin-bottom:4px;">📋 여러 명 추가 (명단 붙여넣기)</div>
+    <div class="mdesc">한 줄에 한 명씩 <b>학번 이름</b> 형식으로 붙여넣으세요. (엑셀 두 칸 복사 OK)<br>비밀번호 없이 명단만 추가 — 학생이 첫 로그인 때 비번을 정합니다. 이미 있는 학번은 건너뜀.</div>
     <textarea id="addText" placeholder="2601 김철수&#10;2602 이영희&#10;2603 박민수"></textarea>
-    <div class="mrow"><button class="btn gray" onclick="closeModal('addModal')">취소</button><button class="btn green" id="addBtn" onclick="doAdd()">추가하기</button></div>
+    <div class="mrow"><button class="btn gray" onclick="closeModal('addModal')">닫기</button><button class="btn green" id="addBtn" onclick="doAdd()">명단 추가하기</button></div>
   </div></div>
 
   <!-- 수정 모달 -->
@@ -177,7 +189,7 @@
     STUDENTS.forEach(function(s){ var c=s.cls||'기타'; if(!groups[c]){ groups[c]=[]; order.push(c); } groups[c].push(s); });
     order.sort(function(a,b){ return a.localeCompare(b,'ko',{numeric:true}); });
     var hint = '<div style="background:rgba(255,255,255,.9);border-radius:14px;padding:12px 16px;margin-bottom:16px;font-size:12.5px;color:#475569;font-weight:600;line-height:1.6;box-shadow:0 4px 12px rgba(37,99,235,.1);">'
-      + '학생마다 <b style="color:#1d4ed8;">수정</b>(이름·학번) · <b style="color:#b45309;">비번</b>(초기화) · <b style="color:#be123c;">전학·졸업</b>(보관) 버튼이 있어요. '
+      + '학생마다 <b style="color:#1d4ed8;">수정</b>(이름·학번) · <b style="color:#b45309;">초기화</b>(비밀번호) · <b style="color:#be123c;">전학·졸업</b>(보관) 버튼이 있어요. '
       + '<b style="color:#15803d;">비번 설정됨</b>=로그인 가능 / <b style="color:#b45309;">비번 없음</b>=첫 로그인 때 비번을 정하게 됩니다.</div>';
     document.getElementById('body').innerHTML = hint + order.map(function(c){
       var rows=groups[c].map(function(s){
@@ -187,7 +199,7 @@
           + '<span class="pw '+(s.hasPw?'set':'no')+'">'+(s.hasPw?'비번 설정됨':'비번 없음')+'</span>'
           + '<span class="acts">'
           + '<button class="act edit" onclick="openEdit(\''+esc(s.sid)+'\')">수정</button>'
-          + '<button class="act pw" onclick="openPw(\''+esc(s.sid)+'\')">비번</button>'
+          + '<button class="act pw" onclick="openPw(\''+esc(s.sid)+'\')">초기화</button>'
           + '<button class="act out" onclick="doArchive(\''+esc(s.sid)+'\')">전학·졸업</button>'
           + '</span></div>';
       }).join('');
@@ -195,7 +207,21 @@
     }).join('');
   }
 
-  function openAdd(){ document.getElementById('addText').value=''; openModal('addModal'); }
+  function openAdd(){ document.getElementById('addText').value=''; document.getElementById('suSid').value=''; document.getElementById('suName').value=''; document.getElementById('suPw').value=''; openModal('addModal'); }
+  function doSignup(){
+    var sid=document.getElementById('suSid').value.trim(), name=document.getElementById('suName').value.trim(), pw=document.getElementById('suPw').value;
+    if(!sid||!name){ toast('학번과 이름을 입력해주세요'); return; }
+    var b=document.getElementById('suBtn'); b.disabled=true; b.textContent='가입 중…';
+    rpc('signupStudent',[TOK,sid,name,pw]).then(function(res){
+      b.disabled=false; b.textContent='이 학생 가입시키기';
+      if(res&&res.success){
+        document.getElementById('suSid').value=''; document.getElementById('suName').value=''; document.getElementById('suPw').value='';
+        var m = res.pwSet ? '✅ '+esc(name)+' 가입 완료 (바로 로그인 가능)' : '✅ '+esc(name)+' 추가됨 (비번은 첫 로그인 때)';
+        if(res.pwFail) m='⚠️ 명단엔 추가됐지만 비번 설정 실패: '+res.pwFail;
+        toast(m); load();
+      } else toast('실패: '+((res&&res.message)||''));
+    }).catch(function(e){ b.disabled=false; b.textContent='이 학생 가입시키기'; toast('오류: '+e.message); });
+  }
   function doAdd(){
     var text=document.getElementById('addText').value.trim(); if(!text){ toast('명단을 붙여넣어주세요'); return; }
     var b=document.getElementById('addBtn'); b.disabled=true; b.textContent='추가 중…';
