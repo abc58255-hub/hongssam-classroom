@@ -275,47 +275,84 @@
     cv.width = W*dpr; cv.height = H*dpr;
     var ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
 
-    var padL = 52, padR = 18, padT = 16, padB = 32;
+    var padL = 60, padR = 20, padT = 16, padB = 32;
     var plotW = W - padL - padR, plotH = H - padT - padB;
 
+    var theory = Number(SESSION.theory_p);
+    var N = seriesX.length;
+    var lastN = seriesX[N-1] || 0;
+
+    // y 범위 자동 (이론값 중심, lastN 커질수록 좁아짐)
+    var yMin, yMax;
+    if(lastN < 30 || N === 0){ yMin = 0; yMax = 1; }
+    else {
+      var baseMargin = lastN<200?0.35 : lastN<1000?0.22 : lastN<5000?0.12 : lastN<20000?0.07 : 0.04;
+      // 후반 60%의 min/max로 margin 보강
+      var startK = Math.floor(N * 0.3);
+      var dmin = theory, dmax = theory;
+      for(var i=startK;i<N;i++){ if(seriesY[i]<dmin) dmin=seriesY[i]; if(seriesY[i]>dmax) dmax=seriesY[i]; }
+      var devMax = Math.max(theory - dmin, dmax - theory, 0);
+      var margin = Math.max(baseMargin, devMax + 0.018);
+      yMin = Math.max(0, theory - margin);
+      yMax = Math.min(1, theory + margin);
+    }
+    var yR = yMax - yMin;
+    function Y(v){ return padT + plotH * (1 - (v - yMin) / yR); }
+
+    // x 로그 스케일
+    var xMaxN = Math.max(10, lastN);
+    var lmax = Math.max(1, Math.log10(xMaxN));
+    function X(nn){ return padL + plotW * (Math.log10(Math.max(1,nn))) / lmax; }
+
+    // y 격자·라벨
     ctx.font = '13px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#eef2f7'; ctx.lineWidth = 1;
     for(var y=0;y<=4;y++){
-      var yy = padT + plotH * (y/4);
+      var yv = yMax - yR * y/4;
+      var yy = padT + plotH * y/4;
       ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL+plotW, yy); ctx.stroke();
-      ctx.fillText((1 - y/4).toFixed(2), 10, yy+5);
+      ctx.fillText(yv.toFixed(2), 10, yy+5);
     }
+
+    // x 눈금 (로그 10의 거듭제곱)
+    ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#f1f5f9';
+    var pow = 1;
+    while(pow <= xMaxN){
+      var xx = X(pow);
+      if(xx >= padL && xx <= padL+plotW+1){
+        ctx.beginPath(); ctx.moveTo(xx, padT); ctx.lineTo(xx, padT+plotH); ctx.stroke();
+        var lbl = pow>=1000 ? (pow/1000).toFixed(pow%1000?1:0)+'k' : String(pow);
+        ctx.fillText(lbl, xx - (lbl.length*3.5), padT+plotH+22);
+      }
+      pow *= 10;
+    }
+
+    // 축선
     ctx.strokeStyle = '#cbd5e1'; ctx.beginPath();
     ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(padL+plotW, padT+plotH); ctx.stroke();
 
-    var lastX = seriesX[seriesX.length-1] || 10;
-    var maxX = Math.max(10, lastX);
-    ctx.fillStyle = '#94a3b8';
-    for(var i=0;i<=5;i++){
-      var xv = Math.round(maxX * i/5);
-      var xx = padL + plotW * i/5;
-      ctx.fillText(String(xv), xx - 10, padT+plotH+22);
+    // 이론 기준선
+    if(theory >= yMin && theory <= yMax){
+      var ty = Y(theory);
+      ctx.strokeStyle = '#ef4444'; ctx.setLineDash([9,5]); ctx.lineWidth = 2.3;
+      ctx.beginPath(); ctx.moveTo(padL, ty); ctx.lineTo(padL+plotW, ty); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ef4444'; ctx.font = 'bold 15px sans-serif';
+      ctx.fillText(SESSION.tool==='coin'?'½':'⅙', padL+8, ty-7);
     }
 
-    var theoryY = padT + plotH * (1 - Number(SESSION.theory_p));
-    ctx.strokeStyle = '#ef4444'; ctx.setLineDash([9,5]); ctx.lineWidth = 2.3;
-    ctx.beginPath(); ctx.moveTo(padL, theoryY); ctx.lineTo(padL+plotW, theoryY); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#ef4444'; ctx.font = 'bold 15px sans-serif';
-    ctx.fillText(SESSION.tool==='coin'?'½':'⅙', padL+8, theoryY-7);
-
-    if(seriesX.length===0) return;
+    if(N===0) return;
 
     ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 3;
     ctx.beginPath();
-    for(var k=0;k<seriesX.length;k++){
-      var px = padL + plotW * (seriesX[k]/maxX);
-      var py = padT + plotH * (1 - seriesY[k]);
+    for(var k=0;k<N;k++){
+      var px = X(seriesX[k]);
+      var py = Math.max(padT, Math.min(padT+plotH, Y(seriesY[k])));
       if(k===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
     }
     ctx.stroke();
 
-    var lx = padL + plotW * (seriesX[seriesX.length-1]/maxX);
-    var ly = padT + plotH * (1 - seriesY[seriesY.length-1]);
+    var lx = X(seriesX[N-1]);
+    var ly = Math.max(padT, Math.min(padT+plotH, Y(seriesY[N-1])));
     ctx.fillStyle = '#06b6d4';
     ctx.beginPath(); ctx.arc(lx, ly, 6, 0, Math.PI*2); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5; ctx.stroke();

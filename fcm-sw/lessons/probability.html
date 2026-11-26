@@ -359,59 +359,97 @@
     cv.width = W*dpr; cv.height = H*dpr;
     var ctx = cv.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
 
-    var padL = 42, padR = 16, padT = 14, padB = 28;
+    var padL = 48, padR = 16, padT = 14, padB = 28;
     var plotW = W - padL - padR, plotH = H - padT - padB;
 
-    ctx.font = '11px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#eef2f7'; ctx.lineWidth = 1;
-    for(var y=0;y<=4;y++){
-      var yy = padT + plotH * (y/4);
-      ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL+plotW, yy); ctx.stroke();
-      ctx.fillText((1 - y/4).toFixed(2), 6, yy+4);
+    var theory = Number(SESSION.theory_p);
+    var n = rolls.length;
+
+    // 1-pass: 누적 상대도수 시퀀스 + 후반 50% 변동폭
+    var series = [], cum = 0, dmin = theory, dmax = theory;
+    var skipTo = Math.max(10, Math.floor(n * 0.3));
+    for(var k=0;k<n;k++){
+      if(rolls[k].hit) cum++;
+      var r = cum / (k+1);
+      series.push(r);
+      if(k >= skipTo){ if(r<dmin) dmin=r; if(r>dmax) dmax=r; }
     }
+
+    // y 범위 자동 (이론값 중심, trials 커질수록 좁아짐)
+    var yMin, yMax;
+    if(n < 15){ yMin = 0; yMax = 1; }
+    else {
+      var baseMargin = n<100?0.42 : n<500?0.26 : n<2000?0.16 : n<10000?0.08 : 0.045;
+      var devMax = Math.max(theory - dmin, dmax - theory, 0);
+      var margin = Math.max(baseMargin, devMax + 0.018);
+      yMin = Math.max(0, theory - margin);
+      yMax = Math.min(1, theory + margin);
+    }
+    var yR = yMax - yMin;
+    function Y(v){ return padT + plotH * (1 - (v - yMin) / yR); }
+
+    // x 로그 스케일 (1 ~ max). 초기엔 최소 10까지 보이게
+    var xMaxN = Math.max(10, n);
+    var lmax = Math.max(1, Math.log10(xMaxN));
+    function X(nn){ return padL + plotW * (Math.log10(Math.max(1,nn))) / lmax; }
+
+    // y 격자·라벨
+    ctx.font = '11px sans-serif'; ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#eef2f7'; ctx.lineWidth = 1;
+    for(var i=0;i<=4;i++){
+      var yv = yMax - yR * i/4;
+      var yy = padT + plotH * i/4;
+      ctx.beginPath(); ctx.moveTo(padL, yy); ctx.lineTo(padL+plotW, yy); ctx.stroke();
+      ctx.fillText(yv.toFixed(2), 4, yy+4);
+    }
+
+    // x 눈금 (10의 거듭제곱: 1, 10, 100, 1k, 10k)
+    ctx.fillStyle = '#94a3b8'; ctx.strokeStyle = '#f1f5f9';
+    var pow = 1;
+    while(pow <= xMaxN){
+      var xx = X(pow);
+      if(xx >= padL && xx <= padL+plotW+1){
+        ctx.beginPath(); ctx.moveTo(xx, padT); ctx.lineTo(xx, padT+plotH); ctx.stroke();
+        var lbl = pow>=1000 ? (pow/1000).toFixed(pow%1000?1:0)+'k' : String(pow);
+        ctx.fillText(lbl, xx - (lbl.length*3), padT+plotH+18);
+      }
+      pow *= 10;
+    }
+
+    // 축선
     ctx.strokeStyle = '#cbd5e1'; ctx.beginPath();
     ctx.moveTo(padL, padT); ctx.lineTo(padL, padT+plotH); ctx.lineTo(padL+plotW, padT+plotH); ctx.stroke();
 
-    var maxX = Math.max(10, Math.pow(2, Math.ceil(Math.log2(Math.max(10, trials)))));
-    if(trials > maxX) maxX = trials;
-
-    ctx.fillStyle = '#94a3b8';
-    for(var i=0;i<=5;i++){
-      var xv = Math.round(maxX * i/5);
-      var xx = padL + plotW * i/5;
-      ctx.fillText(String(xv), xx - 6, padT+plotH+18);
+    // 이론 기준선
+    if(theory >= yMin && theory <= yMax){
+      var ty = Y(theory);
+      ctx.strokeStyle = '#ef4444'; ctx.setLineDash([6,4]); ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(padL, ty); ctx.lineTo(padL+plotW, ty); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#ef4444'; ctx.font = 'bold 12px sans-serif';
+      ctx.fillText(SESSION.tool==='coin'?'½':'⅙', padL+6, ty-5);
     }
 
-    var theoryY = padT + plotH * (1 - Number(SESSION.theory_p));
-    ctx.strokeStyle = '#ef4444'; ctx.setLineDash([6,4]); ctx.lineWidth = 1.8;
-    ctx.beginPath(); ctx.moveTo(padL, theoryY); ctx.lineTo(padL+plotW, theoryY); ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = '#ef4444'; ctx.font = 'bold 12px sans-serif';
-    ctx.fillText(SESSION.tool==='coin'?'½':'⅙', padL+6, theoryY-5);
+    if(n===0) return;
 
-    if(trials===0) return;
-
+    // 꺾은선 (로그 x, 자동 줌 y)
     ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 2.6;
     ctx.beginPath();
-    var cum = 0;
-    for(var k=0;k<rolls.length;k++){
-      if(rolls[k].hit) cum++;
-      var n = k+1;
-      var r = cum/n;
-      var px = padL + plotW * (n/maxX);
-      var py = padT + plotH * (1 - r);
-      if(k===0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    var started = false;
+    for(var k2=0;k2<series.length;k2++){
+      var nn = k2+1;
+      var px = X(nn);
+      var py = Math.max(padT, Math.min(padT+plotH, Y(series[k2])));
+      if(!started){ ctx.moveTo(px, py); started=true; } else ctx.lineTo(px, py);
     }
     ctx.stroke();
 
-    var lastN = rolls.length;
-    if(lastN>0){
-      var lastR = successes/trials;
-      var lx = padL + plotW * (lastN/maxX);
-      var ly = padT + plotH * (1 - lastR);
-      ctx.fillStyle = '#06b6d4';
-      ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI*2); ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-    }
+    // 마지막 점
+    var lastR = series[series.length-1];
+    var lx = X(n);
+    var ly = Math.max(padT, Math.min(padT+plotH, Y(lastR)));
+    ctx.fillStyle = '#06b6d4';
+    ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
   }
 
   window.addEventListener('resize', function(){ if(SESSION) drawChart(); });
