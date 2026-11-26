@@ -1235,12 +1235,38 @@ function bulkChangeLessons(groupId, mode, start, end, classes, reason) {
     var existing = _checkRowList_(sh);
     var applied = 0, skipped = 0;
 
+    // 이동받은 수업(받음: 행)도 '그 날의 수업'이므로 일괄 변동 대상에 포함한다.
+    // 이동받은 수업은 상태 칸이 '받음:원래날짜'로 쓰이고 있어, 사유는 메모 칸으로 표현.
+    // (프론트가 memo='수행평가' 등을 사유 카드로 렌더링)
+    function _movedInRowsInRange_() {
+      var out = [];
+      if (sh.getLastRow() < 2) return out;
+      var raw = sh.getRange(2, 1, sh.getLastRow() - 1, 6).getValues();
+      for (var i = 0; i < raw.length; i++) {
+        if (String(raw[i][4] || '').trim().indexOf('받음:') !== 0) continue;
+        var ds = raw[i][0] instanceof Date
+          ? Utilities.formatDate(raw[i][0], 'Asia/Seoul', 'yyyy-MM-dd')
+          : String(raw[i][0]).trim();
+        if (ds < start || ds > end) continue;
+        if (targets.indexOf(String(raw[i][1] || '').trim()) < 0) continue;
+        out.push({ row: i + 2, memo: String(raw[i][3] || '').trim() });
+      }
+      return out;
+    }
+    var CANCEL_MEMOS = ['공휴일','학교행사','체험학습','시험','수행평가','자습','휴교','취소'];
+
     if (mode === 'restore') {
       var delRows = [];
       existing.forEach(function(e) {
         if (e.date >= start && e.date <= end && targets.indexOf(e.cls) >= 0 && e.status.indexOf('취소') === 0) delRows.push(e.row);
       });
       delRows.sort(function(a, b) { return b - a; }).forEach(function(r) { sh.deleteRow(r); applied++; });
+      // 이동받은 수업에 걸어둔 사유 메모도 해제 (행은 유지 — 수업 자체는 그 날에 그대로 있음)
+      _movedInRowsInRange_().forEach(function(m) {
+        if (CANCEL_MEMOS.indexOf(m.memo) < 0) return;
+        sh.getRange(m.row, 4).setValue('');
+        applied++;
+      });
       return { success: true, applied: applied, skipped: 0 };
     }
 
@@ -1264,6 +1290,13 @@ function bulkChangeLessons(groupId, mode, start, end, classes, reason) {
       });
     });
     if (appendRows.length > 0) sh.getRange(sh.getLastRow() + 1, 1, appendRows.length, 6).setValues(appendRows);
+    // 이동받은 수업도 같은 사유로 변경 (실제차시 0 + 메모=사유)
+    var reasonMemo = reason || '취소';
+    _movedInRowsInRange_().forEach(function(m) {
+      sh.getRange(m.row, 3).setValue(0);
+      sh.getRange(m.row, 4).setValue(reasonMemo);
+      applied++;
+    });
     return { success: true, applied: applied, skipped: skipped };
   } catch(e) { return { success: false, message: e.toString() }; }
 }

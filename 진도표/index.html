@@ -554,6 +554,14 @@ var CANCEL_REASONS = {
   '휴교':    { emoji: '🤒', label: '임시 휴교',  bg: '#fdf4ff', color: '#7c3aed' },
 };
 
+// 이동받은 수업에 걸린 '사유'(수행평가·체험학습 등) — 일괄 변동이 메모에 사유를 쓴다.
+// 사유가 있으면 그 날 그 수업은 진도 진행 없이 사유 카드로 표시된다.
+function _miReason(mi) {
+  var m = String((mi && mi.memo) || '').trim();
+  if (!m) return '';
+  return (CANCEL_REASONS[m] || m === '취소') ? m : '';
+}
+
 function _cancelStatusInfo(status) {
   if (!status || status.indexOf('취소') !== 0) return null;
   var code = status.indexOf(':') > 0 ? status.substring(status.indexOf(':') + 1) : '';
@@ -766,7 +774,7 @@ function fillWeek(monday){
     if(typeof sylMovedInCache!=='undefined' && sylMovedInCache){
       Object.keys(sylMovedInCache).forEach(function(k){
         if(k.substring(11)!==cls || k.substring(0,10)>=monday) return;
-        (sylMovedInCache[k]||[]).forEach(function(mi){ if(String(mi.memo||'').trim()==='수행평가') return; var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
+        (sylMovedInCache[k]||[]).forEach(function(mi){ if(_miReason(mi)) return; var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
       });
     }
     var next=last+1;
@@ -811,7 +819,7 @@ function computeWeekLessons(monday){
     if(typeof sylMovedInCache!=='undefined' && sylMovedInCache){
       Object.keys(sylMovedInCache).forEach(function(k){
         if(k.substring(11)!==cls || k.substring(0,10)>=monday) return;
-        (sylMovedInCache[k]||[]).forEach(function(mi){ if(String(mi.memo||'').trim()==='수행평가') return; var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
+        (sylMovedInCache[k]||[]).forEach(function(mi){ if(_miReason(mi)) return; var ln=Math.max(Number(mi.lessonNo)||0, Number(mi.plannedLessonNo)||0); if(ln>last) last=ln; });
       });
     }
     var next=last+1; map[cls]={};
@@ -1070,7 +1078,7 @@ function renderLessonMatrix() {
   });
   Object.keys(sylMovedInCache||{}).forEach(function(k){
     var cls=k.substring(11);
-    (sylMovedInCache[k]||[]).forEach(function(mi){ if(String(mi.memo||'').trim()==='수행평가')return; if(Number(mi.lessonNo)>0) markDone(cls, Number(mi.lessonNo), k.substring(0,10)); });
+    (sylMovedInCache[k]||[]).forEach(function(mi){ if(_miReason(mi))return; if(Number(mi.lessonNo)>0) markDone(cls, Number(mi.lessonNo), k.substring(0,10)); });
   });
   var th='<th style="position:sticky;left:0;background:#1e3a8a;color:#fff;z-index:2;text-align:left;padding:8px 10px;min-width:180px;">차시</th>'
     + cols.map(function(c){ return '<th style="background:#1e3a8a;color:#fff;padding:8px 6px;white-space:nowrap;">'+escapeHtml(c)+'</th>'; }).join('');
@@ -1324,18 +1332,20 @@ function renderSylTable() {
           var fromLabel = (fromD.getMonth()+1) + '/' + fromD.getDate() + '(' + DAY_KR[fromD.getDay()] + ')';
           var planned = mi.plannedLessonNo || mi.lessonNo;
           var actual  = mi.lessonNo;
-          var miPerf  = String(mi.memo||'').trim() === '수행평가';
+          var miReason = _miReason(mi);
+          var miPerf  = !!miReason;
           var displayLn = actual || planned;
           var miPlan = sylPlanCache.find(function(p){ return p.lessonNo === displayLn; });
           var stateLabel, stateBg, stateBorder, stateColor, stateIcon, stateBadge;
           if (miPerf) {
             // 수행평가 (이동받은 날에 수행평가 실시 — 진도 진행 없음)
-            html += '<div style="background:#f5f3ff;border:1px solid #c4b5fd;' + CARD + '">'
+            var _ri = CANCEL_REASONS[miReason] || { emoji:'🚫', label: miReason, bg:'#f1f5f9', color:'#475569' };
+            html += '<div style="background:' + _ri.bg + ';border:1px solid ' + _ri.color + '33;' + CARD + '">'
               + '<div style="display:flex;align-items:center;gap:3px;margin-bottom:2px;">'
-                + '<span>📋</span><span style="font-weight:800;color:#7c3aed;">수행평가</span>'
-                + '<span style="font-size:8px;background:#ede9fe;color:#7c3aed;padding:0 4px;border-radius:3px;margin-left:1px;">이동</span>'
+                + '<span>' + _ri.emoji + '</span><span style="font-weight:800;color:' + _ri.color + ';">' + _ri.label + '</span>'
+                + '<span style="font-size:8px;background:#fff;color:' + _ri.color + ';padding:0 4px;border-radius:3px;margin-left:1px;">이동</span>'
               + '</div>'
-              + '<div style="font-size:9px;color:#a78bfa;">📍 ' + fromLabel + ' 수업</div>'
+              + '<div style="font-size:9px;color:' + _ri.color + ';opacity:.75;">📍 ' + fromLabel + ' 수업</div>'
             + '</div>';
             return;
           }
