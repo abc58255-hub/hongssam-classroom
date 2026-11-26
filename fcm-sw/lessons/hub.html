@@ -85,6 +85,12 @@
   .modal .mrow{display:flex;gap:10px;margin-top:18px;}
   .modal .mrow button{flex:1;padding:12px;border:none;border-radius:12px;font-size:14px;font-weight:800;cursor:pointer;}
   .mb-save{background:#0284c7;color:#fff;} .mb-cancel{background:#e2e8f0;color:#475569;} .mb-del{background:#fee2e2;color:#b91c1c;}
+  .mkpick{background:#f8fafc;border:2px solid #e2e8f0;border-radius:16px;padding:18px 10px;font-size:28px;cursor:pointer;transition:.15s;font-family:inherit;}
+  .mkpick:hover{border-color:#0284c7;background:#eff6ff;}
+  .mkpick div{font-size:13px;font-weight:800;color:#0f172a;margin-top:6px;}
+  .modal textarea{width:100%;padding:12px 13px;border:2px solid #e2e8f0;border-radius:11px;font-size:14px;font-family:inherit;min-height:92px;resize:vertical;}
+  .modal textarea:focus{outline:none;border-color:#0284c7;}
+  .frow{display:flex;gap:10px;} .frow>div{flex:1;}
 </style>
 </head>
 <body class="l-body">
@@ -111,6 +117,7 @@
       <div class="subline">미리 <b>준비</b>해두고 수업 때 <b>진행</b>으로 바꾸면 학생 화면에 떠요. 준비 중인 건 학생에게 안 보여요.</div>
       <div class="bar">
         <select id="clsSel" onchange="loadPlans()" style="padding:10px 14px;border:none;border-radius:12px;font-size:14px;font-weight:800;background:rgba(255,255,255,.92);color:#0369a1;"></select>
+        <button class="wbtn" style="background:#fff;color:#047857;" onclick="openMake()">＋ 새 활동 만들기</button>
         <span class="sp"></span>
         <button class="wbtn" onclick="loadPlans()">🔄 새로고침</button>
       </div>
@@ -135,6 +142,35 @@
       <div class="wgrid" id="linkGrid"><div class="wempty">불러오는 중…</div></div>
     </div>
   </div>
+
+  <!-- ＋ 새 활동 만들기 모달 -->
+  <div class="modal" id="makeModal"><div class="box">
+    <h3 id="mkH">＋ 새 활동 만들기</h3>
+    <div class="mdesc" id="mkDesc">어떤 활동을 만들까요?</div>
+
+    <!-- 1단계: 활동 종류 -->
+    <div id="mkStep1">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+        <button class="mkpick" data-act="havruta" onclick="pickAct('havruta')">💬<div>하브루타 질문</div></button>
+        <button class="mkpick" data-act="prob" onclick="pickAct('prob')">🐦‍⬛<div>확률 체험</div></button>
+        <button class="mkpick" data-act="graph" onclick="pickAct('graph')">📐<div>그래프 탐구</div></button>
+        <button class="mkpick" style="opacity:.5;cursor:default;" onclick="toast('닮음은 세트 만들기 화면에서 만들어요')">🔺<div>닮음 보물찾기</div></button>
+      </div>
+      <div class="mrow"><button class="mb-cancel" onclick="closeModal('makeModal')">닫기</button></div>
+    </div>
+
+    <!-- 2단계: 설정 폼 -->
+    <div id="mkStep2" style="display:none;">
+      <label>반</label>
+      <select id="mkCls"></select>
+      <div id="mkFields"></div>
+      <div class="mrow">
+        <button class="mb-cancel" onclick="backToPick()">← 뒤로</button>
+        <button class="mb-save" style="background:#64748b;" id="mkDraftBtn" onclick="saveMake(false)">📝 준비로 저장</button>
+        <button class="mb-save" style="background:#059669;" id="mkLiveBtn" onclick="saveMake(true)">▶️ 바로 진행</button>
+      </div>
+    </div>
+  </div></div>
 
   <!-- 링크 추가/수정 모달 -->
   <div class="modal" id="linkModal"><div class="box">
@@ -328,7 +364,8 @@
         ? '<button style="flex:1;background:#fef2f2;color:#b91c1c;" onclick="setPlanState(\''+o.a.key+'\','+o.r.id+',\'done\')">✅ 종료</button>'
           + '<button style="flex:0 0 auto;padding:8px 14px;background:#eff6ff;color:#1d4ed8;" onclick="openPage(\''+o.a.page+'\')">교사 화면</button>'
         : '<button style="flex:1;background:#059669;color:#fff;" onclick="setPlanState(\''+o.a.key+'\','+o.r.id+',\'live\')">▶️ 진행</button>'
-          + '<button style="flex:0 0 auto;padding:8px 14px;background:#fef2f2;color:#b91c1c;" onclick="delPlan(\''+o.a.key+'\','+o.r.id+')">삭제</button>';
+          + (FORMS[o.a.key] ? '<button style="flex:0 0 auto;padding:8px 12px;background:#f1f5f9;color:#475569;" onclick="editPlan(\''+o.a.key+'\','+o.r.id+')">⚙️</button>' : '')
+          + '<button style="flex:0 0 auto;padding:8px 12px;background:#fef2f2;color:#b91c1c;" onclick="delPlan(\''+o.a.key+'\','+o.r.id+')">삭제</button>';
       return '<div class="wcard" style="border-top:5px solid '+o.a.c+';">'
         + '<div class="top"><span class="ic">'+o.a.emoji+'</span>'+badge+'</div>'
         + '<h3>'+esc(o.a.title)+'</h3>'
@@ -337,6 +374,122 @@
         + '</div>';
     }).join('');
   }
+  // ══════════ ＋ 새 활동 만들기 / 설정 수정 ══════════
+  var MK_ACT='', MK_EDIT_ID=null;
+  // 활동별 설정 폼 정의
+  var FORMS={
+    havruta:{ title:'💬 하브루타 질문', desc:'단원과 소단원을 정하면 학생이 소단원마다 질문을 만들어요.',
+      fields:function(v){ v=v||{};
+        return '<label>단원</label><input id="f_unit" value="'+esc(v.unit||'')+'" placeholder="예: Ⅶ. 도형의 닮음과 피타고라스 정리">'
+          + '<label>소단원 (한 줄에 하나, 비우면 ①~⑤)</label><textarea id="f_subs" placeholder="닮은 도형&#10;삼각형의 닮음 조건&#10;평행선 사이의 거리의 비">'+esc(v.sub_units||'')+'</textarea>'
+          + '<div class="frow"><div><label>단어 수</label><input type="number" id="f_nw" min="1" max="5" value="'+(v.n_words||2)+'"></div>'
+          + '<div><label>질문 수</label><input type="number" id="f_nq" min="1" max="5" value="'+(v.n_questions||2)+'"></div>'
+          + '<div><label>투표 수</label><input type="number" id="f_nv" min="1" max="9" value="'+(v.n_votes||2)+'"></div></div>'
+          + '<label class="chk" style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:14px;"><input type="checkbox" id="f_names" style="width:18px;height:18px;"'+(v.show_names!==false?' checked':'')+'> 이름 공개 (해제하면 익명)</label>';
+      },
+      read:function(){ return { unit:val('f_unit'), sub_units:val('f_subs'),
+        n_words:num('f_nw',2), n_questions:num('f_nq',2), n_votes:num('f_nv',2),
+        show_names:document.getElementById('f_names').checked, stage:'submit' }; } },
+    prob:{ title:'🐦‍⬛ 확률 체험', desc:'동전·주사위를 던져 상대도수가 이론확률에 수렴하는 걸 봐요.',
+      fields:function(v){ v=v||{}; var dice=v.tool==='dice';
+        return '<label>도구</label><select id="f_tool" onchange="document.getElementById(\'f_evWrap\').style.display=this.value===\'dice\'?\'block\':\'none\'">'
+          + '<option value="coin"'+(!dice?' selected':'')+'>동전 (앞면, 이론 1/2)</option>'
+          + '<option value="dice"'+(dice?' selected':'')+'>주사위 (특정 눈, 이론 1/6)</option></select>'
+          + '<div id="f_evWrap" style="display:'+(dice?'block':'none')+';"><label>어떤 눈이 나올 확률?</label>'
+          + '<select id="f_ev">'+[1,2,3,4,5,6].map(function(n){return '<option value="'+n+'"'+(String(v.event_value)===String(n)?' selected':'')+'>'+n+'의 눈</option>';}).join('')+'</select></div>';
+      },
+      read:function(){ var tool=val('f_tool'); return { tool:tool, event_value: tool==='dice'?num('f_ev',1):1, theory_p: tool==='dice'?(1/6):0.5 }; } },
+    graph:{ title:'📐 그래프 탐구', desc:'ax + by = c 위의 점을 학생들이 함께 찍어요.',
+      fields:function(v){ v=v||{};
+        return '<label>직선 계수 (ax + by = c)</label><div class="frow">'
+          + '<div><input type="number" id="f_a" value="'+(v.a!==undefined?v.a:1)+'" placeholder="a"></div>'
+          + '<div><input type="number" id="f_b" value="'+(v.b!==undefined?v.b:0)+'" placeholder="b"></div>'
+          + '<div><input type="number" id="f_c" value="'+(v.c!==undefined?v.c:2)+'" placeholder="c"></div></div>'
+          + '<label>학생에게 보일 식</label><input id="f_disp" value="'+esc(v.display||'x = 2')+'" placeholder="예: x = 2">'
+          + '<div class="frow"><div><label>학생당 점 개수 (0=무제한)</label><input type="number" id="f_mp" min="0" max="99" value="'+(v.max_points!==undefined?v.max_points:3)+'"></div></div>'
+          + '<label class="chk" style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:12px;"><input type="checkbox" id="f_wrong" style="width:18px;height:18px;"'+(v.show_wrong!==false?' checked':'')+'> 틀린 점도 표시</label>'
+          + '<label class="chk" style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:8px;"><input type="checkbox" id="f_int" style="width:18px;height:18px;"'+(v.int_only?' checked':'')+'> 정수만 입력</label>'
+          + '<label class="chk" style="display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:700;cursor:pointer;margin-top:8px;"><input type="checkbox" id="f_hide" style="width:18px;height:18px;"'+(v.hide_eq?' checked':'')+'> 식 숨기기</label>';
+      },
+      read:function(){ return { a:num('f_a',0), b:num('f_b',0), c:num('f_c',0), display:val('f_disp'),
+        max_points:num('f_mp',3), show_wrong:document.getElementById('f_wrong').checked,
+        int_only:document.getElementById('f_int').checked, hide_eq:document.getElementById('f_hide').checked,
+        kind:'line', revealed:false }; } }
+  };
+  function val(id){ var e=document.getElementById(id); return e?String(e.value).trim():''; }
+  function num(id,d){ var e=document.getElementById(id); var n=e?Number(e.value):NaN; return isFinite(n)?n:d; }
+
+  function openMake(){
+    if(!CLASSES.length){ toast('반 정보를 먼저 불러와야 해요'); return; }
+    MK_ACT=''; MK_EDIT_ID=null;
+    document.getElementById('mkH').textContent='＋ 새 활동 만들기';
+    document.getElementById('mkDesc').textContent='어떤 활동을 만들까요?';
+    document.getElementById('mkStep1').style.display='block';
+    document.getElementById('mkStep2').style.display='none';
+    openModal('makeModal');
+  }
+  function backToPick(){
+    if(MK_EDIT_ID){ closeModal('makeModal'); return; }
+    document.getElementById('mkStep1').style.display='block';
+    document.getElementById('mkStep2').style.display='none';
+    document.getElementById('mkH').textContent='＋ 새 활동 만들기';
+    document.getElementById('mkDesc').textContent='어떤 활동을 만들까요?';
+  }
+  function pickAct(act, value, editId){
+    MK_ACT=act; MK_EDIT_ID=editId||null;
+    var f=FORMS[act]; if(!f) return;
+    document.getElementById('mkH').textContent=(editId?'⚙️ 설정 수정 — ':'')+f.title;
+    document.getElementById('mkDesc').textContent=f.desc;
+    document.getElementById('mkStep1').style.display='none';
+    document.getElementById('mkStep2').style.display='block';
+    var cur=value&&value.class_scope ? value.class_scope : curClass();
+    document.getElementById('mkCls').innerHTML=CLASSES.map(function(c){ return '<option'+(c===cur?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
+    document.getElementById('mkCls').disabled=!!editId;  // 수정 시 반 변경 금지
+    document.getElementById('mkFields').innerHTML=f.fields(value);
+    document.getElementById('mkLiveBtn').style.display = editId ? 'none' : '';
+    document.getElementById('mkDraftBtn').textContent = editId ? '💾 저장' : '📝 준비로 저장';
+    openModal('makeModal');
+  }
+  function saveMake(goLive){
+    var f=FORMS[MK_ACT]; if(!f) return;
+    var row=f.read();
+    var b=document.getElementById(goLive?'mkLiveBtn':'mkDraftBtn'); var old=b.textContent;
+    b.disabled=true; b.textContent='저장 중…';
+    function done(){ b.disabled=false; b.textContent=old; }
+
+    if(MK_EDIT_ID){
+      portalRPC('activityUpdate',[TOK,MK_ACT,MK_EDIT_ID,row]).then(function(res){
+        done();
+        if(res&&res.success){ closeModal('makeModal'); toast('✅ 수정됨'); loadPlans(); }
+        else toast('실패: '+((res&&res.message)||''));
+      }).catch(function(e){ done(); toast('오류: '+e.message); });
+      return;
+    }
+    row.class_scope=document.getElementById('mkCls').value;
+    portalRPC('activityDraft',[TOK,MK_ACT,row]).then(function(res){
+      if(!res||!res.success){ done(); toast('실패: '+((res&&res.message)||'')); return; }
+      var newId=res.id;
+      if(!goLive){ done(); closeModal('makeModal'); toast('📝 준비 완료 — 수업 때 ▶️ 진행을 누르세요'); loadPlans(); return; }
+      portalRPC('activitySetState',[TOK,MK_ACT,newId,'live',false]).then(function(r2){
+        done();
+        if(r2&&r2.success){ closeModal('makeModal'); toast('▶️ 진행 시작'); loadPlans(); loadLive(); return; }
+        if(r2&&r2.conflict){
+          if(confirm('이 반에 이미 진행 중인 활동이 있어요.\n기존 것을 종료하고 이 활동을 진행할까요?')){
+            portalRPC('activitySetState',[TOK,MK_ACT,newId,'live',true]).then(function(){ closeModal('makeModal'); toast('▶️ 진행 시작'); loadPlans(); loadLive(); });
+          } else { closeModal('makeModal'); toast('📝 준비 상태로 저장했어요'); loadPlans(); }
+          return;
+        }
+        toast('준비는 됐지만 진행 실패: '+((r2&&r2.message)||''));
+        closeModal('makeModal'); loadPlans();
+      }).catch(function(e){ done(); toast('오류: '+e.message); });
+    }).catch(function(e){ done(); toast('오류: '+e.message); });
+  }
+  function editPlan(act,id){
+    var row=(PLANS[act]||[]).filter(function(r){ return r.id===id; })[0];
+    if(!row){ toast('활동을 찾을 수 없어요'); return; }
+    pickAct(act,row,id);
+  }
+
   function setPlanState(act,id,state,force){
     portalRPC('activitySetState',[TOK,act,id,state,!!force]).then(function(res){
       if(res&&res.success){ toast(state==='live'?'▶️ 진행 시작':'✅ 종료됨'); loadPlans(); loadLive(); return; }

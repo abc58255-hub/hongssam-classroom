@@ -41,7 +41,7 @@ var RPC_WHITELIST = [
   'graphPresetSave', 'graphPresetDelete', 'syncRoster',
   'havrutaOpen', 'havrutaStage', 'havrutaFocus', 'havrutaDeleteQ', 'havrutaClose', 'havrutaCandidate', 'havrutaNames', 'havrutaDeleteSession',
   'probabilityOpen', 'probabilitySettings', 'probabilityClose', 'probabilityResetContribs',
-  'activityList', 'activityDraft', 'activitySetState', 'activityDelete',
+  'activityList', 'activityDraft', 'activitySetState', 'activityDelete', 'activityUpdate',
   'simOpenSet', 'simCloseSet', 'simDeleteSet', 'simGetSet', 'simUpdateSet', 'simShowSet', 'simResetAttempts', 'simRecomputeScores'
 ];
 
@@ -580,4 +580,8 @@ function activitySetState(token, act, id, state, force) {
 function activityDelete(token, act, id) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'actDelete', act: act, id: id });
+}
+function activityUpdate(token, act, id, patch) {
+  if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
+  return _lessonCall_({ op: 'actUpdate', act: act, id: id, patch: patch });
 }

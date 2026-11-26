@@ -84,24 +84,14 @@
 
   <div class="ctl" id="ctl" style="display:none;">
     <select id="clsSel"></select>
-    <label>도구</label>
-    <span class="seg">
-      <button id="toolCoin" class="on" onclick="setTool('coin')">동전</button>
-      <button id="toolDice" onclick="setTool('dice')">주사위</button>
-    </span>
-    <span id="diceEvtWrap" style="display:none;align-items:center;gap:8px;">
-      <label>사건(눈)</label>
-      <select id="diceEvt"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
-    </span>
-    <button class="primary" onclick="openSession()">세션 열기</button>
+    <a class="l-btn" href="./hub.html" style="text-decoration:none;display:inline-block;padding:9px 14px;border-radius:10px;background:#f1f5f9;color:#475569;font-size:13px;font-weight:800;">＋ 새 활동은 센터에서</a>
     <span class="sp"></span>
-    <button class="yel" onclick="applySettings()">사건 변경·적용</button>
     <button class="yel" onclick="resetContribs()">기록 리셋</button>
     <button onclick="togglePresent()">🖥️ 전시</button>
     <button class="warn" onclick="closeSession()">닫기</button>
   </div>
 
-  <div class="wrap" id="wrap"><div class="empty">반·도구·사건을 고르고 "세션 열기"를 누르세요.</div></div>
+  <div class="wrap" id="wrap"><div class="empty">이 반에 진행 중인 확률 체험이 없어요. 수업활동 센터에서 만들고 ▶️ 진행을 누르세요.</div></div>
   <div class="toast" id="toast"></div>
 
 <script>
@@ -130,13 +120,6 @@
 
   function relock(msg){ TOK=''; localStorage.removeItem('prob_ptok'); localStorage.removeItem('lesson_ptok'); document.getElementById('ctl').style.display='none'; document.getElementById('lock').style.display='flex'; if(msg) document.getElementById('lerr').textContent=msg; }
 
-  function setTool(t){
-    TOOL = t;
-    document.getElementById('toolCoin').classList.toggle('on', t==='coin');
-    document.getElementById('toolDice').classList.toggle('on', t==='dice');
-    document.getElementById('diceEvtWrap').style.display = t==='dice' ? 'inline-flex' : 'none';
-  }
-
   function initCtl(){
     var sel=document.getElementById('clsSel');
     portalRPC('graphClasses',[TOK]).then(function(res){
@@ -154,8 +137,7 @@
       .then(function(r){
         SESSION=(r.data&&r.data[0])||null; CTRIBS=[]; seriesX=[]; seriesY=[];
         if(SESSION){
-          setTool(SESSION.tool);
-          if(SESSION.tool==='dice') document.getElementById('diceEvt').value = String(SESSION.event_value);
+          TOOL = SESSION.tool;
           subscribe(); loadContribs(); startPoll();
         } else {
           stopPoll(); if(sCh){sb.removeChannel(sCh);sCh=null;} if(cCh){sb.removeChannel(cCh);cCh=null;}
@@ -164,23 +146,6 @@
       });
   }
 
-  function openSession(){
-    var cls=document.getElementById('clsSel').value;
-    var ev = TOOL==='dice' ? parseInt(document.getElementById('diceEvt').value)||1 : 1;
-    portalRPC('probabilityOpen',[TOK,{class_scope:cls, tool:TOOL, event_value:ev}]).then(function(res){
-      if(res&&res.success){ toast('세션을 열었어요'); loadActive(cls); }
-      else toast('실패: '+((res&&res.message)||''));
-    }).catch(function(e){ toast('오류: '+e.message); });
-  }
-  function applySettings(){
-    if(!SESSION){ toast('먼저 세션을 여세요'); return; }
-    var ev = TOOL==='dice' ? parseInt(document.getElementById('diceEvt').value)||1 : 1;
-    if(!confirm('사건을 바꾸면 지금까지의 반 기록이 모두 지워집니다. 계속할까요?')) return;
-    portalRPC('probabilitySettings',[TOK, SESSION.id, TOOL, ev, true]).then(function(res){
-      if(res&&res.success){ toast('사건을 바꿨어요'); loadActive(document.getElementById('clsSel').value); }
-      else toast('실패: '+((res&&res.message)||''));
-    }).catch(function(e){ toast('오류: '+e.message); });
-  }
   function resetContribs(){
     if(!SESSION){ toast('먼저 세션을 여세요'); return; }
     if(!confirm('이번 세션의 반 기록을 모두 지웁니다. 계속할까요?')) return;
@@ -238,7 +203,7 @@
 
   function render(){
     if(!SESSION){
-      document.getElementById('wrap').innerHTML='<div class="empty">반·도구·사건을 고르고 "세션 열기"를 누르세요.</div>';
+      document.getElementById('wrap').innerHTML='<div class="empty">이 반에 진행 중인 확률 체험이 없어요. 수업활동 센터에서 만들고 ▶️ 진행을 누르세요.</div>';
       return;
     }
     var isCoin = SESSION.tool==='coin';

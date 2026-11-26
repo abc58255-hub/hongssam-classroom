@@ -63,12 +63,7 @@
 
   <div class="l-ctl" id="ctl" style="display:none;">
     <select id="clsSel"></select>
-    <input type="text" id="unitInp" placeholder="단원명 (예: 도형의 닮음과 피타고라스)" style="width:240px;">
-    <textarea id="subInp" placeholder="소단원 (한 줄에 하나, 비우면 1~5)" rows="1" style="width:240px;resize:vertical;min-height:34px;"></textarea>
-    <label>단어<input type="number" id="nwInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
-    <label>질문<input type="number" id="nqInp" value="2" min="1" max="5" style="width:48px;margin-left:4px;"></label>
-    <label>투표<input type="number" id="nvInp" value="2" min="1" max="9" style="width:48px;margin-left:4px;"></label>
-    <button class="l-btn primary" onclick="openSession()">세션 열기</button>
+    <a class="l-btn" href="./hub.html" style="text-decoration:none;display:inline-block;">＋ 새 활동은 센터에서</a>
     <span class="sp"></span>
     <button class="l-btn stagebtn" id="st-submit" onclick="setStage('submit')">① 제출</button>
     <button class="l-btn stagebtn" id="st-vote" onclick="setStage('vote')">② 투표</button>
@@ -80,7 +75,7 @@
     <button class="l-btn warn" onclick="closeSession()">닫기</button>
   </div>
 
-  <div class="wrap" id="wrap"><div class="empty">반을 고르고 "세션 열기"를 누르세요.</div></div>
+  <div class="wrap" id="wrap"><div class="empty">반에 진행 중인 하브루타가 없어요. 수업활동 센터에서 활동을 만들고 ▶️ 진행을 누르세요.</div></div>
   <div class="l-toast" id="toast"></div>
 
 <script>
@@ -122,25 +117,11 @@
       loadActive(cls[0]);
     }).catch(function(e){ sel.innerHTML='<option value="">불러오기 실패</option>'; toast('반 불러오기 오류: '+e.message); });
     document.getElementById('clsSel').addEventListener('change',function(){ loadActive(this.value); });
-    document.getElementById('unitInp').value='Ⅶ. 도형의 닮음과 피타고라스 정리';
-    document.getElementById('subInp').value='닮은 도형\n삼각형의 닮음 조건\n평행선 사이의 거리의 비\n삼각형의 무게중심\n피타고라스 정리';
   }
 
   function loadActive(cls){
     sb.from('havruta_sessions').select('*').eq('class_scope',cls).eq('active',true).order('created_at',{ascending:false}).limit(1)
       .then(function(r){ SESSION=(r.data&&r.data[0])||null; if(SESSION){ subscribe(); loadQs(); } else { QS=[]; render(); } });
-  }
-  function openSession(){
-    var cls=document.getElementById('clsSel').value;
-    var unit=document.getElementById('unitInp').value.trim();
-    var subs=document.getElementById('subInp').value.trim();
-    var nw=parseInt(document.getElementById('nwInp').value)||2;
-    var nq=parseInt(document.getElementById('nqInp').value)||2;
-    var nv=parseInt(document.getElementById('nvInp').value)||2;
-    portalRPC('havrutaOpen',[TOK,{class_scope:cls,unit:unit,sub_units:subs,n_words:nw,n_questions:nq,n_votes:nv}]).then(function(res){
-      if(res&&res.success){ toast('세션을 열었어요'); loadActive(cls); }
-      else toast('실패: '+((res&&res.message)||''));
-    }).catch(function(e){ toast('오류: '+e.message); });
   }
   function setStage(st){ if(!SESSION){ toast('세션을 먼저 여세요'); return; }
     portalRPC('havrutaStage',[TOK,SESSION.id,st]).then(function(){ SESSION.stage=st; render(); }).catch(function(e){ toast('오류: '+e.message); }); }
@@ -176,7 +157,7 @@
     var kb=document.getElementById('kwBtn'); if(kb) kb.classList.toggle('on',KWVIEW);
     var nb=document.getElementById('nmBtn'); if(nb){ var showing=!(SESSION&&SESSION.show_names===false); nb.textContent=showing?'👤 이름':'🙈 익명'; nb.classList.toggle('on',!showing); }
     var wrap=document.getElementById('wrap');
-    if(!SESSION){ wrap.innerHTML='<div class="empty">반을 고르고 "세션 열기"를 누르세요.</div>'; return; }
+    if(!SESSION){ wrap.innerHTML='<div class="empty">반에 진행 중인 하브루타가 없어요. 수업활동 센터에서 활동을 만들고 ▶️ 진행을 누르세요.</div>'; return; }
     var qCount=QS.filter(function(q){return String(q.question||'').trim();}).length;
     var kCount=QS.filter(function(q){return String(q.word||'').trim();}).length;
     var head='<div class="title">💬 '+(SESSION.unit?esc(SESSION.unit):'하브루타 질문')+'</div>'

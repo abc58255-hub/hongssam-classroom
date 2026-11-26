@@ -298,6 +298,22 @@ Deno.serve(async (req) => {
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
       return Response.json({ success: true });
     }
+    // 준비 활동 설정 수정: {op:'actUpdate', act, id, patch:{...}} — draft만 수정 허용
+    if (body.op === "actUpdate") {
+      const tbl = ACT_TABLE[String(body.act ?? "")];
+      if (!tbl) return Response.json({ success: false, message: "알 수 없는 활동" }, { status: 400 });
+      const id = Number(body.id);
+      const cur = await admin0.from(tbl).select("state").eq("id", id).single();
+      if (cur.error || !cur.data) return Response.json({ success: false, message: "활동을 찾을 수 없어요." }, { status: 404 });
+      if (cur.data.state !== "draft") {
+        return Response.json({ success: false, message: "준비 중인 활동만 수정할 수 있어요." }, { status: 400 });
+      }
+      const patch = { ...(body.patch ?? {}) };
+      delete patch.id; delete patch.state; delete patch.active; delete patch.created_at;
+      const { error } = await admin0.from(tbl).update(patch).eq("id", id);
+      if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
+      return Response.json({ success: true });
+    }
     // 준비/종료 활동 삭제: {op:'actDelete', act, id}  — live는 삭제 불가(먼저 종료)
     if (body.op === "actDelete") {
       const tbl = ACT_TABLE[String(body.act ?? "")];
