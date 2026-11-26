@@ -60,7 +60,7 @@
   var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
   var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
   var sb=supabase.createClient(SB_URL,SB_KEY);
-  var TOK=localStorage.getItem('sim_ptok')||'';
+  var TOK=localStorage.getItem('lesson_ptok')||localStorage.getItem('sim_ptok')||'';
   var SET=null, BCLS='', STMAP={}, STORDER=[], CH=null;
 
   function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
@@ -69,7 +69,7 @@
   function doUnlock(){
     var pw=document.getElementById('lpw').value,b=document.getElementById('lbtn'); if(!pw)return; b.disabled=true;b.textContent='확인 중…';
     portalRPC('teacherLogin',[pw]).then(function(res){ b.disabled=false;b.textContent='확인';
-      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('sim_ptok',TOK); document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block'; initCtl(); }
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('sim_ptok',TOK); localStorage.setItem('lesson_ptok',TOK); document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block'; initCtl(); }
       else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
     }).catch(function(e){ b.disabled=false;b.textContent='확인'; document.getElementById('lerr').textContent='오류: '+e.message; });
   }
@@ -78,7 +78,7 @@
   function initCtl(){
     var sel=document.getElementById('clsSel');
     portalRPC('graphClasses',[TOK]).then(function(res){
-      if(res&&res.success===false){ TOK=''; localStorage.removeItem('sim_ptok'); location.reload(); return; }
+      if(res&&res.success===false){ TOK=''; localStorage.removeItem('sim_ptok'); localStorage.removeItem('lesson_ptok'); location.reload(); return; }
       var cls=(res&&res.classes)||[];
       sel.innerHTML=cls.map(function(c){return '<option>'+esc(c)+'</option>';}).join('');
       if(cls.length) loadSet(cls[0]);

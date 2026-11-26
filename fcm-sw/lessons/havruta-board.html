@@ -88,7 +88,7 @@
   var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
   var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
   var sb=supabase.createClient(SB_URL,SB_KEY);
-  var TOK=localStorage.getItem('hv_ptok')||'';
+  var TOK=localStorage.getItem('lesson_ptok')||localStorage.getItem('hv_ptok')||'';
   var SESSION=null, QS=[], CIRC=['①','②','③','④','⑤','⑥','⑦','⑧'], qCh=null, sCh=null;
 
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1800); }
@@ -100,14 +100,14 @@
     if(!pw) return; b.disabled=true; b.textContent='확인 중…';
     portalRPC('teacherLogin',[pw]).then(function(res){
       b.disabled=false; b.textContent='확인';
-      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('hv_ptok',TOK); document.getElementById('lock').style.display='none'; document.getElementById('ctl').style.display='flex'; initCtl(); }
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('hv_ptok',TOK); localStorage.setItem('lesson_ptok',TOK); document.getElementById('lock').style.display='none'; document.getElementById('ctl').style.display='flex'; initCtl(); }
       else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
     }).catch(function(e){ b.disabled=false; b.textContent='확인'; document.getElementById('lerr').textContent='오류: '+e.message; });
   }
   if(TOK){ document.getElementById('lock').style.display='none'; document.getElementById('ctl').style.display='flex'; initCtl(); }
 
   function relock(msg){
-    TOK=''; localStorage.removeItem('hv_ptok');
+    TOK=''; localStorage.removeItem('hv_ptok'); localStorage.removeItem('lesson_ptok');
     document.getElementById('ctl').style.display='none';
     document.getElementById('lock').style.display='flex';
     if(msg) document.getElementById('lerr').textContent=msg;

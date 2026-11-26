@@ -195,7 +195,7 @@
   var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
   var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
   var sb = supabase.createClient(SB_URL, SB_KEY);
-  var TOK = localStorage.getItem('graph_ptok') || '';
+  var TOK = localStorage.getItem('lesson_ptok') || localStorage.getItem('graph_ptok') || '';
   var ROOM = null;      // { id, a,b,c, display, revealed, show_wrong }
   var POINTS = [];      // [{x,y,correct,name}]
   var ch = null;
@@ -231,7 +231,7 @@
     if(!pw) return; b.disabled=true; b.textContent='확인 중…';
     portalRPC('teacherLogin',[pw]).then(function(res){
       b.disabled=false; b.textContent='확인';
-      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('graph_ptok',TOK); document.getElementById('lock').style.display='none'; initSetup(); }
+      if(res&&res.success&&res.token){ TOK=res.token; localStorage.setItem('graph_ptok',TOK); localStorage.setItem('lesson_ptok',TOK); document.getElementById('lock').style.display='none'; initSetup(); }
       else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
     }).catch(function(e){ b.disabled=false; b.textContent='확인'; document.getElementById('lerr').textContent='오류: '+e.message; });
   }
@@ -477,7 +477,7 @@
   if(TOK){
     portalRPC('validateTeacherSession',[TOK]).then(function(res){
       if(res&&res.success){ document.getElementById('lock').style.display='none'; initSetup(); }
-      else { TOK=''; localStorage.removeItem('graph_ptok'); }
+      else { TOK=''; localStorage.removeItem('graph_ptok'); localStorage.removeItem('lesson_ptok'); }
     }).catch(function(){});
   }
 </script>

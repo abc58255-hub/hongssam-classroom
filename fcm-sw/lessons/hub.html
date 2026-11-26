@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>수업활동 센터</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>:root{ --accent:#0ea5e9; --accent-dark:#0369a1; }</style>
+<link rel="stylesheet" href="./lessons-ui.css">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,sans-serif;color:#0f172a;min-height:100vh;
+    background:linear-gradient(135deg,#bae6fd 0%,#38bdf8 50%,#0284c7 100%);padding:0;}
+  header{display:flex;align-items:center;gap:12px;padding:22px 24px 10px;color:#fff;flex-wrap:wrap;}
+  header h1{font-size:24px;font-weight:900;letter-spacing:-.5px;text-shadow:0 2px 12px rgba(0,0,0,.18);}
+  header .sp{flex:1;}
+  header .hbtn{background:rgba(255,255,255,.22);backdrop-filter:blur(10px);border:1px solid rgba(255,255,255,.3);color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;font-weight:800;cursor:pointer;text-decoration:none;}
+  header .hbtn:hover{background:rgba(255,255,255,.35);}
+  .subline{padding:0 24px 18px;color:rgba(255,255,255,.92);font-size:13px;font-weight:700;}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;padding:0 24px 40px;max-width:1200px;margin:0 auto;}
+  .acard{background:#fff;border-radius:24px;padding:22px;box-shadow:0 14px 32px rgba(2,132,199,.18), 0 3px 8px rgba(2,132,199,.08);
+    display:flex;flex-direction:column;position:relative;overflow:hidden;cursor:pointer;transition:transform .15s, box-shadow .15s;border-top:5px solid var(--c);}
+  .acard:hover{transform:translateY(-3px);box-shadow:0 20px 40px rgba(2,132,199,.24);}
+  .acard .emoji{font-size:40px;margin-bottom:8px;}
+  .acard h2{font-size:19px;font-weight:900;color:#0f172a;letter-spacing:-.3px;}
+  .acard .desc{font-size:12.5px;color:#64748b;font-weight:600;margin-top:4px;line-height:1.4;}
+  .acard .status{margin-top:16px;display:flex;align-items:center;gap:7px;font-size:13px;font-weight:800;min-height:24px;}
+  .acard .status .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .status.live{color:#dc2626;}
+  .status.live .dot{background:#dc2626;animation:blink 1.4s ease-in-out infinite;}
+  .status.idle{color:#94a3b8;}
+  .status.idle .dot{background:#cbd5e1;}
+  @keyframes blink{0%,100%{opacity:1;}50%{opacity:.35;}}
+  .acard .livelist{margin-top:6px;display:flex;flex-wrap:wrap;gap:5px;}
+  .acard .livechip{background:#fef2f2;color:#b91c1c;font-size:11px;font-weight:800;padding:3px 9px;border-radius:999px;border:1px solid #fecaca;}
+  .acard .go{margin-top:16px;border:none;border-radius:14px;padding:13px;font-size:14px;font-weight:800;cursor:pointer;color:#fff;
+    background:linear-gradient(135deg,var(--c),var(--c2));box-shadow:0 4px 12px rgba(0,0,0,.12);}
+
+  .refresh-note{text-align:center;color:rgba(255,255,255,.85);font-size:12px;font-weight:700;padding:0 24px 30px;}
+</style>
+</head>
+<body class="l-body">
+  <!-- 잠금 -->
+  <div class="l-lock" id="lock"><div class="box"><div class="emoji">🎮</div><h2>수업활동 센터</h2><div class="desc">교사 비밀번호를 입력하세요</div>
+    <input type="password" id="lpw" placeholder="비밀번호" onkeydown="if(event.key==='Enter')doUnlock()">
+    <button id="lbtn" onclick="doUnlock()">입장</button><div class="err" id="lerr"></div></div></div>
+
+  <div id="app" style="display:none;">
+    <header>
+      <h1>🎮 수업활동 센터</h1>
+      <span class="sp"></span>
+      <a class="hbtn" href="https://abc58255-hub.github.io/hongssam-classroom/portal/">⚙ 교사포털</a>
+      <button class="hbtn" onclick="logout()" style="border:none;">로그아웃</button>
+    </header>
+    <div class="subline">수업 중 쓰는 활동을 한곳에서. 카드를 누르면 교사 화면(TV)이 새 창으로 열려요.</div>
+    <div class="grid" id="grid"></div>
+    <div class="refresh-note">🔄 진행 상태는 30초마다 자동 갱신돼요</div>
+  </div>
+  <div class="l-toast" id="toast"></div>
+
+<script>
+  var PORTAL='https://script.google.com/macros/s/AKfycbw8M03W7ECbqUzCPJkPb1YGrEo3SRORTDaxoTMLz5yoUw8pTLpIPAIH1qpfgJY80J9v/exec';
+  var SB_URL='https://lqjrrqhrnxctyrqccmch.supabase.co';
+  var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxxanJycWhybnhjdHlycWNjbWNoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ0MDcwNzUsImV4cCI6MjA5OTk4MzA3NX0.7j44nTdC4CGSFm-1PTECdWNEHUnBb4SvhrcLfY8M4_Q';
+  var BASE='https://abc58255-hub.github.io/hongssam-classroom/lessons/';
+  var TOK=localStorage.getItem('lesson_ptok')||'';
+  var pollTimer=null;
+
+  // 활동 정의 — table: 활성세션 조회 테이블, color: 고유색
+  var ACTS=[
+    { key:'prob', emoji:'🐦‍⬛', title:'확률 체험', desc:'동전·주사위 던지기 — 큰 수의 법칙', page:'probability-board.html',
+      table:'prob_sessions', go:'TV 열기', c:'#0891b2', c2:'#0e7490' },
+    { key:'havruta', emoji:'💬', title:'하브루타 질문', desc:'짝 질문 만들기·투표·토론 (칠판)', page:'havruta-board.html',
+      table:'havruta_sessions', go:'칠판 열기', c:'#7c3aed', c2:'#6d28d9' },
+    { key:'graph', emoji:'📐', title:'그래프 탐구', desc:'학생 참여형 협력 좌표평면', page:'graph-teacher.html',
+      table:'graph_rooms', go:'방 만들기', c:'#ea580c', c2:'#c2410c' },
+    { key:'sim', emoji:'🔺', title:'닮음 보물찾기', desc:'야외 QR 닮음 찾기 — 세트·순위판', page:'sim-teacher.html',
+      table:'sim_sets', go:'세트 만들기', c:'#0f766e', c2:'#115e59', extra:[
+        { label:'📊 현황', page:'sim-monitor.html' },
+        { label:'🏆 순위판', page:'sim-board.html' }
+      ] }
+  ];
+  var LIVE={}; // key -> [class_scope,...]
+
+  function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1800); }
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function doUnlock(){
+    var pw=document.getElementById('lpw').value, b=document.getElementById('lbtn');
+    if(!pw) return; b.disabled=true; b.textContent='확인 중…';
+    fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'teacherLogin',args:[pw]})})
+      .then(function(r){return r.json();}).then(function(d){
+        b.disabled=false; b.textContent='입장';
+        var res=d&&d.ok?d.result:null;
+        if(res&&res.success&&res.token){
+          TOK=res.token;
+          localStorage.setItem('lesson_ptok',TOK); // 공용 토큰 — 각 활동이 공유
+          document.getElementById('lock').style.display='none';
+          document.getElementById('app').style.display='block';
+          startHub();
+        } else document.getElementById('lerr').textContent=(res&&res.message)||'비밀번호 오류';
+      }).catch(function(e){ b.disabled=false; b.textContent='입장'; document.getElementById('lerr').textContent='오류: '+e.message; });
+  }
+  if(TOK){ document.getElementById('lock').style.display='none'; document.getElementById('app').style.display='block'; startHub(); }
+
+  function logout(){
+    try{ fetch(PORTAL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn:'teacherLogout',args:[TOK]})}); }catch(_){}
+    localStorage.removeItem('lesson_ptok');
+    TOK='';
+    location.reload();
+  }
+
+  function startHub(){
+    renderCards();
+    loadLive();
+    if(pollTimer) clearInterval(pollTimer);
+    pollTimer=setInterval(loadLive, 30000);
+  }
+
+  function renderCards(){
+    var grid=document.getElementById('grid');
+    grid.innerHTML=ACTS.map(function(a){
+      return '<div class="acard" style="--c:'+a.c+';--c2:'+a.c2+';" onclick="openAct(\''+a.key+'\')">'
+        + '<div class="emoji">'+a.emoji+'</div>'
+        + '<h2>'+esc(a.title)+'</h2>'
+        + '<div class="desc">'+esc(a.desc)+'</div>'
+        + '<div class="statusbox" id="st-'+a.key+'"><div class="status idle"><span class="dot"></span>대기 중</div></div>'
+        + '<button class="go" onclick="event.stopPropagation();openAct(\''+a.key+'\')">'+esc(a.go)+' →</button>'
+        + (a.extra ? '<div style="display:flex;gap:6px;margin-top:8px;">' + a.extra.map(function(e){
+            return '<button class="l-btn" style="flex:1;font-size:12px;" onclick="event.stopPropagation();openPage(\''+e.page+'\')">'+esc(e.label)+'</button>';
+          }).join('') + '</div>' : '')
+        + '</div>';
+    }).join('');
+    paintLive();
+  }
+
+  function loadLive(){
+    // 각 활동 테이블에서 active 세션의 class_scope 목록을 anon으로 조회 (최근 4시간)
+    var cutoff=new Date(Date.now()-4*3600*1000).toISOString();
+    var proms=ACTS.map(function(a){
+      var url=SB_URL+'/rest/v1/'+a.table+'?select=class_scope&active=eq.true&created_at=gte.'+encodeURIComponent(cutoff);
+      return fetch(url,{headers:{apikey:SB_KEY}}).then(function(r){return r.json();}).then(function(rows){
+        LIVE[a.key]=Array.isArray(rows)?rows.map(function(x){return x.class_scope;}).filter(Boolean):[];
+      }).catch(function(){ LIVE[a.key]=LIVE[a.key]||[]; });
+    });
+    Promise.all(proms).then(paintLive);
+  }
+
+  function paintLive(){
+    ACTS.forEach(function(a){
+      var box=document.getElementById('st-'+a.key); if(!box) return;
+      var list=LIVE[a.key]||[];
+      // '*'(모든 반)은 '전체'로 표시
+      var disp=list.map(function(c){ return c==='*'?'전체':c; });
+      if(disp.length){
+        box.innerHTML='<div class="status live"><span class="dot"></span>진행 중 '+disp.length+'개</div>'
+          + '<div class="livelist">'+disp.map(function(c){return '<span class="livechip">🔴 '+esc(c)+'</span>';}).join('')+'</div>';
+      } else {
+        box.innerHTML='<div class="status idle"><span class="dot"></span>대기 중</div>';
+      }
+    });
+  }
+
+  function openAct(key){
+    var a=ACTS.filter(function(x){return x.key===key;})[0]; if(!a) return;
+    openPage(a.page);
+  }
+  function openPage(page){
+    // 공용 토큰이 이미 localStorage에 있으므로 각 활동이 자동 인식 (lesson_ptok)
+    window.open(BASE+page,'_blank');
+  }
+</script>
+</body>
+</html>
