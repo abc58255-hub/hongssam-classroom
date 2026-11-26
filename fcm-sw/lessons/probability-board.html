@@ -219,8 +219,18 @@
       CTRIBS = r.data||[];
       var sum = CTRIBS.reduce(function(a,c){ return {t:a.t+(c.trials||0), s:a.s+(c.successes||0)}; }, {t:0,s:0});
       if(sum.t>0){
-        seriesX.push(sum.t); seriesY.push(sum.s/sum.t);
-        if(seriesX.length>60){ seriesX.shift(); seriesY.shift(); }
+        var lastX = seriesX[seriesX.length-1] || 0;
+        if(sum.t > lastX){
+          // 정상 — 단조증가일 때만 push
+          seriesX.push(sum.t); seriesY.push(sum.s/sum.t);
+          if(seriesX.length>60){ seriesX.shift(); seriesY.shift(); }
+        } else if(sum.t < lastX){
+          // 학생이 reset을 눌렀거나 교사가 리셋 — 시리즈 초기화
+          seriesX = [sum.t]; seriesY = [sum.s/sum.t];
+        }
+        // sum.t === lastX이면 변화 없음 → skip (중복 push 방지)
+      } else {
+        seriesX = []; seriesY = [];
       }
       render();
     });
