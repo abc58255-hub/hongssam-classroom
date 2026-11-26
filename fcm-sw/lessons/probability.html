@@ -112,7 +112,7 @@
 
 <script>
   var USER=null, sb=null, SESSION=null;
-  var trials=0, successes=0, history=[];
+  var trials=0, successes=0, rolls=[];
   var busy=false, uploadTimer=null;
 
   function toast(m){ var t=document.getElementById('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(t._h); t._h=setTimeout(function(){t.classList.remove('show');},1800); }
@@ -136,7 +136,7 @@
           document.getElementById('main').innerHTML='<div class="panel"><div class="muted">아직 확률 체험이 열리지 않았어요.<br>선생님이 시작하면 바로 나타나요 🐦‍⬛</div></div>';
           subscribeSession(); return;
         }
-        SESSION = s; trials=0; successes=0; history=[];
+        SESSION = s; trials=0; successes=0; rolls=[];
         render(); subscribeSession();
       });
   }
@@ -152,7 +152,7 @@
         var s=(r.data&&r.data[0])||null;
         if(!s){ SESSION=null; document.getElementById('main').innerHTML='<div class="panel"><div class="muted">확률 체험이 종료됐어요. 수고했어요 🐦‍⬛</div></div>'; return; }
         if(!SESSION || SESSION.id!==s.id || SESSION.tool!==s.tool || SESSION.event_value!==s.event_value){
-          SESSION=s; trials=0; successes=0; history=[]; render();
+          SESSION=s; trials=0; successes=0; rolls=[]; render();
         } else {
           SESSION=s; updateHeader();
         }
@@ -245,8 +245,8 @@
       trials++; if(hit) successes++;
       lastVal=v;
     }
-    history = history.concat(results);
-    if(history.length>1000) history = history.slice(-1000);
+    rolls = rolls.concat(results);
+    if(rolls.length>1000) rolls = rolls.slice(-1000);
     disableBtns(true);
     var actor = document.getElementById('actor');
     if(actor && n<=5){
@@ -281,7 +281,7 @@
 
   function renderLog(){
     var strip = document.getElementById('logStrip'); if(!strip) return;
-    var recent = history.slice(-40);
+    var recent = rolls.slice(-40);
     strip.innerHTML = recent.map(function(r){
       var txt = SESSION.tool==='coin' ? (r.v===1?'앞':'뒷') : String(r.v);
       return '<span class="r ' + (r.hit?'hit':'') + '">' + txt + '</span>';
@@ -296,7 +296,7 @@
 
   function resetLocal(){
     if(!SESSION) return;
-    trials=0; successes=0; history=[];
+    trials=0; successes=0; rolls=[];
     updateStats();
     scheduleUpload();
   }
@@ -361,8 +361,8 @@
     ctx.strokeStyle = '#06b6d4'; ctx.lineWidth = 2.6;
     ctx.beginPath();
     var cum = 0;
-    for(var k=0;k<history.length;k++){
-      if(history[k].hit) cum++;
+    for(var k=0;k<rolls.length;k++){
+      if(rolls[k].hit) cum++;
       var n = k+1;
       var r = cum/n;
       var px = padL + plotW * (n/maxX);
@@ -371,7 +371,7 @@
     }
     ctx.stroke();
 
-    var lastN = history.length;
+    var lastN = rolls.length;
     if(lastN>0){
       var lastR = successes/trials;
       var lx = padL + plotW * (lastN/maxX);
