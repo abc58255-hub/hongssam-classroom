@@ -569,9 +569,10 @@ function activityList(token, class_scope, states) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
   return _lessonCall_({ op: 'actList', class_scope: class_scope, states: states });
 }
-function activityDraft(token, act, row) {
+// classes = ['2학년 1반', ...] 주면 같은 설정으로 여러 반 한 번에 생성
+function activityDraft(token, act, row, classes) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };
-  return _lessonCall_({ op: 'actDraft', act: act, row: row });
+  return _lessonCall_({ op: 'actDraft', act: act, row: row, classes: classes });
 }
 function activitySetState(token, act, id, state, force) {
   if (!_teacherOk_(token)) return { success: false, message: '로그인이 만료됐어요.' };

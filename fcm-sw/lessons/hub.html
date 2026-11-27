@@ -91,6 +91,11 @@
   .modal textarea{width:100%;padding:12px 13px;border:2px solid #e2e8f0;border-radius:11px;font-size:14px;font-family:inherit;min-height:92px;resize:vertical;}
   .modal textarea:focus{outline:none;border-color:#0284c7;}
   .frow{display:flex;gap:10px;} .frow>div{flex:1;}
+  .chipbtn{background:#f1f5f9;border:none;color:#475569;padding:6px 12px;border-radius:999px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit;}
+  .clsgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:7px;}
+  .clschip{display:flex;align-items:center;gap:7px;background:#f8fafc;border:2px solid #e2e8f0;border-radius:11px;padding:9px 11px;font-size:13.5px;font-weight:800;cursor:pointer;transition:.12s;}
+  .clschip input{width:17px;height:17px;margin:0;cursor:pointer;}
+  .clschip:has(input:checked){background:#eff6ff;border-color:#0284c7;color:#0369a1;}
 </style>
 </head>
 <body class="l-body">
@@ -114,17 +119,33 @@
 
     <!-- 수업 활동 -->
     <div class="pane on" id="pane-act">
-      <div class="subline">미리 <b>준비</b>해두고 수업 때 <b>진행</b>으로 바꾸면 학생 화면에 떠요. 준비 중인 건 학생에게 안 보여요.</div>
-      <div class="bar">
-        <select id="clsSel" onchange="loadPlans()" style="padding:10px 14px;border:none;border-radius:12px;font-size:14px;font-weight:800;background:rgba(255,255,255,.92);color:#0369a1;"></select>
-        <button class="wbtn" style="background:#fff;color:#047857;" onclick="openMake()">＋ 새 활동 만들기</button>
-        <span class="sp"></span>
-        <button class="wbtn" onclick="loadPlans()">🔄 새로고침</button>
+      <!-- 홈: 활동 카드 그리드 -->
+      <div id="actHome">
+        <div class="subline">활동을 고르면 반별로 준비·진행을 관리할 수 있어요.</div>
+        <div class="grid" id="grid"></div>
+        <div class="refresh-note">🔄 진행 상태는 30초마다 자동 갱신돼요</div>
       </div>
-      <div class="wgrid" id="planGrid"><div class="wempty">불러오는 중…</div></div>
-      <div class="subline" style="padding-top:6px;">아래는 각 활동의 교사 화면이에요. 새 활동을 만들거나 세부 설정은 여기서 해요.</div>
-      <div class="grid" id="grid"></div>
-      <div class="refresh-note">🔄 진행 상태는 30초마다 자동 갱신돼요</div>
+
+      <!-- 상세: 선택한 활동의 반별 관리 -->
+      <div id="actDetail" style="display:none;">
+        <div class="bar">
+          <button class="wbtn" onclick="closeActDetail()">← 활동 목록</button>
+          <span class="sp"></span>
+          <button class="wbtn" style="background:#fff;color:#047857;" onclick="openMake(DETAIL_ACT)">＋ 새로 만들기</button>
+          <button class="wbtn" onclick="loadPlans()">🔄</button>
+        </div>
+        <div style="padding:0 24px 12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <span style="font-size:34px;" id="dtEmoji"></span>
+          <div>
+            <div style="font-size:21px;font-weight:900;color:#fff;letter-spacing:-.4px;" id="dtTitle"></div>
+            <div style="font-size:12.5px;color:rgba(255,255,255,.9);font-weight:700;margin-top:2px;" id="dtDesc"></div>
+          </div>
+          <span class="sp"></span>
+          <span id="dtExtra" style="display:flex;gap:6px;"></span>
+          <button class="wbtn" id="dtOpenBtn">📺 교사 화면 열기</button>
+        </div>
+        <div class="wgrid" id="planGrid"><div class="wempty">불러오는 중…</div></div>
+      </div>
     </div>
 
     <!-- 게임 활동 -->
@@ -161,8 +182,8 @@
 
     <!-- 2단계: 설정 폼 -->
     <div id="mkStep2" style="display:none;">
-      <label>반</label>
-      <select id="mkCls"></select>
+      <label>대상 반</label>
+      <div id="mkClsBox"></div>
       <div id="mkFields"></div>
       <div class="mrow">
         <button class="mb-cancel" onclick="backToPick()">← 뒤로</button>
@@ -267,18 +288,39 @@
   function renderCards(){
     var grid=document.getElementById('grid');
     grid.innerHTML=ACTS.map(function(a){
-      return '<div class="acard" style="--c:'+a.c+';--c2:'+a.c2+';" onclick="openAct(\''+a.key+'\')">'
+      return '<div class="acard" style="--c:'+a.c+';--c2:'+a.c2+';" onclick="openActDetail(\''+a.key+'\')">'
         + '<div class="emoji">'+a.emoji+'</div>'
         + '<h2>'+esc(a.title)+'</h2>'
         + '<div class="desc">'+esc(a.desc)+'</div>'
         + '<div class="statusbox" id="st-'+a.key+'"><div class="status idle"><span class="dot"></span>대기 중</div></div>'
-        + '<button class="go" onclick="event.stopPropagation();openAct(\''+a.key+'\')">'+esc(a.go)+' →</button>'
-        + (a.extra ? '<div style="display:flex;gap:6px;margin-top:8px;">' + a.extra.map(function(e){
-            return '<button class="l-btn" style="flex:1;font-size:12px;" onclick="event.stopPropagation();openPage(\''+e.page+'\')">'+esc(e.label)+'</button>';
-          }).join('') + '</div>' : '')
+        + '<button class="go" onclick="event.stopPropagation();openActDetail(\''+a.key+'\')">반별 관리 →</button>'
         + '</div>';
     }).join('');
     paintLive();
+  }
+
+  // ── 활동 상세(반별 관리) ──
+  var DETAIL_ACT='';
+  function openActDetail(key){
+    var a=ACTS.filter(function(x){return x.key===key;})[0]; if(!a) return;
+    DETAIL_ACT=key;
+    document.getElementById('actHome').style.display='none';
+    document.getElementById('actDetail').style.display='block';
+    document.getElementById('dtEmoji').textContent=a.emoji;
+    document.getElementById('dtTitle').textContent=a.title;
+    document.getElementById('dtDesc').textContent=a.desc;
+    document.getElementById('dtOpenBtn').onclick=function(){ openPage(a.page); };
+    document.getElementById('dtExtra').innerHTML=(a.extra||[]).map(function(e){
+      return '<button class="wbtn" onclick="openPage(\''+e.page+'\')">'+esc(e.label)+'</button>';
+    }).join('');
+    document.getElementById('planGrid').innerHTML='<div class="wempty">불러오는 중…</div>';
+    loadPlans();
+  }
+  function closeActDetail(){
+    DETAIL_ACT='';
+    document.getElementById('actDetail').style.display='none';
+    document.getElementById('actHome').style.display='block';
+    loadLive();
   }
 
   function loadLive(){
@@ -322,19 +364,12 @@
   function loadClasses(){
     portalRPC('graphClasses',[TOK]).then(function(res){
       CLASSES=(res&&res.classes)||[];
-      var sel=document.getElementById('clsSel');
-      if(!CLASSES.length){ sel.innerHTML='<option value="">반 정보 없음</option>'; document.getElementById('planGrid').innerHTML='<div class="wempty">등록된 학생이 없어요.</div>'; return; }
-      var saved=localStorage.getItem('hub_cls')||'';
-      sel.innerHTML=CLASSES.map(function(c){ return '<option'+(c===saved?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
-      loadPlans();
-    }).catch(function(e){ document.getElementById('planGrid').innerHTML='<div class="wempty">반 불러오기 오류: '+esc(e.message)+'</div>'; });
+    }).catch(function(){ CLASSES=[]; });
   }
-  function curClass(){ var s=document.getElementById('clsSel'); return s?s.value:''; }
+  // 선택한 활동의 전체 반 준비/진행 목록
   function loadPlans(){
-    var cls=curClass(); if(!cls) return;
-    localStorage.setItem('hub_cls',cls);
-    document.getElementById('planGrid').innerHTML='<div class="wempty">불러오는 중…</div>';
-    portalRPC('activityList',[TOK,cls,['draft','live']]).then(function(res){
+    if(!DETAIL_ACT) return;
+    portalRPC('activityList',[TOK,'',['draft','live']]).then(function(res){
       if(!res||!res.success){ document.getElementById('planGrid').innerHTML='<div class="wempty">오류: '+esc((res&&res.message)||'')+'</div>'; return; }
       PLANS=res.acts||{}; renderPlans();
     }).catch(function(e){ document.getElementById('planGrid').innerHTML='<div class="wempty">오류: '+esc(e.message)+'</div>'; });
@@ -347,29 +382,29 @@
     return '활동';
   }
   function renderPlans(){
-    var rows=[];
-    ACTS.forEach(function(a){
-      (PLANS[a.key]||[]).forEach(function(r){ rows.push({a:a, r:r}); });
-    });
+    var a=ACTS.filter(function(x){return x.key===DETAIL_ACT;})[0]; if(!a) return;
+    var rows=(PLANS[DETAIL_ACT]||[]).slice();
     if(!rows.length){
-      document.getElementById('planGrid').innerHTML='<div class="wempty">이 반에 준비된 활동이 없어요.<br>아래 활동 카드에서 새로 만들면 여기에 나타나요.</div>';
+      document.getElementById('planGrid').innerHTML='<div class="wempty">아직 준비된 '+esc(a.title)+' 활동이 없어요.<br>＋ 새로 만들기로 여러 반을 한 번에 준비할 수 있어요.</div>';
       return;
     }
-    // 진행 중 먼저
-    rows.sort(function(x,y){ return (y.r.state==='live'?1:0)-(x.r.state==='live'?1:0); });
-    document.getElementById('planGrid').innerHTML=rows.map(function(o){
-      var live=o.r.state==='live';
+    // 진행 중 먼저 → 반 이름 순
+    rows.sort(function(x,y){
+      var d=(y.state==='live'?1:0)-(x.state==='live'?1:0);
+      return d!==0 ? d : String(x.class_scope).localeCompare(String(y.class_scope),'ko',{numeric:true});
+    });
+    document.getElementById('planGrid').innerHTML=rows.map(function(r){
+      var live=r.state==='live';
       var badge = live ? '<span class="pill on">▶️ 진행 중</span>' : '<span class="pill off">📝 준비됨</span>';
       var btns = live
-        ? '<button style="flex:1;background:#fef2f2;color:#b91c1c;" onclick="setPlanState(\''+o.a.key+'\','+o.r.id+',\'done\')">✅ 종료</button>'
-          + '<button style="flex:0 0 auto;padding:8px 14px;background:#eff6ff;color:#1d4ed8;" onclick="openPage(\''+o.a.page+'\')">교사 화면</button>'
-        : '<button style="flex:1;background:#059669;color:#fff;" onclick="setPlanState(\''+o.a.key+'\','+o.r.id+',\'live\')">▶️ 진행</button>'
-          + (FORMS[o.a.key] ? '<button style="flex:0 0 auto;padding:8px 12px;background:#f1f5f9;color:#475569;" onclick="editPlan(\''+o.a.key+'\','+o.r.id+')">⚙️</button>' : '')
-          + '<button style="flex:0 0 auto;padding:8px 12px;background:#fef2f2;color:#b91c1c;" onclick="delPlan(\''+o.a.key+'\','+o.r.id+')">삭제</button>';
-      return '<div class="wcard" style="border-top:5px solid '+o.a.c+';">'
-        + '<div class="top"><span class="ic">'+o.a.emoji+'</span>'+badge+'</div>'
-        + '<h3>'+esc(o.a.title)+'</h3>'
-        + '<p>'+esc(planTitle(o.a.key,o.r))+'</p>'
+        ? '<button style="flex:1;background:#fef2f2;color:#b91c1c;" onclick="setPlanState(\''+a.key+'\','+r.id+',\'done\')">✅ 종료</button>'
+          + '<button style="flex:0 0 auto;padding:8px 14px;background:#eff6ff;color:#1d4ed8;" onclick="openPage(\''+a.page+'\')">교사 화면</button>'
+        : '<button style="flex:1;background:#059669;color:#fff;" onclick="setPlanState(\''+a.key+'\','+r.id+',\'live\')">▶️ 진행</button>'
+          + (FORMS[a.key] ? '<button style="flex:0 0 auto;padding:8px 12px;background:#f1f5f9;color:#475569;" onclick="editPlan(\''+a.key+'\','+r.id+')">⚙️</button>' : '')
+          + '<button style="flex:0 0 auto;padding:8px 12px;background:#fef2f2;color:#b91c1c;" onclick="delPlan(\''+a.key+'\','+r.id+')">삭제</button>';
+      return '<div class="wcard" style="border-top:5px solid '+a.c+';">'
+        + '<div class="top"><span style="font-size:17px;font-weight:900;color:'+a.c+';">'+esc(r.class_scope==='*'?'전체 반':r.class_scope)+'</span>'+badge+'</div>'
+        + '<p style="margin-top:4px;">'+esc(planTitle(a.key,r))+'</p>'
         + '<div class="segrow" style="margin-top:auto;">'+btns+'</div>'
         + '</div>';
     }).join('');
@@ -419,9 +454,10 @@
   function val(id){ var e=document.getElementById(id); return e?String(e.value).trim():''; }
   function num(id,d){ var e=document.getElementById(id); var n=e?Number(e.value):NaN; return isFinite(n)?n:d; }
 
-  function openMake(){
+  function openMake(act){
     if(!CLASSES.length){ toast('반 정보를 먼저 불러와야 해요'); return; }
     MK_ACT=''; MK_EDIT_ID=null;
+    if(act && FORMS[act]){ pickAct(act); return; }   // 활동 상세에서 왔으면 종류 선택 생략
     document.getElementById('mkH').textContent='＋ 새 활동 만들기';
     document.getElementById('mkDesc').textContent='어떤 활동을 만들까요?';
     document.getElementById('mkStep1').style.display='block';
@@ -429,7 +465,7 @@
     openModal('makeModal');
   }
   function backToPick(){
-    if(MK_EDIT_ID){ closeModal('makeModal'); return; }
+    if(MK_EDIT_ID || DETAIL_ACT){ closeModal('makeModal'); return; }
     document.getElementById('mkStep1').style.display='block';
     document.getElementById('mkStep2').style.display='none';
     document.getElementById('mkH').textContent='＋ 새 활동 만들기';
@@ -442,14 +478,26 @@
     document.getElementById('mkDesc').textContent=f.desc;
     document.getElementById('mkStep1').style.display='none';
     document.getElementById('mkStep2').style.display='block';
-    var cur=value&&value.class_scope ? value.class_scope : curClass();
-    document.getElementById('mkCls').innerHTML=CLASSES.map(function(c){ return '<option'+(c===cur?' selected':'')+'>'+esc(c)+'</option>'; }).join('');
-    document.getElementById('mkCls').disabled=!!editId;  // 수정 시 반 변경 금지
+    // 반 선택: 신규=여러 반 체크박스 / 수정=고정 표시
+    var box=document.getElementById('mkClsBox');
+    if(editId){
+      box.innerHTML='<div style="padding:11px 13px;border:2px solid #e2e8f0;border-radius:11px;background:#f8fafc;font-weight:800;color:#0f172a;">'
+        + esc(value&&value.class_scope||'') + ' <span style="font-size:11px;color:#94a3b8;font-weight:700;">(수정 시 반은 바꿀 수 없어요)</span></div>';
+    } else {
+      box.innerHTML='<div style="display:flex;gap:8px;margin-bottom:8px;">'
+          + '<button type="button" class="chipbtn" onclick="mkAllCls(true)">전체 선택</button>'
+          + '<button type="button" class="chipbtn" onclick="mkAllCls(false)">전체 해제</button></div>'
+        + '<div class="clsgrid">' + CLASSES.map(function(c,i){
+            return '<label class="clschip"><input type="checkbox" class="mkcls" value="'+esc(c)+'"'+(i===0?' checked':'')+'><span>'+esc(c)+'</span></label>';
+          }).join('') + '</div>';
+    }
     document.getElementById('mkFields').innerHTML=f.fields(value);
     document.getElementById('mkLiveBtn').style.display = editId ? 'none' : '';
     document.getElementById('mkDraftBtn').textContent = editId ? '💾 저장' : '📝 준비로 저장';
     openModal('makeModal');
   }
+  function mkAllCls(on){ [].forEach.call(document.querySelectorAll('.mkcls'), function(c){ c.checked=on; }); }
+  function pickedClasses(){ return [].map.call(document.querySelectorAll('.mkcls:checked'), function(c){ return c.value; }); }
   function saveMake(goLive){
     var f=FORMS[MK_ACT]; if(!f) return;
     var row=f.read();
@@ -465,23 +513,38 @@
       }).catch(function(e){ done(); toast('오류: '+e.message); });
       return;
     }
-    row.class_scope=document.getElementById('mkCls').value;
-    portalRPC('activityDraft',[TOK,MK_ACT,row]).then(function(res){
+    var picked=pickedClasses();
+    if(!picked.length){ done(); toast('대상 반을 하나 이상 선택해주세요'); return; }
+    portalRPC('activityDraft',[TOK,MK_ACT,row,picked]).then(function(res){
       if(!res||!res.success){ done(); toast('실패: '+((res&&res.message)||'')); return; }
-      var newId=res.id;
-      if(!goLive){ done(); closeModal('makeModal'); toast('📝 준비 완료 — 수업 때 ▶️ 진행을 누르세요'); loadPlans(); return; }
-      portalRPC('activitySetState',[TOK,MK_ACT,newId,'live',false]).then(function(r2){
-        done();
-        if(r2&&r2.success){ closeModal('makeModal'); toast('▶️ 진행 시작'); loadPlans(); loadLive(); return; }
-        if(r2&&r2.conflict){
-          if(confirm('이 반에 이미 진행 중인 활동이 있어요.\n기존 것을 종료하고 이 활동을 진행할까요?')){
-            portalRPC('activitySetState',[TOK,MK_ACT,newId,'live',true]).then(function(){ closeModal('makeModal'); toast('▶️ 진행 시작'); loadPlans(); loadLive(); });
-          } else { closeModal('makeModal'); toast('📝 준비 상태로 저장했어요'); loadPlans(); }
-          return;
+      var ids=res.ids||(res.id?[res.id]:[]);
+      if(!goLive){
+        done(); closeModal('makeModal');
+        toast('📝 '+picked.length+'개 반 준비 완료 — 수업 때 ▶️ 진행을 누르세요');
+        if(!DETAIL_ACT) openActDetail(MK_ACT); else loadPlans();
+        return;
+      }
+      // 바로 진행: 선택한 반들을 순서대로 live 전환(충돌 시 각 반마다 확인)
+      var i=0, started=0;
+      (function next(){
+        if(i>=ids.length){
+          done(); closeModal('makeModal');
+          toast('▶️ '+started+'개 반 진행 시작');
+          if(!DETAIL_ACT) openActDetail(MK_ACT); else loadPlans();
+          loadLive(); return;
         }
-        toast('준비는 됐지만 진행 실패: '+((r2&&r2.message)||''));
-        closeModal('makeModal'); loadPlans();
-      }).catch(function(e){ done(); toast('오류: '+e.message); });
+        var id=ids[i], cls=picked[i]; i++;
+        portalRPC('activitySetState',[TOK,MK_ACT,id,'live',false]).then(function(r2){
+          if(r2&&r2.success){ started++; next(); return; }
+          if(r2&&r2.conflict){
+            if(confirm(cls+'에 이미 진행 중인 활동이 있어요.\n기존 것을 종료하고 이 활동을 진행할까요?')){
+              portalRPC('activitySetState',[TOK,MK_ACT,id,'live',true]).then(function(){ started++; next(); }).catch(next);
+            } else next();  // 준비 상태로 둠
+            return;
+          }
+          next();
+        }).catch(next);
+      })();
     }).catch(function(e){ done(); toast('오류: '+e.message); });
   }
   function editPlan(act,id){

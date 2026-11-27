@@ -256,18 +256,21 @@ Deno.serve(async (req) => {
       }
       return Response.json({ success: true, acts: out });
     }
-    // 준비(draft) 생성: {op:'actDraft', act:'prob'|'havruta'|'graph'|'sim', row:{...}}
-    //   row에 class_scope 필수. state는 강제로 'draft'.
+    // 준비(draft) 생성: {op:'actDraft', act, row:{...}, classes?:['2학년 1반',...]}
+    //   classes를 주면 같은 설정으로 여러 반을 한 번에 생성. 없으면 row.class_scope 하나.
     if (body.op === "actDraft") {
       const tbl = ACT_TABLE[String(body.act ?? "")];
       if (!tbl) return Response.json({ success: false, message: "알 수 없는 활동" }, { status: 400 });
-      const row = { ...(body.row ?? {}), state: "draft", active: false };
-      if (!String(row.class_scope ?? "").trim()) {
-        return Response.json({ success: false, message: "반이 없습니다." }, { status: 400 });
-      }
-      const { data, error } = await admin0.from(tbl).insert(row).select("id").single();
+      const base = { ...(body.row ?? {}), state: "draft", active: false };
+      const list: string[] = Array.isArray(body.classes) && body.classes.length
+        ? body.classes.map((c: unknown) => String(c).trim()).filter(Boolean)
+        : [String(base.class_scope ?? "").trim()].filter(Boolean);
+      if (!list.length) return Response.json({ success: false, message: "반을 선택해주세요." }, { status: 400 });
+      const rows = list.map((c) => ({ ...base, class_scope: c }));
+      const { data, error } = await admin0.from(tbl).insert(rows).select("id");
       if (error) return Response.json({ success: false, message: error.message }, { status: 500 });
-      return Response.json({ success: true, id: data.id });
+      const ids = (data ?? []).map((r: { id: number }) => r.id);
+      return Response.json({ success: true, id: ids[0], ids: ids, count: ids.length });
     }
     // 상태 전환: {op:'actSetState', act, id, state:'draft'|'live'|'done', force?:bool}
     //   live로 올릴 때 같은 반에 이미 live가 있으면 force 없으면 충돌 알림(교사에게 확인받기).
