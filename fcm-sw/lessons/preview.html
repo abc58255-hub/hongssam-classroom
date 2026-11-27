@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>화면 미리보기 — 교사 · 학생</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:Pretendard,-apple-system,BlinkMacSystemFont,'Apple SD Gothic Neo',sans-serif;
+    height:100vh;display:flex;flex-direction:column;overflow:hidden;
+    background:linear-gradient(135deg,#bae6fd 0%,#38bdf8 50%,#0284c7 100%);}
+  .bar{background:rgba(255,255,255,.94);backdrop-filter:blur(10px);padding:10px 16px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;flex-shrink:0;box-shadow:0 2px 12px rgba(2,132,199,.14);}
+  .bar h1{font-size:16px;font-weight:900;color:#0f172a;white-space:nowrap;}
+  .bar select{padding:8px 11px;border:1.5px solid #e2e8f0;border-radius:10px;font-size:13px;font-weight:800;background:#fff;color:#0f172a;}
+  .bar .sp{flex:1;}
+  .btn{background:#f1f5f9;color:#475569;border:none;padding:8px 13px;border-radius:10px;font-size:13px;font-weight:800;cursor:pointer;white-space:nowrap;text-decoration:none;display:inline-block;}
+  .btn:hover{background:#e2e8f0;}
+  .btn.on{background:linear-gradient(135deg,#38bdf8,#0284c7);color:#fff;}
+  .seg{display:inline-flex;background:#f1f5f9;border-radius:11px;padding:3px;gap:2px;}
+  .seg button{background:transparent;border:none;color:#64748b;padding:6px 13px;font-weight:800;border-radius:9px;cursor:pointer;font-size:13px;font-family:inherit;}
+  .seg button.on{background:#fff;color:#0369a1;box-shadow:0 1px 4px rgba(0,0,0,.1);}
+
+  .stage{flex:1;display:flex;gap:10px;padding:10px;overflow:hidden;}
+  .frame{flex:1;display:flex;flex-direction:column;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 10px 30px rgba(2,132,199,.2);min-width:0;}
+  .frame.hide{display:none;}
+  .fhead{display:flex;align-items:center;gap:8px;padding:9px 13px;border-bottom:1px solid #eef2f7;flex-shrink:0;}
+  .fhead .tag{font-size:12px;font-weight:900;padding:3px 10px;border-radius:999px;}
+  .tag.t{background:#eff6ff;color:#1d4ed8;} .tag.s{background:#f0fdf4;color:#15803d;}
+  .fhead .url{font-size:10.5px;color:#94a3b8;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+  .fhead button{background:#f8fafc;border:1px solid #e2e8f0;color:#64748b;border-radius:8px;padding:4px 9px;font-size:11px;font-weight:800;cursor:pointer;}
+  .frame iframe{flex:1;width:100%;border:none;background:#fff;}
+  /* 학생 화면은 폰 비율로 — 실제 학생이 보는 모습에 가깝게 */
+  .frame.phone .wrapc{flex:1;display:flex;justify-content:center;background:#f1f5f9;overflow:auto;padding:10px;}
+  .frame.phone iframe{width:420px;max-width:100%;flex:none;height:100%;border-radius:12px;box-shadow:0 4px 16px rgba(0,0,0,.12);background:#fff;}
+  .note{padding:8px 16px;color:rgba(255,255,255,.95);font-size:12px;font-weight:700;text-align:center;flex-shrink:0;}
+  @media (max-width:900px){ .stage{flex-direction:column;} }
+</style>
+</head>
+<body>
+  <div class="bar">
+    <h1>🖥 화면 미리보기</h1>
+    <select id="actSel" onchange="switchAct()"></select>
+    <span class="seg">
+      <button id="m-both" class="on" onclick="setMode('both')">나란히</button>
+      <button id="m-teacher" onclick="setMode('teacher')">교사만</button>
+      <button id="m-student" onclick="setMode('student')">학생만</button>
+    </span>
+    <span class="sp"></span>
+    <button class="btn" onclick="reloadAll()">🔄 새로고침</button>
+    <a class="btn" href="./hub.html">← 수업활동 센터</a>
+  </div>
+
+  <div class="stage">
+    <div class="frame" id="fTeacher">
+      <div class="fhead"><span class="tag t">👩‍🏫 교사 화면</span><span class="url" id="uT"></span>
+        <button onclick="openNew('teacher')">새 창</button><button onclick="reloadOne('teacher')">↻</button></div>
+      <iframe id="ifT" title="교사 화면"></iframe>
+    </div>
+    <div class="frame phone" id="fStudent">
+      <div class="fhead"><span class="tag s">🎒 학생 화면</span><span class="url" id="uS"></span>
+        <button onclick="openNew('student')">새 창</button><button onclick="reloadOne('student')">↻</button></div>
+      <div class="wrapc"><iframe id="ifS" title="학생 화면"></iframe></div>
+    </div>
+  </div>
+  <div class="note">학생 화면은 처음 한 번 학생 계정(학번·비밀번호)으로 로그인하면 이후 계속 유지돼요. 테스트용 계정을 쓰는 걸 권장해요.</div>
+
+<script>
+  var ACTS = [
+    { key:'prob',    title:'🐦‍⬛ 확률 체험',     teacher:'probability-board.html', student:'probability.html' },
+    { key:'havruta', title:'💬 하브루타 질문',   teacher:'havruta-board.html',     student:'havruta.html' },
+    { key:'graph',   title:'📐 그래프 탐구',     teacher:'graph-teacher.html',     student:'graph.html' },
+    { key:'sim',     title:'🔺 닮음 보물찾기',   teacher:'sim-teacher.html',       student:'sim.html' }
+  ];
+  function qs(k){ var m=new RegExp('[?&]'+k+'=([^&]*)').exec(location.search); return m?decodeURIComponent(m[1]):''; }
+  var CUR = qs('act') || 'prob';
+  if(!ACTS.some(function(a){return a.key===CUR;})) CUR='prob';
+
+  document.getElementById('actSel').innerHTML = ACTS.map(function(a){
+    return '<option value="'+a.key+'"'+(a.key===CUR?' selected':'')+'>'+a.title+'</option>';
+  }).join('');
+
+  function cur(){ return ACTS.filter(function(a){return a.key===CUR;})[0]; }
+  function load(){
+    var a=cur(); if(!a) return;
+    document.getElementById('ifT').src = './'+a.teacher;
+    document.getElementById('ifS').src = './'+a.student;
+    document.getElementById('uT').textContent = a.teacher;
+    document.getElementById('uS').textContent = a.student;
+  }
+  function switchAct(){
+    CUR=document.getElementById('actSel').value;
+    history.replaceState(null,'','?act='+CUR);
+    load();
+  }
+  function setMode(m){
+    ['both','teacher','student'].forEach(function(k){ document.getElementById('m-'+k).classList.toggle('on', k===m); });
+    document.getElementById('fTeacher').classList.toggle('hide', m==='student');
+    document.getElementById('fStudent').classList.toggle('hide', m==='teacher');
+  }
+  function reloadAll(){ load(); }
+  function reloadOne(w){
+    var id = w==='teacher' ? 'ifT' : 'ifS';
+    var f=document.getElementById(id); f.src=f.src;
+  }
+  function openNew(w){
+    var a=cur(); window.open('./'+(w==='teacher'?a.teacher:a.student),'_blank');
+  }
+  load();
+</script>
+</body>
+</html>

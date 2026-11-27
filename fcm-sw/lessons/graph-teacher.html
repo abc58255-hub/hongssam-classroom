@@ -105,54 +105,13 @@
   </span>
 </div>
 
-<!-- 설정 -->
+<!-- 진행 중인 방 (생성은 수업활동 센터에서) -->
 <div id="setup"><div class="panel">
-  <div id="activeBanner"></div>
   <div class="card">
-    <h3>1. 반 선택</h3>
-    <div class="field">
-      <select id="classSel" style="min-width:160px;"><option value="">불러오는 중…</option></select>
-    </div>
-    <div class="hint" style="text-align:left;" id="classHint"></div>
+    <h3>📐 진행 중인 그래프 탐구</h3>
+    <div class="hint" style="text-align:left;margin-bottom:10px;">방 만들기는 <b>수업활동 센터</b>에서 해요. 여기서는 진행 중인 방을 열어 학생 화면을 띄웁니다.</div>
+    <div id="activeBanner"></div>
   </div>
-  <div class="card" id="presetCard" style="display:none;">
-    <h3>⭐ 저장된 프리셋 <span style="font-weight:600;font-size:11px;color:#a68a63;">반 선택 후 [시작]</span></h3>
-    <div id="presetList"></div>
-  </div>
-  <div class="card">
-    <h3>2. 직선 입력 (ax + by = c)</h3>
-    <div class="abc">
-      <input type="number" id="ca" value="1" oninput="onABC()"> x <span style="color:#a68a63;">+</span>
-      <input type="number" id="cb" value="0" oninput="onABC()"> y <span style="color:#a68a63;">=</span>
-      <input type="number" id="cc" value="2" oninput="onABC()">
-    </div>
-    <div class="hint">세로선은 b=0, 가로선은 a=0 · 계수는 분수 대신 정수로</div>
-    <div class="prevbox">
-      <div class="prevlab">학생에게 보일 식</div>
-      <input class="disp" id="disp" value="x = 2">
-    </div>
-    <div class="quicklab">빠른 예시</div>
-    <div class="presets" id="presets"></div>
-  </div>
-  <div class="card">
-    <h3>3. 설정</h3>
-    <div class="row"><label>학생당 점 개수</label>
-      <div class="seg" id="mpSeg">
-        <button data-v="1" onclick="setMp(1)">1</button>
-        <button data-v="3" class="on" onclick="setMp(3)">3</button>
-        <button data-v="5" onclick="setMp(5)">5</button>
-        <button data-v="0" onclick="setMp(0)">무제한</button>
-      </div>
-      <input type="number" id="mpCustom" min="0" placeholder="직접" oninput="setMp(parseInt(this.value)||0, true)" style="width:70px;padding:7px;border:1.5px solid #eaddc2;border-radius:8px;font-size:14px;text-align:center;font-weight:800;">
-    </div>
-    <label class="chk"><input type="checkbox" id="noDup" checked> 같은 점 중복 제출 방지 (학생별)</label>
-    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="showWrong" checked> 틀린 점도 표시 (회색)</label>
-    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="showNames"> 점에 학생 이름 표시</label>
-    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="intOnly"> 정수만 입력 허용</label>
-    <label class="chk" style="margin-top:8px;"><input type="checkbox" id="hideEq"> 함수식 숨기기 (학생 화면에 식 미표시)</label>
-  </div>
-  <button class="savePreset" onclick="savePreset()">＋ 지금 설정을 프리셋으로 저장</button>
-  <button class="start" onclick="startRoom()">🚀 방 시작하기</button>
 </div></div>
 
 <!-- 라이브 -->
@@ -247,8 +206,8 @@
     {t:'x+y=4', a:1,b:1,c:4, d:'x + y = 4'}
   ];
   function initSetup(){
-    document.getElementById('presets').innerHTML=PRESETS.map(function(p,i){return '<button onclick="applyPreset('+i+')">'+p.t+'</button>';}).join('');
-    onABC(); loadClasses(); loadActiveRooms(); loadPresets();
+    // 방 생성은 수업활동 센터로 이전 — 여기서는 진행 중인 방만 보여준다
+    loadActiveRooms();
   }
   // B. 진행 중(안 닫힌) 방 배너 — 이어서 열기 / 종료
   var activeRooms=[];
@@ -274,121 +233,7 @@
       portalRPC('graphClose',[TOK,id]).then(function(){ toast('방을 종료했어요'); loadActiveRooms(); }).catch(function(e){ toast('오류: '+e.message); });
     }, {icon:'■', danger:true, okText:'종료'});
   }
-  function loadClasses(){
-    var sel=document.getElementById('classSel'), hint=document.getElementById('classHint');
-    portalRPC('graphClasses',[TOK]).then(function(res){
-      if(!res||!res.success||!res.classes||!res.classes.length){
-        sel.innerHTML='<option value="">반 정보 없음</option>'; hint.textContent='등록된 학생이 없어요. 학생 명단을 먼저 등록해주세요.'; return;
-      }
-      sel.innerHTML=res.classes.map(function(c){return '<option value="'+c+'">'+c+'</option>';}).join('');
-      hint.textContent='학생 명단이 있는 반만 표시돼요.';
-    }).catch(function(e){ sel.innerHTML='<option value="">불러오기 실패</option>'; hint.textContent='오류: '+e.message; });
-  }
-  function applyPreset(i){ var p=PRESETS[i]; document.getElementById('ca').value=p.a; document.getElementById('cb').value=p.b; document.getElementById('cc').value=p.c; document.getElementById('disp').value=p.d; }
-
-  // ── 저장된 프리셋 (Supabase graph_presets) ──
-  var SAVED=[];
-  function loadPresets(){
-    sb.from('graph_presets').select('*').order('sort',{ascending:true}).order('created_at',{ascending:true}).then(function(r){
-      SAVED=r.data||[];
-      var card=document.getElementById('presetCard'), list=document.getElementById('presetList');
-      if(!SAVED.length){ card.style.display='none'; list.innerHTML=''; return; }
-      card.style.display='block';
-      list.innerHTML=SAVED.map(function(p){
-        return '<div class="pstrow"><span class="peq">'+esc(p.display||'(식 없음)')+'</span>'
-          +'<button class="pgo" onclick="startFromPreset('+p.id+')">시작</button>'
-          +'<button class="pdel" onclick="deletePreset('+p.id+')">🗑</button></div>';
-      }).join('');
-    });
-  }
-  function savePreset(){
-    var a=parseInt(document.getElementById('ca').value)||0, b=parseInt(document.getElementById('cb').value)||0, c=parseInt(document.getElementById('cc').value)||0;
-    if(a===0&&b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
-    var preset={
-      title:'', a:a, b:b, c:c, display:document.getElementById('disp').value.trim(), kind:'line',
-      max_points:MP, show_wrong:document.getElementById('showWrong').checked,
-      show_names:document.getElementById('showNames').checked, int_only:document.getElementById('intOnly').checked,
-      hide_eq:document.getElementById('hideEq').checked, no_dup:document.getElementById('noDup').checked
-    };
-    portalRPC('graphPresetSave',[TOK, preset]).then(function(res){
-      if(!res||!res.success){ toast('저장 실패: '+((res&&res.message)||'')); return; }
-      toast('⭐ 프리셋 저장됨'); loadPresets();
-    }).catch(function(e){ toast('오류: '+e.message); });
-  }
-  function startFromPreset(id){
-    var cls=document.getElementById('classSel').value;
-    if(!cls){ toast('먼저 반을 선택하세요'); return; }
-    var p=SAVED.filter(function(x){return x.id===id;})[0]; if(!p) return;
-    createRoom({
-      class_scope:cls, a:Number(p.a), b:Number(p.b), c:Number(p.c), display:p.display, kind:p.kind||'line',
-      hide_eq:!!p.hide_eq, max_points:Number(p.max_points)||0, show_wrong:p.show_wrong!==false,
-      show_names:!!p.show_names, int_only:!!p.int_only, no_dup:p.no_dup!==false
-    });
-  }
-  function deletePreset(id){
-    uiConfirm('이 프리셋을 삭제할까요?', function(){
-      portalRPC('graphPresetDelete',[TOK, id]).then(function(){ toast('삭제됨'); loadPresets(); }).catch(function(e){ toast('오류: '+e.message); });
-    }, {icon:'🗑', danger:true, okText:'삭제'});
-  }
-  // 계수 → 표시식 자동 생성
-  function _gcd(a,b){ a=Math.abs(a);b=Math.abs(b); while(b){var t=b;b=a%b;a=t;} return a||1; }
-  function _frac(n,d){ if(d===0) return '0'; var g=_gcd(n,d); n/=g; d/=g; if(d<0){n=-n;d=-d;} return d===1?String(n):(n+'/'+d); }
-  function autoDisplay(a,b,c){
-    if(a===0&&b===0) return '';
-    if(b===0) return 'x = ' + _frac(c,a);          // 세로선
-    if(a===0) return 'y = ' + _frac(c,b);          // 가로선
-    // y = mx + n  (m=-a/b, n=c/b)
-    var m=_frac(-a,b), n=_frac(c,b);
-    var mt = m==='1'?'x':(m==='-1'?'-x':m+'x');
-    var nt = (n==='0')?'':(String(n).charAt(0)==='-'?(' - '+n.slice(1)):(' + '+n));
-    return 'y = ' + mt + nt;
-  }
-  function onABC(){
-    var a=parseInt(document.getElementById('ca').value)||0, b=parseInt(document.getElementById('cb').value)||0, c=parseInt(document.getElementById('cc').value)||0;
-    document.getElementById('disp').value = autoDisplay(a,b,c);
-  }
-  var MP=3;
-  function setMp(v, fromCustom){
-    MP=Math.max(0, Math.min(99, parseInt(v)||0));   // 0=무제한, 최대 99
-    document.querySelectorAll('#mpSeg button').forEach(function(x){x.classList.toggle('on', parseInt(x.dataset.v)===MP);});
-    if(!fromCustom){ var c=document.getElementById('mpCustom'); if(c) c.value=''; }
-  }
-
-  var starting=false;
-  function resetStartBtn(){ starting=false; var b=document.querySelector('.start'); if(b){ b.disabled=false; b.textContent='🚀 방 시작하기'; } }
-  function startRoom(){
-    if(starting) return;
-    var cls=document.getElementById('classSel').value;
-    if(!cls){ toast('반을 선택하세요'); return; }
-    var room={
-      class_scope: cls,
-      a: parseInt(document.getElementById('ca').value)||0,
-      b: parseInt(document.getElementById('cb').value)||0,
-      c: parseInt(document.getElementById('cc').value)||0,
-      display: document.getElementById('disp').value.trim(),
-      hide_eq: document.getElementById('hideEq').checked,
-      max_points: MP,
-      show_wrong: document.getElementById('showWrong').checked,
-      show_names: document.getElementById('showNames').checked,
-      int_only: document.getElementById('intOnly').checked,
-      no_dup: document.getElementById('noDup').checked,
-      kind: 'line'
-    };
-    if(room.a===0&&room.b===0){ toast('직선을 입력하세요 (a,b 둘 다 0 불가)'); return; }
-    createRoom(room);
-  }
-  // 방 생성 공통 (직접 입력·프리셋 모두 여기로)
-  function createRoom(room){
-    if(starting) return;
-    starting=true;
-    var sb0=document.querySelector('.start'); if(sb0){ sb0.disabled=true; sb0.textContent='방 만드는 중…'; }
-    function reset(){ resetStartBtn(); }
-    portalRPC('graphCreate',[TOK, room]).then(function(res){
-      if(!res||!res.success){ toast('방 생성 실패: '+((res&&res.message)||'')); reset(); return; }
-      ROOM={ id:res.id, a:room.a, b:room.b, c:room.c, display:room.display, kind:room.kind||'line', revealed:false, show_wrong:room.show_wrong, show_names:room.show_names, no_dup:room.no_dup };
-      starting=false; enterLive();
-    }).catch(function(e){ toast('오류: '+e.message); reset(); });
-  }
+  // (방 생성·프리셋 UI는 수업활동 센터로 이전됨 — loadClasses/startRoom/createRoom/프리셋 함수 제거)
 
   // ── 라이브 ──
   var plot=null;
@@ -467,7 +312,7 @@
         if(ch){ sb.removeChannel(ch); ch=null; }
         ROOM=null; document.getElementById('live').style.display='none';
         document.getElementById('liveBtns').style.display='none'; document.getElementById('topEq').textContent='';
-        document.getElementById('setup').style.display='flex'; loadActiveRooms(); resetStartBtn(); toast('방을 종료했어요');
+        document.getElementById('setup').style.display='flex'; loadActiveRooms(); toast('방을 종료했어요');
       }).catch(function(e){ toast('오류: '+e.message); });
     }, {icon:'■', danger:true, okText:'종료'});
   }
