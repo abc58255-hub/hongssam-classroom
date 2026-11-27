@@ -108,7 +108,6 @@
     <header>
       <h1>🎮 수업활동 센터</h1>
       <span class="sp"></span>
-      <a class="hbtn" href="./preview.html">🖥 화면 미리보기</a>
       <a class="hbtn" href="https://abc58255-hub.github.io/hongssam-classroom/portal/">⚙ 교사포털</a>
       <button class="hbtn" onclick="logout()" style="border:none;">로그아웃</button>
     </header>
@@ -143,7 +142,7 @@
           </div>
           <span class="sp"></span>
           <span id="dtExtra" style="display:flex;gap:6px;"></span>
-          <button class="wbtn" id="dtPreviewBtn">🖥 교사+학생 미리보기</button>
+          <button class="wbtn" id="dtStudentBtn">🎒 학생 화면</button>
           <button class="wbtn" id="dtOpenBtn">📺 교사 화면 열기</button>
         </div>
         <div class="wgrid" id="planGrid"><div class="wempty">불러오는 중…</div></div>
@@ -237,13 +236,13 @@
 
   // 활동 정의 — table: 활성세션 조회 테이블, color: 고유색
   var ACTS=[
-    { key:'prob', emoji:'🐦‍⬛', title:'확률 체험', desc:'동전·주사위 던지기 — 큰 수의 법칙', page:'probability-board.html',
+    { key:'prob', emoji:'🐦‍⬛', title:'확률 체험', desc:'동전·주사위 던지기 — 큰 수의 법칙', page:'probability-board.html', spage:'probability.html',
       table:'prob_sessions', go:'TV 열기', c:'#0891b2', c2:'#0e7490' },
-    { key:'havruta', emoji:'💬', title:'하브루타 질문', desc:'짝 질문 만들기·투표·토론 (칠판)', page:'havruta-board.html',
+    { key:'havruta', emoji:'💬', title:'하브루타 질문', desc:'짝 질문 만들기·투표·토론 (칠판)', page:'havruta-board.html', spage:'havruta.html',
       table:'havruta_sessions', go:'칠판 열기', c:'#7c3aed', c2:'#6d28d9' },
-    { key:'graph', emoji:'📐', title:'그래프 탐구', desc:'학생 참여형 협력 좌표평면', page:'graph-teacher.html',
+    { key:'graph', emoji:'📐', title:'그래프 탐구', desc:'학생 참여형 협력 좌표평면', page:'graph-teacher.html', spage:'graph.html',
       table:'graph_rooms', go:'방 만들기', c:'#ea580c', c2:'#c2410c' },
-    { key:'sim', emoji:'🔺', title:'닮음 보물찾기', desc:'야외 QR 닮음 찾기 — 세트·순위판', page:'sim-teacher.html',
+    { key:'sim', emoji:'🔺', title:'닮음 보물찾기', desc:'야외 QR 닮음 찾기 — 세트·순위판', page:'sim-teacher.html', spage:'sim.html',
       table:'sim_sets', go:'세트 만들기', c:'#0f766e', c2:'#115e59', extra:[
         { label:'📊 현황', page:'sim-monitor.html' },
         { label:'🏆 순위판', page:'sim-board.html' }
@@ -296,6 +295,7 @@
         + '<div class="desc">'+esc(a.desc)+'</div>'
         + '<div class="statusbox" id="st-'+a.key+'"><div class="status idle"><span class="dot"></span>대기 중</div></div>'
         + '<button class="go" onclick="event.stopPropagation();openActDetail(\''+a.key+'\')">반별 관리 →</button>'
+        + (a.spage ? '<button class="go" style="background:#f1f5f9;color:#475569;box-shadow:none;margin-top:7px;padding:10px;font-size:13px;" onclick="event.stopPropagation();openPage(\''+a.spage+'\')">🎒 학생 화면 열기</button>' : '')
         + '</div>';
     }).join('');
     paintLive();
@@ -312,7 +312,9 @@
     document.getElementById('dtTitle').textContent=a.title;
     document.getElementById('dtDesc').textContent=a.desc;
     document.getElementById('dtOpenBtn').onclick=function(){ openPage(a.page); };
-    document.getElementById('dtPreviewBtn').onclick=function(){ window.open(BASE+'preview.html?act='+a.key,'_blank'); };
+    var sbtn=document.getElementById('dtStudentBtn');
+    sbtn.style.display = a.spage ? '' : 'none';
+    sbtn.onclick=function(){ if(a.spage) openPage(a.spage); };
     document.getElementById('dtExtra').innerHTML=(a.extra||[]).map(function(e){
       return '<button class="wbtn" onclick="openPage(\''+e.page+'\')">'+esc(e.label)+'</button>';
     }).join('');
